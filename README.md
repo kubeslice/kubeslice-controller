@@ -1,1 +1,1 @@
-# kubeslice-controller
+# controller
