@@ -1,0 +1,93 @@
+domain: kubeslice.io
+layout:
+- go.kubebuilder.io/v3
+multigroup: true
+projectName: kubeslice-controller
+repo: github.com/kubeslice/kubeslice-controller
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeslice.io
+  group: controller
+  kind: Project
+  path: github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeslice.io
+  group: controller
+  kind: Cluster
+  path: github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeslice.io
+  group: controller
+  kind: SliceConfig
+  path: github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeslice.io
+  group: worker
+  kind: WorkerSliceConfig
+  path: github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeslice.io
+  group: worker
+  kind: WorkerSliceGateway
+  path: github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeslice.io
+  group: controller
+  kind: ServiceExportConfig
+  path: github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeslice.io
+  group: worker
+  kind: WorkerServiceImport
+  path: github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1
+  version: v1alpha1
+version: "3"

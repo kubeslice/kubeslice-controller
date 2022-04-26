@@ -1,0 +1,19 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: ServiceExportConfig
+metadata:
+  name: mysql-alpha-red-cluster-1
+spec:
+  serviceName: mysql
+  serviceNamespace: alpha
+  sourceCluster: cluster-1
+  sliceName: red
+  serviceDiscoveryPorts:
+    - name: tcp
+      protocol: tcp
+      port: 3306
+  serviceDiscoveryEndpoints:
+    - port: 3306
+      podName: mysql-pod-abc
+      nsmIp: 10.1.1.1
+      dnsName: mysql.red.slice.local
+      cluster: cluster-1

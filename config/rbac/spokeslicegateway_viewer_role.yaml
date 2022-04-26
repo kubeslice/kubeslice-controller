@@ -1,0 +1,20 @@
+# permissions for end users to view slicegateways.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: workerslicegateway-viewer-role
+rules:
+  - apiGroups:
+      - worker.kubeslice.io
+    resources:
+      - workerslicegateways
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - worker.kubeslice.io
+    resources:
+      - workerslicegateways/status
+    verbs:
+      - get

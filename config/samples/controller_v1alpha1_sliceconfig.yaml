@@ -1,0 +1,40 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: red
+spec:
+  sliceSubnet: 10.1.0.0/16
+  sliceType: Application
+  sliceGatewayProvider:
+    sliceGatewayType: OpenVPN
+    sliceCaType: Local
+  sliceIpamType: Local
+  clusters:
+    - cluster-1
+    - cluster-2
+  qosProfileDetails:
+    queueType: HTB
+    priority: 1
+    tcType: BANDWIDTH_CONTROL
+    bandwidthCeilingKbps: 5120
+    bandwidthGuaranteedKbps: 2560
+    dscpClass: AF11
+  externalGatewayConfig:
+    - ingress:
+        enabled: false
+      egress:
+        enabled: false
+      nsIngress:
+        enabled: false
+      gatewayType: none
+      clusters:
+        - "*"
+    - ingress:
+        enabled: true
+      egress:
+        enabled: true
+      nsIngress:
+        enabled: true
+      gatewayType: istio
+      clusters:
+        - cluster-2

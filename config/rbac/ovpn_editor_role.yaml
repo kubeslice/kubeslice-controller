@@ -1,0 +1,49 @@
+# permissions for end users to edit workerslicegateways.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ovpn-editor-role
+rules:
+  - apiGroups:
+      - worker.kubeslice.io
+    resources:
+      - workerslicegateways
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - escalate
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - escalate
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - create
+  - apiGroups:
+      - worker.kubeslice.io
+    resources:
+      - workerslicegateways/status
+    verbs:
+      - get
+      - patch
+      - update

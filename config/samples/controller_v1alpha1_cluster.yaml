@@ -1,0 +1,104 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-1
+spec:
+  networkInterface: eth0
+  nodeIP: 11.11.11.11
+  clusterProperty:
+    telemetry:
+      enabled: true
+      telemetryProvider: "prometheus"
+      endpoint: "http://10.1.1.27:8080"
+    geoLocation:
+      cloudProvider: "AWS"
+      cloudRegion: "us-east-1"
+    monitoring:
+      kubernetesDashboard:
+        enabled: true
+        accessToken: "superSecretJWTToken"
+        ingressPrefix: "/dashboard/"
+---
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-2
+spec:
+  networkInterface: eth0
+  nodeIP: 11.11.12.11
+  clusterProperty:
+    telemetry:
+      enabled: true
+      telemetryProvider: "prometheus"
+      endpoint: "http://10.1.1.27:8080"
+    geoLocation:
+      cloudProvider: "AWS"
+      cloudRegion: "us-east-1"
+    monitoring:
+      kubernetesDashboard:
+        enabled: true
+        accessToken: "superSecretJWTToken"
+        ingressPrefix: "/dashboard/"
+---
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-3
+spec:
+  networkInterface: eth0
+  nodeIP: 11.11.13.11
+  clusterProperty:
+    telemetry:
+      enabled: true
+      telemetryProvider: "prometheus"
+      endpoint: "http://10.1.1.27:8080"
+    geoLocation:
+      cloudProvider: "AWS"
+      cloudRegion: "us-east-1"
+    monitoring:
+      kubernetesDashboard:
+        enabled: true
+        accessToken: "superSecretJWTToken"
+        ingressPrefix: "/dashboard/"
+---
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-4
+spec:
+  networkInterface: eth0
+  nodeIP: 11.11.14.11
+  clusterProperty:
+    telemetry:
+      enabled: true
+      telemetryProvider: "prometheus"
+      endpoint: "http://10.1.1.27:8080"
+    geoLocation:
+      cloudProvider: "AWS"
+      cloudRegion: "us-east-1"
+    monitoring:
+      kubernetesDashboard:
+        enabled: true
+        accessToken: "superSecretJWTToken"
+        ingressPrefix: "/dashboard/"
+---
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-5
+spec:
+  networkInterface: eth0
+  nodeIP: 11.11.14.11
+  clusterProperty:
+    telemetry:
+      enabled: true
+      telemetryProvider: "prometheus"
+      endpoint: "http://10.1.1.27:8080"
+    geoLocation:
+      cloudProvider: "AWS"
+      cloudRegion: "us-east-1"
+    monitoring:
+      kubernetesDashboard:
+        enabled: true
+        accessToken: "superSecretJWTToken"
+        ingressPrefix: "/dashboard/"
