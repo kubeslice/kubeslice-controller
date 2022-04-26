@@ -1,6 +1,6 @@
 # kubeslice-controller
 
-kubeslice-controller is working on Kubebuilder, it is a framework for building Kubernetes APIs
+kubeslice-controller uses Kubebuilder, a framework for building Kubernetes APIs
 using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions)
 .
 
