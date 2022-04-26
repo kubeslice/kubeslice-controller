@@ -1,0 +1,24 @@
+# permissions for end users to edit serviceexportconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: serviceexportconfig-editor-role
+rules:
+  - apiGroups:
+      - controller.kubeslice.io
+    resources:
+      - serviceexportconfigs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - controller.kubeslice.io
+    resources:
+      - serviceexportconfigs/status
+    verbs:
+      - get
