@@ -26,6 +26,7 @@ import (
 )
 
 var Loglevel zapcore.Level
+var LoglevelString string
 
 type kubeSliceControllerContextKey struct {
 }
