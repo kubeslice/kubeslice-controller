@@ -32,9 +32,7 @@ It is strongly recommended that you use a released version.
 make webhookCA
 ```
 
-<pre>
 or
-</pre>
 
 ```bash
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.0/cert-manager.yaml
