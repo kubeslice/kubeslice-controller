@@ -371,7 +371,7 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), gateway).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, mock.Anything).Return(nil).Times(2)
-	jobMock.On("CreateJob", ctx, jobNamespace, "nexus.dev.aveshalabs.io/kubeslice/ovpn-cert-generator:latest", mock.Anything).Return(ctrl.Result{}, nil).Once()
+	jobMock.On("CreateJob", ctx, jobNamespace, JobImage, mock.Anything).Return(ctrl.Result{}, nil).Once()
 
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16")
 	expectedResult := ctrl.Result{}
