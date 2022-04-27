@@ -110,6 +110,7 @@ func initialize(services *service.Services) {
 	}
 	opts.BindFlags(flag.CommandLine)
 	util.Loglevel = zapLogLevel
+	util.LoglevelString = logLevel
 	service.ControllerEndpoint = controllerEndpoint
 	service.JobImage = jobImage
 	service.JobCredential = jobCredential

@@ -48,6 +48,13 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 		}
 		envValues = append(envValues, envValue)
 	}
+
+	logEnv := v1.EnvVar{
+		Name:  "LOG_LEVEL",
+		Value: util.LoglevelString,
+	}
+	envValues = append(envValues, logEnv)
+
 	job := &batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Job",
