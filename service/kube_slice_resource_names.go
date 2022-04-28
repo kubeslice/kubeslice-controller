@@ -129,7 +129,7 @@ var (
 	jobNamespace = os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE")
 
 	// Job Image
-	JobImage          = "aveshadev/gateway-certs-generator:latest"
+	JobImage          = "aveshasystems/gateway-certs-generator:latest"
 	JobCredential     = ""
 	JobServiceAccount = "kubeslice-controller-ovpn-manager"
 )
