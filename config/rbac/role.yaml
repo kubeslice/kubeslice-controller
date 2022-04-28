@@ -6,145 +6,145 @@ metadata:
   creationTimestamp: null
   name: controller-role
 rules:
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
-      - escalate
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - namespaces
-    verbs:
-      - create
-      - delete
-      - escalate
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - secrets
-    verbs:
-      - delete
-      - escalate
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - serviceaccounts
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - controller.kubeslice.io
-    resources:
-      - clusters
-      - projects
-      - serviceexportconfigs
-      - sliceconfigs
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - controller.kubeslice.io
-    resources:
-      - clusters/finalizers
-      - projects/finalizers
-      - serviceexportconfigs/finalizers
-      - sliceconfigs/finalizers
-    verbs:
-      - update
-  - apiGroups:
-      - controller.kubeslice.io
-    resources:
-      - clusters/status
-      - projects/status
-      - serviceexportconfigs/status
-      - sliceconfigs/status
-    verbs:
-      - get
-      - patch
-      - update
-  - apiGroups:
-      - rbac.authorization.k8s.io
-    resources:
-      - clusterroles
-      - rolebindings
-      - roles
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - worker.kubeslice.io
-    resources:
-      - workerserviceimports
-      - workersliceconfigs
-      - workerslicegateways
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - worker.kubeslice.io
-    resources:
-      - workerserviceimports/finalizers
-      - workersliceconfigs/finalizers
-      - workerslicegateways/
-    verbs:
-      - update
-  - apiGroups:
-      - worker.kubeslice.io
-    resources:
-      - workerserviceimports/status
-      - workersliceconfigs/status
-      - workerslicegateways/status
-    verbs:
-      - get
-      - patch
-      - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - escalate
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - create
+  - delete
+  - escalate
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - delete
+  - escalate
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - controller.kubeslice.io
+  resources:
+  - clusters
+  - projects
+  - serviceexportconfigs
+  - sliceconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - controller.kubeslice.io
+  resources:
+  - clusters/finalizers
+  - projects/finalizers
+  - serviceexportconfigs/finalizers
+  - sliceconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - controller.kubeslice.io
+  resources:
+  - clusters/status
+  - projects/status
+  - serviceexportconfigs/status
+  - sliceconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - worker.kubeslice.io
+  resources:
+  - workerserviceimports
+  - workersliceconfigs
+  - workerslicegateways
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - worker.kubeslice.io
+  resources:
+  - workerserviceimports/finalizers
+  - workersliceconfigs/finalizers
+  - workerslicegateways/
+  verbs:
+  - update
+- apiGroups:
+  - worker.kubeslice.io
+  resources:
+  - workerserviceimports/status
+  - workersliceconfigs/status
+  - workerslicegateways/status
+  verbs:
+  - get
+  - patch
+  - update

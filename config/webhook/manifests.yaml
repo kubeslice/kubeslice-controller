@@ -6,126 +6,126 @@ metadata:
   creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /mutate-controller-kubeslice-io-v1alpha1-cluster
-    failurePolicy: Fail
-    name: mcluster.kb.io
-    rules:
-      - apiGroups:
-          - controller.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - clusters
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /mutate-controller-kubeslice-io-v1alpha1-project
-    failurePolicy: Fail
-    name: mproject.kb.io
-    rules:
-      - apiGroups:
-          - controller.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - projects
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /mutate-controller-kubeslice-io-v1alpha1-serviceexportconfig
-    failurePolicy: Fail
-    name: mserviceexportconfig.kb.io
-    rules:
-      - apiGroups:
-          - controller.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - serviceexportconfigs
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /mutate-controller-kubeslice-io-v1alpha1-sliceconfig
-    failurePolicy: Fail
-    name: msliceconfig.kb.io
-    rules:
-      - apiGroups:
-          - controller.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - sliceconfigs
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /mutate-worker-kubeslice-io-v1alpha1-workersliceconfig
-    failurePolicy: Fail
-    name: mworkersliceconfig.kb.io
-    rules:
-      - apiGroups:
-          - worker.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - workersliceconfigs
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /mutate-worker-kubeslice-io-v1alpha1-workerslicegateway
-    failurePolicy: Fail
-    name: mworkerslicegateway.kb.io
-    rules:
-      - apiGroups:
-          - worker.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - workerslicegateways
-    sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-controller-kubeslice-io-v1alpha1-cluster
+  failurePolicy: Fail
+  name: mcluster.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-controller-kubeslice-io-v1alpha1-project
+  failurePolicy: Fail
+  name: mproject.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - projects
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-controller-kubeslice-io-v1alpha1-serviceexportconfig
+  failurePolicy: Fail
+  name: mserviceexportconfig.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceexportconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-controller-kubeslice-io-v1alpha1-sliceconfig
+  failurePolicy: Fail
+  name: msliceconfig.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - sliceconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-worker-kubeslice-io-v1alpha1-workersliceconfig
+  failurePolicy: Fail
+  name: mworkersliceconfig.kb.io
+  rules:
+  - apiGroups:
+    - worker.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - workersliceconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-worker-kubeslice-io-v1alpha1-workerslicegateway
+  failurePolicy: Fail
+  name: mworkerslicegateway.kb.io
+  rules:
+  - apiGroups:
+    - worker.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - workerslicegateways
+  sideEffects: None
 
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -134,124 +134,124 @@ metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /validate-controller-kubeslice-io-v1alpha1-cluster
-    failurePolicy: Fail
-    name: vcluster.kb.io
-    rules:
-      - apiGroups:
-          - controller.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-          - DELETE
-        resources:
-          - clusters
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /validate-controller-kubeslice-io-v1alpha1-project
-    failurePolicy: Fail
-    name: vproject.kb.io
-    rules:
-      - apiGroups:
-          - controller.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - projects
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /validate-controller-kubeslice-io-v1alpha1-serviceexportconfig
-    failurePolicy: Fail
-    name: vserviceexportconfig.kb.io
-    rules:
-      - apiGroups:
-          - controller.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - serviceexportconfigs
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /validate-controller-kubeslice-io-v1alpha1-sliceconfig
-    failurePolicy: Fail
-    name: vsliceconfig.kb.io
-    rules:
-      - apiGroups:
-          - controller.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - sliceconfigs
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /validate-worker-kubeslice-io-v1alpha1-workersliceconfig
-    failurePolicy: Fail
-    name: vworkersliceconfig.kb.io
-    rules:
-      - apiGroups:
-          - worker.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - workersliceconfigs
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /validate-worker-kubeslice-io-v1alpha1-workerslicegateway
-    failurePolicy: Fail
-    name: vworkerslicegateway.kb.io
-    rules:
-      - apiGroups:
-          - worker.kubeslice.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - workerslicegateways
-    sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-controller-kubeslice-io-v1alpha1-cluster
+  failurePolicy: Fail
+  name: vcluster.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-controller-kubeslice-io-v1alpha1-project
+  failurePolicy: Fail
+  name: vproject.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - projects
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-controller-kubeslice-io-v1alpha1-serviceexportconfig
+  failurePolicy: Fail
+  name: vserviceexportconfig.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceexportconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-controller-kubeslice-io-v1alpha1-sliceconfig
+  failurePolicy: Fail
+  name: vsliceconfig.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - sliceconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-worker-kubeslice-io-v1alpha1-workersliceconfig
+  failurePolicy: Fail
+  name: vworkersliceconfig.kb.io
+  rules:
+  - apiGroups:
+    - worker.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - workersliceconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-worker-kubeslice-io-v1alpha1-workerslicegateway
+  failurePolicy: Fail
+  name: vworkerslicegateway.kb.io
+  rules:
+  - apiGroups:
+    - worker.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - workerslicegateways
+  sideEffects: None
