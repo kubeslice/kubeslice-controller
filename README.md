@@ -66,6 +66,17 @@ kubectl apply -f config/samples/hub_v1alpha1_cluster.yaml -n=kubeslice-cisco
 kubectl apply -f config/samples/hub_v1alpha1_sliceconfig.yaml -n=kubeslice-cisco
 ```
 
+### Uninstall
+```bash
+# delete all the projects
+kubectl delete project --all
+```
+```bash
+# uninstall all the resources
+make undeploy
+```
+
+
 ## License
 
 Apache License 2.0
