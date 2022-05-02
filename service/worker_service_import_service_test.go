@@ -51,16 +51,18 @@ func TestWorkerServiceImportServiceSuite(t *testing.T) {
 }
 
 var WorkerServiceImportServiceTestbed = map[string]func(*testing.T){
-	"TestReconcileWorkerServiceImportGetWorkerServiceImportResourceFail":        testReconcileWorkerServiceImportGetWorkerServiceImportResourceFail,
-	"TestReconcileWorkerServiceDeleteTheobjectHappyCase":                        testReconcileWorkerServiceDeleteTheobjectHappyCase,
-	"TestReconcileWorkerServiceImportGetServiceExportListFail":                  testReconcileWorkerServiceImportGetServiceExportListFail,
-	"TestReconcileWorkerServiceImportGetServiceExportListEmpty":                 testReconcileWorkerServiceImportGetServiceExportListEmpty,
-	"TestReconcileWorkerServiceImportHappyPath":                                 testReconcileWorkerServiceImportHappyPath,
-	"TestListWorkerServiceImportFail":                                           testListWorkerServiceImportFail,
-	"TestDeleteWorkerServiceImportByLabelPass":                                  testDeleteWorkerServiceImportByLabelPass,
-	"TestCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail":    testCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail,
-	"TestCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail": testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail,
-	"TestCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail": testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail,
+	"TestReconcileWorkerServiceImportGetWorkerServiceImportResourceFail":                   testReconcileWorkerServiceImportGetWorkerServiceImportResourceFail,
+	"TestReconcileWorkerServiceDeleteTheobjectHappyCase":                                   testReconcileWorkerServiceDeleteTheobjectHappyCase,
+	"TestReconcileWorkerServiceImportGetServiceExportListFail":                             testReconcileWorkerServiceImportGetServiceExportListFail,
+	"TestReconcileWorkerServiceImportGetServiceExportListEmpty":                            testReconcileWorkerServiceImportGetServiceExportListEmpty,
+	"TestReconcileWorkerServiceImportHappyPath":                                            testReconcileWorkerServiceImportHappyPath,
+	"TestListWorkerServiceImportFail":                                                      testListWorkerServiceImportFail,
+	"TestDeleteWorkerServiceImportByLabelPass":                                             testDeleteWorkerServiceImportByLabelPass,
+	"TestCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail":               testCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail,
+	"TestCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail":            testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail,
+	"TestCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail":            testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail,
+	"CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatchWithLabel": CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatchWithLabel,
+	"ForceReconciliationHappyCase":                                                         ForceReconciliationHappyCase,
 }
 
 func testReconcileWorkerServiceImportGetWorkerServiceImportResourceFail(t *testing.T) {
@@ -351,5 +353,50 @@ func testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail(t
 	clientMock.On("Create", ctx, mock.Anything).Return(existserr).Once()
 	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
 	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatchWithLabel(t *testing.T) {
+	clientMock := &utilmock.Client{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	serviceName := "mysql"
+	serviceNamespace := "alpha"
+	sliceName := "red"
+	clusters := []string{"cluster1", "cluster2"}
+	namespace := "cisco"
+	label := make(map[string]string)
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	clientMock.On("List", ctx, workerServiceImports, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*meshv1alpha1.WorkerServiceImportList)
+		if arg.Items == nil {
+			arg.Items = make([]meshv1alpha1.WorkerServiceImport, 1)
+		}
+		arg.Items[0].GenerateName = "random"
+		if arg.Items[0].Labels == nil {
+			arg.Items[0].Labels = map[string]string{}
+		}
+		arg.Items[0].Labels["worker-cluster"] = "cluster3"
+	}).Once()
+
+	deleteError := errors.New("existingWorkerServiceImport delete failed")
+	clientMock.On("Delete", ctx, mock.Anything).Return(deleteError).Once()
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func ForceReconciliationHappyCase(t *testing.T) {
+	clientMock := &utilmock.Client{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	if workerServiceImports.Items == nil {
+		workerServiceImports.Items = make([]meshv1alpha1.WorkerServiceImport, 1)
+	}
+	workerServiceImports.Items[0].GenerateName = "random"
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	err := WorkerServiceImportServiceStruct.ForceReconciliation(ctx, workerServiceImports.Items)
+	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }

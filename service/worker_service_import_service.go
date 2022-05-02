@@ -125,7 +125,7 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 	return ctrl.Result{}, err
 }
 
-// ReconcileWorkerServiceImport is a function to create the service import on worker object/cluster
+// CreateMinimalWorkerServiceImport is a function to create the service import on worker object/cluster
 func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx context.Context, clusters []string,
 	namespace string, label map[string]string, serviceName string, serviceNamespace string, sliceName string) error {
 	logger := util.CtxLogger(ctx)
