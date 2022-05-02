@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//
+
 type IWorkerSliceConfigService interface {
 	ReconcileWorkerSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
@@ -217,7 +217,7 @@ func (s *WorkerSliceConfigService) CreateWorkerSliceConfig(ctx context.Context, 
 			expectedSlice.Spec.SliceSubnet = sliceSubnet
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
-				if !k8sErrors.IsAlreadyExists(err) {
+				if !k8sErrors.IsAlreadyExists(err) {// ignores resource already exists error(for handling parallel calls to create same resource)
 					logger.Debug("failed to create mesh slice %s since it already exists, namespace - %s ",
 						expectedSlice.Name, namespace)
 					return clusterMap, err
@@ -234,7 +234,7 @@ func (s *WorkerSliceConfigService) CreateWorkerSliceConfig(ctx context.Context, 
 			existingSlice.Annotations["updatedTimestamp"] = time.Now().String()
 			err = util.UpdateResource(ctx, existingSlice)
 			if err != nil {
-				if !k8sErrors.IsAlreadyExists(err) {
+				if !k8sErrors.IsAlreadyExists(err) {// ignores resource already exists error(for handling parallel calls to create same resource)
 					logger.Debug("failed to create mesh slice %s since it already exists, namespace - %s ",
 						workerSliceConfigName, namespace)
 					return clusterMap, err

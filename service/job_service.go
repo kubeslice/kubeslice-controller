@@ -34,7 +34,6 @@ type IJobService interface {
 
 type JobService struct{}
 
-// CreateJob Fixme: Change the type of env as per need
 // CreateJob is function to create the job in k8s
 func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage string, environment map[string]string) (ctrl.Result, error) {
 	name := fmt.Sprintf("%s-%s", "open-cert", uuid.NewUUID()[:8])
@@ -81,11 +80,9 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 						{
 							Name:  "ovpn-cert-generator",
 							Image: jobImage,
-							// fixme: change the env
 							Env: envValues,
 						},
 					},
-					// fixme: change the serviceaccount to the one created for the job
 					ServiceAccountName: JobServiceAccount,
 				},
 			},

@@ -55,7 +55,6 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 	}
 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 	//Finalizers
-	//FIXME: verify if separate finalizers are needed
 	if project.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(project.GetFinalizers(), ProjectFinalizer) {
 			if shouldReturn, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, project, ProjectFinalizer)); shouldReturn {

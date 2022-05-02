@@ -145,14 +145,17 @@ apply-sample: ## Generate sample manifests.
 webhookCA: ## Install the Cert Manager for Admission controller Webhooks.
 	kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.0/cert-manager.yaml
 
+.PHONY: generate-mocks
 generate-mocks: ## Generate mocks for the controller-runtime.
 	mockery --dir service/ --all  --output service/mocks
 	mockery --dir util/ --name Client  --output util/mocks
 
+.PHONY: unit-test
 unit-test: ## Run local unit tests.
 	go test ./service --coverprofile=coverage.out
 	mkdir -p coverage-report
 	go tool cover -html=coverage.out -o coverage-report/report.html
 
+.PHONY: unit-test-docker
 unit-test-docker: ## Run local unit tests in a docker container.
 	docker build -f unit_tests.dockerfile -o . .
