@@ -54,6 +54,7 @@ var ServiceExportConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateServiceExportConfigCreate_ServiceEndpointInvalidCluster": testValidateServiceExportConfigCreateServiceEndpointInvalidCluster,
 	"TestValidateServiceExportConfigUpdate_ServiceEndpointInvalidCluster": testValidateServiceExportConfigUpdateServiceEndpointInvalidCluster,
 	"TestValidateServiceExportConfigUpdate_DoesNotExist":                  testValidateServiceExportConfigUpdateDoesNotExist,
+	"ValidateServiceExportConfigCreateIfClusterIsPresentInSlice":          ValidateServiceExportConfigCreateIfClusterIsPresentInSlice,
 }
 
 func testValidateServiceExportConfigCreateDoesNotExist(t *testing.T) {
@@ -168,6 +169,33 @@ func testValidateServiceExportConfigCreateIfClusterNotPresentInSlice(t *testing.
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Cluster: Invalid value:")
 	require.Contains(t, err.Error(), serviceExportConfig.Spec.SourceCluster)
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateServiceExportConfigCreateIfClusterIsPresentInSlice(t *testing.T) {
+	name := "service_export_config"
+	namespace := "namespace"
+	clientMock, serviceExportConfig, ctx := setupServiceExportConfigWebhookValidationTest(name, namespace)
+	serviceExportConfig.Spec.SourceCluster = "cluster1"
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	}).Once()
+	cluster := &controllerv1alpha1.Cluster{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, mock.Anything, cluster).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		agr := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		agr.Spec.Clusters = []string{"cluster1", "cluster2"}
+	}).Once()
+	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
 
