@@ -21,7 +21,6 @@ import (
 	"time"
 )
 
-// FIXME: The resource names MUST not be changed after the first release/GA
 
 // Api Groups
 const (
