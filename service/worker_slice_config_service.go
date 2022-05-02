@@ -38,8 +38,8 @@ type IWorkerSliceConfigService interface {
 	ReconcileWorkerSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
 	ListWorkerSliceConfigs(ctx context.Context, ownerLabel map[string]string, namespace string) ([]workerv1alpha1.WorkerSliceConfig, error)
-	ComputeClusterMap(clusterNames []string, meshSlices []workerv1alpha1.WorkerSliceConfig) map[string]int
-	CreateWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string) (map[string]int, error)
+	ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int
+	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string) (map[string]int, error)
 }
 
 // WorkerSliceConfigService implements the IWorkerSliceConfigService interface
@@ -175,17 +175,17 @@ outer:
 }
 
 // CreateWorkerSliceConfig is a function to create the worker slice config
-func (s *WorkerSliceConfigService) CreateWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string) (map[string]int, error) {
+func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string) (map[string]int, error) {
 	logger := util.CtxLogger(ctx)
 	err := s.cleanUpSlices(ctx, label, namespace, clusters)
 	if err != nil {
 		return nil, err
 	}
-	meshSlices, err := s.ListWorkerSliceConfigs(ctx, label, namespace)
+	workerSliceConfigs, err := s.ListWorkerSliceConfigs(ctx, label, namespace)
 	if err != nil {
 		return nil, err
 	}
-	clusterMap := s.ComputeClusterMap(clusters, meshSlices)
+	clusterMap := s.ComputeClusterMap(clusters, workerSliceConfigs)
 	for _, cluster := range clusters {
 		logger.Debugf("Cluster Object %s", cluster)
 		workerSliceConfigName := fmt.Sprintf("%s-%s", name, cluster)
@@ -218,7 +218,7 @@ func (s *WorkerSliceConfigService) CreateWorkerSliceConfig(ctx context.Context, 
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
 				if !k8sErrors.IsAlreadyExists(err) {// ignores resource already exists error(for handling parallel calls to create same resource)
-					logger.Debug("failed to create mesh slice %s since it already exists, namespace - %s ",
+					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
 						expectedSlice.Name, namespace)
 					return clusterMap, err
 				}
@@ -235,7 +235,7 @@ func (s *WorkerSliceConfigService) CreateWorkerSliceConfig(ctx context.Context, 
 			err = util.UpdateResource(ctx, existingSlice)
 			if err != nil {
 				if !k8sErrors.IsAlreadyExists(err) {// ignores resource already exists error(for handling parallel calls to create same resource)
-					logger.Debug("failed to create mesh slice %s since it already exists, namespace - %s ",
+					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
 						workerSliceConfigName, namespace)
 					return clusterMap, err
 				}
@@ -272,12 +272,12 @@ func (s *WorkerSliceConfigService) ListWorkerSliceConfigs(ctx context.Context, o
 }
 
 // ComputeClusterMap - function returns map of the cluster and the index
-func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, meshSlices []workerv1alpha1.WorkerSliceConfig) map[string]int {
+func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int {
 	clusterMapping := make(map[string]int, len(clusterNames))
 	usedIndexes := make(map[int]bool, 0)
-	for _, meshSlice := range meshSlices {
-		clusterMapping[meshSlice.Labels["worker-cluster"]] = meshSlice.Spec.IpamClusterOctet
-		usedIndexes[meshSlice.Spec.IpamClusterOctet] = true
+	for _, WorkerSliceConfig := range workerSliceConfigs {
+		clusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = WorkerSliceConfig.Spec.IpamClusterOctet
+		usedIndexes[WorkerSliceConfig.Spec.IpamClusterOctet] = true
 	}
 	unUsedIndexes := make([]int, 0)
 	for index := 1; index <= len(clusterNames); index++ {

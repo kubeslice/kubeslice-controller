@@ -13,13 +13,13 @@ type IWorkerSliceConfigService struct {
 	mock.Mock
 }
 
-// ComputeClusterMap provides a mock function with given fields: clusterNames, meshSlices
-func (_m *IWorkerSliceConfigService) ComputeClusterMap(clusterNames []string, meshSlices []v1alpha1.WorkerSliceConfig) map[string]int {
-	ret := _m.Called(clusterNames, meshSlices)
+// ComputeClusterMap provides a mock function with given fields: clusterNames, workerSliceConfigs
+func (_m *IWorkerSliceConfigService) ComputeClusterMap(clusterNames []string, workerSliceConfigs []v1alpha1.WorkerSliceConfig) map[string]int {
+	ret := _m.Called(clusterNames, workerSliceConfigs)
 
 	var r0 map[string]int
 	if rf, ok := ret.Get(0).(func([]string, []v1alpha1.WorkerSliceConfig) map[string]int); ok {
-		r0 = rf(clusterNames, meshSlices)
+		r0 = rf(clusterNames, workerSliceConfigs)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]int)
@@ -30,7 +30,7 @@ func (_m *IWorkerSliceConfigService) ComputeClusterMap(clusterNames []string, me
 }
 
 // CreateWorkerSliceConfig provides a mock function with given fields: ctx, clusters, namespace, label, name, sliceSubnet
-func (_m *IWorkerSliceConfigService) CreateWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string) (map[string]int, error) {
+func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string) (map[string]int, error) {
 	ret := _m.Called(ctx, clusters, namespace, label, name, sliceSubnet)
 
 	var r0 map[string]int

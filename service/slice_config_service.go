@@ -90,8 +90,8 @@ func (s SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	// Step 3: Creation of Mesh Slice Objects and Cluster Labels
-	clusterMap, err := s.ms.CreateWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, util.GetOwnerLabel(sliceConfig), sliceConfig.Name, sliceConfig.Spec.SliceSubnet)
+	// Step 3: Creation of worker slice Objects and Cluster Labels
+	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, util.GetOwnerLabel(sliceConfig), sliceConfig.Name, sliceConfig.Spec.SliceSubnet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
