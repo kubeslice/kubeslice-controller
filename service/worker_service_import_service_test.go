@@ -26,7 +26,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
-	meshv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	utilmock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -67,7 +67,7 @@ var WorkerServiceImportServiceTestbed = map[string]func(*testing.T){
 
 func testReconcileWorkerServiceImportGetWorkerServiceImportResourceFail(t *testing.T) {
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	workerServiceImport := &meshv1alpha1.WorkerServiceImport{}
+	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
 		Name:      "mysql-1",
@@ -86,7 +86,7 @@ func testReconcileWorkerServiceImportGetWorkerServiceImportResourceFail(t *testi
 }
 func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	workerServiceImport := &meshv1alpha1.WorkerServiceImport{}
+	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
 		Name:      "mysql-1",
@@ -101,7 +101,7 @@ func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 	timeStamp := kubemachine.Now()
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerServiceImport).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*meshv1alpha1.WorkerServiceImport)
+		arg := args.Get(2).(*workerv1alpha1.WorkerServiceImport)
 		arg.ObjectMeta.DeletionTimestamp = &timeStamp
 		if arg.Labels == nil {
 			arg.Labels = make(map[string]string)
@@ -139,7 +139,7 @@ func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 
 func testReconcileWorkerServiceImportGetServiceExportListFail(t *testing.T) {
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	workerServiceImport := &meshv1alpha1.WorkerServiceImport{}
+	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
 		Name:      "mysql-1",
@@ -170,7 +170,7 @@ func testReconcileWorkerServiceImportGetServiceExportListFail(t *testing.T) {
 func testReconcileWorkerServiceImportGetServiceExportListEmpty(t *testing.T) {
 	//var errList errorList
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	workerServiceImport := &meshv1alpha1.WorkerServiceImport{}
+	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
 		Name:      "mysql-1",
@@ -185,7 +185,7 @@ func testReconcileWorkerServiceImportGetServiceExportListEmpty(t *testing.T) {
 		"service-namespace":   workerServiceImport.Spec.ServiceNamespace,
 		"original-slice-name": workerServiceImport.Spec.SliceName,
 	}
-	//	serviceImport := meshv1alpha1.WorkerServiceImport{}
+	//	serviceImport := workerv1alpha1.WorkerServiceImport{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerServiceImport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -199,7 +199,7 @@ func testReconcileWorkerServiceImportGetServiceExportListEmpty(t *testing.T) {
 }
 func testReconcileWorkerServiceImportHappyPath(t *testing.T) {
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	workerServiceImport := &meshv1alpha1.WorkerServiceImport{}
+	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
 		Name:      "mysql-1",
@@ -235,7 +235,7 @@ func testReconcileWorkerServiceImportHappyPath(t *testing.T) {
 }
 
 func testListWorkerServiceImportFail(t *testing.T) {
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	clientMock := &utilmock.Client{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	labels := map[string]string{
@@ -253,8 +253,8 @@ func testListWorkerServiceImportFail(t *testing.T) {
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
 	clientMock.On("List", ctx, workerServiceImports, client.MatchingLabels(labels), client.InNamespace(requestObj.Namespace)).Return(kubeerrors.NewNotFound(util.Resource("WorkerServiceImportTest"), "ListWorkerService not found")).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(1).(*meshv1alpha1.WorkerServiceImportList)
-			arg.Items = []meshv1alpha1.WorkerServiceImport{}
+			arg := args.Get(1).(*workerv1alpha1.WorkerServiceImportList)
+			arg.Items = []workerv1alpha1.WorkerServiceImport{}
 		}).Once()
 	result, err := WorkerServiceImportServiceStruct.ListWorkerServiceImport(ctx, labels, requestObj.Namespace)
 	require.Equal(t, len(result), 0)
@@ -262,7 +262,7 @@ func testListWorkerServiceImportFail(t *testing.T) {
 	clientMock.AssertExpectations(t)
 }
 func testDeleteWorkerServiceImportByLabelPass(t *testing.T) {
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
 	clientMock := &utilmock.Client{}
 	labels := map[string]string{
@@ -279,9 +279,9 @@ func testDeleteWorkerServiceImportByLabelPass(t *testing.T) {
 	}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("List", ctx, workerServiceImports, client.MatchingLabels(labels), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*meshv1alpha1.WorkerServiceImportList)
+		arg := args.Get(1).(*workerv1alpha1.WorkerServiceImportList)
 		if arg.Items == nil {
-			arg.Items = make([]meshv1alpha1.WorkerServiceImport, 1)
+			arg.Items = make([]workerv1alpha1.WorkerServiceImport, 1)
 			arg.Items[0].Name = "random"
 		}
 	})
@@ -294,8 +294,8 @@ func testDeleteWorkerServiceImportByLabelPass(t *testing.T) {
 func testCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	existingWorkerServiceImport := &meshv1alpha1.WorkerServiceImport{}
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	existingWorkerServiceImport := &workerv1alpha1.WorkerServiceImport{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	serviceName := "mysql"
 	serviceNamespace := "alpha"
 	sliceName := "red"
@@ -316,8 +316,8 @@ func testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail(t
 	clientMock := &utilmock.Client{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
 
-	existingWorkerServiceImport := &meshv1alpha1.WorkerServiceImport{}
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	existingWorkerServiceImport := &workerv1alpha1.WorkerServiceImport{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	serviceName := "mysql"
 	serviceNamespace := "alpha"
 	sliceName := "red"
@@ -338,7 +338,7 @@ func testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail(t
 func testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	serviceName := "mysql"
 	serviceNamespace := "alpha"
 	sliceName := "red"
@@ -359,7 +359,7 @@ func testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail(t
 func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatchWithLabel(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	serviceName := "mysql"
 	serviceNamespace := "alpha"
 	sliceName := "red"
@@ -368,9 +368,9 @@ func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatch
 	label := make(map[string]string)
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("List", ctx, workerServiceImports, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*meshv1alpha1.WorkerServiceImportList)
+		arg := args.Get(1).(*workerv1alpha1.WorkerServiceImportList)
 		if arg.Items == nil {
-			arg.Items = make([]meshv1alpha1.WorkerServiceImport, 1)
+			arg.Items = make([]workerv1alpha1.WorkerServiceImport, 1)
 		}
 		arg.Items[0].GenerateName = "random"
 		if arg.Items[0].Labels == nil {
@@ -390,9 +390,9 @@ func ForceReconciliationHappyCase(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	if workerServiceImports.Items == nil {
-		workerServiceImports.Items = make([]meshv1alpha1.WorkerServiceImport, 1)
+		workerServiceImports.Items = make([]workerv1alpha1.WorkerServiceImport, 1)
 	}
 	workerServiceImports.Items[0].GenerateName = "random"
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
