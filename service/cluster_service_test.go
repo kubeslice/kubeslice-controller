@@ -27,7 +27,6 @@ import (
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilmock "github.com/kubeslice/kubeslice-controller/util/mocks"
 
-	//statusMock "bitbucket.org/realtimeai/mesh-controller/util/statusMock"
 	"github.com/dailymotion/allure-go"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
