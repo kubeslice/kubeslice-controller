@@ -359,7 +359,7 @@ func testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail(t
 func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatchWithLabel(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	serviceName := "mysql"
 	serviceNamespace := "alpha"
 	sliceName := "red"
@@ -368,9 +368,9 @@ func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatch
 	label := make(map[string]string)
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("List", ctx, workerServiceImports, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*meshv1alpha1.WorkerServiceImportList)
+		arg := args.Get(1).(*workerv1alpha1.WorkerServiceImportList)
 		if arg.Items == nil {
-			arg.Items = make([]meshv1alpha1.WorkerServiceImport, 1)
+			arg.Items = make([]workerv1alpha1.WorkerServiceImport, 1)
 		}
 		arg.Items[0].GenerateName = "random"
 		if arg.Items[0].Labels == nil {
@@ -390,9 +390,9 @@ func ForceReconciliationHappyCase(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	workerServiceImports := &meshv1alpha1.WorkerServiceImportList{}
+	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	if workerServiceImports.Items == nil {
-		workerServiceImports.Items = make([]meshv1alpha1.WorkerServiceImport, 1)
+		workerServiceImports.Items = make([]workerv1alpha1.WorkerServiceImport, 1)
 	}
 	workerServiceImports.Items[0].GenerateName = "random"
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
