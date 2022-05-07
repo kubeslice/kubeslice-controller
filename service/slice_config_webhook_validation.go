@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -84,6 +86,52 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		return nil
 	}
 	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
+}
+
+func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
+	s = sliceConfig
+	workerSliceConfigCtx = ctx
+
+	var allErrs field.ErrorList
+	if err := preventDeleteSliceConfig(); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "hub.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
+}
+
+func preventDeleteSliceConfig() *field.Error {
+	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
+	//SpokeSliceConfigList{}
+	sliceConfig := &v1alpha1.SliceConfig{}
+
+	applicationNamespacesErr := &field.Error{
+		Type:     "",
+		Field:    "",
+		BadValue: nil,
+		Detail:   fmt.Sprintf("%s", "Please deboard the namespace before deletion."),
+	}
+	onboardNamespaceErr := &field.Error{
+		Type:     "",
+		Field:    "",
+		BadValue: nil,
+		Detail:   fmt.Sprintf("%s", "Deboarding of namespaces is in progress try after some time."),
+	}
+	ownerLabel := util.GetOwnerLabel(sliceConfig)
+	_ = util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(s.Namespace))
+	for _, slice := range workerSlices.Items {
+		if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 && len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces) > 0 {
+			return applicationNamespacesErr
+		} else {
+			if len(slice.Status.OnboardedNamespaces) > 0 {
+				return onboardNamespaceErr
+			}
+		}
+
+	}
+	return nil
 }
 
 // validateSliceSubnet is function to validate the the subnet of slice

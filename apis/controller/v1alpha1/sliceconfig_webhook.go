@@ -34,12 +34,14 @@ type customSliceConfigValidation func(ctx context.Context, sliceConfig *SliceCon
 
 var customSliceConfigCreateValidation func(ctx context.Context, sliceConfig *SliceConfig) error = nil
 var customSliceConfigUpdateValidation func(ctx context.Context, sliceConfig *SliceConfig) error = nil
+var customSliceConfigDeleteValidation func(ctx context.Context, sliceConfig *SliceConfig) error = nil
 var sliceConfigWebhookClient client.Client
 
-func (r *SliceConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customSliceConfigValidation, validateUpdate customSliceConfigValidation) error {
+func (r *SliceConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customSliceConfigValidation, validateUpdate customSliceConfigValidation, validateDelete customSliceConfigValidation) error {
 	sliceConfigWebhookClient = mgr.GetClient()
 	customSliceConfigCreateValidation = validateCreate
 	customSliceConfigUpdateValidation = validateUpdate
+	customSliceConfigDeleteValidation = validateDelete
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -63,7 +65,6 @@ var _ webhook.Validator = &SliceConfig{}
 func (r *SliceConfig) ValidateCreate() error {
 	sliceconfigurationlog.Info("validate create", "name", r.Name)
 	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation")
-
 	return customSliceConfigCreateValidation(sliceConfigCtx, r)
 }
 
@@ -77,6 +78,8 @@ func (r *SliceConfig) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *SliceConfig) ValidateDelete() error {
-	sliceconfigurationlog.Info("validate delete", "name", r.Name)
-	return nil
+	sliceconfigurationlog.Info("validate update", "name", r.Name)
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation")
+
+	return customSliceConfigDeleteValidation(sliceConfigCtx, r)
 }

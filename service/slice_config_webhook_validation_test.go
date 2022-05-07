@@ -23,6 +23,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
@@ -79,6 +80,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace":            UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters":                      UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
+	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
+	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty":                                    DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -997,4 +1000,52 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 	}
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest")
 	return clientMock, sliceConfig, ctx
+}
+
+func DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
+	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
+		if arg.Items == nil {
+			arg.Items = make([]workerv1alpha1.WorkerSliceConfig, 1)
+		}
+		if arg.Items[0].Status.OnboardedNamespaces == nil {
+			arg.Items[0].Status.OnboardedNamespaces = make([]workerv1alpha1.NamespaceConfig, 2)
+		}
+		arg.Items[0].Status.OnboardedNamespaces[0].Name = "random1"
+		arg.Items[0].Status.OnboardedNamespaces[1].Name = "random2"
+
+	}).Once()
+	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
+	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
+	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
+		if arg.Items == nil {
+			arg.Items = make([]workerv1alpha1.WorkerSliceConfig, 1)
+		}
+		if arg.Items[0].Spec.NamespaceIsolationProfile.ApplicationNamespaces == nil {
+			arg.Items[0].Spec.NamespaceIsolationProfile.ApplicationNamespaces = make([]string, 2)
+		}
+		arg.Items[0].Spec.NamespaceIsolationProfile.ApplicationNamespaces[0] = "random1"
+		arg.Items[0].Spec.NamespaceIsolationProfile.ApplicationNamespaces[1] = "random2"
+		if arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces == nil {
+			arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces = make([]string, 2)
+		}
+		arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces[0] = "random1"
+		arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces[1] = "random2"
+	}).Once()
+	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
+	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
 }
