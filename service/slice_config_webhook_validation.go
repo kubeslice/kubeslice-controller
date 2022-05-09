@@ -93,7 +93,7 @@ func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alp
 	workerSliceConfigCtx = ctx
 
 	var allErrs field.ErrorList
-	if err := preventDeleteSliceConfig(); err != nil {
+	if err := preventDeleteSliceConfig(workerSliceConfigCtx); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -102,9 +102,9 @@ func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alp
 	return apierrors.NewInvalid(schema.GroupKind{Group: "hub.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
 }
 
-func preventDeleteSliceConfig() *field.Error {
+func preventDeleteSliceConfig(ctx context.Context) *field.Error {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
-	ctx := context.Background()
+	//ctx := context.Background()
 	logger := util.CtxLogger(ctx)
 
 	sliceConfig := &v1alpha1.SliceConfig{}
