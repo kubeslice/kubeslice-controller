@@ -66,6 +66,7 @@ func WithSliceConfigService() ISliceConfigService {
 		acs: WithAccessControlService(),
 		sgs: WithWorkerSliceGatewayService(),
 		ms:  WithWorkerSliceConfigService(),
+		si:  WithWorkerServiceImportService(),
 		se:  WithServiceExportConfigService(),
 	}
 }
