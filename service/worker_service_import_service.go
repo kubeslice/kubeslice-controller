@@ -164,7 +164,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 		if !found {
 			err = util.CreateResource(ctx, &expectedWorkerServiceImport)
 			if err != nil {
-				if !k8sErrors.IsAlreadyExists(err) {// ignores resource already exists error (for handling parallel calls to create same resource)
+				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker service import %s since it already exists, namespace - %s ",
 						expectedWorkerServiceImport.Name, namespace)
 					return err
@@ -178,7 +178,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 			existingWorkerServiceImport.Annotations["updatedTimestamp"] = time.Now().String()
 			err = util.UpdateResource(ctx, existingWorkerServiceImport)
 			if err != nil {
-				if !k8sErrors.IsAlreadyExists(err) {// ignores resource already exists error (for handling parallel calls to create same resource)
+				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
 					logger.Debug("failed to create service import %s since it already exists, namespace - %s ",
 						existingWorkerServiceImport.Name, namespace)
 					return err
