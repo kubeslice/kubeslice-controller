@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -107,7 +106,7 @@ func preventDeleteSliceConfig(ctx context.Context) *field.Error {
 	//ctx := context.Background()
 	logger := util.CtxLogger(ctx)
 
-	sliceConfig := &v1alpha1.SliceConfig{}
+	//sliceConfig := &v1alpha1.SliceConfig{}
 	applicationNamespacesErr := &field.Error{
 		Type:     "",
 		Field:    "",
@@ -120,8 +119,8 @@ func preventDeleteSliceConfig(ctx context.Context) *field.Error {
 		BadValue: nil,
 		Detail:   fmt.Sprintf("%s", "Deboarding of namespaces is in progress try after some time."),
 	}
-	ownerLabel := util.GetOwnerLabel(sliceConfig)
-	err := util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(s.Namespace))
+	ownerLabel := util.GetOwnerLabel(&workerSlices.Items[0])
+	err := util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(ss.Namespace))
 	logger.Infof("worker slices list %v", workerSlices)
 	if err == nil {
 		for _, slice := range workerSlices.Items {
