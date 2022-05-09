@@ -78,7 +78,7 @@ func (r *SliceConfig) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *SliceConfig) ValidateDelete() error {
-	sliceconfigurationlog.Info("validate update", "name", r.Name)
+	sliceconfigurationlog.Info("validate delete", "name", r.Name)
 	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation")
 
 	return customSliceConfigDeleteValidation(sliceConfigCtx, r)

@@ -104,9 +104,10 @@ func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alp
 
 func preventDeleteSliceConfig() *field.Error {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
-	//SpokeSliceConfigList{}
-	sliceConfig := &v1alpha1.SliceConfig{}
+	ctx := context.Background()
+	logger := util.CtxLogger(ctx)
 
+	sliceConfig := &v1alpha1.SliceConfig{}
 	applicationNamespacesErr := &field.Error{
 		Type:     "",
 		Field:    "",
@@ -122,10 +123,13 @@ func preventDeleteSliceConfig() *field.Error {
 	ownerLabel := util.GetOwnerLabel(sliceConfig)
 	_ = util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(s.Namespace))
 	for _, slice := range workerSlices.Items {
+		logger.Infof("workerSLices Items %v", slice)
 		if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 && len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces) > 0 {
+
 			return applicationNamespacesErr
 		} else {
 			if len(slice.Status.OnboardedNamespaces) > 0 {
+				logger.Infof("length of onboarded namespaces is greater than 0")
 				return onboardNamespaceErr
 			}
 		}
@@ -183,6 +187,7 @@ func validateClusters() *field.Error {
 		if len(cluster.Status.CniSubnet) == 0 {
 			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
 		}
+
 		for _, cniSubnet := range cluster.Status.CniSubnet {
 			if util.OverlapIP(cniSubnet, s.Spec.SliceSubnet) {
 				return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), s.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
@@ -211,6 +216,7 @@ func preventUpdate() *field.Error {
 	if sliceConfig.Spec.SliceIpamType != s.Spec.SliceIpamType {
 		return field.Invalid(field.NewPath("Spec").Child("SliceIpamType"), s.Spec.SliceIpamType, "cannot be updated")
 	}
+
 	return nil
 }
 
