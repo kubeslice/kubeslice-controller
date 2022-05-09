@@ -121,19 +121,22 @@ func preventDeleteSliceConfig(ctx context.Context) *field.Error {
 		Detail:   fmt.Sprintf("%s", "Deboarding of namespaces is in progress try after some time."),
 	}
 	ownerLabel := util.GetOwnerLabel(sliceConfig)
-	_ = util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(s.Namespace))
-	for _, slice := range workerSlices.Items {
-		logger.Infof("workerSLices Items %v", slice)
-		if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 && len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces) > 0 {
+	err := util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(s.Namespace))
+	logger.Infof("worker slices list %v", workerSlices)
+	if err == nil {
+		for _, slice := range workerSlices.Items {
+			logger.Infof("workerSLices Items %v", slice)
+			if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 && len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces) > 0 {
 
-			return applicationNamespacesErr
-		} else {
-			if len(slice.Status.OnboardedNamespaces) > 0 {
-				logger.Infof("length of onboarded namespaces is greater than 0")
-				return onboardNamespaceErr
+				return applicationNamespacesErr
+			} else {
+				if len(slice.Status.OnboardedNamespaces) > 0 {
+					logger.Infof("length of onboarded namespaces is greater than 0")
+					return onboardNamespaceErr
+				}
 			}
-		}
 
+		}
 	}
 	return nil
 }
