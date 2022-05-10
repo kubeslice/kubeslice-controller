@@ -21,7 +21,6 @@ import (
 	"time"
 )
 
-
 // Api Groups
 const (
 	apiGroupKubeSliceControllers = "controller.kubeslice.io"
