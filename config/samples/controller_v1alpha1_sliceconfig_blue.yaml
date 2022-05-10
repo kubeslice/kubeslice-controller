@@ -15,7 +15,7 @@ spec:
     - cluster-3
   qosProfileDetails:
     queueType: HTB
-    priority: High
+    priority: 1
     tcType: BANDWIDTH_CONTROL
     bandwidthCeilingKbps: 5120
     bandwidthGuaranteedKbps: 2560
