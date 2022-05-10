@@ -87,53 +87,45 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
 }
 
+// ValidateSliceConfigDelete is function to validate the deletion of sliceConfig
 func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
 	s = sliceConfig
 	workerSliceConfigCtx = ctx
 
 	var allErrs field.ErrorList
-	if err := preventDeleteSliceConfig(workerSliceConfigCtx); err != nil {
+	if err := preventDeleteSliceConfig(); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
 		return nil
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "hub.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
 }
 
-func preventDeleteSliceConfig(ctx context.Context) *field.Error {
+func preventDeleteSliceConfig() *field.Error {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
-	//ctx := context.Background()
-	logger := util.CtxLogger(ctx)
-
-	//sliceConfig := &v1alpha1.SliceConfig{}
-	applicationNamespacesErr := &field.Error{
-		Type:     "",
-		Field:    "",
-		BadValue: nil,
-		Detail:   fmt.Sprintf("%s", "Please deboard the namespace before deletion."),
+	ownerLabel := map[string]string{
+		"original-slice-name": s.Name,
 	}
-	onboardNamespaceErr := &field.Error{
-		Type:     "",
-		Field:    "",
-		BadValue: nil,
-		Detail:   fmt.Sprintf("%s", "Deboarding of namespaces is in progress try after some time."),
-	}
-	workerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
-	found, err := util.GetResourceIfExist(workerSliceConfigCtx, client.ObjectKey{Name: ss.Name, Namespace: ss.Namespace}, &workerSliceConfig)
-	logger.Debug(found, err)
-	ownerLabel := util.GetOwnerLabel(&workerSliceConfig)
-	err = util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(ss.Namespace))
-	logger.Debugf("worker slices list %v", workerSlices)
-	if err == nil {
+	err := util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(s.Namespace))
+	if err == nil && len(workerSlices.Items) > 0 {
 		for _, slice := range workerSlices.Items {
-			logger.Debugf("workerSLices Items %v", slice)
 			if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 && len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces) > 0 {
-
+				applicationNamespacesErr := &field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "ApplicationNamespaces & AllowedNamespaces",
+					BadValue: fmt.Sprintf("Number of ApplicationNamespaces: %d and AllowedNamespaces: %d", len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces), len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces)),
+					Detail:   fmt.Sprintf("%s", "Please deboard the namespace before deletion."),
+				}
 				return applicationNamespacesErr
 			} else {
 				if len(slice.Status.OnboardedNamespaces) > 0 {
-					logger.Debugf("length of onboarded namespaces is greater than 0")
+					onboardNamespaceErr := &field.Error{
+						Type:     field.ErrorTypeInvalid,
+						Field:    "onboarded Namespaces",
+						BadValue: fmt.Sprintf("Number of onboarded namespaces: %d", len(slice.Status.OnboardedNamespaces)),
+						Detail:   fmt.Sprintf("%s", "Deboarding of namespaces is in progress try after some time."),
+					}
 					return onboardNamespaceErr
 				}
 			}

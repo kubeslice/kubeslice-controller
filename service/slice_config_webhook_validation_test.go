@@ -80,8 +80,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace":            UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters":                      UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
-	//	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
-	//	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty":                                    DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty,
+	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
+	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty":                                    DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1007,7 +1007,6 @@ func DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
-	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
 	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
 		if arg.Items == nil {
@@ -1030,7 +1029,6 @@ func DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEm
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
-	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
 	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
 		if arg.Items == nil {
@@ -1048,7 +1046,6 @@ func DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEm
 		arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces[1] = "random2"
 	}).Once()
 	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
-	t.Error(t, err)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
