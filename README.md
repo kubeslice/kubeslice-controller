@@ -62,11 +62,11 @@ kubectl apply -f config/samples/controller_v1alpha1_project.yaml
 
 ### Registering the Worker Cluster
 ```bash
-kubectl apply -f config/samples/hub_v1alpha1_cluster.yaml -n=kubeslice-cisco
+kubectl apply -f config/samples/controller_v1alpha1_cluster.yaml -n=kubeslice-cisco
 ```
 ### Applying the sliceconfig
 ```bash
-kubectl apply -f config/samples/hub_v1alpha1_sliceconfig.yaml -n=kubeslice-cisco
+kubectl apply -f config/samples/controller_v1alpha1_sliceconfig.yaml -n=kubeslice-cisco
 ```
 
 ### Uninstalling the kubeslice-controller
