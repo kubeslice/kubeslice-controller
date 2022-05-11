@@ -80,10 +80,10 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipatingInSliceConfig":    UpdateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipatingInSliceConfig,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace":            UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters":                      UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters,
-	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice":                           UpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice,
-	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
-	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
-	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty":                                    DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty,
+	//"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice":                           UpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                     UpdateValidateSliceConfigWithoutErrors,
+	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty": DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
+	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty":   DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1034,7 +1034,7 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	clientMock.AssertExpectations(t)
 }
 
-func UpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice(t *testing.T) {
+func TestUpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -1054,6 +1054,7 @@ func UpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice(t *testin
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	newSliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps = 4096
 	newSliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps = 5120
+
 	if newSliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces == nil {
 		newSliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces = make([]controllerv1alpha1.SliceNamespaceSelection, 1)
 	}

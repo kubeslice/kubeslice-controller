@@ -260,18 +260,19 @@ func validateExternalGatewayConfig() *field.Error {
 
 // validateNamespaces is function to validate the application namespaces
 func validateNamespaces() *field.Error {
-	for _, namespaceName := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
-		for _, clusterName := range namespaceName.Clusters {
-			cluster := controllerv1alpha1.Cluster{}
-			if clusterName == "*" {
-				for _, clusterSpec := range s.Spec.Clusters {
-					err := validateClusterNamespaces(clusterSpec, cluster, namespaceName)
-					if err != nil {
-						return err
-					}
+	cluster := controllerv1alpha1.Cluster{}
+	for _, applicationNamespaces := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+		if applicationNamespaces.Clusters[0] == "*" {
+			for _, clusterSpec := range s.Spec.Clusters {
+				err := validateAllowedClusterNamespaces(clusterSpec, cluster, applicationNamespaces, s.GetName())
+				if err != nil {
+					return err
 				}
-			} else {
-				err := validateClusterNamespaces(clusterName, cluster, namespaceName)
+			}
+		} else {
+			for _, clusterName := range applicationNamespaces.Clusters {
+				cluster := controllerv1alpha1.Cluster{}
+				err := validateAllowedClusterNamespaces(clusterName, cluster, applicationNamespaces, s.GetName())
 				if err != nil {
 					return err
 				}
@@ -282,15 +283,16 @@ func validateNamespaces() *field.Error {
 }
 
 // validateClusterNamespaces is a function to validate the namespaces present is cluster
-func validateClusterNamespaces(allClusters string, cluster controllerv1alpha1.Cluster, namespaceName controllerv1alpha1.SliceNamespaceSelection) *field.Error {
-	exist, _ := util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: allClusters, Namespace: s.Namespace}, &cluster)
+func validateAllowedClusterNamespaces(clusterName string, cluster controllerv1alpha1.Cluster, applicationNamespaces controllerv1alpha1.SliceNamespaceSelection, sliceName string) *field.Error {
+	exist, _ := util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: clusterName, Namespace: s.Namespace}, &cluster)
 	if !exist {
-		return field.Invalid(field.NewPath("Spec").Child("Clusters"), allClusters, "cluster is not registered")
+		return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster is not registered")
 	}
 	for _, cluster_namespaces := range cluster.Status.Namespaces {
-		if namespaceName.Namespace == cluster_namespaces.Name && len(cluster_namespaces.SliceName) > 0 {
-			return field.Invalid(field.NewPath("Spec").Child("SliceConfig"), s.Name, "The given namespace is already acquired by other slice")
+		if applicationNamespaces.Namespace == cluster_namespaces.Name && len(cluster_namespaces.SliceName) > 0 && cluster_namespaces.SliceName != sliceName {
+			return field.Invalid(field.NewPath("Spec").Child("SliceConfig.NamespaceIsolationProfile.ApplicationNamespaces"), s.Name, "The given namespace: "+applicationNamespaces.Namespace+" is already acquired by other slice: "+cluster_namespaces.SliceName) // add slice name
 		}
 	}
+
 	return nil
 }
