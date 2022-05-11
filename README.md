@@ -25,18 +25,18 @@ git clone https://github.com/kubeslice/kubeslice-controller.git
 cd kubeslice-controller
 ```
 
-2. Adjust image name variable `IMG` in the `Makefile` to change the docker tag to be built.
-   Image is set as `IMG ?= aveshasystems/kubeslice-controller:latest` in the Makefile. Change this if required
+2. Adjust image name variable `IMG` in the [`Makefile`](Makefile) to change the docker tag to be built.
+   Default image is set as `IMG ?= aveshasystems/kubeslice-controller:latest`. Modify this if required.
 
 ```bash
 make docker-build
 ```
 
-3. Loading your kubeslice-controller Image Into Your Kind Cluster ([`link`](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster))
-   you need the replace the `my-custom-image` with your local built contoller image
+3. Loading kubeslice-controller Image Into Your Kind Cluster ([`link`](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster))
+   If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
 
 ```bash
-kind load docker-image my-custom-image
+kind load docker-image aveshasystems/kubeslice-controller
 ```
 ### Installation
 To install:
