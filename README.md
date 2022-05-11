@@ -41,7 +41,7 @@ kind load docker-image aveshasystems/kubeslice-controller
 ### Installation
 To install:
 
-2. Create a self-signed certificate for the webhook server.
+1. Create a self-signed certificate for the webhook server.
 
 ```bash
 make webhookCA
@@ -53,13 +53,13 @@ or
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.0/cert-manager.yaml
 ```
 
-3. First check all the cert-manager pods are up and running then apply the following command to deploy `kubeslice-controller` to the kind cluster with all the CRDs:
+2. First check all the cert-manager pods are up and running then run the following command to deploy `kubeslice-controller` to the kind cluster with all the CRDs:
 
 ```bash
 make deploy
 ```
 
-4. For checking the logs of the pods, run the following command:
+3. For checking the logs of the pods, run the following command: (pod-name would start with `kubeslice-controller-manager-`)
 
 ```bash
 kubectl logs -f {pod-name} -n kubeslice-controller
@@ -70,7 +70,7 @@ kubectl logs -f {pod-name} -n kubeslice-controller
 * We have some sample manifests yaml file under `/config/sample`.
 * Run the following commands:
 
-#### for creating a project
+#### For creating a project
 ```bash
 kubectl apply -f config/samples/controller_v1alpha1_project.yaml  
  ```
@@ -84,7 +84,7 @@ kubectl apply -f config/samples/controller_v1alpha1_cluster.yaml -n=kubeslice-ci
 kubectl apply -f config/samples/controller_v1alpha1_sliceconfig.yaml -n=kubeslice-cisco
 ```
 
-### Run unit-test cases
+### Running unit-test cases
 After running this command it will generate a report under `coverage-report/report.html`
 open this on your browser for the coverage report
 ```bash
