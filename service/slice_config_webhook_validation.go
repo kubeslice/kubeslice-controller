@@ -57,6 +57,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err = validateExternalGatewayConfig(); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		if err = validateNamespaces(); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	if len(allErrs) == 0 {
 		return nil
@@ -79,6 +82,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		allErrs = append(allErrs, err)
 	}
 	if err := validateExternalGatewayConfig(); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := validateNamespaces(); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -112,8 +118,8 @@ func preventDeleteSliceConfig() *field.Error {
 		for _, slice := range workerSlices.Items {
 			if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 && len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces) > 0 {
 				applicationNamespacesErr := &field.Error{
-					Type:     field.ErrorTypeInvalid,
-					Field:    "ApplicationNamespaces & AllowedNamespaces",
+					Type:     field.ErrorTypeInternal,
+					Field:    "Field: ApplicationNamespaces & AllowedNamespaces",
 					BadValue: fmt.Sprintf("Number of ApplicationNamespaces: %d and AllowedNamespaces: %d", len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces), len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces)),
 					Detail:   fmt.Sprintf("%s", "Please deboard the namespace before deletion."),
 				}
@@ -121,8 +127,8 @@ func preventDeleteSliceConfig() *field.Error {
 			} else {
 				if len(slice.Status.OnboardedNamespaces) > 0 {
 					onboardNamespaceErr := &field.Error{
-						Type:     field.ErrorTypeInvalid,
-						Field:    "onboarded Namespaces",
+						Type:     field.ErrorTypeInternal,
+						Field:    "Field: OnboardedNamespaces",
 						BadValue: fmt.Sprintf("Number of onboarded namespaces: %d", len(slice.Status.OnboardedNamespaces)),
 						Detail:   fmt.Sprintf("%s", "Deboarding of namespaces is in progress try after some time."),
 					}
@@ -184,7 +190,6 @@ func validateClusters() *field.Error {
 		if len(cluster.Status.CniSubnet) == 0 {
 			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
 		}
-
 		for _, cniSubnet := range cluster.Status.CniSubnet {
 			if util.OverlapIP(cniSubnet, s.Spec.SliceSubnet) {
 				return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), s.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
@@ -219,7 +224,6 @@ func preventUpdate() *field.Error {
 
 // validateQosProfile is a function to validate the Qos(quality of service)profile of slice
 func validateQosProfile() *field.Error {
-
 	if s.Spec.QosProfileDetails.BandwidthCeilingKbps < s.Spec.QosProfileDetails.BandwidthGuaranteedKbps {
 		return field.Invalid(field.NewPath("Spec").Child("QosProfileDetails").Child("BandwidthGuaranteedKbps"), s.Spec.QosProfileDetails.BandwidthGuaranteedKbps, "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
 	}
@@ -250,6 +254,43 @@ func validateExternalGatewayConfig() *field.Error {
 	}
 	if dup, cl := util.CheckDuplicateInArray(allClusters); dup {
 		return field.Invalid(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), cl, "duplicate cluster")
+	}
+	return nil
+}
+
+// validateNamespaces is function to validate the application namespaces
+func validateNamespaces() *field.Error {
+	for _, namespaceName := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+		for _, clusterName := range namespaceName.Clusters {
+			cluster := controllerv1alpha1.Cluster{}
+			if clusterName == "*" {
+				for _, clusterSpec := range s.Spec.Clusters {
+					err := validateClusterNamespaces(clusterSpec, cluster, namespaceName)
+					if err != nil {
+						return err
+					}
+				}
+			} else {
+				err := validateClusterNamespaces(clusterName, cluster, namespaceName)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// validateClusterNamespaces is a function to validate the namespaces present is cluster
+func validateClusterNamespaces(allClusters string, cluster controllerv1alpha1.Cluster, namespaceName controllerv1alpha1.SliceNamespaceSelection) *field.Error {
+	exist, _ := util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: allClusters, Namespace: s.Namespace}, &cluster)
+	if !exist {
+		return field.Invalid(field.NewPath("Spec").Child("Clusters"), allClusters, "cluster is not registered")
+	}
+	for _, cluster_namespaces := range cluster.Status.Namespaces {
+		if namespaceName.Namespace == cluster_namespaces.Name && len(cluster_namespaces.SliceName) > 0 {
+			return field.Invalid(field.NewPath("Spec").Child("SliceConfig"), s.Name, "The given namespace is already acquired by other slice")
+		}
 	}
 	return nil
 }

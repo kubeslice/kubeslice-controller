@@ -131,13 +131,6 @@ spec:
           status:
             description: WorkerSliceConfigStatus defines the observed state of Slice
             properties:
-              OnboardedNamespaces:
-                items:
-                  properties:
-                    Name:
-                      type: string
-                  type: object
-                type: array
               connectedAppPods:
                 items:
                   description: AppPod defines the app pods connected to slice
@@ -159,6 +152,13 @@ spec:
                       type: string
                     podNamespace:
                       description: PodNamespace is App Pod Namespace
+                      type: string
+                  type: object
+                type: array
+              onboardedNamespaces:
+                items:
+                  properties:
+                    name:
                       type: string
                   type: object
                 type: array

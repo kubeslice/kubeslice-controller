@@ -108,9 +108,9 @@ spec:
                 description: Namespaces present in cluster
                 items:
                   properties:
-                    SliceName:
-                      type: string
                     name:
+                      type: string
+                    sliceName:
                       type: string
                   type: object
                 type: array

@@ -90,7 +90,7 @@ type ClusterStatus struct {
 
 type NamespacesConfig struct {
 	Name      string `json:"name,omitempty"`
-	SliceName string `json:"SliceName,omitempty"`
+	SliceName string `json:"sliceName,omitempty"`
 }
 
 //+kubebuilder:object:root=true
