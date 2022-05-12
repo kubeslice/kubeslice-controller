@@ -5,8 +5,8 @@ using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/acce
 
 ## Getting Started
 
-The KubeSlice Controller orchestrates the creation and management of slices on worker clusters. The KubeSlice Controller components and the worker cluster components can coexist on a cluster.
-It is strongly recommended to use a released version. please follow this[`link`](https://docs.avesha.io/opensource/installing-the-kubeslice-controller)
+The KubeSlice Controller orchestrates the creation and management of slices on worker clusters.
+It is strongly recommended to use a released version. please follow this[`documents`](https://docs.avesha.io/opensource/installing-the-kubeslice-controller)
 
 ## Building & Installing `kubeslice-controller` in local kind cluster
 
