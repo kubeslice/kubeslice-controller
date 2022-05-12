@@ -5,9 +5,10 @@ using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/acce
 
 ## Getting Started
 
-It is strongly recommended to use a released version.
+The KubeSlice Controller orchestrates the creation and management of slices on worker clusters. The KubeSlice Controller components and the worker cluster components can coexist on a cluster.
+It is strongly recommended to use a released version. please follow this[`link`](https://docs.avesha.io/opensource/installing-the-kubeslice-controller)
 
-## Installing `kubeslice-controller` in local kind cluster
+## Building & Installing `kubeslice-controller` in local kind cluster
 
 ### Prerequisites
 
@@ -16,8 +17,7 @@ It is strongly recommended to use a released version.
   cluster
 * [`kubectl`](https://kubernetes.io/docs/tasks/tools/) installed and configured
 
-### Installation
-To install:
+### Build docker images
 
 1. Clone the latest version of kubeslice-controller from  the `master` branch.
 
@@ -26,25 +26,41 @@ git clone https://github.com/kubeslice/kubeslice-controller.git
 cd kubeslice-controller
 ```
 
-2. Create a self-signed certificate for the webhook server.
+2. Adjust image name variable `IMG` in the [`Makefile`](Makefile) to change the docker tag to be built.
+   Default image is set as `IMG ?= aveshasystems/kubeslice-controller:latest`. Modify this if required.
+
+```bash
+make docker-build
+```
+
+3. Loading kubeslice-controller Image Into Your Kind Cluster ([`link`](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster))
+   If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
+
+```bash
+kind load docker-image aveshasystems/kubeslice-controller
+```
+### Installation
+To install:
+
+1. Create a self-signed certificate for the webhook server.
 
 ```bash
 make webhookCA
 ```
 
-   or
+or
 
 ```bash
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.0/cert-manager.yaml
 ```
 
-3. Run the following command to deploy kubeslice-controller to the kind cluster with all the CRDs:
+2. First check all the cert-manager pods are up and running then run the following command to deploy `kubeslice-controller` to the kind cluster with all the CRDs:
 
 ```bash
 make deploy
 ```
 
-4. For checking the logs of the pods, run the following command:
+3. For checking the logs of the pods, run the following command: (pod-name would start with `kubeslice-controller-manager-`)
 
 ```bash
 kubectl logs -f {pod-name} -n kubeslice-controller
@@ -55,18 +71,25 @@ kubectl logs -f {pod-name} -n kubeslice-controller
 * We have some sample manifests yaml file under `/config/sample`.
 * Run the following commands:
 
-### for creating a project
+#### For creating a project
 ```bash
 kubectl apply -f config/samples/controller_v1alpha1_project.yaml  
  ```
 
-### Registering the Worker Cluster
+#### Registering the Worker Cluster
 ```bash
-kubectl apply -f config/samples/hub_v1alpha1_cluster.yaml -n=kubeslice-cisco
+kubectl apply -f config/samples/controller_v1alpha1_cluster.yaml -n=kubeslice-cisco
 ```
-### Applying the sliceconfig
+#### Applying the sliceconfig
 ```bash
-kubectl apply -f config/samples/hub_v1alpha1_sliceconfig.yaml -n=kubeslice-cisco
+kubectl apply -f config/samples/controller_v1alpha1_sliceconfig.yaml -n=kubeslice-cisco
+```
+
+### Running unit-test cases
+After running this command it will generate a report under `coverage-report/report.html`
+open this on your browser for the coverage report
+```bash
+make unit-test
 ```
 
 ### Uninstalling the kubeslice-controller

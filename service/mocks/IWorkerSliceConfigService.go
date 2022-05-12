@@ -29,7 +29,7 @@ func (_m *IWorkerSliceConfigService) ComputeClusterMap(clusterNames []string, wo
 	return r0
 }
 
-// CreateWorkerSliceConfig provides a mock function with given fields: ctx, clusters, namespace, label, name, sliceSubnet
+// CreateMinimalWorkerSliceConfig provides a mock function with given fields: ctx, clusters, namespace, label, name, sliceSubnet
 func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string) (map[string]int, error) {
 	ret := _m.Called(ctx, clusters, namespace, label, name, sliceSubnet)
 

@@ -38,6 +38,7 @@ type SliceConfigService struct {
 	acs IAccessControlService
 	sgs IWorkerSliceGatewayService
 	ms  IWorkerSliceConfigService
+	si  IWorkerServiceImportService
 	se  IServiceExportConfigService
 }
 
@@ -102,6 +103,23 @@ func (s SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, err
 	}
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
+
+	// Step 5: Create ServiceImport Objects
+	serviceExports := &v1alpha1.ServiceExportConfigList{}
+	_, err = s.getServiceExportBySliceName(ctx, req.Namespace, sliceConfig.Name, serviceExports)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if len(serviceExports.Items) > 0 {
+		// iterate service export configs
+		for _, serviceExport := range serviceExports.Items {
+			err = s.si.CreateMinimalWorkerServiceImport(ctx, sliceConfig.Spec.Clusters, req.Namespace, s.getOwnerLabelsForServiceExport(&serviceExport), serviceExport.Spec.ServiceName, serviceExport.Spec.ServiceNamespace, serviceExport.Spec.SliceName)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -143,4 +161,24 @@ func (s *SliceConfigService) DeleteSliceConfigs(ctx context.Context, namespace s
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+// getServiceExportBySliceName is a function to get the service export configs by slice name
+func (s *SliceConfigService) getServiceExportBySliceName(ctx context.Context, namespace string, sliceName string, serviceExports *v1alpha1.ServiceExportConfigList) (ctrl.Result, error) {
+	label := map[string]string{
+		"original-slice-name": sliceName,
+	}
+	err := util.ListResources(ctx, serviceExports, client.InNamespace(namespace), client.MatchingLabels(label))
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+// getOwnerLabelsForServiceExport is a function to get the owner labels for service export
+func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig *v1alpha1.ServiceExportConfig) map[string]string {
+	ownerLabels := util.GetOwnerLabel(serviceExportConfig)
+	resourceName := fmt.Sprintf("%s-%s-%s", serviceExportConfig.Spec.ServiceName, serviceExportConfig.Spec.ServiceNamespace, serviceExportConfig.Spec.SliceName)
+	ownerLabels["controller-resource-name"] = fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
+	return ownerLabels
 }
