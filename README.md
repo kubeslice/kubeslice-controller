@@ -12,6 +12,7 @@ It is strongly recommended to use a released version. please follow this[`docume
 
 ### Prerequisites
 
+* Go (version 1.17 or later) installed and configured in your machine ([Installing Go](https://go.dev/dl/))
 * Docker installed and running in your local machine
 * A running [`kind`](https://kind.sigs.k8s.io/) or [`Docker Desktop Kubernetes`](https://docs.docker.com/desktop/kubernetes/)
   cluster
@@ -35,9 +36,14 @@ make docker-build
 
 3. Loading kubeslice-controller Image Into Your Kind Cluster ([`link`](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster))
    If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
-
+    [See loading an image into your cluster](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)
 ```bash
-kind load docker-image aveshasystems/kubeslice-controller
+kind load docker-image aveshasystems/kubeslice-controller --name kind
+```
+
+4. Check the loaded image in the cluster. Modify node name if required.
+```bash
+docker exec -it kind-control-plane crictl images
 ```
 ### Installation
 To install:
