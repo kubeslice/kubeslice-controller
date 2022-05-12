@@ -34,21 +34,17 @@ import (
 // s is instance of SliceConfig schema
 var s *controllerv1alpha1.SliceConfig = nil
 
-// sliceConfigCtx is context var
-var sliceConfigCtx context.Context = nil
-
 // ValidateSliceConfigCreate is a function to verify the creation of slice config
 func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
 	s = sliceConfig
-	sliceConfigCtx = ctx
 	var allErrs field.ErrorList
-	if err := validateProjectNamespace(); err != nil {
+	if err := validateProjectNamespace(ctx); err != nil {
 		allErrs = append(allErrs, err)
 	} else {
 		if err = validateSliceSubnet(); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		if err = validateClusters(); err != nil {
+		if err = validateClusters(ctx); err != nil {
 			allErrs = append(allErrs, err)
 		}
 		if err = validateQosProfile(); err != nil {
@@ -57,7 +53,7 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err = validateExternalGatewayConfig(); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		if err = validateNamespaces(); err != nil {
+		if err = validateApplicationNamespaces(ctx); err != nil {
 			allErrs = append(allErrs, err)
 		}
 	}
@@ -70,12 +66,11 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 // ValidateSliceConfigUpdate is function to verify the update of slice config
 func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
 	s = sliceConfig
-	sliceConfigCtx = ctx
 	var allErrs field.ErrorList
-	if err := preventUpdate(); err != nil {
+	if err := preventUpdate(ctx); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateClusters(); err != nil {
+	if err := validateClusters(ctx); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if err := validateQosProfile(); err != nil {
@@ -84,7 +79,7 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateExternalGatewayConfig(); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateNamespaces(); err != nil {
+	if err := validateApplicationNamespaces(ctx); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -96,10 +91,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 // ValidateSliceConfigDelete is function to validate the deletion of sliceConfig
 func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
 	s = sliceConfig
-	workerSliceConfigCtx = ctx
 
 	var allErrs field.ErrorList
-	if err := preventDeleteSliceConfig(); err != nil {
+	if err := checkNamespaceDeboardingStatus(ctx); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -108,20 +102,20 @@ func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alp
 	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
 }
 
-func preventDeleteSliceConfig() *field.Error {
+func checkNamespaceDeboardingStatus(ctx context.Context) *field.Error {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	ownerLabel := map[string]string{
 		"original-slice-name": s.Name,
 	}
-	err := util.ListResources(workerSliceConfigCtx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(s.Namespace))
+	err := util.ListResources(ctx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(s.Namespace))
 	if err == nil && len(workerSlices.Items) > 0 {
 		for _, slice := range workerSlices.Items {
-			if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 && len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces) > 0 {
+			if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 || len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces) > 0 {
 				applicationNamespacesErr := &field.Error{
-					Type:     field.ErrorTypeInternal,
+					Type:     field.ErrorTypeForbidden,
 					Field:    "Field: ApplicationNamespaces & AllowedNamespaces",
 					BadValue: fmt.Sprintf("Number of ApplicationNamespaces: %d and AllowedNamespaces: %d", len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces), len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces)),
-					Detail:   fmt.Sprintf("%s", "Please deboard the namespace before deletion."),
+					Detail:   fmt.Sprintf("%s", "Please deboard the namespaces before deletion of slice."),
 				}
 				return applicationNamespacesErr
 			} else {
@@ -130,7 +124,7 @@ func preventDeleteSliceConfig() *field.Error {
 						Type:     field.ErrorTypeInternal,
 						Field:    "Field: OnboardedNamespaces",
 						BadValue: fmt.Sprintf("Number of onboarded namespaces: %d", len(slice.Status.OnboardedNamespaces)),
-						Detail:   fmt.Sprintf("%s", "Deboarding of namespaces is in progress try after some time."),
+						Detail:   fmt.Sprintf("%s", "Deboarding of namespaces is in progress, please try after some time."),
 					}
 					return onboardNamespaceErr
 				}
@@ -156,9 +150,9 @@ func validateSliceSubnet() *field.Error {
 }
 
 // validateProjectNamespace is a function to verify the namespace of project
-func validateProjectNamespace() *field.Error {
+func validateProjectNamespace(ctx context.Context) *field.Error {
 	namespace := &corev1.Namespace{}
-	exist, _ := util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: s.Namespace}, namespace)
+	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: s.Namespace}, namespace)
 	if !exist || !checkForProjectNamespace(namespace) {
 		return field.Invalid(field.NewPath("metadata").Child("namespace"), s.Namespace, "SliceConfig must be applied on project namespace")
 	}
@@ -171,13 +165,13 @@ func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 }
 
 // validateClusters is function to validate the cluster specification
-func validateClusters() *field.Error {
+func validateClusters(ctx context.Context) *field.Error {
 	if duplicate, value := util.CheckDuplicateInArray(s.Spec.Clusters); duplicate {
 		return field.Invalid(field.NewPath("Spec").Child("Clusters"), value, "clusters must be unique in slice config")
 	}
 	for _, clusterName := range s.Spec.Clusters {
 		cluster := controllerv1alpha1.Cluster{}
-		exist, _ := util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: clusterName, Namespace: s.Namespace}, &cluster)
+		exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: s.Namespace}, &cluster)
 		if !exist {
 			return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster is not registered")
 		}
@@ -200,9 +194,9 @@ func validateClusters() *field.Error {
 }
 
 // preventUpdate is a function to stop/avoid the update of config of slice
-func preventUpdate() *field.Error {
+func preventUpdate(ctx context.Context) *field.Error {
 	sliceConfig := controllerv1alpha1.SliceConfig{}
-	_, _ = util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: s.Name, Namespace: s.Namespace}, &sliceConfig)
+	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: s.Name, Namespace: s.Namespace}, &sliceConfig)
 	if sliceConfig.Spec.SliceSubnet != s.Spec.SliceSubnet {
 		return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), s.Spec.SliceSubnet, "cannot be updated")
 	}
@@ -258,21 +252,19 @@ func validateExternalGatewayConfig() *field.Error {
 	return nil
 }
 
-// validateNamespaces is function to validate the application namespaces
-func validateNamespaces() *field.Error {
-	cluster := controllerv1alpha1.Cluster{}
-	for _, applicationNamespaces := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
-		if applicationNamespaces.Clusters[0] == "*" {
-			for _, clusterSpec := range s.Spec.Clusters {
-				err := validateAllowedClusterNamespaces(clusterSpec, cluster, applicationNamespaces, s.GetName())
+// validateApplicationNamespaces is function to validate the application namespaces
+func validateApplicationNamespaces(ctx context.Context) *field.Error {
+	for _, applicationNamespace := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+		if applicationNamespace.Clusters[0] == "*" {
+			for _, clusterName := range s.Spec.Clusters {
+				err := validateAllowedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, s.Name)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			for _, clusterName := range applicationNamespaces.Clusters {
-				cluster := controllerv1alpha1.Cluster{}
-				err := validateAllowedClusterNamespaces(clusterName, cluster, applicationNamespaces, s.GetName())
+			for _, clusterName := range applicationNamespace.Clusters {
+				err := validateAllowedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, s.Name)
 				if err != nil {
 					return err
 				}
@@ -283,16 +275,16 @@ func validateNamespaces() *field.Error {
 }
 
 // validateClusterNamespaces is a function to validate the namespaces present is cluster
-func validateAllowedClusterNamespaces(clusterName string, cluster controllerv1alpha1.Cluster, applicationNamespaces controllerv1alpha1.SliceNamespaceSelection, sliceName string) *field.Error {
-	exist, _ := util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: clusterName, Namespace: s.Namespace}, &cluster)
+func validateAllowedClusterNamespaces(ctx context.Context, clusterName string, applicationNamespace string, sliceName string) *field.Error {
+	cluster := controllerv1alpha1.Cluster{}
+	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: s.Namespace}, &cluster)
 	if !exist {
 		return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster is not registered")
 	}
-	for _, cluster_namespaces := range cluster.Status.Namespaces {
-		if applicationNamespaces.Namespace == cluster_namespaces.Name && len(cluster_namespaces.SliceName) > 0 && cluster_namespaces.SliceName != sliceName {
-			return field.Invalid(field.NewPath("Spec").Child("SliceConfig.NamespaceIsolationProfile.ApplicationNamespaces"), s.Name, "The given namespace: "+applicationNamespaces.Namespace+" is already acquired by other slice: "+cluster_namespaces.SliceName) // add slice name
+	for _, clusterNamespace := range cluster.Status.Namespaces {
+		if applicationNamespace == clusterNamespace.Name && len(clusterNamespace.SliceName) > 0 && clusterNamespace.SliceName != sliceName {
+			return field.Invalid(field.NewPath("Spec").Child("SliceConfig.NamespaceIsolationProfile.ApplicationNamespaces"), applicationNamespace, "The given namespace: "+applicationNamespace+" in cluster "+clusterName+" is already acquired by other slice: "+clusterNamespace.SliceName)
 		}
 	}
-
 	return nil
 }
