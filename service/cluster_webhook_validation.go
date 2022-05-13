@@ -29,16 +29,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// c is instance of cluster schema
-var c *controllerv1alpha1.Cluster = nil
-var clusterCtx context.Context = nil
-
 // ValidateClusterCreate is a function to validate the creation of cluster
-func ValidateClusterCreate(ctx context.Context, cluster *controllerv1alpha1.Cluster) error {
-	clusterCtx = ctx
-	c = cluster
+func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) error {
 	var allErrs field.ErrorList
-	if err := validateAppliedInProjectNamespace(); err != nil {
+	if err := validateAppliedInProjectNamespace(ctx, c); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -48,11 +42,9 @@ func ValidateClusterCreate(ctx context.Context, cluster *controllerv1alpha1.Clus
 }
 
 // ValidateClusterUpdate is a function to validate to the update of specification of cluster
-func ValidateClusterUpdate(ctx context.Context, cluster *controllerv1alpha1.Cluster) error {
-	clusterCtx = ctx
-	c = cluster
+func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster) error {
 	var allErrs field.ErrorList
-	if err := validateClusterSpec(); err != nil {
+	if err := validateClusterSpec(ctx, c); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -62,11 +54,9 @@ func ValidateClusterUpdate(ctx context.Context, cluster *controllerv1alpha1.Clus
 }
 
 // ValidateClusterDelete is a function to validate the deletion of cluster
-func ValidateClusterDelete(ctx context.Context, cluster *controllerv1alpha1.Cluster) error {
-	clusterCtx = ctx
-	c = cluster
+func ValidateClusterDelete(ctx context.Context, c *controllerv1alpha1.Cluster) error {
 	var allErrs field.ErrorList
-	if err := validateClusterInAnySlice(); err != nil {
+	if err := validateClusterInAnySlice(ctx, c); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -76,9 +66,9 @@ func ValidateClusterDelete(ctx context.Context, cluster *controllerv1alpha1.Clus
 }
 
 // validateAppliedInProjectNamespace is a function to validate the if the cluster is applied in project namespace or not
-func validateAppliedInProjectNamespace() *field.Error {
+func validateAppliedInProjectNamespace(ctx context.Context, c *controllerv1alpha1.Cluster) *field.Error {
 	actualNamespace := corev1.Namespace{}
-	exist, _ := util.GetResourceIfExist(clusterCtx, client.ObjectKey{Name: c.Namespace}, &actualNamespace)
+	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Namespace}, &actualNamespace)
 	if exist {
 		if actualNamespace.Labels[util.LabelName] == "" {
 			return field.Invalid(field.NewPath("metadata").Child("namespace"), c.Name, "cluster must be applied on project namespace")
@@ -88,9 +78,9 @@ func validateAppliedInProjectNamespace() *field.Error {
 }
 
 // validateClusterSpec is a function to to validate the specification of cluster
-func validateClusterSpec() *field.Error {
+func validateClusterSpec(ctx context.Context, c *controllerv1alpha1.Cluster) *field.Error {
 	cluster := controllerv1alpha1.Cluster{}
-	_, _ = util.GetResourceIfExist(clusterCtx, client.ObjectKey{Name: c.Name, Namespace: c.Namespace}, &cluster)
+	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Name, Namespace: c.Namespace}, &cluster)
 	if cluster.Spec.NetworkInterface != "" && cluster.Spec.NetworkInterface != c.Spec.NetworkInterface {
 		return field.Invalid(field.NewPath("spec").Child("networkInterface"), c.Spec.NetworkInterface, "network interface can't be changed")
 	}
@@ -98,10 +88,10 @@ func validateClusterSpec() *field.Error {
 }
 
 // validateClusterInAnySlice is a function to check if the cluster is in any slice
-func validateClusterInAnySlice() *field.Error {
+func validateClusterInAnySlice(ctx context.Context, c *controllerv1alpha1.Cluster) *field.Error {
 	workerSlice := &workerv1alpha1.WorkerSliceConfigList{}
 	label := map[string]string{"worker-cluster": c.Name}
-	err := util.ListResources(clusterCtx, workerSlice, client.MatchingLabels(label), client.InNamespace(c.Namespace))
+	err := util.ListResources(ctx, workerSlice, client.MatchingLabels(label), client.InNamespace(c.Namespace))
 	if err == nil {
 		if len(workerSlice.Items) > 0 {
 			return field.Invalid(field.NewPath("metadata").Child("name"), c.Name, "can't delete cluster which is participating in any slice")

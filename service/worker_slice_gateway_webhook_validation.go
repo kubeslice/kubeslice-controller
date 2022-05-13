@@ -27,28 +27,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// sg is instance of schema WorkerSliceGateway
-var sg *workerv1alpha1.WorkerSliceGateway = nil
-
-// workerSliceGatewayCtx context variable
-var workerSliceGatewayCtx context.Context = nil
-
 // ValidateWorkerSliceGatewayUpdate is function to validate the updation of gateways
 func ValidateWorkerSliceGatewayUpdate(ctx context.Context, workerSliceGateway *workerv1alpha1.WorkerSliceGateway) error {
-	sg = workerSliceGateway
-	workerSliceGatewayCtx = ctx
 	var allErrs field.ErrorList
-	if err := preventUpdateWorkerSliceGateway(); err != nil {
+	if err := preventUpdateWorkerSliceGateway(ctx, workerSliceGateway); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
 		return nil
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "worker.kubeslice.io", Kind: "WorkerSliceGateway"}, sg.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "worker.kubeslice.io", Kind: "WorkerSliceGateway"}, workerSliceGateway.Name, allErrs)
 }
 
 // preventUpdateWorkerSliceGateway is a function to check the gatewaynumber of workerslice
-func preventUpdateWorkerSliceGateway() *field.Error {
+func preventUpdateWorkerSliceGateway(workerSliceGatewayCtx context.Context, sg *workerv1alpha1.WorkerSliceGateway) *field.Error {
 	workerSliceGateway := workerv1alpha1.WorkerSliceGateway{}
 	_, _ = util.GetResourceIfExist(workerSliceGatewayCtx, client.ObjectKey{Name: sg.Name, Namespace: sg.Namespace}, &workerSliceGateway)
 	if workerSliceGateway.Spec.GatewayNumber != sg.Spec.GatewayNumber {

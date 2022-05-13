@@ -29,30 +29,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// se is instance ServiceExportConfig Schema
-var se *controllerv1alpha1.ServiceExportConfig = nil
-
 // ValidateServiceExportConfigCreate is a function to validate the create process of service export config
 func ValidateServiceExportConfigCreate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
-	se = serviceExportConfig
 	var allErrs field.ErrorList
-	if err := validateServiceExportConfigNamespace(ctx, se); err != nil {
+	if err := validateServiceExportConfigNamespace(ctx, serviceExportConfig); err != nil {
 		allErrs = append(allErrs, err)
-		return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, se.Name, allErrs)
+		return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, serviceExportConfig.Name, allErrs)
 	}
-	if err := validateServiceExportClusterAndSlice(ctx, se); err != nil {
+	if err := validateServiceExportClusterAndSlice(ctx, serviceExportConfig); err != nil {
 		allErrs = append(allErrs, err...)
 	}
-	if err := validateServiceEndpoint(ctx, se); err != nil {
+	if err := validateServiceEndpoint(ctx, serviceExportConfig); err != nil {
 		allErrs = append(allErrs, err...)
 	}
 	if len(allErrs) == 0 {
 		return nil
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, se.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, serviceExportConfig.Name, allErrs)
 }
 
-//
 func validateServiceExportClusterAndSlice(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) field.ErrorList {
 	var allErrs field.ErrorList = nil
 	cluster := &controllerv1alpha1.Cluster{}
@@ -120,28 +115,27 @@ func validateServiceEndpoint(ctx context.Context, serviceExport *controllerv1alp
 	return allErrs
 }
 func ValidateServiceExportConfigUpdate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
-	se = serviceExportConfig
 	var allErrs field.ErrorList
-	if err := validateServiceExportConfigNamespace(ctx, se); err != nil {
+	if err := validateServiceExportConfigNamespace(ctx, serviceExportConfig); err != nil {
 		allErrs = append(allErrs, err)
-		return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, se.Name, allErrs)
+		return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, serviceExportConfig.Name, allErrs)
 	}
-	if err := validateServiceExportClusterAndSlice(ctx, se); err != nil {
+	if err := validateServiceExportClusterAndSlice(ctx, serviceExportConfig); err != nil {
 		allErrs = append(allErrs, err...)
 	}
-	if err := validateServiceEndpoint(ctx, se); err != nil {
+	if err := validateServiceEndpoint(ctx, serviceExportConfig); err != nil {
 		allErrs = append(allErrs, err...)
 	}
 	if len(allErrs) == 0 {
 		return nil
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, se.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, serviceExportConfig.Name, allErrs)
 }
 func validateServiceExportConfigNamespace(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
 	namespace := &corev1.Namespace{}
 	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Namespace}, namespace)
 	if !exist || !checkForProjectNamespace(namespace) {
-		return field.Invalid(field.NewPath("metadata").Child("namespace"), se.Namespace, "ServiceExportConfig must be applied on project namespace")
+		return field.Invalid(field.NewPath("metadata").Child("namespace"), serviceExport.Namespace, "ServiceExportConfig must be applied on project namespace")
 	}
 	return nil
 }
