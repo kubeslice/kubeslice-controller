@@ -53,6 +53,10 @@ make docker-build
    If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
 * Note: If using a named cluster you will need to specify the name of the cluster you wish to load the images into. See [loading an image into your kind cluster](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster).
 ```console
+kind load docker-image aveshasystems/kubeslice-controller --name cluster-name
+```
+example:
+```console
 kind load docker-image aveshasystems/kubeslice-controller --name kind
 ```
 
