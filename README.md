@@ -113,6 +113,8 @@ kubeslice-controller-manager-5b548fb865-kzb7c   2/2     Running   0          102
 ```
 
 ### Uninstalling the kubeslice-controller
+For more information, see [uninstalling the KubeSlice](https://docs.avesha.io/opensource/uninstalling-kubeslice).
+
 ```console
 make chart-undeploy
  ```
