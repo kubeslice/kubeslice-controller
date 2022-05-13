@@ -1,7 +1,7 @@
 # kubeslice-controller
 
 ![Docker Image Size](https://img.shields.io/docker/image-size/aveshasystems/kubeslice-controller/latest)
-![Docker Image Version](https://img.shields.io/docker/v/aveshasystems/kubeslice-controller?sort=latest)
+![Docker Image Version](https://img.shields.io/docker/v/aveshasystems/kubeslice-controller?sort=date)
 
 kubeslice-controller uses Kubebuilder, a framework for building Kubernetes APIs
 using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions).
