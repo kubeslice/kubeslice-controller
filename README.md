@@ -51,13 +51,13 @@ make docker-build
 
 1. Loading kubeslice-controller Image Into Your Kind Cluster ([kind](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)).
    If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
-* Note: If using a named cluster you will need to specify the name of the cluster you wish to load the images into.
+* Note: If using a named cluster you will need to specify the name of the cluster you wish to load the images into. See [loading an image into your kind cluster](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster).
 ```console
 kind load docker-image aveshasystems/kubeslice-controller --name kind
 ```
 
 2. Check the loaded image in the cluster. Modify node name if required.
-* Note: Where `my-node-name` is the name of the Docker container (e.g. kind-control-plane).
+* Note: `kind-control-plane` is the name of the Docker container. Modify if needed.
 ```console
 docker exec -it kind-control-plane crictl images
 ```
