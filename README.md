@@ -74,8 +74,8 @@ docker exec -it kind-control-plane crictl images
 ```
 ### Deploying in a Cluster
 1. Create chart values file `yourvaluesfile.yaml`. Refer to [values.yaml](https://github.com/kubeslice/charts/blob/master/kubeslice-controller/values.yaml) on how to adjust this and update the `kubeslice-controller` image to the local build image.
-2. 
-From the sample,
+
+From the sample:
 
 ```
 kubeslice:
@@ -88,7 +88,7 @@ kubeslice:
       tag: 0.1.1
 ```
 
-Change it to
+Change it to:
 
 ```
 kubeslice:
@@ -103,9 +103,10 @@ kubeslice:
 
 2. Deploy the updated chart.
 
-```console
-make chart-deploy VALUESFILE=yourvaluesfile.yaml
-```
+   ```console
+   make chart-deploy VALUESFILE=yourvaluesfile.yaml
+   ```
+   
 ### Verify if the Operator is Running
 
 
