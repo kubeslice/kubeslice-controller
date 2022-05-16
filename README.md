@@ -73,7 +73,7 @@ kind load docker-image aveshasystems/kubeslice-controller --name kind
 docker exec -it kind-control-plane crictl images
 ```
 ### Deploying in a Cluster
-1. Create chart values file `yourvaluesfile.yaml`. Refer to [values.yaml](https://github.com/kubeslice/charts/blob/master/kubeslice-controller/values.yaml) on how to adjust this and update the `kubeslice-controller` image to the local build image.
+1. Create chart values file `yourvaluesfile.yaml`. Refer to [values.yaml](https://github.com/kubeslice/charts/blob/master/charts/kubeslice-controller/values.yaml) on how to adjust this and update the `kubeslice-controller` image to the local build image.
 
 From the sample:
 
