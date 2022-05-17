@@ -112,11 +112,11 @@ func checkNamespaceDeboardingStatus(ctx context.Context, sliceConfig *controller
 				}
 				return applicationNamespacesErr
 			} else {
-				if len(slice.Status.OnboardedNamespaces) > 0 {
+				if len(slice.Status.OnboardedAppNamespaces) > 0 {
 					onboardNamespaceErr := &field.Error{
 						Type:     field.ErrorTypeInternal,
-						Field:    "Field: OnboardedNamespaces",
-						BadValue: fmt.Sprintf("Number of onboarded namespaces: %d", len(slice.Status.OnboardedNamespaces)),
+						Field:    "Field: OnboardedAppNamespaces",
+						BadValue: fmt.Sprintf("Number of onboarded Application namespaces: %d", len(slice.Status.OnboardedAppNamespaces)),
 						Detail:   fmt.Sprintf("Deboarding of namespaces is in progress, please try after some time."),
 					}
 					return onboardNamespaceErr

@@ -378,8 +378,8 @@ func (in *WorkerSliceConfigStatus) DeepCopyInto(out *WorkerSliceConfigStatus) {
 		*out = make([]AppPod, len(*in))
 		copy(*out, *in)
 	}
-	if in.OnboardedNamespaces != nil {
-		in, out := &in.OnboardedNamespaces, &out.OnboardedNamespaces
+	if in.OnboardedAppNamespaces != nil {
+		in, out := &in.OnboardedAppNamespaces, &out.OnboardedAppNamespaces
 		*out = make([]NamespaceConfig, len(*in))
 		copy(*out, *in)
 	}

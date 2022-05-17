@@ -83,7 +83,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice":                           UpdateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
-	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty":                                    DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty,
+	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty":                                 DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1173,7 +1173,7 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 	return clientMock, sliceConfig, ctx
 }
 
-func DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty(t *testing.T) {
+func DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -1183,11 +1183,11 @@ func DeleteValidateSliceConfigWithOnboardedNamespacesNotEmpty(t *testing.T) {
 		if arg.Items == nil {
 			arg.Items = make([]workerv1alpha1.WorkerSliceConfig, 1)
 		}
-		if arg.Items[0].Status.OnboardedNamespaces == nil {
-			arg.Items[0].Status.OnboardedNamespaces = make([]workerv1alpha1.NamespaceConfig, 2)
+		if arg.Items[0].Status.OnboardedAppNamespaces == nil {
+			arg.Items[0].Status.OnboardedAppNamespaces = make([]workerv1alpha1.NamespaceConfig, 2)
 		}
-		arg.Items[0].Status.OnboardedNamespaces[0].Name = "random1"
-		arg.Items[0].Status.OnboardedNamespaces[1].Name = "random2"
+		arg.Items[0].Status.OnboardedAppNamespaces[0].Name = "random1"
+		arg.Items[0].Status.OnboardedAppNamespaces[1].Name = "random2"
 
 	}).Once()
 	err := ValidateSliceConfigDelete(ctx, newSliceConfig)

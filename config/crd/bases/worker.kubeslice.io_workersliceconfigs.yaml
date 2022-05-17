@@ -155,7 +155,7 @@ spec:
                       type: string
                   type: object
                 type: array
-              onboardedNamespaces:
+              onboardedAppNamespaces:
                 items:
                   properties:
                     name:
