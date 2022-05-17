@@ -215,7 +215,7 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
 			os.Exit(1)
 		}
-		if err = (&controllerv1alpha1.SliceConfig{}).SetupWebhookWithManager(mgr, service.ValidateSliceConfigCreate, service.ValidateSliceConfigUpdate); err != nil {
+		if err = (&controllerv1alpha1.SliceConfig{}).SetupWebhookWithManager(mgr, service.ValidateSliceConfigCreate, service.ValidateSliceConfigUpdate, service.ValidateSliceConfigDelete); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SliceConfig")
 			os.Exit(1)
 		}

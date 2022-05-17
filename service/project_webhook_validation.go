@@ -32,54 +32,45 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var projectCtx context.Context = nil
-
-// r is instance of Project schema
-var r *controllerv1alpha1.Project = nil
-
 // ValidateProjectCreate is a function to validate the creation of project
 func ValidateProjectCreate(ctx context.Context, project *controllerv1alpha1.Project) error {
-	projectCtx = ctx
-	r = project
 	var allErrs field.ErrorList
-	if err := validateAppliedInAveshaNamespace(); err != nil {
+	if err := validateAppliedInAveshaNamespace(ctx, project); err != nil {
 		allErrs = append(allErrs, err)
 	} else {
-		if err = validateProjectName(r.Name); err != nil {
+		if err = validateProjectName(project.Name); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, r.Name)
-		if err := validateProjectNamespaceIfAlreadyExists(projectNamespace); err != nil {
+		projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.Name)
+		if err := validateProjectNamespaceIfAlreadyExists(ctx, projectNamespace); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		errors := validateDNSCompliantSANames()
+		errors := validateDNSCompliantSANames(project)
 		allErrs = append(allErrs, errors...)
 	}
 	if len(allErrs) == 0 {
 		return nil
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, r.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, project.Name, allErrs)
 }
 
 // ValidateProjectUpdate is a function to verify the project - service account, role binding, service account names
 func ValidateProjectUpdate(ctx context.Context, project *controllerv1alpha1.Project) error {
-	projectCtx = ctx
-	r = project
 	var allErrs field.ErrorList
-	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, r.Name)
-	if err := validateServiceAccount(projectNamespace); err != nil {
+	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.Name)
+	if err := validateServiceAccount(ctx, project, projectNamespace); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateRoleBinding(projectNamespace); err != nil {
+	if err := validateRoleBinding(ctx, project, projectNamespace); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	errors := validateDNSCompliantSANames()
+	errors := validateDNSCompliantSANames(project)
 	allErrs = append(allErrs, errors...)
 	if len(allErrs) == 0 {
 		return nil
 	}
 
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, r.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, project.Name, allErrs)
 }
 
 func validateProjectName(name string) *field.Error {
@@ -93,16 +84,16 @@ func validateProjectName(name string) *field.Error {
 }
 
 // validateAppliedInAveshaNamespace is a function to verify if project is applied in kubeslice
-func validateAppliedInAveshaNamespace() *field.Error {
-	if r.Namespace != os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE") {
-		return field.Invalid(field.NewPath("namespace"), r.Namespace, "project must be applied on kubeslice-manager namespace - "+os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"))
+func validateAppliedInAveshaNamespace(ctx context.Context, project *controllerv1alpha1.Project) *field.Error {
+	if project.Namespace != os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE") {
+		return field.Invalid(field.NewPath("namespace"), project.Namespace, "project must be applied on kubeslice-manager namespace - "+os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"))
 	}
 	return nil
 }
 
 // validateProjectNamespaceIfAlreadyExists is a function validate the whether the project namespace already exists or not
-func validateProjectNamespaceIfAlreadyExists(projectNamespace string) *field.Error {
-	exist, _ := util.GetResourceIfExist(projectCtx, client.ObjectKey{Name: projectNamespace}, &corev1.Namespace{})
+func validateProjectNamespaceIfAlreadyExists(ctx context.Context, projectNamespace string) *field.Error {
+	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: projectNamespace}, &corev1.Namespace{})
 	if exist {
 		return field.Invalid(field.NewPath("project namespace"), projectNamespace, "already exists")
 	}
@@ -110,8 +101,8 @@ func validateProjectNamespaceIfAlreadyExists(projectNamespace string) *field.Err
 }
 
 // validateDNSCompliantSANames is a function to validate the service account name whether it is DNS compliant
-func validateDNSCompliantSANames() []*field.Error {
-	readNames := r.Spec.ServiceAccount.ReadOnly
+func validateDNSCompliantSANames(project *controllerv1alpha1.Project) []*field.Error {
+	readNames := project.Spec.ServiceAccount.ReadOnly
 	var errors []*field.Error
 	for _, name := range readNames {
 		if !util.IsDNSCompliant(name) {
@@ -119,7 +110,7 @@ func validateDNSCompliantSANames() []*field.Error {
 			errors = append(errors, invalidError)
 		}
 	}
-	writeNames := r.Spec.ServiceAccount.ReadWrite
+	writeNames := project.Spec.ServiceAccount.ReadWrite
 	for _, name := range writeNames {
 		if !util.IsDNSCompliant(name) {
 			invalidError := field.Invalid(field.NewPath("spec").Child("serviceAccount").Child("readWrite"), name, "is not valid.")
@@ -130,14 +121,14 @@ func validateDNSCompliantSANames() []*field.Error {
 }
 
 // validateServiceAccount is a function to validate the service account
-func validateServiceAccount(projectNamespace string) *field.Error {
+func validateServiceAccount(ctx context.Context, project *controllerv1alpha1.Project, projectNamespace string) *field.Error {
 	// The field helpers from the kubernetes API machinery help us return nicely
 	// structured validation errors.
-	err := validateSANamesIfAlreadyExists(r.Spec.ServiceAccount.ReadOnly, projectNamespace, ServiceAccountReadOnlyUser, "readOnly")
+	err := validateSANamesIfAlreadyExists(ctx, project, project.Spec.ServiceAccount.ReadOnly, projectNamespace, ServiceAccountReadOnlyUser, "readOnly")
 	if err != nil {
 		return err
 	}
-	err = validateSANamesIfAlreadyExists(r.Spec.ServiceAccount.ReadWrite, projectNamespace, ServiceAccountReadWriteUser, "readWrite")
+	err = validateSANamesIfAlreadyExists(ctx, project, project.Spec.ServiceAccount.ReadWrite, projectNamespace, ServiceAccountReadWriteUser, "readWrite")
 	if err != nil {
 		return err
 	}
@@ -145,29 +136,29 @@ func validateServiceAccount(projectNamespace string) *field.Error {
 }
 
 // validateRoleBindingIfExists is a function to verify the role like read only, readwrite
-func validateRoleBinding(projectNamespace string) *field.Error {
+func validateRoleBinding(ctx context.Context, project *controllerv1alpha1.Project, projectNamespace string) *field.Error {
 	// The field helpers from the kubernetes API machinery help us return nicely
 	// structured validation errors.
-	err := validateRoleBindingIfExists(r.Spec.ServiceAccount.ReadOnly, projectNamespace, RoleBindingReadOnlyUser, "readOnly")
+	err := validateRoleBindingIfExists(ctx, project, project.Spec.ServiceAccount.ReadOnly, projectNamespace, RoleBindingReadOnlyUser, "readOnly")
 	if err != nil {
 		return err
 	}
-	err = validateRoleBindingIfExists(r.Spec.ServiceAccount.ReadWrite, projectNamespace, RoleBindingReadWriteUser, "readWrite")
+	err = validateRoleBindingIfExists(ctx, project, project.Spec.ServiceAccount.ReadWrite, projectNamespace, RoleBindingReadWriteUser, "readWrite")
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func validateRoleBindingIfExists(names []string, projectNamespace, format, child string) *field.Error {
-	labels := util.GetOwnerLabel(r)
+func validateRoleBindingIfExists(ctx context.Context, project *controllerv1alpha1.Project, names []string, projectNamespace, format, child string) *field.Error {
+	labels := util.GetOwnerLabel(project)
 	for _, name := range names {
 		roleBindingNamespacedName := client.ObjectKey{
 			Namespace: projectNamespace,
 			Name:      fmt.Sprintf(format, name),
 		}
 		actualRoleBinding := rbacv1.RoleBinding{}
-		exist, _ := util.GetResourceIfExist(projectCtx, roleBindingNamespacedName, &actualRoleBinding)
+		exist, _ := util.GetResourceIfExist(ctx, roleBindingNamespacedName, &actualRoleBinding)
 		if exist {
 			for key, value := range labels {
 				if actualRoleBinding.Labels[key] != value {
@@ -180,15 +171,15 @@ func validateRoleBindingIfExists(names []string, projectNamespace, format, child
 }
 
 // validateSANamesIfAlreadyExists is a function to validate the service account name if already exists
-func validateSANamesIfAlreadyExists(names []string, projectNamespace, format, child string) *field.Error {
-	labels := util.GetOwnerLabel(r)
+func validateSANamesIfAlreadyExists(ctx context.Context, project *controllerv1alpha1.Project, names []string, projectNamespace, format, child string) *field.Error {
+	labels := util.GetOwnerLabel(project)
 	for _, name := range names {
 		serviceAccountNamespacedName := client.ObjectKey{
 			Namespace: projectNamespace,
 			Name:      fmt.Sprintf(format, name),
 		}
 		sa := corev1.ServiceAccount{}
-		exist, _ := util.GetResourceIfExist(projectCtx, serviceAccountNamespacedName, &sa)
+		exist, _ := util.GetResourceIfExist(ctx, serviceAccountNamespacedName, &sa)
 		if exist {
 			for key, value := range labels {
 				if sa.Labels[key] != value {

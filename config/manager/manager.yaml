@@ -38,7 +38,7 @@ spec:
                   fieldPath: metadata.namespace
           image: controller:latest
           name: manager
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           securityContext:
             allowPrivilegeEscalation: false
           livenessProbe:

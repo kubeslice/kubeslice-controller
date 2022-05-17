@@ -11,4 +11,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: aveshasystems/kubeslice-controller
-  newTag: latest
+  newTag: latest-intra-cluster-slice
