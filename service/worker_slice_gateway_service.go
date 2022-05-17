@@ -240,7 +240,7 @@ type IndividualCertPairRequest struct {
 	ServerId string `json:"serverId,omitempty"`
 }
 
-// CreateMinimumWorkerSliceGateways is a function to create gatway between worker-slices
+// CreateMinimumWorkerSliceGateways is a function to create gateways with minimum specification
 func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
 	sliceSubnet string) (ctrl.Result, error) {

@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 type IWorkerSliceConfigService interface {
 	ReconcileWorkerSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
@@ -174,7 +173,8 @@ outer:
 	return ctrl.Result{}, err
 }
 
-// CreateWorkerSliceConfig is a function to create the worker slice config
+// CreateMinimalWorkerSliceConfig CreateWorkerSliceConfig is a function to create the worker slice configs with minimum number of fields.
+// More fields are added in reconciliation loop.
 func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string) (map[string]int, error) {
 	logger := util.CtxLogger(ctx)
 	err := s.cleanUpSlices(ctx, label, namespace, clusters)
@@ -217,7 +217,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			expectedSlice.Spec.SliceSubnet = sliceSubnet
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
-				if !k8sErrors.IsAlreadyExists(err) {// ignores resource already exists error(for handling parallel calls to create same resource)
+				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
 						expectedSlice.Name, namespace)
 					return clusterMap, err
@@ -234,7 +234,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			existingSlice.Annotations["updatedTimestamp"] = time.Now().String()
 			err = util.UpdateResource(ctx, existingSlice)
 			if err != nil {
-				if !k8sErrors.IsAlreadyExists(err) {// ignores resource already exists error(for handling parallel calls to create same resource)
+				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
 						workerSliceConfigName, namespace)
 					return clusterMap, err
@@ -271,7 +271,7 @@ func (s *WorkerSliceConfigService) ListWorkerSliceConfigs(ctx context.Context, o
 	return slices.Items, nil
 }
 
-// ComputeClusterMap - function returns map of the cluster and the index
+// ComputeClusterMap - function assigns a numerical value to the cluster. The value will be from 1 to n, where n is the number of clusters in the slice.
 func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int {
 	clusterMapping := make(map[string]int, len(clusterNames))
 	usedIndexes := make(map[int]bool, 0)

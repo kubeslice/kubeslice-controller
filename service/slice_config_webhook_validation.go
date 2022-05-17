@@ -117,6 +117,9 @@ func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 
 // validateClusters is function to validate the cluster specification
 func validateClusters() *field.Error {
+	if len(s.Spec.Clusters) == 0 {
+		return field.Required(field.NewPath("Spec").Child("Clusters"), "you cannot create a slice config without including at least one cluster")
+	}
 	if duplicate, value := util.CheckDuplicateInArray(s.Spec.Clusters); duplicate {
 		return field.Invalid(field.NewPath("Spec").Child("Clusters"), value, "clusters must be unique in slice config")
 	}

@@ -80,7 +80,7 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 						{
 							Name:  "ovpn-cert-generator",
 							Image: jobImage,
-							Env: envValues,
+							Env:   envValues,
 						},
 					},
 					ServiceAccountName: JobServiceAccount,
