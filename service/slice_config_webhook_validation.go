@@ -56,6 +56,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err = validateExternalGatewayConfig(); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		if err = validateNamespaceIsolationProfile(); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	if len(allErrs) == 0 {
 		return nil
@@ -78,6 +81,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		allErrs = append(allErrs, err)
 	}
 	if err := validateExternalGatewayConfig(); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := validateNamespaceIsolationProfile(); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -200,5 +206,63 @@ func validateExternalGatewayConfig() *field.Error {
 	if dup, cl := util.CheckDuplicateInArray(allClusters); dup {
 		return field.Invalid(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), cl, "duplicate cluster")
 	}
+	return nil
+}
+
+// validateNamespaceIsolationProfile checks for validation errors in NamespaceIsolationProfile.
+// Checks if the participating clusters are valid and if the namespaces are configured correctly.
+func validateNamespaceIsolationProfile() *field.Error {
+
+	if len(s.Spec.NamespaceIsolationProfile.ApplicationNamespaces) == 0 && len(s.Spec.NamespaceIsolationProfile.AllowedNamespaces) == 0 {
+		return nil
+	}
+
+	// for each namespace in applicationNamespaces, check if the clusters are valid
+	participatingClusters := s.Spec.Clusters
+	var checkedApplicationNs []string
+
+	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+		//check if the clusters are already specified for a namespace
+		if util.ContainsString(checkedApplicationNs, nsSelection.Namespace) {
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Duplicate namespace")
+		}
+		checkedApplicationNs = append(checkedApplicationNs, nsSelection.Namespace)
+
+		if util.ContainsString(nsSelection.Clusters, "*") {
+			if len(nsSelection.Clusters) > 1 {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "other clusters are not allowed when * is present")
+			}
+		}
+
+		//check if the cluster is valid
+		for _, cluster := range nsSelection.Clusters {
+			if cluster != "*" && !util.ContainsString(participatingClusters, cluster) {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), cluster, "Cluster is not participating in slice config")
+			}
+		}
+	}
+
+	// for each namespace in AllowedNamespaces, check if the clusters are valid
+	var checkedAllowedNs []string
+	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.AllowedNamespaces {
+		//check if the clusters are already specified for a namespace
+		if util.ContainsString(checkedAllowedNs, nsSelection.Namespace) {
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace, "Duplicate namespace")
+		}
+		checkedAllowedNs = append(checkedAllowedNs, nsSelection.Namespace)
+
+		if util.ContainsString(nsSelection.Clusters, "*") {
+			if len(nsSelection.Clusters) > 1 {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "other clusters are not allowed when * is present")
+			}
+		}
+		//check if the cluster is valid
+		for _, cluster := range nsSelection.Clusters {
+			if cluster != "*" && !util.ContainsString(participatingClusters, cluster) {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), cluster, "Cluster is not participating in slice config")
+			}
+		}
+	}
+
 	return nil
 }
