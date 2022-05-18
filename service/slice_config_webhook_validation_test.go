@@ -79,6 +79,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace":            UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters":                      UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
+	"SliceConfigWebhookValition_UpdateValidateSliceCofigWithNamespaceIsolationProfileClusterHasAsterixAndOtherCluster":         ValidateSliceConfigCreateWithNamespaceIsolationProfileClusterHasAsterixAndOtherCluster,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -519,6 +520,35 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateSliceConfigCreateWithNamespaceIsolationProfileClusterHasAsterixAndOtherCluster(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	}).Once()
+	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"*", "cluster-1"},
+			},
+		},
+	}
+	err := ValidateSliceConfigCreate(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.NamespaceIsolationProfile.ApplicationNamespaces.Clusters: Invalid value:")
 	clientMock.AssertExpectations(t)
 }
 
