@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,30 +31,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// s is instance of SliceConfig schema
-var s *controllerv1alpha1.SliceConfig = nil
-
-// sliceConfigCtx is context var
-var sliceConfigCtx context.Context = nil
-
 // ValidateSliceConfigCreate is a function to verify the creation of slice config
 func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
-	s = sliceConfig
-	sliceConfigCtx = ctx
 	var allErrs field.ErrorList
-	if err := validateProjectNamespace(); err != nil {
+	if err := validateProjectNamespace(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	} else {
-		if err = validateSliceSubnet(); err != nil {
+		if err = validateSliceSubnet(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		if err = validateClusters(); err != nil {
+		if err = validateClusters(ctx, sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		if err = validateQosProfile(); err != nil {
+		if err = validateQosProfile(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		if err = validateExternalGatewayConfig(); err != nil {
+		if err = validateExternalGatewayConfig(sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err = validateApplicationNamespaces(ctx, sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
 		if err = validateNamespaceIsolationProfile(); err != nil {
@@ -63,24 +59,25 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if len(allErrs) == 0 {
 		return nil
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, sliceConfig.Name, allErrs)
 }
 
 // ValidateSliceConfigUpdate is function to verify the update of slice config
 func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
-	s = sliceConfig
-	sliceConfigCtx = ctx
 	var allErrs field.ErrorList
-	if err := preventUpdate(); err != nil {
+	if err := preventUpdate(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateClusters(); err != nil {
+	if err := validateClusters(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateQosProfile(); err != nil {
+	if err := validateQosProfile(sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateExternalGatewayConfig(); err != nil {
+	if err := validateExternalGatewayConfig(sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := validateApplicationNamespaces(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if err := validateNamespaceIsolationProfile(); err != nil {
@@ -89,29 +86,74 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if len(allErrs) == 0 {
 		return nil
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, s.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, sliceConfig.Name, allErrs)
+}
+
+// ValidateSliceConfigDelete is function to validate the deletion of sliceConfig
+func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
+	var allErrs field.ErrorList
+	if err := checkNamespaceDeboardingStatus(ctx, sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, sliceConfig.Name, allErrs)
+}
+
+func checkNamespaceDeboardingStatus(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
+	ownerLabel := map[string]string{
+		"original-slice-name": sliceConfig.Name,
+	}
+	err := util.ListResources(ctx, workerSlices, client.MatchingLabels(ownerLabel), client.InNamespace(sliceConfig.Namespace))
+	if err == nil && len(workerSlices.Items) > 0 {
+		for _, slice := range workerSlices.Items {
+			if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 {
+				applicationNamespacesErr := &field.Error{
+					Type:     field.ErrorTypeForbidden,
+					Field:    "Field: ApplicationNamespaces",
+					BadValue: fmt.Sprintf("Number of ApplicationNamespaces: %d ", len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces)),
+					Detail:   fmt.Sprint("Please deboard the namespaces before deletion of slice."),
+				}
+				return applicationNamespacesErr
+			} else {
+				if len(slice.Status.OnboardedAppNamespaces) > 0 {
+					onboardNamespaceErr := &field.Error{
+						Type:     field.ErrorTypeInternal,
+						Field:    "Field: OnboardedAppNamespaces",
+						BadValue: fmt.Sprintf("Number of onboarded Application namespaces: %d", len(slice.Status.OnboardedAppNamespaces)),
+						Detail:   fmt.Sprint("Deboarding of namespaces is in progress, please try after some time."),
+					}
+					return onboardNamespaceErr
+				}
+			}
+
+		}
+	}
+	return nil
 }
 
 // validateSliceSubnet is function to validate the the subnet of slice
-func validateSliceSubnet() *field.Error {
-	if !util.IsPrivateSubnet(s.Spec.SliceSubnet) {
-		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), s.Spec.SliceSubnet, "must be a private subnet")
+func validateSliceSubnet(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if !util.IsPrivateSubnet(sliceConfig.Spec.SliceSubnet) {
+		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), sliceConfig.Spec.SliceSubnet, "must be a private subnet")
 	}
-	if !util.HasPrefix(s.Spec.SliceSubnet, "16") {
-		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), s.Spec.SliceSubnet, "prefix must be 16")
+	if !util.HasPrefix(sliceConfig.Spec.SliceSubnet, "16") {
+		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), sliceConfig.Spec.SliceSubnet, "prefix must be 16")
 	}
-	if !util.HasLastTwoOctetsZero(s.Spec.SliceSubnet) {
-		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), s.Spec.SliceSubnet, "third and fourth octets must be 0")
+	if !util.HasLastTwoOctetsZero(sliceConfig.Spec.SliceSubnet) {
+		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), sliceConfig.Spec.SliceSubnet, "third and fourth octets must be 0")
 	}
 	return nil
 }
 
 // validateProjectNamespace is a function to verify the namespace of project
-func validateProjectNamespace() *field.Error {
+func validateProjectNamespace(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	namespace := &corev1.Namespace{}
-	exist, _ := util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: s.Namespace}, namespace)
+	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceConfig.Namespace}, namespace)
 	if !exist || !checkForProjectNamespace(namespace) {
-		return field.Invalid(field.NewPath("metadata").Child("namespace"), s.Namespace, "SliceConfig must be applied on project namespace")
+		return field.Invalid(field.NewPath("metadata").Child("namespace"), sliceConfig.Namespace, "SliceConfig must be applied on project namespace")
 	}
 	return nil
 }
@@ -122,13 +164,13 @@ func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 }
 
 // validateClusters is function to validate the cluster specification
-func validateClusters() *field.Error {
-	if duplicate, value := util.CheckDuplicateInArray(s.Spec.Clusters); duplicate {
+func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		return field.Invalid(field.NewPath("Spec").Child("Clusters"), value, "clusters must be unique in slice config")
 	}
-	for _, clusterName := range s.Spec.Clusters {
+	for _, clusterName := range sliceConfig.Spec.Clusters {
 		cluster := controllerv1alpha1.Cluster{}
-		exist, _ := util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: clusterName, Namespace: s.Namespace}, &cluster)
+		exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
 		if !exist {
 			return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster is not registered")
 		}
@@ -142,8 +184,8 @@ func validateClusters() *field.Error {
 			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
 		}
 		for _, cniSubnet := range cluster.Status.CniSubnet {
-			if util.OverlapIP(cniSubnet, s.Spec.SliceSubnet) {
-				return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), s.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
+			if util.OverlapIP(cniSubnet, sliceConfig.Spec.SliceSubnet) {
+				return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
 			}
 		}
 	}
@@ -151,42 +193,42 @@ func validateClusters() *field.Error {
 }
 
 // preventUpdate is a function to stop/avoid the update of config of slice
-func preventUpdate() *field.Error {
+func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig) *field.Error {
 	sliceConfig := controllerv1alpha1.SliceConfig{}
-	_, _ = util.GetResourceIfExist(sliceConfigCtx, client.ObjectKey{Name: s.Name, Namespace: s.Namespace}, &sliceConfig)
-	if sliceConfig.Spec.SliceSubnet != s.Spec.SliceSubnet {
-		return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), s.Spec.SliceSubnet, "cannot be updated")
+	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: sc.Name, Namespace: sc.Namespace}, &sliceConfig)
+	if sliceConfig.Spec.SliceSubnet != sc.Spec.SliceSubnet {
+		return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sc.Spec.SliceSubnet, "cannot be updated")
 	}
-	if sliceConfig.Spec.SliceType != s.Spec.SliceType {
-		return field.Invalid(field.NewPath("Spec").Child("SliceType"), s.Spec.SliceType, "cannot be updated")
+	if sliceConfig.Spec.SliceType != sc.Spec.SliceType {
+		return field.Invalid(field.NewPath("Spec").Child("SliceType"), sc.Spec.SliceType, "cannot be updated")
 	}
-	if sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType != s.Spec.SliceGatewayProvider.SliceGatewayType {
-		return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayType"), s.Spec.SliceGatewayProvider.SliceGatewayType, "cannot be updated")
+	if sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType != sc.Spec.SliceGatewayProvider.SliceGatewayType {
+		return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayType"), sc.Spec.SliceGatewayProvider.SliceGatewayType, "cannot be updated")
 	}
-	if sliceConfig.Spec.SliceGatewayProvider.SliceCaType != s.Spec.SliceGatewayProvider.SliceCaType {
-		return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceCaType"), s.Spec.SliceGatewayProvider.SliceCaType, "cannot be updated")
+	if sliceConfig.Spec.SliceGatewayProvider.SliceCaType != sc.Spec.SliceGatewayProvider.SliceCaType {
+		return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceCaType"), sc.Spec.SliceGatewayProvider.SliceCaType, "cannot be updated")
 	}
-	if sliceConfig.Spec.SliceIpamType != s.Spec.SliceIpamType {
-		return field.Invalid(field.NewPath("Spec").Child("SliceIpamType"), s.Spec.SliceIpamType, "cannot be updated")
+	if sliceConfig.Spec.SliceIpamType != sc.Spec.SliceIpamType {
+		return field.Invalid(field.NewPath("Spec").Child("SliceIpamType"), sc.Spec.SliceIpamType, "cannot be updated")
 	}
+
 	return nil
 }
 
 // validateQosProfile is a function to validate the Qos(quality of service)profile of slice
-func validateQosProfile() *field.Error {
-
-	if s.Spec.QosProfileDetails.BandwidthCeilingKbps < s.Spec.QosProfileDetails.BandwidthGuaranteedKbps {
-		return field.Invalid(field.NewPath("Spec").Child("QosProfileDetails").Child("BandwidthGuaranteedKbps"), s.Spec.QosProfileDetails.BandwidthGuaranteedKbps, "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
+func validateQosProfile(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps < sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps {
+		return field.Invalid(field.NewPath("Spec").Child("QosProfileDetails").Child("BandwidthGuaranteedKbps"), sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps, "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
 	}
 
 	return nil
 }
 
 // validateExternalGatewayConfig is a function to validate the external gateway
-func validateExternalGatewayConfig() *field.Error {
+func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	count := 0
 	var allClusters []string
-	for _, config := range s.Spec.ExternalGatewayConfig {
+	for _, config := range sliceConfig.Spec.ExternalGatewayConfig {
 		if util.ContainsString(config.Clusters, "*") {
 			count++
 			if len(config.Clusters) > 1 {
@@ -195,7 +237,7 @@ func validateExternalGatewayConfig() *field.Error {
 		}
 		for _, cluster := range config.Clusters {
 			allClusters = append(allClusters, cluster)
-			if cluster != "*" && !util.ContainsString(s.Spec.Clusters, cluster) {
+			if cluster != "*" && !util.ContainsString(sliceConfig.Spec.Clusters, cluster) {
 				return field.Invalid(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), cluster, "cluster is not participating in slice config")
 			}
 		}
@@ -209,6 +251,7 @@ func validateExternalGatewayConfig() *field.Error {
 	return nil
 }
 
+<<<<<<< HEAD
 // validateNamespaceIsolationProfile checks for validation errors in NamespaceIsolationProfile.
 // Checks if the participating clusters are valid and if the namespaces are configured correctly.
 func validateNamespaceIsolationProfile() *field.Error {
@@ -264,5 +307,38 @@ func validateNamespaceIsolationProfile() *field.Error {
 		}
 	}
 
+=======
+// validateApplicationNamespaces is function to validate the application namespaces
+func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	for _, applicationNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+		if applicationNamespace.Clusters[0] == "*" {
+			for _, clusterName := range sliceConfig.Spec.Clusters {
+				err := validateAllowedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, sliceConfig.Name, sliceConfig)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			for _, clusterName := range applicationNamespace.Clusters {
+				err := validateAllowedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, sliceConfig.Name, sliceConfig)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// validateClusterNamespaces is a function to validate the namespaces present is cluster
+func validateAllowedClusterNamespaces(ctx context.Context, clusterName string, applicationNamespace string, sliceName string, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	cluster := controllerv1alpha1.Cluster{}
+	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
+	for _, clusterNamespace := range cluster.Status.Namespaces {
+		if applicationNamespace == clusterNamespace.Name && len(clusterNamespace.SliceName) > 0 && clusterNamespace.SliceName != sliceName {
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces"), applicationNamespace, "The given namespace: "+applicationNamespace+" in cluster "+clusterName+" is already acquired by other slice: "+clusterNamespace.SliceName)
+		}
+	}
+>>>>>>> 41e1d51 (feat(AM-3970): Feature onboard namespace & webhook validation)
 	return nil
 }
