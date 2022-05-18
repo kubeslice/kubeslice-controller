@@ -104,6 +104,16 @@ spec:
                 items:
                   type: string
                 type: array
+              namespaces:
+                description: Namespaces present in cluster
+                items:
+                  properties:
+                    name:
+                      type: string
+                    sliceName:
+                      type: string
+                  type: object
+                type: array
               secretName:
                 description: SecretName is the name of the secret for the worker cluster.
                 type: string

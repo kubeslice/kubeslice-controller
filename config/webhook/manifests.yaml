@@ -212,6 +212,7 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - sliceconfigs
   sideEffects: None
