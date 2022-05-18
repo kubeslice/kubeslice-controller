@@ -110,9 +110,9 @@ func checkNamespaceDeboardingStatus(ctx context.Context, sliceConfig *controller
 			if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 {
 				applicationNamespacesErr := &field.Error{
 					Type:     field.ErrorTypeForbidden,
-					Field:    "Field: ApplicationNamespaces & AllowedNamespaces",
-					BadValue: fmt.Sprintf("Number of ApplicationNamespaces: %d and AllowedNamespaces: %d", len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces), len(slice.Spec.NamespaceIsolationProfile.AllowedNamespaces)),
-					Detail:   fmt.Sprintf("Please deboard the namespaces before deletion of slice."),
+					Field:    "Field: ApplicationNamespaces",
+					BadValue: fmt.Sprintf("Number of ApplicationNamespaces: %d ", len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces)),
+					Detail:   fmt.Sprint("Please deboard the namespaces before deletion of slice."),
 				}
 				return applicationNamespacesErr
 			} else {
@@ -121,7 +121,7 @@ func checkNamespaceDeboardingStatus(ctx context.Context, sliceConfig *controller
 						Type:     field.ErrorTypeInternal,
 						Field:    "Field: OnboardedAppNamespaces",
 						BadValue: fmt.Sprintf("Number of onboarded Application namespaces: %d", len(slice.Status.OnboardedAppNamespaces)),
-						Detail:   fmt.Sprintf("Deboarding of namespaces is in progress, please try after some time."),
+						Detail:   fmt.Sprint("Deboarding of namespaces is in progress, please try after some time."),
 					}
 					return onboardNamespaceErr
 				}
@@ -305,7 +305,7 @@ func validateAllowedClusterNamespaces(ctx context.Context, clusterName string, a
 	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
 	for _, clusterNamespace := range cluster.Status.Namespaces {
 		if applicationNamespace == clusterNamespace.Name && len(clusterNamespace.SliceName) > 0 && clusterNamespace.SliceName != sliceName {
-			return field.Invalid(field.NewPath("Spec").Child("SliceConfig.NamespaceIsolationProfile.ApplicationNamespaces"), applicationNamespace, "The given namespace: "+applicationNamespace+" in cluster "+clusterName+" is already acquired by other slice: "+clusterNamespace.SliceName)
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces"), applicationNamespace, "The given namespace: "+applicationNamespace+" in cluster "+clusterName+" is already acquired by other slice: "+clusterNamespace.SliceName)
 		}
 	}
 	return nil
