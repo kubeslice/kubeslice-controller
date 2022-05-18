@@ -97,15 +97,19 @@ func OverlapIP(ip1, ip2 string) bool {
 }
 
 // CheckDuplicateInArray check duplicate data in array
-func CheckDuplicateInArray(data []string) (bool, string) {
+func CheckDuplicateInArray(data []string) (bool, []string) {
 	set := make(map[string]bool)
+	var dup []string
 	for _, v := range data {
 		if set[v] {
-			return true, v
+			dup = append(dup, v)
 		}
 		set[v] = true
 	}
-	return false, ""
+	if len(dup) > 0 {
+		return true, dup
+	}
+	return false, dup
 
 }
 
