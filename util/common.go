@@ -108,3 +108,16 @@ func CheckDuplicateInArray(data []string) (bool, string) {
 	return false, ""
 
 }
+
+func RemoveDuplicate(duplicate []string) (nonDup []string) {
+	mp := make(map[string]bool)
+	for i := 0; i < len(duplicate); i++ {
+		if _, ok := mp[duplicate[i]]; ok {
+			continue
+		} else {
+			mp[duplicate[i]] = true
+			nonDup = append(nonDup, duplicate[i])
+		}
+	}
+	return nonDup
+}
