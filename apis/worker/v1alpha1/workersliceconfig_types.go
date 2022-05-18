@@ -91,7 +91,12 @@ type AppPod struct {
 
 // WorkerSliceConfigStatus defines the observed state of Slice
 type WorkerSliceConfigStatus struct {
-	ConnectedAppPods []AppPod `json:"connectedAppPods,omitempty"`
+	ConnectedAppPods       []AppPod          `json:"connectedAppPods,omitempty"`
+	OnboardedAppNamespaces []NamespaceConfig `json:"onboardedAppNamespaces,omitempty"`
+}
+
+type NamespaceConfig struct {
+	Name string `json:"name,omitempty"`
 }
 
 //+kubebuilder:object:root=true

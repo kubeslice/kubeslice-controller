@@ -27,30 +27,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ss is the instance of WorkerSliceConfig
-var ss *workerv1alpha1.WorkerSliceConfig = nil
-
-// workerSliceConfigCtx is context var
-var workerSliceConfigCtx context.Context = nil
-
 // ValidateWorkerSliceConfigUpdate is a function to verify the update of config of workerslice
 func ValidateWorkerSliceConfigUpdate(ctx context.Context, workerSliceConfig *workerv1alpha1.WorkerSliceConfig) error {
-	ss = workerSliceConfig
-	workerSliceConfigCtx = ctx
 	var allErrs field.ErrorList
-	if err := preventUpdateWorkerSliceConfig(); err != nil {
+	if err := preventUpdateWorkerSliceConfig(ctx, workerSliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
 		return nil
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "worker.kubeslice.io", Kind: "WorkerSliceConfig"}, ss.Name, allErrs)
+	return apierrors.NewInvalid(schema.GroupKind{Group: "worker.kubeslice.io", Kind: "WorkerSliceConfig"}, workerSliceConfig.Name, allErrs)
 }
 
 // preventUpdateWorkerSliceConfig is a function to prevent the update of workersliceconfig
-func preventUpdateWorkerSliceConfig() *field.Error {
+func preventUpdateWorkerSliceConfig(ctx context.Context, ss *workerv1alpha1.WorkerSliceConfig) *field.Error {
 	workerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
-	_, _ = util.GetResourceIfExist(workerSliceConfigCtx, client.ObjectKey{Name: ss.Name, Namespace: ss.Namespace}, &workerSliceConfig)
+	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: ss.Name, Namespace: ss.Namespace}, &workerSliceConfig)
 	if workerSliceConfig.Spec.IpamClusterOctet != ss.Spec.IpamClusterOctet {
 		return field.Invalid(field.NewPath("Spec").Child("IpamClusterOctet"), ss.Spec.IpamClusterOctet, "cannot be updated")
 	}

@@ -84,6 +84,13 @@ type ClusterStatus struct {
 	SecretName string `json:"secretName,omitempty"`
 	//CniSubnet is the podip and service ip subnet of CNI
 	CniSubnet []string `json:"cniSubnet,omitempty"`
+	// Namespaces present in cluster
+	Namespaces []NamespacesConfig `json:"namespaces,omitempty"`
+}
+
+type NamespacesConfig struct {
+	Name      string `json:"name,omitempty"`
+	SliceName string `json:"sliceName,omitempty"`
 }
 
 //+kubebuilder:object:root=true
