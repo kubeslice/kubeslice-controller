@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"fmt"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"strings"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -159,7 +158,7 @@ func validateProjectNamespace(ctx context.Context, sliceConfig *controllerv1alph
 // validateIfServiceExportConfigExists is a function to validate if ServiceExportConfig exists for the given SliceConfig
 func validateIfServiceExportConfigExists(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
-	_, err := getServiceExportBySliceName(ctx, sliceConfig.Namespace, sliceConfig.Name, serviceExports)
+	err := getServiceExportBySliceName(ctx, sliceConfig.Namespace, sliceConfig.Name, serviceExports)
 	if err == nil && len(serviceExports.Items) > 0 {
 		return &field.Error{
 			Type:     field.ErrorTypeForbidden,
@@ -170,15 +169,12 @@ func validateIfServiceExportConfigExists(ctx context.Context, sliceConfig *contr
 }
 
 // getServiceExportBySliceName is a function to get the service export configs by slice name
-func getServiceExportBySliceName(ctx context.Context, namespace string, sliceName string, serviceExports *controllerv1alpha1.ServiceExportConfigList) (ctrl.Result, error) {
+func getServiceExportBySliceName(ctx context.Context, namespace string, sliceName string, serviceExports *controllerv1alpha1.ServiceExportConfigList) error {
 	label := map[string]string{
 		"original-slice-name": sliceName,
 	}
 	err := util.ListResources(ctx, serviceExports, client.InNamespace(namespace), client.MatchingLabels(label))
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	return ctrl.Result{}, nil
+	return err
 }
 
 // checkForProjectNamespace is a function to check namespace is in decided format
