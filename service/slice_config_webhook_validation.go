@@ -52,7 +52,7 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err = validateApplicationNamespaces(ctx, sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		if err = validateNamespaceIsolationProfile(); err != nil {
+		if err = validateNamespaceIsolationProfile(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
 	}
@@ -80,7 +80,7 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateApplicationNamespaces(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateNamespaceIsolationProfile(); err != nil {
+	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -254,7 +254,7 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 <<<<<<< HEAD
 // validateNamespaceIsolationProfile checks for validation errors in NamespaceIsolationProfile.
 // Checks if the participating clusters are valid and if the namespaces are configured correctly.
-func validateNamespaceIsolationProfile() *field.Error {
+func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field.Error {
 
 	if len(s.Spec.NamespaceIsolationProfile.ApplicationNamespaces) == 0 && len(s.Spec.NamespaceIsolationProfile.AllowedNamespaces) == 0 {
 		return nil
