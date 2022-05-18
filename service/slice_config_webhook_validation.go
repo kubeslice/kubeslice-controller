@@ -160,7 +160,7 @@ func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 // validateClusters is function to validate the cluster specification
 func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
-		return field.Invalid(field.NewPath("Spec").Child("Clusters"), value, "clusters must be unique in slice config")
+		return field.Duplicate(field.NewPath("Spec").Child("Clusters"), value)
 	}
 	for _, clusterName := range sliceConfig.Spec.Clusters {
 		cluster := controllerv1alpha1.Cluster{}
@@ -240,7 +240,7 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 		return field.Invalid(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), "*", "* is not allowed in more than one external gateways")
 	}
 	if dup, cl := util.CheckDuplicateInArray(allClusters); dup {
-		return field.Invalid(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), cl, "duplicate cluster")
+		return field.Duplicate(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), cl)
 	}
 	return nil
 }
@@ -248,6 +248,10 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 // validateApplicationNamespaces is function to validate the application namespaces
 func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	for _, applicationNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+		/* check duplicate values of clusters */
+		if dup, cl := util.CheckDuplicateInArray(applicationNamespace.Clusters); dup {
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces").Child("Clusters"), cl)
+		}
 		if applicationNamespace.Clusters[0] == "*" {
 			for _, clusterName := range sliceConfig.Spec.Clusters {
 				err := validateAllowedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, sliceConfig.Name, sliceConfig)

@@ -154,7 +154,6 @@ outer:
 			}
 		}
 	}
-
 	for _, namespace := range controllerIsolationProfile.AllowedNamespaces {
 		for _, cluster := range namespace.Clusters {
 			if cluster == "*" || cluster == workerSliceConfig.Labels["worker-cluster"] {
