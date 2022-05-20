@@ -251,7 +251,6 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 	return nil
 }
 
-<<<<<<< HEAD
 // validateNamespaceIsolationProfile checks for validation errors in NamespaceIsolationProfile.
 // Checks if the participating clusters are valid and if the namespaces are configured correctly.
 func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field.Error {
@@ -306,8 +305,9 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 			}
 		}
 	}
+	return nil
+}
 
-=======
 // validateApplicationNamespaces is function to validate the application namespaces
 func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	for _, applicationNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
@@ -339,6 +339,5 @@ func validateAllowedClusterNamespaces(ctx context.Context, clusterName string, a
 			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces"), applicationNamespace, "The given namespace: "+applicationNamespace+" in cluster "+clusterName+" is already acquired by other slice: "+clusterNamespace.SliceName)
 		}
 	}
->>>>>>> 41e1d51 (feat(AM-3970): Feature onboard namespace & webhook validation)
 	return nil
 }
