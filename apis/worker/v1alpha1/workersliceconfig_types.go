@@ -89,6 +89,34 @@ type AppPod struct {
 	NsmPeerIP string `json:"nsmPeerIp,omitempty"`
 }
 
+type ResourceQuotaProfile struct {
+	SliceQuota   SliceQuota   `json:"sliceQuota,omitempty"`
+	ClusterQuota ClusterQuota `json:"clusterQuota,omitempty"`
+}
+
+type SliceQuota struct {
+	Resources Resource `json:"resources,omitempty"`
+	EnforceQuota bool `json:"enforceQuota,omitempty"`
+}
+
+type ClusterQuota struct {
+	ClusterName string `json:"clusterName,omitempty"`
+	Resources Resource `json:"resources,omitempty"`
+	EnforceQuota bool `json:"enforceQuota,omitempty"`
+	NamespaceQuota []NamespaceQuota `json:"namespaceQuota,omitempty"`
+}
+
+type NamespaceQuota struct {
+	Namespace string `json:"namespace,omitempty"`
+	Resources Resource `json:"resources,omitempty"`
+	EnforceQuota bool `json:"enforceQuota,omitempty"`
+}
+
+type Resource struct {
+	Memory int `json:"memory,omitempty"`
+	Cpu    int `json:"cpu,omitempty"`
+}
+
 // WorkerSliceConfigStatus defines the observed state of Slice
 type WorkerSliceConfigStatus struct {
 	ConnectedAppPods       []AppPod          `json:"connectedAppPods,omitempty"`

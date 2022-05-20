@@ -38,6 +38,7 @@ type SliceConfigSpec struct {
 	QosProfileDetails         QOSProfile                `json:"qosProfileDetails"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
 	ExternalGatewayConfig     []ExternalGatewayConfig   `json:"externalGatewayConfig,omitempty"`
+	ResourceQuotaProfile      ResourceQuotaProfile      `json:"resourceQuotaProfile,omitempty"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/
@@ -98,6 +99,34 @@ type NamespaceIsolationProfile struct {
 type SliceNamespaceSelection struct {
 	Namespace string   `json:"namespace,omitempty"`
 	Clusters  []string `json:"clusters,omitempty"`
+}
+
+type ResourceQuotaProfile struct {
+	SliceQuota   SliceQuota     `json:"sliceQuota,omitempty"`
+	ClusterQuota []ClusterQuota `json:"clusterQuota,omitempty"`
+}
+
+type SliceQuota struct {
+	Resources    Resource `json:"resources,omitempty"`
+	EnforceQuota bool     `json:"enforceQuota,omitempty"`
+}
+
+type ClusterQuota struct {
+	ClusterName    string           `json:"clusterName,omitempty"`
+	Resources      Resource         `json:"resources,omitempty"`
+	EnforceQuota   bool             `json:"enforceQuota,omitempty"`
+	NamespaceQuota []NamespaceQuota `json:"namespaceQuota,omitempty"`
+}
+
+type NamespaceQuota struct {
+	Namespace    string   `json:"namespace,omitempty"`
+	Resources    Resource `json:"resources,omitempty"`
+	EnforceQuota bool     `json:"enforceQuota,omitempty"`
+}
+
+type Resource struct {
+	Memory int `json:"memory,omitempty"`
+	Cpu    int `json:"cpu,omitempty"`
 }
 
 // SliceConfigStatus defines the observed state of SliceConfig

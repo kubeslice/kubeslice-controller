@@ -38,3 +38,37 @@ spec:
       gatewayType: istio
       clusters:
         - cluster-2
+  resourceQuotaProfile:
+    sliceQuota:
+      resources:
+        memory: 32
+        cpu: 100
+      enforceQuota: true
+    clusterQuota:
+      - clusterName: cluster-1
+        resources:
+          memory: 16
+          cpu: 50
+        enforceQuota: true
+        namespaceQuota:
+          - namespace: namespace-1
+            resources:
+              memory: 8
+              cpu: 25
+            enforceQuota: true
+      - clusterName: cluster-2
+        resources:
+          memory: 16
+          cpu: 50
+        enforceQuota: true
+        namespaceQuota:
+          - namespace: namespace-2
+            resources:
+              memory: 8
+              cpu: 25
+            enforceQuota: true
+          - namespace: namespace-3
+            resources:
+              memory: 8
+              cpu: 25
+            enforceQuota: true

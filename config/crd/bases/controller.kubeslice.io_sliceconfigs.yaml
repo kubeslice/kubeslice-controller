@@ -138,6 +138,53 @@ spec:
                 - queueType
                 - tcType
                 type: object
+              resourceQuotaProfile:
+                properties:
+                  clusterQuota:
+                    items:
+                      properties:
+                        clusterName:
+                          type: string
+                        enforceQuota:
+                          type: boolean
+                        namespaceQuota:
+                          items:
+                            properties:
+                              enforceQuota:
+                                type: boolean
+                              namespace:
+                                type: string
+                              resources:
+                                properties:
+                                  cpu:
+                                    type: integer
+                                  memory:
+                                    type: integer
+                                type: object
+                            type: object
+                          type: array
+                        resources:
+                          properties:
+                            cpu:
+                              type: integer
+                            memory:
+                              type: integer
+                          type: object
+                      type: object
+                    type: array
+                  sliceQuota:
+                    properties:
+                      enforceQuota:
+                        type: boolean
+                      resources:
+                        properties:
+                          cpu:
+                            type: integer
+                          memory:
+                            type: integer
+                        type: object
+                    type: object
+                type: object
               sliceGatewayProvider:
                 description: WorkerSliceGatewayProvider defines the configuration
                   for slicegateway
