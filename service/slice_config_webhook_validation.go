@@ -300,13 +300,13 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
 		//check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedApplicationNs, nsSelection.Namespace) {
-			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Duplicate namespace")
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Duplicate namespace not allowed for application namespaces")
 		}
 		checkedApplicationNs = append(checkedApplicationNs, nsSelection.Namespace)
 
 		if util.ContainsString(nsSelection.Clusters, "*") {
 			if len(nsSelection.Clusters) > 1 {
-				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "other clusters are not allowed when * is present")
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "Other clusters are not allowed when * is present")
 			}
 		}
 
@@ -323,13 +323,13 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.AllowedNamespaces {
 		//check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedAllowedNs, nsSelection.Namespace) {
-			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace, "Duplicate namespace")
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace, "Duplicate namespace not allowed for allowed namespaces")
 		}
 		checkedAllowedNs = append(checkedAllowedNs, nsSelection.Namespace)
 
 		if util.ContainsString(nsSelection.Clusters, "*") {
 			if len(nsSelection.Clusters) > 1 {
-				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "other clusters are not allowed when * is present")
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "Other clusters are not allowed when * is present")
 			}
 		}
 		//check if the cluster is valid
