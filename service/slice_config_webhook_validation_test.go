@@ -84,6 +84,12 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty":                                 DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty,
+	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileApplicationNSDuplicateNamespaces":                           ValidateNamespaceIsolationProfileApplicationNSDuplicateNamespaces,
+	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces":                               ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces,
+	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileApplicationNSClusterIsNotParticipating":                     ValidateNamespaceIsolationProfileApplicationNSClusterIsNotParticipating,
+	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileAllowedNSClusterIsNotParticipating":                         ValidateNamespaceIsolationProfileAllowedNSClusterIsNotParticipating,
+	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileApplicationNSAsteriskAndOtherCluserPresent":                 ValidateNamespaceIsolationProfileApplicationNSAsteriskAndOtherCluserPresent,
+	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent":                     ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1218,5 +1224,139 @@ func DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEm
 	}).Once()
 	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
 	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateNamespaceIsolationProfileApplicationNSDuplicateNamespaces(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"cluster-1"},
+			},
+			{
+				Namespace: namespace,
+				Clusters:  []string{"cluster-2"},
+			},
+		},
+	}
+
+	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	err := validateNamespaceIsolationProfile(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Duplicate namespace")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateNamespaceIsolationProfileApplicationNSClusterIsNotParticipating(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"cluster-3"},
+			},
+		},
+	}
+
+	sliceConfig.Spec.Clusters = []string{"cluster-1"}
+	err := validateNamespaceIsolationProfile(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Cluster is not participating in slice config")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateNamespaceIsolationProfileApplicationNSAsteriskAndOtherCluserPresent(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"*", "cluster-1"},
+			},
+		},
+	}
+
+	sliceConfig.Spec.Clusters = []string{"cluster-1"}
+	err := validateNamespaceIsolationProfile(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "other clusters are not allowed when * is present")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"cluster-1"},
+			},
+			{
+				Namespace: namespace,
+				Clusters:  []string{"cluster-2"},
+			},
+		},
+	}
+
+	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	err := validateNamespaceIsolationProfile(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Duplicate namespace")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateNamespaceIsolationProfileAllowedNSClusterIsNotParticipating(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"cluster-3"},
+			},
+		},
+	}
+
+	sliceConfig.Spec.Clusters = []string{"cluster-1"}
+	err := validateNamespaceIsolationProfile(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Cluster is not participating in slice config")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"*", "cluster-1"},
+			},
+		},
+	}
+
+	sliceConfig.Spec.Clusters = []string{"cluster-1"}
+	err := validateNamespaceIsolationProfile(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "other clusters are not allowed when * is present")
 	clientMock.AssertExpectations(t)
 }
