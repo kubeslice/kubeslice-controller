@@ -1248,7 +1248,7 @@ func ValidateNamespaceIsolationProfileApplicationNSDuplicateNamespaces(t *testin
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Duplicate namespace")
+	require.Contains(t, err.Error(), "Duplicate namespace not allowed for application namespaces")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1290,7 +1290,7 @@ func ValidateNamespaceIsolationProfileApplicationNSAsteriskAndOtherCluserPresent
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "other clusters are not allowed when * is present")
+	require.Contains(t, err.Error(), "Other clusters are not allowed when * is present")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1315,7 +1315,7 @@ func ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces(t *testing.T)
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Duplicate namespace")
+	require.Contains(t, err.Error(), "Duplicate namespace not allowed for allowed namespaces")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1357,6 +1357,6 @@ func ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent(t *
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "other clusters are not allowed when * is present")
+	require.Contains(t, err.Error(), "Other clusters are not allowed when * is present")
 	clientMock.AssertExpectations(t)
 }
