@@ -172,10 +172,11 @@ func validateIfServiceExportConfigExists(ctx context.Context, sliceConfig *contr
 	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
 	err := getServiceExportBySliceName(ctx, sliceConfig.Namespace, sliceConfig.Name, serviceExports)
 	if err == nil && len(serviceExports.Items) > 0 {
-		return &field.Error{
-			Type:   field.ErrorTypeForbidden,
-			Detail: fmt.Sprintf("The SliceConfig can only be deleted after all the service exports are deleted for the slice."),
-		}
+		//return &field.Error{
+		//	Type:   field.ErrorTypeForbidden,
+		//	Detail: fmt.Sprintf("The SliceConfig can only be deleted after all the service exports are deleted for the slice."),
+		//}
+		return field.Forbidden(field.NewPath("ServiceExports"), "The SliceConfig can only be deleted after all the service exports are deleted for the slice.")
 	}
 	return nil
 }
