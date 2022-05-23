@@ -155,7 +155,8 @@ outer:
 		}
 	}
 	for _, namespace := range controllerIsolationProfile.AllowedNamespaces {
-		for _, cluster := range namespace.Clusters {
+		nonDuplicateClusters := util.RemoveDuplicatesFromArray(namespace.Clusters)
+		for _, cluster := range nonDuplicateClusters {
 			if cluster == "*" || cluster == workerSliceConfig.Labels["worker-cluster"] {
 				workerIsolationProfile.AllowedNamespaces = append(workerIsolationProfile.AllowedNamespaces, namespace.Namespace)
 			}

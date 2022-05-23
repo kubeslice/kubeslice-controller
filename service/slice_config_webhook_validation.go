@@ -52,7 +52,7 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err = validateApplicationNamespaces(ctx, sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		if err := validateAllowedNamespaces(ctx, sliceConfig); err != nil {
+		if err := validateAllowedNamespaces(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
 		if err = validateNamespaceIsolationProfile(sliceConfig); err != nil {
@@ -83,7 +83,7 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateApplicationNamespaces(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateAllowedNamespaces(ctx, sliceConfig); err != nil {
+	if err := validateAllowedNamespaces(sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
@@ -279,8 +279,8 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 	if count > 1 {
 		return field.Invalid(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), "*", "* is not allowed in more than one external gateways")
 	}
-	if dup, cl := util.CheckDuplicateInArray(allClusters); dup {
-		return field.Duplicate(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), strings.Join(cl, ", "))
+	if duplicate, value := util.CheckDuplicateInArray(allClusters); duplicate {
+		return field.Duplicate(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), strings.Join(value, ", "))
 	}
 	return nil
 }
@@ -289,8 +289,8 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	for _, applicationNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
 		/* check duplicate values of clusters */
-		if dup, cl := util.CheckDuplicateInArray(applicationNamespace.Clusters); dup {
-			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces").Child("Clusters"), strings.Join(cl, ", "))
+		if duplicate, value := util.CheckDuplicateInArray(applicationNamespace.Clusters); duplicate {
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces").Child("Clusters"), strings.Join(value, ", "))
 		}
 		if applicationNamespace.Clusters[0] == "*" {
 			for _, clusterName := range sliceConfig.Spec.Clusters {
@@ -323,11 +323,11 @@ func validateGrantedClusterNamespaces(ctx context.Context, clusterName string, a
 	return nil
 }
 
-func validateAllowedNamespaces(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+func validateAllowedNamespaces(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	for _, allowedNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.AllowedNamespaces {
 		/* check duplicate values of clusters */
-		if dup, cl := util.CheckDuplicateInArray(allowedNamespace.Clusters); dup {
-			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.AllowedNamespaces").Child("Clusters"), strings.Join(cl, ", "))
+		if duplicate, value := util.CheckDuplicateInArray(allowedNamespace.Clusters); duplicate {
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.AllowedNamespaces").Child("Clusters"), strings.Join(value, ", "))
 		}
 	}
 	return nil

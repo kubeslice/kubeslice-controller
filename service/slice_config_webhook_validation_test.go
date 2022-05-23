@@ -1351,7 +1351,7 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 func validateAllowedNamespacesWithDuplicateClusters(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
-	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
 
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
@@ -1361,7 +1361,7 @@ func validateAllowedNamespacesWithDuplicateClusters(t *testing.T) {
 			},
 		},
 	}
-	err := validateAllowedNamespaces(ctx, sliceConfig)
+	err := validateAllowedNamespaces(sliceConfig)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
