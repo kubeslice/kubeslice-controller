@@ -58,7 +58,6 @@ var SliceConfigTestBed = map[string]func(*testing.T){
 	"SliceConfig_ObjectWithDuplicateClustersInSpec":                          SliceConfigObjectWithDuplicateClustersInSpec,
 	"SliceConfig_ErrorOnCreateWorkerSliceConfig":                             SliceConfigErrorOnCreateWorkerSliceConfig,
 	"SliceConfig_ErrorOnCreateWorkerSliceGateway":                            SliceConfigErrorOnCreateWorkerSliceGateway,
-	"SliceConfig_ErrorOnDeleteServiceExportConfigByParticipatingSliceConfig": SliceConfigErrorOnDeleteServiceExportConfigByParticipatingSliceConfig,
 	"SliceConfig_ErrorOnDeleteWorkerSliceGatewaysByLabel":                    SliceConfigErrorOnDeleteWorkerSliceGatewaysByLabel,
 	"SliceConfig_ErrorOnDeleteWorkerSliceConfigByLabel":                      SliceConfigErrorOnDeleteWorkerSliceConfigByLabel,
 	"SliceConfig_ErrorOnUpdatingTheFinalizer":                                SliceConfigErrorOnUpdatingTheFinalizer,
@@ -154,7 +153,6 @@ func SliceConfigDeleteTheObjectHappyCase(t *testing.T) {
 	}).Once()
 	workerSliceGatewayMock.On("DeleteWorkerSliceGatewaysByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	workerSliceConfigMock.On("DeleteWorkerSliceConfigByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
-	serviceExportConfigMock.On("DeleteServiceExportConfigByParticipatingSliceConfig", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	//remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
@@ -296,25 +294,6 @@ func SliceConfigErrorOnCreateWorkerSliceGateway(t *testing.T) {
 	workerSliceGatewayMock.AssertExpectations(t)
 }
 
-func SliceConfigErrorOnDeleteServiceExportConfigByParticipatingSliceConfig(t *testing.T) {
-	workerSliceGatewayMock, _, serviceExportConfigMock, _, requestObj, clientMock, sliceConfig, ctx, sliceConfigService := setupSliceConfigTest("slice_config", "namespace")
-	time := metav1.Now()
-	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.ObjectMeta.DeletionTimestamp = &time
-	}).Once()
-	err1 := errors.New("internal_error")
-	serviceExportConfigMock.On("DeleteServiceExportConfigByParticipatingSliceConfig", ctx, mock.Anything, requestObj.Namespace).Return(err1).Once()
-	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
-	expectedResult := ctrl.Result{}
-	require.Error(t, err2)
-	require.Equal(t, expectedResult, result)
-	require.Equal(t, err1, err2)
-	require.False(t, result.Requeue)
-	clientMock.AssertExpectations(t)
-	workerSliceGatewayMock.AssertExpectations(t)
-}
-
 func SliceConfigErrorOnDeleteWorkerSliceGatewaysByLabel(t *testing.T) {
 	workerSliceGatewayMock, _, serviceExportConfigMock, _, requestObj, clientMock, sliceConfig, ctx, sliceConfigService := setupSliceConfigTest("slice_config", "namespace")
 	time := metav1.Now()
@@ -322,7 +301,6 @@ func SliceConfigErrorOnDeleteWorkerSliceGatewaysByLabel(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
 		arg.ObjectMeta.DeletionTimestamp = &time
 	}).Once()
-	serviceExportConfigMock.On("DeleteServiceExportConfigByParticipatingSliceConfig", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	workerSliceGatewayMock.On("DeleteWorkerSliceGatewaysByLabel", ctx, mock.Anything, requestObj.Namespace).Return(err1).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
@@ -343,7 +321,6 @@ func SliceConfigErrorOnDeleteWorkerSliceConfigByLabel(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
 		arg.ObjectMeta.DeletionTimestamp = &time
 	}).Once()
-	serviceExportConfigMock.On("DeleteServiceExportConfigByParticipatingSliceConfig", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	workerSliceGatewayMock.On("DeleteWorkerSliceGatewaysByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	workerSliceConfigMock.On("DeleteWorkerSliceConfigByLabel", ctx, mock.Anything, requestObj.Namespace).Return(err1).Once()
@@ -382,7 +359,6 @@ func SliceConfigRemoveFinalizerErrorOnUpdate(t *testing.T) {
 	}).Once()
 	workerSliceGatewayMock.On("DeleteWorkerSliceGatewaysByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	workerSliceConfigMock.On("DeleteWorkerSliceConfigByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
-	serviceExportConfigMock.On("DeleteServiceExportConfigByParticipatingSliceConfig", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
@@ -406,7 +382,6 @@ func SliceConfigRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
 	}).Once()
 	workerSliceGatewayMock.On("DeleteWorkerSliceGatewaysByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	workerSliceConfigMock.On("DeleteWorkerSliceConfigByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
-	serviceExportConfigMock.On("DeleteServiceExportConfigByParticipatingSliceConfig", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
 	//remove finalizer
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()

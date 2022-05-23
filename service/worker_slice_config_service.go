@@ -173,7 +173,8 @@ outer:
 	return ctrl.Result{}, err
 }
 
-// CreateWorkerSliceConfig is a function to create the worker slice config
+// CreateMinimalWorkerSliceConfig CreateWorkerSliceConfig is a function to create the worker slice configs with minimum number of fields.
+// More fields are added in reconciliation loop.
 func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string) (map[string]int, error) {
 	logger := util.CtxLogger(ctx)
 	err := s.cleanUpSlices(ctx, label, namespace, clusters)
@@ -270,7 +271,7 @@ func (s *WorkerSliceConfigService) ListWorkerSliceConfigs(ctx context.Context, o
 	return slices.Items, nil
 }
 
-// ComputeClusterMap - function returns map of the cluster and the index
+// ComputeClusterMap - function assigns a numerical value to the cluster. The value will be from 1 to n, where n is the number of clusters in the slice.
 func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int {
 	clusterMapping := make(map[string]int, len(clusterNames))
 	usedIndexes := make(map[int]bool, 0)
