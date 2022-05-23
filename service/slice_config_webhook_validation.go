@@ -55,6 +55,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err := validateAllowedNamespaces(ctx, sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		if err = validateNamespaceIsolationProfile(sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	if len(allErrs) == 0 {
 		return nil
@@ -83,6 +86,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateAllowedNamespaces(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -93,6 +99,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
 	var allErrs field.ErrorList
 	if err := checkNamespaceDeboardingStatus(ctx, sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := validateIfServiceExportConfigExists(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -158,6 +167,28 @@ func validateProjectNamespace(ctx context.Context, sliceConfig *controllerv1alph
 	return nil
 }
 
+// validateIfServiceExportConfigExists is a function to validate if ServiceExportConfig exists for the given SliceConfig
+func validateIfServiceExportConfigExists(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
+	err := getServiceExportBySliceName(ctx, sliceConfig.Namespace, sliceConfig.Name, serviceExports)
+	if err == nil && len(serviceExports.Items) > 0 {
+		return &field.Error{
+			Type:   field.ErrorTypeForbidden,
+			Detail: fmt.Sprintf("The SliceConfig can only be deleted after all the service exports are deleted for the slice."),
+		}
+	}
+	return nil
+}
+
+// getServiceExportBySliceName is a function to get the service export configs by slice name
+func getServiceExportBySliceName(ctx context.Context, namespace string, sliceName string, serviceExports *controllerv1alpha1.ServiceExportConfigList) error {
+	label := map[string]string{
+		"original-slice-name": sliceName,
+	}
+	err := util.ListResources(ctx, serviceExports, client.InNamespace(namespace), client.MatchingLabels(label))
+	return err
+}
+
 // checkForProjectNamespace is a function to check namespace is in decided format
 func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 	return namespace.Labels[util.LabelName] == fmt.Sprintf(util.LabelValue, "Project", namespace.Name)
@@ -165,6 +196,9 @@ func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 
 // validateClusters is function to validate the cluster specification
 func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if len(sliceConfig.Spec.Clusters) == 0 {
+		return field.Required(field.NewPath("Spec").Child("Clusters"), "you cannot create a slice config without including at least one cluster")
+	}
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		return field.Duplicate(field.NewPath("Spec").Child("Clusters"), strings.Join(value, ", "))
 	}
@@ -294,6 +328,63 @@ func validateAllowedNamespaces(ctx context.Context, sliceConfig *controllerv1alp
 		/* check duplicate values of clusters */
 		if dup, cl := util.CheckDuplicateInArray(allowedNamespace.Clusters); dup {
 			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.AllowedNamespaces").Child("Clusters"), strings.Join(cl, ", "))
+		}
+	}
+	return nil
+}
+
+// validateNamespaceIsolationProfile checks for validation errors in NamespaceIsolationProfile.
+// Checks if the participating clusters are valid and if the namespaces are configured correctly.
+func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field.Error {
+
+	if len(s.Spec.NamespaceIsolationProfile.ApplicationNamespaces) == 0 && len(s.Spec.NamespaceIsolationProfile.AllowedNamespaces) == 0 {
+		return nil
+	}
+
+	// for each namespace in applicationNamespaces, check if the clusters are valid
+	participatingClusters := s.Spec.Clusters
+	var checkedApplicationNs []string
+
+	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+		//check if the clusters are already specified for a namespace
+		if util.ContainsString(checkedApplicationNs, nsSelection.Namespace) {
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
+		}
+		checkedApplicationNs = append(checkedApplicationNs, nsSelection.Namespace)
+
+		if util.ContainsString(nsSelection.Clusters, "*") {
+			if len(nsSelection.Clusters) > 1 {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "Other clusters are not allowed when * is present")
+			}
+		}
+
+		//check if the cluster is valid
+		for _, cluster := range nsSelection.Clusters {
+			if cluster != "*" && !util.ContainsString(participatingClusters, cluster) {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), cluster, "Cluster is not participating in slice config")
+			}
+		}
+	}
+
+	// for each namespace in AllowedNamespaces, check if the clusters are valid
+	var checkedAllowedNs []string
+	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.AllowedNamespaces {
+		//check if the clusters are already specified for a namespace
+		if util.ContainsString(checkedAllowedNs, nsSelection.Namespace) {
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace)
+		}
+		checkedAllowedNs = append(checkedAllowedNs, nsSelection.Namespace)
+
+		if util.ContainsString(nsSelection.Clusters, "*") {
+			if len(nsSelection.Clusters) > 1 {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "Other clusters are not allowed when * is present")
+			}
+		}
+		//check if the cluster is valid
+		for _, cluster := range nsSelection.Clusters {
+			if cluster != "*" && !util.ContainsString(participatingClusters, cluster) {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), cluster, "Cluster is not participating in slice config")
+			}
 		}
 	}
 	return nil
