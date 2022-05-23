@@ -110,6 +110,7 @@ func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alp
 	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceConfig"}, sliceConfig.Name, allErrs)
 }
 
+// checkNamespaceDeboardingStatus checks if the namespace is deboarding
 func checkNamespaceDeboardingStatus(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	ownerLabel := map[string]string{
@@ -320,6 +321,7 @@ func validateGrantedClusterNamespaces(ctx context.Context, clusterName string, a
 	return nil
 }
 
+// validateAllowedNamespaces is a function to validate the namespaces present in slice config
 func validateAllowedNamespaces(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	for _, allowedNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.AllowedNamespaces {
 		/* check duplicate values of clusters */
