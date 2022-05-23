@@ -132,11 +132,7 @@ func (s *SliceConfigService) checkForProjectNamespace(namespace *corev1.Namespac
 func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 	slice *v1alpha1.SliceConfig, namespace string) (ctrl.Result, error) {
 	ownershipLabel := util.GetOwnerLabel(slice)
-	err := s.se.DeleteServiceExportConfigByParticipatingSliceConfig(ctx, slice.Name, namespace)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	err = s.sgs.DeleteWorkerSliceGatewaysByLabel(ctx, ownershipLabel, namespace)
+	err := s.sgs.DeleteWorkerSliceGatewaysByLabel(ctx, ownershipLabel, namespace)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

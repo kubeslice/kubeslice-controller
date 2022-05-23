@@ -89,6 +89,9 @@ func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alp
 	if err := checkNamespaceDeboardingStatus(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	if err := validateIfServiceExportConfigExists(ctx, sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -152,6 +155,28 @@ func validateProjectNamespace(ctx context.Context, sliceConfig *controllerv1alph
 	return nil
 }
 
+// validateIfServiceExportConfigExists is a function to validate if ServiceExportConfig exists for the given SliceConfig
+func validateIfServiceExportConfigExists(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
+	err := getServiceExportBySliceName(ctx, sliceConfig.Namespace, sliceConfig.Name, serviceExports)
+	if err == nil && len(serviceExports.Items) > 0 {
+		return &field.Error{
+			Type:     field.ErrorTypeForbidden,
+			Detail:   fmt.Sprintf("The SliceConfig can only be deleted after all the service exports are deleted for the slice."),
+		}
+	}
+	return nil
+}
+
+// getServiceExportBySliceName is a function to get the service export configs by slice name
+func getServiceExportBySliceName(ctx context.Context, namespace string, sliceName string, serviceExports *controllerv1alpha1.ServiceExportConfigList) error {
+	label := map[string]string{
+		"original-slice-name": sliceName,
+	}
+	err := util.ListResources(ctx, serviceExports, client.InNamespace(namespace), client.MatchingLabels(label))
+	return err
+}
+
 // checkForProjectNamespace is a function to check namespace is in decided format
 func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 	return namespace.Labels[util.LabelName] == fmt.Sprintf(util.LabelValue, "Project", namespace.Name)
@@ -159,6 +184,9 @@ func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 
 // validateClusters is function to validate the cluster specification
 func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if len(sliceConfig.Spec.Clusters) == 0 {
+		return field.Required(field.NewPath("Spec").Child("Clusters"), "you cannot create a slice config without including at least one cluster")
+	}
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		return field.Invalid(field.NewPath("Spec").Child("Clusters"), value, "clusters must be unique in slice config")
 	}
