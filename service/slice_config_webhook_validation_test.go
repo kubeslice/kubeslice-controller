@@ -84,6 +84,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty":                                 DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty,
+	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithServiceExportsNotEmpty":                                         DeleteValidateSliceConfigWithServiceExportsNotEmpty,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1190,6 +1191,7 @@ func DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty(t *testing.T) {
 		arg.Items[0].Status.OnboardedAppNamespaces[1].Name = "random2"
 
 	}).Once()
+	clientMock.On("List", ctx, &controllerv1alpha1.ServiceExportConfigList{}, mock.Anything, mock.Anything).Return(nil).Once()
 	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
@@ -1215,6 +1217,29 @@ func DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEm
 		}
 		arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces[0] = "random1"
 		arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces[1] = "random2"
+	}).Once()
+	clientMock.On("List", ctx, &controllerv1alpha1.ServiceExportConfigList{}, mock.Anything, mock.Anything).Return(nil).Once()
+	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
+	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func DeleteValidateSliceConfigWithServiceExportsNotEmpty(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
+	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Once()
+	clientMock.On("List", ctx, &controllerv1alpha1.ServiceExportConfigList{}, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*controllerv1alpha1.ServiceExportConfigList)
+		if arg.Items == nil {
+			arg.Items = make([]controllerv1alpha1.ServiceExportConfig, 1)
+		}
+		arg.Items[0].Spec.SliceName = name
+		if arg.Items[0].Labels == nil {
+			arg.Items[0].Labels = make(map[string]string, 1)
+		}
+		arg.Items[0].Labels["original-slice-name"] = name
 	}).Once()
 	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
 	require.NotNil(t, err)
