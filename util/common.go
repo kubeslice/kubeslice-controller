@@ -110,10 +110,9 @@ func CheckDuplicateInArray(data []string) (bool, []string) {
 		return true, dup
 	}
 	return false, dup
-
 }
 
-func RemoveDuplicate(duplicate []string) (nonDup []string) {
+func RemoveDuplicatesFromArray(duplicate []string) (nonDup []string) {
 	mp := make(map[string]bool)
 	for i := 0; i < len(duplicate); i++ {
 		if _, ok := mp[duplicate[i]]; ok {

@@ -52,6 +52,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err = validateApplicationNamespaces(ctx, sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		if err := validateAllowedNamespaces(ctx, sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	if len(allErrs) == 0 {
 		return nil
@@ -75,6 +78,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		allErrs = append(allErrs, err)
 	}
 	if err := validateApplicationNamespaces(ctx, sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := validateAllowedNamespaces(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -160,7 +166,7 @@ func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 // validateClusters is function to validate the cluster specification
 func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
-		return field.Duplicate(field.NewPath("Spec").Child("Clusters"), value)
+		return field.Duplicate(field.NewPath("Spec").Child("Clusters"), strings.Join(value, ", "))
 	}
 	for _, clusterName := range sliceConfig.Spec.Clusters {
 		cluster := controllerv1alpha1.Cluster{}
@@ -240,7 +246,7 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 		return field.Invalid(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), "*", "* is not allowed in more than one external gateways")
 	}
 	if dup, cl := util.CheckDuplicateInArray(allClusters); dup {
-		return field.Duplicate(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), cl)
+		return field.Duplicate(field.NewPath("Spec").Child("ExternalGatewayConfig").Child("Clusters"), strings.Join(cl, ", "))
 	}
 	return nil
 }
@@ -250,18 +256,18 @@ func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv
 	for _, applicationNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
 		/* check duplicate values of clusters */
 		if dup, cl := util.CheckDuplicateInArray(applicationNamespace.Clusters); dup {
-			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces").Child("Clusters"), cl)
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces").Child("Clusters"), strings.Join(cl, ", "))
 		}
 		if applicationNamespace.Clusters[0] == "*" {
 			for _, clusterName := range sliceConfig.Spec.Clusters {
-				err := validateAllowedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, sliceConfig.Name, sliceConfig)
+				err := validateGrantedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, sliceConfig.Name, sliceConfig)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
 			for _, clusterName := range applicationNamespace.Clusters {
-				err := validateAllowedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, sliceConfig.Name, sliceConfig)
+				err := validateGrantedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, sliceConfig.Name, sliceConfig)
 				if err != nil {
 					return err
 				}
@@ -272,12 +278,22 @@ func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv
 }
 
 // validateClusterNamespaces is a function to validate the namespaces present is cluster
-func validateAllowedClusterNamespaces(ctx context.Context, clusterName string, applicationNamespace string, sliceName string, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+func validateGrantedClusterNamespaces(ctx context.Context, clusterName string, applicationNamespace string, sliceName string, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	cluster := controllerv1alpha1.Cluster{}
 	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
 	for _, clusterNamespace := range cluster.Status.Namespaces {
 		if applicationNamespace == clusterNamespace.Name && len(clusterNamespace.SliceName) > 0 && clusterNamespace.SliceName != sliceName {
 			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces"), applicationNamespace, "The given namespace: "+applicationNamespace+" in cluster "+clusterName+" is already acquired by other slice: "+clusterNamespace.SliceName)
+		}
+	}
+	return nil
+}
+
+func validateAllowedNamespaces(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	for _, allowedNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.AllowedNamespaces {
+		/* check duplicate values of clusters */
+		if dup, cl := util.CheckDuplicateInArray(allowedNamespace.Clusters); dup {
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.AllowedNamespaces").Child("Clusters"), strings.Join(cl, ", "))
 		}
 	}
 	return nil

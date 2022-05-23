@@ -56,7 +56,7 @@ type QOSProfile struct {
 }
 
 type NamespaceIsolationProfile struct {
-	IsolationEnabled      bool     `json:"isolationEnabled,omitempty"`
+	IsolationEnabled      bool     `json:"isolationEnabled"`
 	ApplicationNamespaces []string `json:"applicationNamespaces,omitempty"`
 	AllowedNamespaces     []string `json:"allowedNamespaces,omitempty"`
 }

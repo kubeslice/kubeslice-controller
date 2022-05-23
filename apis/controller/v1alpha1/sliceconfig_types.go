@@ -90,7 +90,7 @@ type QOSProfile struct {
 }
 
 type NamespaceIsolationProfile struct {
-	IsolationEnabled      bool                      `json:"isolationEnabled,omitempty"`
+	IsolationEnabled      bool                      `json:"isolationEnabled"`
 	ApplicationNamespaces []SliceNamespaceSelection `json:"applicationNamespaces,omitempty"`
 	AllowedNamespaces     []SliceNamespaceSelection `json:"allowedNamespaces,omitempty"`
 }

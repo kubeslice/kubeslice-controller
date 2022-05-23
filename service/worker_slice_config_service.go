@@ -147,7 +147,7 @@ outer:
 	}
 
 	for _, namespace := range controllerIsolationProfile.ApplicationNamespaces {
-		nonDuplicateClusters := util.RemoveDuplicate(namespace.Clusters)
+		nonDuplicateClusters := util.RemoveDuplicatesFromArray(namespace.Clusters)
 		for _, cluster := range nonDuplicateClusters {
 			if cluster == "*" || cluster == workerSliceConfig.Labels["worker-cluster"] {
 				workerIsolationProfile.ApplicationNamespaces = append(workerIsolationProfile.ApplicationNamespaces, namespace.Namespace)
