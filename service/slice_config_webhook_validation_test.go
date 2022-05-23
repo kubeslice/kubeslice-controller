@@ -206,7 +206,7 @@ func CreateValidateSliceConfigWithDuplicateClusters(t *testing.T) {
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-1"}
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "Spec.Clusters: Duplicate value:")
 	require.Contains(t, err.Error(), sliceConfig.Spec.Clusters[0])
 	clientMock.AssertExpectations(t)
 }
@@ -522,7 +522,7 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Duplicate value:")
 	clientMock.AssertExpectations(t)
 }
 func CreateValidateSliceConfigWithNamespaceAlreadyAssignedToOtherSlice(t *testing.T) {
@@ -770,7 +770,7 @@ func UpdateValidateSliceConfigWithDuplicateClusters(t *testing.T) {
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-1"}
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "Spec.Clusters: Duplicate value:")
 	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[0])
 	clientMock.AssertExpectations(t)
 }
@@ -1030,7 +1030,7 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Duplicate value:")
 	clientMock.AssertExpectations(t)
 }
 
