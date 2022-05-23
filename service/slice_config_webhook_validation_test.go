@@ -90,6 +90,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileAllowedNSClusterIsNotParticipating":                         ValidateNamespaceIsolationProfileAllowedNSClusterIsNotParticipating,
 	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileApplicationNSAsteriskAndOtherCluserPresent":                 ValidateNamespaceIsolationProfileApplicationNSAsteriskAndOtherCluserPresent,
 	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent":                     ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent,
+	"SliceConfigWebhookValidationValidateSliceConfigCreateWithErrorInNSIsolationProfile":                                       ValidateSliceConfigCreateWithErrorInNSIsolationProfile,
+	"SliceConfigWebhookValidationValidateSliceConfigUpdateWithErrorInNSIsolationProfile":                                       ValidateSliceConfigUpdateWithErrorInNSIsolationProfile,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1356,6 +1358,99 @@ func ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent(t *
 
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Other clusters are not allowed when * is present")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	}).Once()
+	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"*", "cluster-1"},
+			},
+		},
+	}
+	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	clusterCniSubnet := "10.10.1.1/16"
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NetworkInterface = "eth0"
+		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+	}).Once()
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[1],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NetworkInterface = "eth0"
+		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+	}).Once()
+	err := ValidateSliceConfigCreate(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Other clusters are not allowed when * is present")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	existingSliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &existingSliceConfig).Return(nil).Once()
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	clusterCniSubnet := "10.10.1.1/16"
+	newSliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
+		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+			{
+				Namespace: namespace,
+				Clusters:  []string{"*", "cluster-1"},
+			},
+		},
+	}
+
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NetworkInterface = "eth0"
+		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+	}).Once()
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[1],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NetworkInterface = "eth0"
+		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Other clusters are not allowed when * is present")
 	clientMock.AssertExpectations(t)
