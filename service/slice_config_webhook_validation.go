@@ -300,7 +300,7 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
 		//check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedApplicationNs, nsSelection.Namespace) {
-			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Duplicate namespace not allowed for application namespaces")
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
 		}
 		checkedApplicationNs = append(checkedApplicationNs, nsSelection.Namespace)
 
@@ -323,7 +323,7 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.AllowedNamespaces {
 		//check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedAllowedNs, nsSelection.Namespace) {
-			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace, "Duplicate namespace not allowed for allowed namespaces")
+			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace)
 		}
 		checkedAllowedNs = append(checkedAllowedNs, nsSelection.Namespace)
 

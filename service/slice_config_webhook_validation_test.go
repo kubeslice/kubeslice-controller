@@ -1250,7 +1250,7 @@ func ValidateNamespaceIsolationProfileApplicationNSDuplicateNamespaces(t *testin
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Duplicate namespace not allowed for application namespaces")
+	require.Contains(t, err.Error(), "NamespaceIsolationProfile.ApplicationNamespaces.Namespace: Duplicate value:")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1317,7 +1317,7 @@ func ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces(t *testing.T)
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Duplicate namespace not allowed for allowed namespaces")
+	require.Contains(t, err.Error(), "NamespaceIsolationProfile.AllowedNamespaces.Namespace: Duplicate value:")
 	clientMock.AssertExpectations(t)
 }
 
