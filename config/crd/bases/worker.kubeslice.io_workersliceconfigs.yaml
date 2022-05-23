@@ -73,6 +73,8 @@ spec:
                     type: array
                   isolationEnabled:
                     type: boolean
+                required:
+                - isolationEnabled
                 type: object
               qosProfileDetails:
                 description: QOSProfile is the QOS Profile configuration from backend
