@@ -26,7 +26,7 @@ A signed commit is a commit where the commit message contains the following cont
 This can be done by adding `--signoff` to your git command line
 
 ## Code of conduct
-Please make sure to read and observe our [Code of Conduct].
+Please make sure to read and observe our [Code of Conduct](https://github.com/kubeslice/kubeslice-controller/blob/doc/AM-4043-Contribution-Guide/code_of_conduct.md).
 
 ## Contributor Workflow
 
