@@ -96,9 +96,8 @@ spec:
                       type: object
                     type: array
                   isolationEnabled:
+                    default: false
                     type: boolean
-                required:
-                - isolationEnabled
                 type: object
               qosProfileDetails:
                 description: The custom QOS Profile Details
