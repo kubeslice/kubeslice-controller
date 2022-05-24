@@ -90,6 +90,8 @@ type QOSProfile struct {
 }
 
 type NamespaceIsolationProfile struct {
+	//+kubebuilder:default:=false
+	//+kubebuilder:validation:Optional
 	IsolationEnabled      bool                      `json:"isolationEnabled"`
 	ApplicationNamespaces []SliceNamespaceSelection `json:"applicationNamespaces,omitempty"`
 	AllowedNamespaces     []SliceNamespaceSelection `json:"allowedNamespaces,omitempty"`
