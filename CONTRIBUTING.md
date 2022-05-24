@@ -2,7 +2,7 @@
 
 Guidelines on how to contribute to KubeSlice
 
-There are a number of ways you can contribute to the KubeSlice project. We would like to accept your patches and contributions to the KubeSlice code base. This document provides guidelines on how to contribute to the KubeSlice code base. we require all participants to adhere to the Code of Conduct.
+There are a number of ways you can contribute to the KubeSlice project. We would like to accept your patches and contributions to the KubeSlice code base. This document provides guidelines on how to contribute to the KubeSlice code base. we require all participants to adhere to the [Code of Conduct](https://github.com/kubeslice/kubeslice-controller/blob/doc/AM-4043-Contribution-Guide/code_of_conduct.md).
 
 
 Here are some ways to contribute:
