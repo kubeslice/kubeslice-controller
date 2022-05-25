@@ -262,7 +262,7 @@ func initialize(services *service.Services) {
 
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create;update;patch;delete;escalate
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;escalate;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=create;get;list;watch;escalate;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;escalate;update;patch;create
 //+kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
