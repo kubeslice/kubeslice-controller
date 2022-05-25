@@ -99,7 +99,7 @@ func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
 				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
 			},
 			{
-				Verbs:     []string{verbGet, verbList, verbWatch},
+				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate},
 				APIGroups: []string{""},
 				Resources: []string{resourceSecrets},
 			},
