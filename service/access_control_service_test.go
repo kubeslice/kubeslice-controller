@@ -105,7 +105,7 @@ func AccessControlService_ReconcileWorkerClusterRole_Create(t *testing.T) {
 				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
 			},
 			{
-				Verbs:     []string{verbGet, verbList, verbWatch},
+				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
 				APIGroups: []string{""},
 				Resources: []string{resourceSecrets},
 			},
@@ -170,7 +170,7 @@ func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
 				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
 			},
 			{
-				Verbs:     []string{verbGet, verbList, verbWatch},
+				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
 				APIGroups: []string{""},
 				Resources: []string{resourceSecrets},
 			},
