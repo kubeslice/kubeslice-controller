@@ -24,7 +24,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
-	vutil "github.com/kubeslice/apis/pkg/util"
+	apiutil "github.com/kubeslice/apis/pkg/util"
 	workerv1alpha1 "github.com/kubeslice/apis/pkg/worker/v1alpha1"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
@@ -517,6 +517,6 @@ func setupWorkerSliceTest(name string, namespace string) (WorkerSliceConfigServi
 	clientMock := &utilMock.Client{}
 	workerSlice := &workerv1alpha1.WorkerSliceConfig{}
 
-	ctx := vutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceConfigController")
+	ctx := apiutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceConfigController")
 	return WorkerSliceService, requestObj, clientMock, workerSlice, ctx
 }

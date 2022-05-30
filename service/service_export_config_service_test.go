@@ -23,7 +23,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
-	vutil "github.com/kubeslice/apis/pkg/util"
+	apiutil "github.com/kubeslice/apis/pkg/util"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -454,6 +454,6 @@ func setupServiceExportTest(name string, namespace string) (*mocks.IWorkerServic
 	}
 	clientMock := &utilMock.Client{}
 	serviceExport := &controllerv1alpha1.ServiceExportConfig{}
-	ctx := vutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "ServiceExportConfigServiceTest")
+	ctx := apiutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "ServiceExportConfigServiceTest")
 	return workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx
 }

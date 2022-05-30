@@ -22,7 +22,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
-	vutil "github.com/kubeslice/apis/pkg/util"
+	apiutil "github.com/kubeslice/apis/pkg/util"
 	workerv1alpha1 "github.com/kubeslice/apis/pkg/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -540,6 +540,6 @@ func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretS
 	}
 	clientMock := &utilMock.Client{}
 	workerSliceGateway := &workerv1alpha1.WorkerSliceGateway{}
-	ctx := vutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayTest")
+	ctx := apiutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayTest")
 	return secretServiceMock, workerSliceConfigMock, jobServiceMock, workerSliceGatewayMock, requestObj, clientMock, workerSliceGateway, ctx
 }

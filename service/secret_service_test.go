@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/dailymotion/allure-go"
-	vutil "github.com/kubeslice/apis/pkg/util"
+	apiutil "github.com/kubeslice/apis/pkg/util"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
@@ -109,6 +109,6 @@ func setupSecretTest(name string, namespace string) (SecretService, *utilMock.Cl
 			Namespace: namespace,
 		},
 	}
-	ctx := vutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SecretServiceTest")
+	ctx := apiutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SecretServiceTest")
 	return secretService, clientMock, secret, ctx
 }

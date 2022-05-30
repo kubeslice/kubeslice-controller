@@ -24,7 +24,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
-	vutil "github.com/kubeslice/apis/pkg/util"
+	apiutil "github.com/kubeslice/apis/pkg/util"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -207,6 +207,6 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 
 func prepareProjectTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	preparedCtx := vutil.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController")
+	preparedCtx := apiutil.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController")
 	return preparedCtx
 }

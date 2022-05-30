@@ -23,7 +23,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
-	vutil "github.com/kubeslice/apis/pkg/util"
+	apiutil "github.com/kubeslice/apis/pkg/util"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
@@ -1036,6 +1036,6 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 }
 func prepareACSTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	preparedCtx := vutil.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController")
+	preparedCtx := apiutil.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController")
 	return preparedCtx
 }

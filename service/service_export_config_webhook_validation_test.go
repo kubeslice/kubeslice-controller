@@ -23,7 +23,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
-	vutil "github.com/kubeslice/apis/pkg/util"
+	apiutil "github.com/kubeslice/apis/pkg/util"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
@@ -349,6 +349,6 @@ func setupServiceExportConfigWebhookValidationTest(name string, namespace string
 			Namespace: namespace,
 		},
 	}
-	ctx := vutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "ServiceExportConfigWebhookValidationServiceTest")
+	ctx := apiutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "ServiceExportConfigWebhookValidationServiceTest")
 	return clientMock, serviceExportConfig, ctx
 }
