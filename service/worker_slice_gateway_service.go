@@ -25,9 +25,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
 
-	"github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/apis/pkg/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"

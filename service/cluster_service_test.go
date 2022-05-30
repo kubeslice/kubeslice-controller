@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"testing"
 
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/dailymotion/allure-go"
+	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
+	vutil "github.com/kubeslice/apis/pkg/util"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilmock "github.com/kubeslice/kubeslice-controller/util/mocks"
-
-	"github.com/dailymotion/allure-go"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -259,7 +259,7 @@ func testDeleteClusterDeleteFail(t *testing.T) {
 
 func prepareTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ClusterTestController")
+	preparedCtx := vutil.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ClusterTestController")
 	return preparedCtx
 }
 

@@ -19,7 +19,7 @@ package service
 import (
 	"context"
 
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/apis/pkg/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"

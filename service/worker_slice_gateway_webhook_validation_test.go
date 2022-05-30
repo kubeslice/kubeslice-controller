@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/dailymotion/allure-go"
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
-	"github.com/kubeslice/kubeslice-controller/util"
+	vutil "github.com/kubeslice/apis/pkg/util"
+	workerv1alpha1 "github.com/kubeslice/apis/pkg/worker/v1alpha1"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -91,6 +91,6 @@ func setupWorkerSliceGatewayWebhookValidationTest(name string, namespace string)
 			Namespace: namespace,
 		},
 	}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayWebhookValidationServiceTest")
+	ctx := vutil.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayWebhookValidationServiceTest")
 	return clientMock, workerSliceGateway, ctx
 }

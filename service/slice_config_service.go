@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/kubeslice/apis/pkg/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"

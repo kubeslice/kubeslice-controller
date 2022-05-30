@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/dailymotion/allure-go"
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/apis/pkg/worker/v1alpha1"
 	utilmock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

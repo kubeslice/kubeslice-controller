@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/dailymotion/allure-go"
-	"github.com/kubeslice/kubeslice-controller/util"
+	util "github.com/kubeslice/apis/pkg/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

@@ -20,9 +20,9 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	controllerv1alpha1 "github.com/kubeslice/apis/pkg/controller/v1alpha1"
+	util "github.com/kubeslice/apis/pkg/util"
 	"github.com/kubeslice/kubeslice-controller/service"
-	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
