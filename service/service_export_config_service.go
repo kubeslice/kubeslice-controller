@@ -183,8 +183,21 @@ func (s *ServiceExportConfigService) ListServiceExportConfigs(ctx context.Contex
 }
 
 func (s *ServiceExportConfigService) getOwnerLabelsForServiceExport(serviceExportConfig *controllerv1alpha1.ServiceExportConfig) map[string]string {
-	ownerLabels := util.GetOwnerLabel(serviceExportConfig)
+	//ownerLabels := util.GetOwnerLabel(serviceExportConfig)
+	ownerLabels := make(map[string]string)
 	resourceName := fmt.Sprintf("%s-%s-%s", serviceExportConfig.Spec.ServiceName, serviceExportConfig.Spec.ServiceNamespace, serviceExportConfig.Spec.SliceName)
-	ownerLabels["controller-resource-name"] = fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
+	// validating the length of label
+	lenResourceName := len(resourceName)
+	i := 0
+	j := 0
+	if lenResourceName > 52 {
+		noOfLabels := lenResourceName / 52
+		for i = 1; i <= noOfLabels; i++ {
+			ownerLabels["kubeslice-controller-resource-name-"+fmt.Sprint(i)] = fmt.Sprintf(util.LabelValue, "svcExpConf", resourceName[j:52*i])
+			j = 52 * i
+		}
+		ownerLabels["kubeslice-controller-resource-name-"+fmt.Sprint(i)] = fmt.Sprintf(util.LabelValue, "svcExpConf", resourceName[j:])
+
+	}
 	return ownerLabels
 }

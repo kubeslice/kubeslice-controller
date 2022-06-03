@@ -41,7 +41,7 @@ var (
 )
 var (
 	LabelName  = "kubeslice-controller-resource-name"
-	LabelValue = "controller-%s-%s"
+	LabelValue = "%s-%s"
 )
 
 // GetObjectKindis a function which return the kind of existing resource
