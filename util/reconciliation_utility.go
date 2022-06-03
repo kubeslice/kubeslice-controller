@@ -220,7 +220,27 @@ func GetOwnerLabel(owner client.Object) map[string]string {
 	for key, value := range LabelsKubeSliceController {
 		label[key] = value
 	}
-	label[LabelName] = fmt.Sprintf(LabelValue, GetObjectKind(owner), owner.GetName())
+	lenCompleteResourceName := len(GetObjectKind(owner)) + len(owner.GetName())
+	i := 0
+	j := 0
+	resourceName := fmt.Sprintf(LabelValue, GetObjectKind(owner), owner.GetName())
+	if lenCompleteResourceName > 63 {
+		noOfLabels := lenCompleteResourceName / 63
+		label["kubeslice-controller-resource-name"] = resourceName[j:63]
+		j = 63
+		lenCompleteResourceName = lenCompleteResourceName - 63
+		for i = 1; i <= noOfLabels; i++ {
+			if lenCompleteResourceName < 63 {
+				break
+			}
+			label["kubeslice-controller-resource-name-"+fmt.Sprint(i)] = resourceName[j : 63*(i+1)]
+			lenCompleteResourceName = lenCompleteResourceName - 63
+			j = 63 * (i + 1)
+		}
+		label["kubeslice-controller-resource-name-"+fmt.Sprint(i)] = resourceName[j:]
+	} else {
+		label["kubeslice-controller-resource-name"] = resourceName
+	}
 	return label
 }
 
