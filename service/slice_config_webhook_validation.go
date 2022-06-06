@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -335,7 +336,6 @@ func validateAllowedNamespaces(sliceConfig *controllerv1alpha1.SliceConfig) *fie
 // validateNamespaceIsolationProfile checks for validation errors in NamespaceIsolationProfile.
 // Checks if the participating clusters are valid and if the namespaces are configured correctly.
 func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field.Error {
-
 	if len(s.Spec.NamespaceIsolationProfile.ApplicationNamespaces) == 0 && len(s.Spec.NamespaceIsolationProfile.AllowedNamespaces) == 0 {
 		return nil
 	}
@@ -345,6 +345,13 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 	var checkedApplicationNs []string
 
 	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+		if len(nsSelection.Namespace) == 0 && len(nsSelection.Clusters) > 0 {
+			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
+		}
+		validNamespace, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", nsSelection.Namespace)
+		if validNamespace == false {
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Namespaces cannot contain special characteres")
+		}
 		//check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedApplicationNs, nsSelection.Namespace) {
 			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
@@ -368,6 +375,13 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 	// for each namespace in AllowedNamespaces, check if the clusters are valid
 	var checkedAllowedNs []string
 	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.AllowedNamespaces {
+		if len(nsSelection.Namespace) == 0 && len(nsSelection.Clusters) > 0 {
+			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
+		}
+		validNamespace, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", nsSelection.Namespace)
+		if validNamespace == false {
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Namespaces cannot contain special characteres")
+		}
 		//check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedAllowedNs, nsSelection.Namespace) {
 			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace)
