@@ -1263,7 +1263,7 @@ func ValidateNamespaceIsolationProfileApplicationNSNamespaceEmpty(t *testing.T) 
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
 
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
-		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
 				Namespace: namespace,
 				Clusters:  []string{"cluster-1"},
@@ -1282,7 +1282,7 @@ func ValidateNamespaceIsolationProfileApplicationNSNamespaceSpecialCharacter(t *
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
 
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
-		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
+		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
 				Namespace: namespace,
 				Clusters:  []string{"cluster-1"},
