@@ -6,7 +6,7 @@ It is strongly recommended to use a released version. Follow the instructions pr
 ## Building and Installing `kubeslice-controller` in a Local Kind Cluster
 For more information, see [getting started with kind clusters](https://docs.avesha.io/opensource/getting-started-with-kind-clusters).
 
-### Setup development environment
+### Setting up Development Environment
 
 * Go (version 1.17 or later) installed and configured in your machine ([Installing Go](https://go.dev/dl/))
 * Docker installed and running in your local machine
@@ -15,7 +15,7 @@ For more information, see [getting started with kind clusters](https://docs.aves
 
 
 
-### Build docker images
+### Building Docker Images
 
 1. Clone the latest version of kubeslice-controller from  the `master` branch.
 

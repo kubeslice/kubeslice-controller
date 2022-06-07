@@ -15,7 +15,7 @@ Here are some ways to contribute:
 * Provide feedback
 * Submit PRs for small bug fixes
 
-## Contributor compliance with Developer Certificate Of Origin (DCO)
+## Contributor Compliance with Developer Certificate Of Origin (DCO)
 
 We require every contributor to certify that they are legally permitted to contribute to our project. A contributor expresses this by consciously signing their commits, and by this act expressing that they comply with the Developer Certificate Of Origin
 
@@ -25,7 +25,7 @@ A signed commit is a commit where the commit message contains the following cont
 
 This can be done by adding `--signoff` to your git command line
 
-## Code of conduct
+## Code of Conduct
 Please make sure to read and observe our [Code of Conduct](https://github.com/kubeslice/kubeslice-controller/blob/doc/AM-4043-Contribution-Guide/code_of_conduct.md).
 
 ## Contributor Workflow
@@ -44,7 +44,7 @@ NOTE: Be sure to merge the latest from "upstream" before making a pull request!
 If you encounter a bug please file an issue in the Github repository. Please provide as much information as possible to help fix the issue. Please file the issue under the appropriate repo.
 
 
-## Coding guidelines
+## Coding Guidelines
 * follow good [coding guidelines](https://github.com/golang/go/wiki/CodeReviewComments).
 * write good [commit messages](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#-commit-message-format).
 
