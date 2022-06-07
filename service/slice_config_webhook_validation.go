@@ -348,7 +348,7 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 		if len(nsSelection.Namespace) == 0 && len(nsSelection.Clusters) > 0 {
 			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
 		}
-		validNamespace, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", nsSelection.Namespace)
+		validNamespace, _ := regexp.MatchString("^[a-zA-Z0-9-]+$", nsSelection.Namespace)
 		if validNamespace == false {
 			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Namespaces cannot contain special characteres")
 		}
@@ -378,7 +378,7 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 		if len(nsSelection.Namespace) == 0 && len(nsSelection.Clusters) > 0 {
 			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
 		}
-		validNamespace, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", nsSelection.Namespace)
+		validNamespace, _ := regexp.MatchString("^[a-zA-Z0-9-]+$", nsSelection.Namespace)
 		if validNamespace == false {
 			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Namespaces cannot contain special characteres")
 		}
