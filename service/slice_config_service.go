@@ -92,13 +92,15 @@ func (s SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.R
 	}
 
 	// Step 3: Creation of worker slice Objects and Cluster Labels
-	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, util.GetOwnerLabel(sliceConfig), sliceConfig.Name, sliceConfig.Spec.SliceSubnet)
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
+	ownershipLabel := util.GetOwnerLabel(completeResourceName)
+	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Step 4: Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, util.GetOwnerLabel(sliceConfig), clusterMap, sliceConfig.Spec.SliceSubnet)
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -131,7 +133,8 @@ func (s *SliceConfigService) checkForProjectNamespace(namespace *corev1.Namespac
 // cleanUpSliceConfigResources is a function to delete the slice config resources
 func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 	slice *v1alpha1.SliceConfig, namespace string) (ctrl.Result, error) {
-	ownershipLabel := util.GetOwnerLabel(slice)
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(slice), slice.GetName())
+	ownershipLabel := util.GetOwnerLabel(completeResourceName)
 	err := s.sgs.DeleteWorkerSliceGatewaysByLabel(ctx, ownershipLabel, namespace)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -173,8 +176,9 @@ func (s *SliceConfigService) getServiceExportBySliceName(ctx context.Context, na
 
 // getOwnerLabelsForServiceExport is a function to get the owner labels for service export
 func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig *v1alpha1.ServiceExportConfig) map[string]string {
-	ownerLabels := util.GetOwnerLabel(serviceExportConfig)
+	ownerLabels := make(map[string]string)
 	resourceName := fmt.Sprintf("%s-%s-%s", serviceExportConfig.Spec.ServiceName, serviceExportConfig.Spec.ServiceNamespace, serviceExportConfig.Spec.SliceName)
-	ownerLabels["controller-resource-name"] = fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
+	ownerLabels = util.GetOwnerLabel(completeResourceName)
 	return ownerLabels
 }

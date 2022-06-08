@@ -119,7 +119,8 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 			clusters := slice.Spec.Clusters
 			if util.IsInSlice(clusters, workerSliceGateway.Labels["worker-cluster"]) {
 				logger.Debug("SliceGateway deleted forcefully from slice, removing gateway pair and secret", req.NamespacedName)
-				labels := util.GetOwnerLabel(slice)
+				completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(slice), slice.GetName())
+				labels := util.GetOwnerLabel(completeResourceName)
 				labels["worker-cluster"] = workerSliceGateway.Labels["remote-cluster"]
 				labels["remote-cluster"] = workerSliceGateway.Labels["worker-cluster"]
 				pairWorkerSliceGateway := &v1alpha1.WorkerSliceGatewayList{}
