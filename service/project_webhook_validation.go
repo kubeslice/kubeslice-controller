@@ -151,7 +151,8 @@ func validateRoleBinding(ctx context.Context, project *controllerv1alpha1.Projec
 }
 
 func validateRoleBindingIfExists(ctx context.Context, project *controllerv1alpha1.Project, names []string, projectNamespace, format, child string) *field.Error {
-	labels := util.GetOwnerLabel(project)
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	for _, name := range names {
 		roleBindingNamespacedName := client.ObjectKey{
 			Namespace: projectNamespace,
@@ -172,7 +173,8 @@ func validateRoleBindingIfExists(ctx context.Context, project *controllerv1alpha
 
 // validateSANamesIfAlreadyExists is a function to validate the service account name if already exists
 func validateSANamesIfAlreadyExists(ctx context.Context, project *controllerv1alpha1.Project, names []string, projectNamespace, format, child string) *field.Error {
-	labels := util.GetOwnerLabel(project)
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	for _, name := range names {
 		serviceAccountNamespacedName := client.ObjectKey{
 			Namespace: projectNamespace,

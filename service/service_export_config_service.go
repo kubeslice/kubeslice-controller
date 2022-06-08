@@ -183,8 +183,10 @@ func (s *ServiceExportConfigService) ListServiceExportConfigs(ctx context.Contex
 }
 
 func (s *ServiceExportConfigService) getOwnerLabelsForServiceExport(serviceExportConfig *controllerv1alpha1.ServiceExportConfig) map[string]string {
-	ownerLabels := util.GetOwnerLabel(serviceExportConfig)
+	ownerLabels := make(map[string]string)
 	resourceName := fmt.Sprintf("%s-%s-%s", serviceExportConfig.Spec.ServiceName, serviceExportConfig.Spec.ServiceNamespace, serviceExportConfig.Spec.SliceName)
-	ownerLabels["controller-resource-name"] = fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
+	// validating the length of label
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
+	ownerLabels = util.GetOwnerLabel(completeResourceName)
 	return ownerLabels
 }

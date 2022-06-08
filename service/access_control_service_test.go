@@ -71,12 +71,13 @@ func AccessControlService_ReconcileWorkerClusterRole_Create(t *testing.T) {
 		Name:      roleWorkerCluster,
 	}
 	project := &controllerv1alpha1.Project{}
-
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -136,12 +137,13 @@ func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
 		Name:      roleWorkerCluster,
 	}
 	project := &controllerv1alpha1.Project{}
-
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -201,12 +203,13 @@ func AccessControlService_ReconcileReadOnlyRole_Create(t *testing.T) {
 		Name:      roleSharedReadOnly,
 	}
 	project := &controllerv1alpha1.Project{}
-
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -256,12 +259,13 @@ func AccessControlService_ReconcileReadOnlyRole_Update(t *testing.T) {
 		Name:      roleSharedReadOnly,
 	}
 	project := &controllerv1alpha1.Project{}
-
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -310,12 +314,13 @@ func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
 		Name:      roleSharedReadWrite,
 	}
 	project := &controllerv1alpha1.Project{}
-
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -365,12 +370,13 @@ func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
 		Name:      roleSharedReadWrite,
 	}
 	project := &controllerv1alpha1.Project{}
-
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -423,11 +429,13 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 		Namespace: namespace,
 		Name:      fmt.Sprintf(ServiceAccountWorkerCluster, readonlynames[0]),
 	}
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedServiceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountNamespacedName.Name,
 			Namespace: serviceAccountNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeClusterReadWrite,
 			},
@@ -445,7 +453,7 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleBindingNamespacedName.Name,
 			Namespace: roleBindingNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeClusterReadWrite,
 			},
@@ -490,11 +498,13 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_SA_exists_RoleBinding_exis
 		Namespace: namespace,
 		Name:      fmt.Sprintf(RoleBindingWorkerCluster, readonlynames[0]),
 	}
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRoleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleBindingNamespacedName.Name,
 			Namespace: roleBindingNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeClusterReadWrite,
 			},
@@ -756,11 +766,13 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 		Namespace: namespace,
 		Name:      fmt.Sprintf(ServiceAccountReadOnlyUser, readonlynames[0]),
 	}
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedServiceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountNamespacedName.Name,
 			Namespace: serviceAccountNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeReadOnly,
 			},
@@ -778,7 +790,7 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleBindingNamespacedName.Name,
 			Namespace: roleBindingNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeReadOnly,
 			},
@@ -869,11 +881,13 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 		Namespace: namespace,
 		Name:      fmt.Sprintf(ServiceAccountReadWriteUser, readonlynames[0]),
 	}
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedServiceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountNamespacedName.Name,
 			Namespace: serviceAccountNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeReadWrite,
 			},
@@ -891,7 +905,7 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleBindingNamespacedName.Name,
 			Namespace: roleBindingNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeReadWrite,
 			},
@@ -984,11 +998,13 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 		Namespace: namespace,
 		Name:      fmt.Sprintf(ServiceAccountWorkerCluster, readonlynames[0]),
 	}
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(project), project.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedServiceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountNamespacedName.Name,
 			Namespace: serviceAccountNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeClusterReadWrite,
 			},
@@ -1006,7 +1022,7 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleBindingNamespacedName.Name,
 			Namespace: roleBindingNamespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(project),
+			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeClusterReadWrite,
 			},

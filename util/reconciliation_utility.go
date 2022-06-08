@@ -41,7 +41,7 @@ var (
 )
 var (
 	LabelName  = "kubeslice-controller-resource-name"
-	LabelValue = "controller-%s-%s"
+	LabelValue = "%s-%s"
 )
 
 // GetObjectKindis a function which return the kind of existing resource
@@ -215,12 +215,32 @@ func ContainsString(strings []string, t string) bool {
 }
 
 // GetOwnerLabel is a function returns the label of object
-func GetOwnerLabel(owner client.Object) map[string]string {
+func GetOwnerLabel(completeResourceName string) map[string]string {
 	label := map[string]string{}
 	for key, value := range LabelsKubeSliceController {
 		label[key] = value
 	}
-	label[LabelName] = fmt.Sprintf(LabelValue, GetObjectKind(owner), owner.GetName())
+	lenCompleteResourceName := len(completeResourceName)
+	i := 0
+	j := 0
+	//resourceName = fmt.Sprintf(LabelValue, GetObjectKind(owner), owner.GetName())
+	if lenCompleteResourceName > 63 {
+		noOfLabels := lenCompleteResourceName / 63
+		label["kubeslice-controller-resource-name"] = completeResourceName[j:63]
+		j = 63
+		lenCompleteResourceName = lenCompleteResourceName - 63
+		for i = 1; i <= noOfLabels; i++ {
+			if lenCompleteResourceName < 63 {
+				break
+			}
+			label["kubeslice-controller-resource-name-"+fmt.Sprint(i)] = completeResourceName[j : 63*(i+1)]
+			lenCompleteResourceName = lenCompleteResourceName - 63
+			j = 63 * (i + 1)
+		}
+		label["kubeslice-controller-resource-name-"+fmt.Sprint(i)] = completeResourceName[j:]
+	} else {
+		label["kubeslice-controller-resource-name"] = completeResourceName
+	}
 	return label
 }
 

@@ -66,11 +66,13 @@ func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
 		Namespace: namespace,
 		Name:      roleWorkerCluster,
 	}
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(owner), owner.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(owner),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -136,11 +138,13 @@ func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namesp
 		Namespace: namespace,
 		Name:      roleSharedReadOnly,
 	}
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(owner), owner.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(owner),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -196,11 +200,13 @@ func (a *AccessControlService) ReconcileReadWriteRole(ctx context.Context,
 		Namespace: namespace,
 		Name:      roleSharedReadWrite,
 	}
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(owner), owner.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespacedName.Name,
 			Namespace: namespacedName.Namespace,
-			Labels:    util.GetOwnerLabel(owner),
+			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -319,11 +325,13 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			Namespace: namespace,
 			Name:      fmt.Sprintf(svcAccNamePattern, strings.ToLower(name)),
 		}
+		completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(owner), owner.GetName())
+		labels := util.GetOwnerLabel(completeResourceName)
 		expectedServiceAccount := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceAccountNamespacedName.Name,
 				Namespace: serviceAccountNamespacedName.Namespace,
-				Labels:    util.GetOwnerLabel(owner),
+				Labels:    labels,
 				Annotations: map[string]string{
 					fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): accessType,
 				},
@@ -349,11 +357,13 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			Namespace: namespace,
 			Name:      fmt.Sprintf(roleBindingNamePatterns, strings.ToLower(name)),
 		}
+		completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(owner), owner.GetName())
+		labels := util.GetOwnerLabel(completeResourceName)
 		expectedRoleBinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      roleBindingNamespacedName.Name,
 				Namespace: roleBindingNamespacedName.Namespace,
-				Labels:    util.GetOwnerLabel(owner),
+				Labels:    labels,
 				Annotations: map[string]string{
 					fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): accessType,
 				},
@@ -396,7 +406,10 @@ func (a *AccessControlService) cleanupObsoleteServiceAccountsAndRoleBindings(ctx
 	// Fetch existing RoleBindings and assume them for deletion
 	activeRoleBindings := map[string]activeRoleBinding{}
 	roleBindings := &rbacv1.RoleBindingList{}
-	err := util.ListResources(ctx, roleBindings, client.MatchingLabels(util.GetOwnerLabel(owner)), client.InNamespace(namespace))
+
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(owner), owner.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
+	err := util.ListResources(ctx, roleBindings, client.MatchingLabels(labels), client.InNamespace(namespace))
 	if err != nil {
 		util.CtxLogger(ctx).With(zap.Error(err)).Errorf("Could not list resources")
 		return ctrl.Result{}, err
@@ -412,7 +425,7 @@ func (a *AccessControlService) cleanupObsoleteServiceAccountsAndRoleBindings(ctx
 	// Fetch existing ServiceAccounts and assume them for deletions
 	activeServiceAccounts := map[string]activeServiceAccount{}
 	serviceAccounts := &corev1.ServiceAccountList{}
-	err = util.ListResources(ctx, serviceAccounts, client.MatchingLabels(util.GetOwnerLabel(owner)), client.InNamespace(namespace))
+	err = util.ListResources(ctx, serviceAccounts, client.MatchingLabels(labels), client.InNamespace(namespace))
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -457,7 +470,9 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 	names []string, owner client.Object) (ctrl.Result, error) {
 	// Fetch existing RoleBindings and assume them for deletion
 	roleBindings := &rbacv1.RoleBindingList{}
-	err := util.ListResources(ctx, roleBindings, client.MatchingLabels(util.GetOwnerLabel(owner)), client.InNamespace(namespace))
+	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(owner), owner.GetName())
+	labels := util.GetOwnerLabel(completeResourceName)
+	err := util.ListResources(ctx, roleBindings, client.MatchingLabels(labels), client.InNamespace(namespace))
 	if err != nil {
 		util.CtxLogger(ctx).With(zap.Error(err)).Errorf("Could not list resources")
 		return ctrl.Result{}, err
@@ -465,7 +480,7 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 
 	// Fetch existing ServiceAccounts and assume them for deletions
 	serviceAccounts := &corev1.ServiceAccountList{}
-	err = util.ListResources(ctx, serviceAccounts, client.MatchingLabels(util.GetOwnerLabel(owner)), client.InNamespace(namespace))
+	err = util.ListResources(ctx, serviceAccounts, client.MatchingLabels(labels), client.InNamespace(namespace))
 	if err != nil {
 		return ctrl.Result{}, err
 	}
