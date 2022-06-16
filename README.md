@@ -8,17 +8,17 @@ using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/acce
 ## Getting Started
 
 The KubeSlice Controller orchestrates the creation and management of slices on worker clusters.
-It is strongly recommended to use a released version. Follow the instructions provided in this [document](https://docs.avesha.io/opensource/installing-the-kubeslice-controller).
+It is strongly recommended to use a released version. Follow the instructions provided in this [document](https://docs.avesha.io/documentation/open-source/0.2.0/getting-started-with-cloud-clusters/installing-kubeslice/installing-the-kubeslice-controller).
 
 ## Building and Deploying `kubeslice-controller` in a Local Kind Cluster
-For more information, see [getting started with kind clusters](https://docs.avesha.io/opensource/getting-started-with-kind-clusters).
+For more information, see [getting started with kind clusters](https://docs.avesha.io/documentation/open-source/0.2.0/getting-started-with-kind-clusters).
 
 ### Prerequisites
 
 * Docker installed and running in your local machine
 * A running [`kind`](https://kind.sigs.k8s.io/)  cluster
 * [`kubectl`](https://kubernetes.io/docs/tasks/tools/) installed and configured
-* Follow the getting started from above, to install [`kubeslice-controller`](https://github.com/kubeslice/kubeslice-controller) and [`worker-operator`](https://github.com/kubeslice/worker-operator)
+* Follow the getting started from above to install [`kubeslice-controller`](https://github.com/kubeslice/kubeslice-controller) and [`worker-operator`](https://github.com/kubeslice/worker-operator).
 
 ### Setting up Your Helm Repo
 If you have not added avesha helm repo yet, add it.
@@ -54,7 +54,7 @@ make docker-build
 1. Loading kubeslice-controller image into your kind cluster ([kind](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)).
    If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
    
-* Note: If using a named cluster you will need to specify the name of the cluster you wish to load the images into. See [loading an image into your kind cluster](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster).
+* Note: If you use a named cluster, you must specify the name of the cluster you wish to load the images into. See [loading an image into your kind cluster](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster).
 
 ```console
 kind load docker-image aveshasystems/kubeslice-controller --name cluster-name
@@ -122,7 +122,7 @@ kubeslice-controller-manager-5b548fb865-kzb7c   2/2     Running   0          102
 ```
 
 ### Uninstalling the kubeslice-controller
-For more information, see [uninstalling the KubeSlice](https://docs.avesha.io/opensource/uninstalling-kubeslice).
+For more information, see [uninstalling KubeSlice](https://docs.avesha.io/documentation/open-source/0.2.0/getting-started-with-cloud-clusters/uninstalling-kubeslice).
 
 ```console
 make chart-undeploy
