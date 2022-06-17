@@ -56,6 +56,7 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err := validateAllowedNamespaces(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		// TODO: merge validateApplicationNamespaces & validateAllowedNamespaces in one function
 		if err = validateNamespaceIsolationProfile(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
