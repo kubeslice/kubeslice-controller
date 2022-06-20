@@ -19,57 +19,25 @@ package util
 import (
 	"context"
 
+	apiutil "github.com/kubeslice/apis/pkg/util"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8sUuid "k8s.io/apimachinery/pkg/util/uuid"
 )
 
 var Loglevel zapcore.Level
 var LoglevelString string
 
-type kubeSliceControllerContextKey struct {
-}
-
-// kubeSliceControllerRequestContext is a schema for request context
 type kubeSliceControllerRequestContext struct {
 	Client
 	Scheme *runtime.Scheme
 	Log    *zap.SugaredLogger
 }
 
-// kubeSliceControllerContext is instance of kubeSliceControllerContextKey
-var kubeSliceControllerContext = &kubeSliceControllerContextKey{}
-
-// PrepareKubeSliceControllersRequestContext is a function to create the context for kube slice
-func PrepareKubeSliceControllersRequestContext(ctx context.Context, client Client,
-	scheme *runtime.Scheme, controllerName string) context.Context {
-	uuid := k8sUuid.NewUUID()[:8]
-
-	var log *zap.SugaredLogger
-
-	if Loglevel == zap.DebugLevel {
-		log = zap.S().With(
-			zap.String("RequestId", string(uuid)),
-			zap.String("Controller", controllerName),
-		)
-	} else {
-		log = zap.S()
-	}
-
-	ctxVal := &kubeSliceControllerRequestContext{
-		Client: client,
-		Scheme: scheme,
-		Log:    log,
-	}
-	newCtx := context.WithValue(ctx, kubeSliceControllerContext, ctxVal)
-	return newCtx
-}
-
 // GetKubeSliceControllerRequestContext is a function to get the request context
-func GetKubeSliceControllerRequestContext(ctx context.Context) *kubeSliceControllerRequestContext {
-	if ctx.Value(kubeSliceControllerContext) != nil {
-		return ctx.Value(kubeSliceControllerContext).(*kubeSliceControllerRequestContext)
+func GetKubeSliceControllerRequestContext(ctx context.Context) *apiutil.KubeSliceControllerRequestContext {
+	if ctx.Value(apiutil.KubeSliceControllerContext) != nil {
+		return ctx.Value(apiutil.KubeSliceControllerContext).(*apiutil.KubeSliceControllerRequestContext)
 	}
 	return nil
 }

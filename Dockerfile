@@ -11,7 +11,6 @@ RUN go mod download
 
 # Copy the go source
 COPY main.go main.go
-COPY apis/ apis/
 COPY controllers/ controllers/
 COPY service/ service/
 COPY util/ util/

@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= aveshasystems/kubeslice-controller:latest
+IMG ?= aveshasystems/kubeslice-controller:latest-feature-apirepo
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
@@ -42,7 +42,7 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=controller-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-
+	$(CONTROLLER_GEN) rbac:roleName=controller-role crd webhook paths="./vendor/github.com/kubeslice/apis/..." output:crd:artifacts:config=config/crd/bases 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
