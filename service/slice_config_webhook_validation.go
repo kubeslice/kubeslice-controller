@@ -56,6 +56,7 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err := validateAllowedNamespaces(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		// TODO: merge validateApplicationNamespaces & validateAllowedNamespaces in one function
 		if err = validateNamespaceIsolationProfile(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
@@ -288,6 +289,12 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	for _, applicationNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
 		/* check duplicate values of clusters */
+		if len(applicationNamespace.Namespace) > 0 && len(applicationNamespace.Clusters) == 0 {
+			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), "clusters")
+		}
+		if len(applicationNamespace.Namespace) == 0 && len(applicationNamespace.Clusters) > 0 {
+			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), "Namespace")
+		}
 		if duplicate, value := util.CheckDuplicateInArray(applicationNamespace.Clusters); duplicate {
 			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces").Child("Clusters"), strings.Join(value, ", "))
 		}
@@ -345,9 +352,6 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 	var checkedApplicationNs []string
 
 	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
-		if len(nsSelection.Namespace) == 0 && len(nsSelection.Clusters) > 0 {
-			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
-		}
 		validNamespace, _ := regexp.MatchString("^[a-zA-Z0-9-]+$", nsSelection.Namespace)
 		if validNamespace == false {
 			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Namespaces cannot contain special characteres")
@@ -376,11 +380,14 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 	var checkedAllowedNs []string
 	for _, nsSelection := range s.Spec.NamespaceIsolationProfile.AllowedNamespaces {
 		if len(nsSelection.Namespace) == 0 && len(nsSelection.Clusters) > 0 {
-			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
+			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace)
 		}
 		validNamespace, _ := regexp.MatchString("^[a-zA-Z0-9-]+$", nsSelection.Namespace)
 		if validNamespace == false {
-			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Namespaces cannot contain special characteres")
+			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace, "Namespaces cannot contain special characteres")
+		}
+		if len(nsSelection.Namespace) > 0 && len(nsSelection.Clusters) == 0 {
+			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), "clusters")
 		}
 		//check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedAllowedNs, nsSelection.Namespace) {
