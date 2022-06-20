@@ -207,7 +207,7 @@ func initialize(services *service.Services) {
 	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = (&controllerv1alpha1.Project{}).SetupWebhookWithManager(mgr, service.ValidateProjectCreate, service.ValidateProjectUpdate); err != nil {
+		if err = (&controllerv1alpha1.Project{}).SetupWebhookWithManager(mgr, service.ValidateProjectCreate, service.ValidateProjectUpdate, service.ValidateProjectDelete); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Project")
 			os.Exit(1)
 		}

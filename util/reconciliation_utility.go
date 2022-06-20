@@ -40,8 +40,9 @@ var (
 	}
 )
 var (
-	LabelName  = "kubeslice-controller-resource-name"
-	LabelValue = "%s-%s"
+	LabelName       = "kubeslice-controller-resource-name"
+	LabelValue      = "%s-%s"
+	NamespacePrefix = "kubeslice-"
 )
 
 // GetObjectKindis a function which return the kind of existing resource
@@ -149,6 +150,7 @@ func DeleteResource(ctx context.Context, object client.Object) error {
 func ListResources(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	logger := CtxLogger(ctx)
 	logger.Debugf("Listing objects of kind %s with options %v", GetObjectKind(list), opts)
+
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.List(ctx, list, opts...)
 	return err

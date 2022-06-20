@@ -73,6 +73,36 @@ func ValidateProjectUpdate(ctx context.Context, project *controllerv1alpha1.Proj
 	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, project.Name, allErrs)
 }
 
+func ValidateProjectDelete(ctx context.Context, project *controllerv1alpha1.Project) error {
+	var allErrs field.ErrorList
+	exists, err := validateIfSliceConfigExists(ctx, project)
+	if err != nil {
+		return err
+	}
+	if exists {
+		err := &field.Error{
+			Type:     field.ErrorTypeForbidden,
+			Field:    "Field:Project",
+			BadValue: nil,
+			Detail:   fmt.Sprint("Delete the sliceconfig before deleting the project"),
+		}
+		allErrs = append(allErrs, err)
+	}
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, project.Name, allErrs)
+}
+
+func validateIfSliceConfigExists(ctx context.Context, project *controllerv1alpha1.Project) (bool, error) {
+	sliceConfig := &controllerv1alpha1.SliceConfigList{}
+	err := util.ListResources(ctx, sliceConfig, client.InNamespace(util.NamespacePrefix+project.Name))
+	if len(sliceConfig.Items) > 0 {
+		return true, nil
+	}
+	return false, err
+}
+
 func validateProjectName(name string) *field.Error {
 	if strings.Contains(name, ".") {
 		return field.Invalid(field.NewPath("name"), name, "cannot contain dot(.)")
