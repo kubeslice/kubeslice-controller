@@ -80,7 +80,7 @@ func ValidateProjectDelete(ctx context.Context, project *controllerv1alpha1.Proj
 		return err
 	}
 	if exists {
-		err := field.Forbidden(field.NewPath("Project"), "The Project can be delete only after delelting the slice config")
+		err := field.Forbidden(field.NewPath("Project"), "The Project can be delete only after deleting the slice config")
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
