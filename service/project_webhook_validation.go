@@ -80,12 +80,7 @@ func ValidateProjectDelete(ctx context.Context, project *controllerv1alpha1.Proj
 		return err
 	}
 	if exists {
-		err := &field.Error{
-			Type:     field.ErrorTypeForbidden,
-			Field:    "Field:Project",
-			BadValue: nil,
-			Detail:   fmt.Sprint("Delete the sliceconfig before deleting the project"),
-		}
+		err := field.Forbidden(field.NewPath("Project"), "The Project can be delete only after delelting the slice config")
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -96,7 +91,8 @@ func ValidateProjectDelete(ctx context.Context, project *controllerv1alpha1.Proj
 
 func validateIfSliceConfigExists(ctx context.Context, project *controllerv1alpha1.Project) (bool, error) {
 	sliceConfig := &controllerv1alpha1.SliceConfigList{}
-	err := util.ListResources(ctx, sliceConfig, client.InNamespace(util.NamespacePrefix+project.Name))
+	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
+	err := util.ListResources(ctx, sliceConfig, client.InNamespace(projectNamespace))
 	if len(sliceConfig.Items) > 0 {
 		return true, nil
 	}
