@@ -55,6 +55,7 @@ var ProjectWebhookTestbed = map[string]func(*testing.T){
 	"Test_ValidateProjectUpdate_ThrowsErrorIf_RoleBinding_Readonly_exists_throws_error":  Test_ValidateProjectUpdate_ThrowsErrorIf_RoleBinding_Readonly_exists_throws_error,
 	"Test_ValidateProjectUpdate_ThrowsErrorIf_RoleBinding_ReadWrite_exists_throws_error": Test_ValidateProjectUpdate_ThrowsErrorIf_RoleBinding_ReadWrite_exists_throws_error,
 	"Test_ValidateProjectUpdate_Happy":                                                   Test_ValidateProjectUpdate_Happy,
+	"Test_ValidateProjectDelete_FailsIfSliceConfigExists":                                Test_ValidateProjectDelete_FailsIfSliceConfigExists,
 }
 
 func TestValidateProjectCreate_Applied_Namespace_Error(t *testing.T) {
@@ -314,4 +315,21 @@ func prepareProjectWebhookTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
 	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectWebhookTestController")
 	return preparedCtx
+}
+
+func Test_ValidateProjectDelete_FailsIfSliceConfigExists(t *testing.T) {
+	project := &controllerv1alpha1.Project{}
+	sliceConfig := &controllerv1alpha1.SliceConfigList{}
+	clientMock := &utilMock.Client{}
+	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
+	clientMock.On("List", ctx, sliceConfig, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*controllerv1alpha1.SliceConfigList)
+		if arg.Items == nil {
+			arg.Items = make([]controllerv1alpha1.SliceConfig, 1)
+			arg.Items[0].Name = "sliceConfig1"
+		}
+	}).Once()
+	err := ValidateProjectDelete(ctx, project)
+	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
 }
