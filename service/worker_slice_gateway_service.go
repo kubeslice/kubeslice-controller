@@ -381,9 +381,9 @@ func (s *WorkerSliceGatewayService) buildNetworkAddresses(sliceSubnet, sourceClu
 	gatewayAddresses.ClientNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], clusterMap[destinationClusterName], "0")
 	gatewayAddresses.ServerSubnet = gatewayAddresses.ServerNetwork + "/24"
 	gatewayAddresses.ClientSubnet = gatewayAddresses.ClientNetwork + "/24"
-	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "0")
-	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "1")
-	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "2")
+	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "0")
+	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "1")
+	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "2")
 	return gatewayAddresses
 }
 
