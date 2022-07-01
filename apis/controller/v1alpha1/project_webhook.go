@@ -20,6 +20,9 @@ import (
 	"context"
 
 	"github.com/kubeslice/kubeslice-controller/util"
+	v1 "k8s.io/api/admission/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,9 +42,11 @@ var projectWebhookClient client.Client
 
 func (r *Project) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customProjectValidation, validateUpdate customProjectValidation, validateDelete customProjectValidation) error {
 	projectWebhookClient = mgr.GetClient()
+
 	customProjectCreateValidation = validateCreate
 	customProjectUpdateValidation = validateUpdate
 	customProjectDeleteValidation = validateDelete
+
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -59,7 +64,7 @@ func (r *Project) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-project,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=projects,verbs=create;update;delete,versions=v1alpha1,name=vproject.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-project,mutating=true,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=projects,verbs=create;update;delete,versions=v1alpha1,name=vproject.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Project{}
 
@@ -67,12 +72,48 @@ var _ webhook.Validator = &Project{}
 func (r *Project) ValidateCreate() error {
 	projectlog.Info("validate create", "name", r.Name)
 	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), projectWebhookClient, nil, "ProjectValidation")
+
+	request := webhook.AdmissionRequest{
+		AdmissionRequest: v1.AdmissionRequest{
+			UID: r.GetUID(),
+			Kind: metav1.GroupVersionKind{
+				Group:   "",
+				Version: r.APIVersion,
+				Kind:    r.Kind,
+			},
+			Resource: metav1.GroupVersionResource{
+				Group:    "",
+				Version:  r.ResourceVersion,
+				Resource: r.Name,
+			},
+			SubResource:        "",
+			RequestKind:        &metav1.GroupVersionKind{},
+			RequestResource:    &metav1.GroupVersionResource{},
+			RequestSubResource: "",
+			Name:               r.Name,
+			Namespace:          r.Namespace,
+			Operation:          v1.Create,
+			UserInfo: authenticationv1.UserInfo{
+				Username: "",
+				UID:      "",
+				Groups:   []string{},
+				Extra:    map[string]authenticationv1.ExtraValue{},
+			},
+			Object:    runtime.RawExtension{},
+			OldObject: runtime.RawExtension{},
+			DryRun:    new(bool),
+			Options:   runtime.RawExtension{},
+		},
+	}
+	projectlog.Info("validate create", "request", request)
+	//fmt.Println(req)
 	return customProjectCreateValidation(projectCtx, r)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Project) ValidateUpdate(old runtime.Object) error {
 	projectlog.Info("validate update", "name", r.Name)
+
 	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), projectWebhookClient, nil, "ProjectValidation")
 	return customProjectUpdateValidation(projectCtx, r)
 }

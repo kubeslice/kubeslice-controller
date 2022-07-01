@@ -134,6 +134,7 @@ func initialize(services *service.Services) {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "6a2ced6b.kubeslice.io",
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)

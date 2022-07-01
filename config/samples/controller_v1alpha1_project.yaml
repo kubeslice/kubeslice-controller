@@ -1,7 +1,7 @@
 apiVersion: controller.kubeslice.io/v1alpha1
 kind: Project
 metadata:
-  name: cisco
+  name: cisco11
 spec:
   serviceAccount:
     readWrite:

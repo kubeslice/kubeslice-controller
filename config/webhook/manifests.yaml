@@ -52,6 +52,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-controller-kubeslice-io-v1alpha1-project
+  failurePolicy: Fail
+  name: vproject.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - projects
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-controller-kubeslice-io-v1alpha1-serviceexportconfig
   failurePolicy: Fail
   name: mserviceexportconfig.kb.io
@@ -154,26 +175,6 @@ webhooks:
     - DELETE
     resources:
     - clusters
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-controller-kubeslice-io-v1alpha1-project
-  failurePolicy: Fail
-  name: vproject.kb.io
-  rules:
-  - apiGroups:
-    - controller.kubeslice.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - projects
   sideEffects: None
 - admissionReviewVersions:
   - v1
