@@ -24,14 +24,19 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	//"../vendor/sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
 var projectlog = logf.Log.WithName("project-resource")
+var admissionScheme = runtime.NewScheme()
+var admissionCodecs = serializer.NewCodecFactory(admissionScheme)
 
 type customProjectValidation func(ctx context.Context, project *Project) error
 
@@ -77,7 +82,6 @@ func (r *Project) ValidateCreate() error {
 		AdmissionRequest: v1.AdmissionRequest{
 			UID: r.GetUID(),
 			Kind: metav1.GroupVersionKind{
-				Group:   "",
 				Version: r.APIVersion,
 				Kind:    r.Kind,
 			},
@@ -96,8 +100,6 @@ func (r *Project) ValidateCreate() error {
 			UserInfo: authenticationv1.UserInfo{
 				Username: "",
 				UID:      "",
-				Groups:   []string{},
-				Extra:    map[string]authenticationv1.ExtraValue{},
 			},
 			Object:    runtime.RawExtension{},
 			OldObject: runtime.RawExtension{},
