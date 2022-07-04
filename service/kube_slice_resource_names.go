@@ -104,6 +104,7 @@ const (
 	WorkerSliceConfigFinalizer   = "worker.kubeslice.io/worker-slice-configuration-finalizer"
 	WorkerSliceGatewayFinalizer  = "worker.kubeslice.io/worker-slice-gateway-finalizer"
 	WorkerServiceImportFinalizer = "worker.kubeslice.io/worker-service-import-finalizer"
+	QoSProfileFinalizer          = "controller.kubeslice.io/qos-profile-finalizer"
 )
 
 // ControllerEndpoint

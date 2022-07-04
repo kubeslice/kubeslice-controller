@@ -73,6 +73,7 @@ rules:
   resources:
   - clusters
   - projects
+  - qosprofiles
   - serviceexportconfigs
   - sliceconfigs
   verbs:
@@ -88,6 +89,7 @@ rules:
   resources:
   - clusters/finalizers
   - projects/finalizers
+  - qosprofiles/finalizers
   - serviceexportconfigs/finalizers
   - sliceconfigs/finalizers
   verbs:
@@ -97,6 +99,7 @@ rules:
   resources:
   - clusters/status
   - projects/status
+  - qosprofiles/status
   - serviceexportconfigs/status
   - sliceconfigs/status
   verbs:

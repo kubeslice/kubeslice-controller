@@ -161,6 +161,8 @@ spec:
               sliceType:
                 default: Application
                 type: string
+              standardQosProfileName:
+                type: string
             required:
             - qosProfileDetails
             - sliceGatewayProvider

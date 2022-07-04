@@ -24,6 +24,7 @@ type Services struct {
 	WorkerSliceConfigService   IWorkerSliceConfigService
 	WorkerSliceGatewayService  IWorkerSliceGatewayService
 	WorkerServiceImportService IWorkerServiceImportService
+	QoSProfileService          IQoSProfileService
 }
 
 // bootstrapping Services
@@ -36,6 +37,7 @@ func WithServices() *Services {
 		WorkerSliceConfigService:   WithWorkerSliceConfigService(),
 		WorkerSliceGatewayService:  WithWorkerSliceGatewayService(),
 		WorkerServiceImportService: WithWorkerServiceImportService(),
+		QoSProfileService:          WithQoSProfileService(),
 	}
 }
 
@@ -115,4 +117,9 @@ func WithWorkerSliceConfigService() IWorkerSliceConfigService {
 // bootstrapping worker service import service
 func WithWorkerServiceImportService() IWorkerServiceImportService {
 	return &WorkerServiceImportService{}
+}
+
+// bootstrapping qos profile service
+func WithQoSProfileService() IQoSProfileService {
+	return &QoSProfileService{}
 }

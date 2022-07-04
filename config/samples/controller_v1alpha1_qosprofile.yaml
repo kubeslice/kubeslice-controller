@@ -1,0 +1,6 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: QoSProfile
+metadata:
+  name: qosprofile-sample
+spec:
+  # TODO(user): Add fields here
