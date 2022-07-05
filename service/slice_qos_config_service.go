@@ -28,22 +28,22 @@ import (
 	"time"
 )
 
-type IQoSProfileService interface {
-	ReconcileQoSProfile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
+type ISliceQoSConfigService interface {
+	ReconcileSliceQoSConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 }
 
-// QoSProfileService implements different service interfaces
-type QoSProfileService struct {
+// SliceQoSConfigService implements different service interfaces
+type SliceQoSConfigService struct {
 	wsc IWorkerSliceConfigService
 }
 
-// ReconcileQoSProfile is a function to reconcile the qos_profile
-func (q *QoSProfileService) ReconcileQoSProfile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// Step 0: Get QoSProfile resource
+// ReconcileSliceQoSConfig is a function to reconcile the qos_profile
+func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// Step 0: Get SliceQoSConfig resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Started Recoincilation of QoSProfile %v", req.NamespacedName)
-	qosProfile := &v1alpha1.QoSProfile{}
-	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, qosProfile)
+	logger.Infof("Started Recoincilation of SliceQoSConfig %v", req.NamespacedName)
+	sliceQosConfig := &v1alpha1.SliceQoSConfig{}
+	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, sliceQosConfig)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -52,21 +52,21 @@ func (q *QoSProfileService) ReconcileQoSProfile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 	//Step 1: Finalizers
-	if qosProfile.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !util.ContainsString(qosProfile.GetFinalizers(), QoSProfileFinalizer) {
-			if shouldReturn, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, qosProfile, QoSProfileFinalizer)); shouldReturn {
+	if sliceQosConfig.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !util.ContainsString(sliceQosConfig.GetFinalizers(), SliceQoSConfigFinalizer) {
+			if shouldReturn, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, sliceQosConfig, SliceQoSConfigFinalizer)); shouldReturn {
 				return result, reconErr
 			}
 		}
 	} else {
 		logger.Debug("starting delete for qos profile", req.NamespacedName)
-		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, qosProfile, QoSProfileFinalizer)); shouldReturn {
+		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceQosConfig, SliceQoSConfigFinalizer)); shouldReturn {
 			return result, reconErr
 		}
 		return ctrl.Result{}, err
 	}
 
-	// Step 2: check if QoSProfile is in project namespace
+	// Step 2: check if SliceQoSConfig is in project namespace
 	nsResource := &corev1.Namespace{}
 	found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
 		Name: req.Namespace,
@@ -88,12 +88,12 @@ func (q *QoSProfileService) ReconcileQoSProfile(ctx context.Context, req ctrl.Re
 }
 
 // checkForProjectNamespace is a function to check the namespace is in proper format
-func (q *QoSProfileService) checkForProjectNamespace(namespace *corev1.Namespace) bool {
+func (q *SliceQoSConfigService) checkForProjectNamespace(namespace *corev1.Namespace) bool {
 	return namespace.Labels[util.LabelName] == fmt.Sprintf(util.LabelValue, "Project", namespace.Name)
 }
 
 // updateWorkerSliceConfigs is a function to trigger reconciliation of worker slice config whenever there is a change in qos profile
-func (q *QoSProfileService) updateWorkerSliceConfigs(ctx context.Context, namespacedName types.NamespacedName) error {
+func (q *SliceQoSConfigService) updateWorkerSliceConfigs(ctx context.Context, namespacedName types.NamespacedName) error {
 	logger := util.CtxLogger(ctx)
 	label := map[string]string{
 		StandardQoSProfileLabel: namespacedName.Name,

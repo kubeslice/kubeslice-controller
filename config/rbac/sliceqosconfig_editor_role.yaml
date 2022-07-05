@@ -1,20 +1,24 @@
-# permissions for end users to view qosprofiles.
+# permissions for end users to edit sliceqosconfigs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: qosprofile-viewer-role
+  name: sliceqosconfig-editor-role
 rules:
 - apiGroups:
   - controller.kubeslice.io
   resources:
-  - qosprofiles
+  - sliceqosconfigs
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - controller.kubeslice.io
   resources:
-  - qosprofiles/status
+  - sliceqosconfigs/status
   verbs:
   - get
