@@ -206,13 +206,13 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkerServiceImport")
 		os.Exit(1)
 	}
-	if err = (&controller.QoSProfileReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		Log:               ctrl.Log.WithName("controllers").WithName("QoSProfile"),
-		QoSProfileService: services.QoSProfileService,
+	if err = (&controller.SliceQoSConfigReconciler{
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		Log:                   ctrl.Log.WithName("controllers").WithName("SliceQoSConfig"),
+		SliceQoSConfigService: services.SliceQoSConfigService,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "QoSProfile")
+		setupLog.Error(err, "unable to create controller", "controller", "SliceQoSConfig")
 		os.Exit(1)
 	}
 
@@ -262,9 +262,9 @@ func initialize(services *service.Services) {
 
 //All Controller RBACs goes here.
 
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;qosprofiles,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;qosprofiles/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;qosprofiles/finalizers,verbs=update
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;sliceqosconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs;workerserviceimports;workerslicegateways,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/status;workerserviceimports/status;workerslicegateways/status,verbs=get;update;patch

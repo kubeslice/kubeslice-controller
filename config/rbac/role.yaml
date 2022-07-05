@@ -73,9 +73,9 @@ rules:
   resources:
   - clusters
   - projects
-  - qosprofiles
   - serviceexportconfigs
   - sliceconfigs
+  - sliceqosconfigs
   verbs:
   - create
   - delete
@@ -89,9 +89,9 @@ rules:
   resources:
   - clusters/finalizers
   - projects/finalizers
-  - qosprofiles/finalizers
   - serviceexportconfigs/finalizers
   - sliceconfigs/finalizers
+  - sliceqosconfigs/finalizers
   verbs:
   - update
 - apiGroups:
@@ -99,9 +99,9 @@ rules:
   resources:
   - clusters/status
   - projects/status
-  - qosprofiles/status
   - serviceexportconfigs/status
   - sliceconfigs/status
+  - sliceqosconfigs/status
   verbs:
   - get
   - patch

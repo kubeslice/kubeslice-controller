@@ -23,8 +23,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// QoSProfileSpec defines the desired state of QoSProfile
-type QoSProfileSpec struct {
+// SliceQoSConfigSpec defines the desired state of SliceQoSConfig
+type SliceQoSConfigSpec struct {
 	//+kubebuilder:validation:Enum:=HTB
 	// +kubebuilder:validation:Required
 	QueueType string `json:"queueType"`
@@ -47,8 +47,8 @@ type QoSProfileSpec struct {
 	DscpClass string `json:"dscpClass"`
 }
 
-// QoSProfileStatus defines the observed state of QoSProfile
-type QoSProfileStatus struct {
+// SliceQoSConfigStatus defines the observed state of SliceQoSConfig
+type SliceQoSConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -56,24 +56,24 @@ type QoSProfileStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// QoSProfile is the Schema for the qosprofiles API
-type QoSProfile struct {
+// SliceQoSConfig is the Schema for the sliceqosconfigs API
+type SliceQoSConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   QoSProfileSpec   `json:"spec,omitempty"`
-	Status QoSProfileStatus `json:"status,omitempty"`
+	Spec   SliceQoSConfigSpec   `json:"spec,omitempty"`
+	Status SliceQoSConfigStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// QoSProfileList contains a list of QoSProfile
-type QoSProfileList struct {
+// SliceQoSConfigList contains a list of SliceQoSConfig
+type SliceQoSConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []QoSProfile `json:"items"`
+	Items           []SliceQoSConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&QoSProfile{}, &QoSProfileList{})
+	SchemeBuilder.Register(&SliceQoSConfig{}, &SliceQoSConfigList{})
 }

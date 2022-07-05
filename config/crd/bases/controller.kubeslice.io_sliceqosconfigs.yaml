@@ -6,20 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
-  name: qosprofiles.controller.kubeslice.io
+  name: sliceqosconfigs.controller.kubeslice.io
 spec:
   group: controller.kubeslice.io
   names:
-    kind: QoSProfile
-    listKind: QoSProfileList
-    plural: qosprofiles
-    singular: qosprofile
+    kind: SliceQoSConfig
+    listKind: SliceQoSConfigList
+    plural: sliceqosconfigs
+    singular: sliceqosconfig
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: QoSProfile is the Schema for the qosprofiles API
+        description: SliceQoSConfig is the Schema for the sliceqosconfigs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,7 +34,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: QoSProfileSpec defines the desired state of QoSProfile
+            description: SliceQoSConfigSpec defines the desired state of SliceQoSConfig
             properties:
               bandwidthCeilingKbps:
                 type: integer
@@ -76,7 +76,7 @@ spec:
             - tcType
             type: object
           status:
-            description: QoSProfileStatus defines the observed state of QoSProfile
+            description: SliceQoSConfigStatus defines the observed state of SliceQoSConfig
             type: object
         type: object
     served: true

@@ -96,7 +96,7 @@ resources:
   controller: true
   domain: kubeslice.io
   group: controller
-  kind: QoSProfile
+  kind: SliceQoSConfig
   path: github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1
   version: v1alpha1
 version: "3"

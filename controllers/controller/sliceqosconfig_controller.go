@@ -22,29 +22,30 @@ import (
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 )
 
-// QoSProfileReconciler reconciles a QoSProfile object
-type QoSProfileReconciler struct {
+// SliceQoSConfigReconciler reconciles a SliceQoSConfig object
+type SliceQoSConfigReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	QoSProfileService service.IQoSProfileService
-	Log               logr.Logger
+	Scheme                *runtime.Scheme
+	SliceQoSConfigService service.ISliceQoSConfigService
+	Log                   logr.Logger
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *QoSProfileReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *SliceQoSConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&controllerv1alpha1.QoSProfile{}).
+		For(&controllerv1alpha1.SliceQoSConfig{}).
 		Complete(r)
 }
 
-// Reconcile is a function to reconcile the qos_profile, QoSProfileReconciler implements it
-func (r *QoSProfileReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "QoSProfileController")
-	return r.QoSProfileService.ReconcileQoSProfile(kubeSliceCtx, req)
+// Reconcile is a function to reconcile the qos_profile, SliceQoSConfigReconciler implements it
+func (r *SliceQoSConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "SliceQoSConfigController")
+	return r.SliceQoSConfigService.ReconcileSliceQoSConfig(kubeSliceCtx, req)
 }

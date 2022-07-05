@@ -1,5 +1,5 @@
 apiVersion: controller.kubeslice.io/v1alpha1
-kind: QoSProfile
+kind: SliceQoSConfig
 metadata:
   name: profile1
 spec:
