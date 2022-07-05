@@ -9,8 +9,8 @@ resources:
   - bases/worker.kubeslice.io_workersliceconfigs.yaml
   - bases/worker.kubeslice.io_workerslicegateways.yaml
   - bases/worker.kubeslice.io_workerserviceimports.yaml
-- bases/controller.kubeslice.io_qosprofiles.yaml
-#+kubebuilder:scaffold:crdkustomizeresource
+  - bases/controller.kubeslice.io_qosprofiles.yaml
+  #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
   # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.

@@ -31,9 +31,9 @@ import (
 // QoSProfileReconciler reconciles a QoSProfile object
 type QoSProfileReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme            *runtime.Scheme
 	QoSProfileService service.IQoSProfileService
-	Log            logr.Logger
+	Log               logr.Logger
 }
 
 // SetupWithManager sets up the controller with the Manager.

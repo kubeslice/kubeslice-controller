@@ -136,3 +136,8 @@ var (
 const (
 	KubesliceWorkerDeleteRequeueTime = 3
 )
+
+//StandardQoSProfileLabel name
+const (
+	StandardQoSProfileLabel = "standard-qos-profile"
+)
