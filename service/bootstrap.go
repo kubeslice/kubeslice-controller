@@ -121,5 +121,7 @@ func WithWorkerServiceImportService() IWorkerServiceImportService {
 
 // bootstrapping qos profile service
 func WithQoSProfileService() IQoSProfileService {
-	return &QoSProfileService{}
+	return &QoSProfileService{
+		wsc: WithWorkerSliceConfigService(),
+	}
 }

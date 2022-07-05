@@ -207,9 +207,9 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&controller.QoSProfileReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Log:            ctrl.Log.WithName("controllers").WithName("QoSProfile"),
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Log:               ctrl.Log.WithName("controllers").WithName("QoSProfile"),
 		QoSProfileService: services.QoSProfileService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QoSProfile")

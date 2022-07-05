@@ -1,6 +1,11 @@
 apiVersion: controller.kubeslice.io/v1alpha1
 kind: QoSProfile
 metadata:
-  name: qosprofile-sample
+  name: profile1
 spec:
-  # TODO(user): Add fields here
+  queueType: HTB
+  priority: 1
+  tcType: BANDWIDTH_CONTROL
+  bandwidthCeilingKbps: 5120
+  bandwidthGuaranteedKbps: 2562
+  dscpClass: AF11

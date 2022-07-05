@@ -22,8 +22,10 @@ import (
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 )
 
 type IQoSProfileService interface {
@@ -32,7 +34,7 @@ type IQoSProfileService interface {
 
 // QoSProfileService implements different service interfaces
 type QoSProfileService struct {
-
+	wsc IWorkerSliceConfigService
 }
 
 // ReconcileQoSProfile is a function to reconcile the qos_profile
@@ -77,10 +79,39 @@ func (q *QoSProfileService) ReconcileQoSProfile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
+	err = q.updateWorkerSliceConfigs(ctx, req.NamespacedName)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
 // checkForProjectNamespace is a function to check the namespace is in proper format
 func (q *QoSProfileService) checkForProjectNamespace(namespace *corev1.Namespace) bool {
 	return namespace.Labels[util.LabelName] == fmt.Sprintf(util.LabelValue, "Project", namespace.Name)
+}
+
+// updateWorkerSliceConfigs is a function to trigger reconciliation of worker slice config whenever there is a change in qos profile
+func (q *QoSProfileService) updateWorkerSliceConfigs(ctx context.Context, namespacedName types.NamespacedName) error {
+	logger := util.CtxLogger(ctx)
+	label := map[string]string{
+		StandardQoSProfileLabel: namespacedName.Name,
+	}
+	workerSlices, err := q.wsc.ListWorkerSliceConfigs(ctx, label, namespacedName.Namespace)
+	if err != nil {
+		return err
+	}
+	for _, workerSlice := range workerSlices {
+		if workerSlice.Annotations == nil {
+			workerSlice.Annotations = make(map[string]string)
+		}
+		workerSlice.Annotations["updatedTimestamp"] = time.Now().String()
+		logger.Debug("Reconciling workerSliceConfig: ", workerSlice.Name)
+		err = util.UpdateResource(ctx, &workerSlice)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
