@@ -119,7 +119,7 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 
 	// if standardQos Found update the workerSliceConfig
 	if sliceConfig.Spec.StandardQosProfileName != "" {
-		qos := &controllerv1alpha1.QoSProfile{}
+		qos := &controllerv1alpha1.SliceQoSConfig{}
 		found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
 			Name:      sliceConfig.Spec.StandardQosProfileName,
 			Namespace: req.Namespace,
