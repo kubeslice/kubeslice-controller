@@ -49,7 +49,7 @@ func TestSliceQoSConfigSuite(t *testing.T) {
 }
 
 var SliceQoSConfigTestbed = map[string]func(*testing.T){
-	//"SliceQoSConfig_ReconciliationCompleteHappyCase": SliceQoSConfigReconciliationCompleteHappyCase,
+	"SliceQoSConfig_ReconciliationCompleteHappyCase": SliceQoSConfigReconciliationCompleteHappyCase,
 	"SliceQoSConfig_GetObjectErrorOtherThanNotFound": SliceQoSConfigGetObjectErrorOtherThanNotFound,
 	"SliceQoSConfig_GetObjectErrorNotFound":          SliceQoSConfigGetObjectErrorNotFound,
 	"SliceQoSConfig_DeleteTheObjectHappyCase":        SliceQoSConfigDeleteTheObjectHappyCase,
@@ -57,7 +57,7 @@ var SliceQoSConfigTestbed = map[string]func(*testing.T){
 	"SliceQoSConfig_ObjectNotInProjectNamespace":     SliceQoSConfigObjectNotInProjectNamespace,
 }
 
-func TestSliceQoSConfigReconciliationCompleteHappyCase(t *testing.T) {
+func SliceQoSConfigReconciliationCompleteHappyCase(t *testing.T) {
 	workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService := setupSliceQoSConfigTest("qos_profile_1", "namespace")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceQosConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
