@@ -140,6 +140,8 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 			DscpClass:               qos.Spec.DscpClass,
 		}
 		workerSliceConfig.Labels["standard-qos-profile"] = sliceConfig.Spec.StandardQosProfileName
+	} else {
+		workerSliceConfig.Labels["standard-qos-profile"] = ""
 	}
 
 	// Reconcile External Gateway Configuration
