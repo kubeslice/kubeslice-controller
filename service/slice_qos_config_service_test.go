@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +49,7 @@ func TestSliceQoSConfigSuite(t *testing.T) {
 }
 
 var SliceQoSConfigTestbed = map[string]func(*testing.T){
-	"SliceQoSConfig_ReconciliationCompleteHappyCase": SliceQoSConfigReconciliationCompleteHappyCase,
+	//"SliceQoSConfig_ReconciliationCompleteHappyCase": SliceQoSConfigReconciliationCompleteHappyCase,
 	"SliceQoSConfig_GetObjectErrorOtherThanNotFound": SliceQoSConfigGetObjectErrorOtherThanNotFound,
 	"SliceQoSConfig_GetObjectErrorNotFound":          SliceQoSConfigGetObjectErrorNotFound,
 	"SliceQoSConfig_DeleteTheObjectHappyCase":        SliceQoSConfigDeleteTheObjectHappyCase,
@@ -56,7 +57,7 @@ var SliceQoSConfigTestbed = map[string]func(*testing.T){
 	"SliceQoSConfig_ObjectNotInProjectNamespace":     SliceQoSConfigObjectNotInProjectNamespace,
 }
 
-func SliceQoSConfigReconciliationCompleteHappyCase(t *testing.T) {
+func TestSliceQoSConfigReconciliationCompleteHappyCase(t *testing.T) {
 	workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService := setupSliceQoSConfigTest("qos_profile_1", "namespace")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceQosConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -70,7 +71,24 @@ func SliceQoSConfigReconciliationCompleteHappyCase(t *testing.T) {
 		arg.Name = requestObj.Namespace
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
 	}).Once()
-	workerSliceConfigMock.On("ListWorkerSliceConfigs", ctx, mock.Anything, requestObj.Namespace).Return(nil, nil).Once()
+	workerSliceConfigs := workerv1alpha1.WorkerSliceConfigList{
+		Items: []workerv1alpha1.WorkerSliceConfig{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker-slice-config-1",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker-slice-config-2",
+				},
+			},
+		},
+	}
+	workerSliceConfigMock.On("ListWorkerSliceConfigs", ctx, mock.Anything, requestObj.Namespace).Return(workerSliceConfigs.Items, nil).Once()
+	for i := 0; i < len(workerSliceConfigs.Items); i++ {
+		clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	}
 	result, err := sliceQosConfigService.ReconcileSliceQoSConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
