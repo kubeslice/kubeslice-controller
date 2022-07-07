@@ -255,7 +255,11 @@ func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.Sli
 		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "Either StandardQosProfileName or QosProfileDetails is required")
 	}
 	if len(sliceConfig.Spec.StandardQosProfileName) > 0 {
-		existsQosConfigFromStandardQosProfileName(ctx, sliceConfig.Namespace, sliceConfig.Spec.StandardQosProfileName)
+		exists := existsQosConfigFromStandardQosProfileName(ctx, sliceConfig.Namespace, sliceConfig.Spec.StandardQosProfileName)
+		if !exists {
+			return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "StandardQosProfileName not found.")
+
+		}
 	}
 	if sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps < sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps {
 		return field.Invalid(field.NewPath("Spec").Child("QosProfileDetails").Child("BandwidthGuaranteedKbps"), sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps, "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
