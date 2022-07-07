@@ -257,7 +257,7 @@ func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.Sli
 	if sliceConfig.Spec.StandardQosProfileName != "" {
 		exists := existsQosConfigFromStandardQosProfileName(ctx, sliceConfig.Namespace, sliceConfig.Spec.StandardQosProfileName)
 		if !exists {
-			return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "StandardQosProfileName not found.")
+			return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "SliceQoSConfig not found.")
 
 		}
 	}
