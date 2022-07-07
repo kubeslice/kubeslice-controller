@@ -241,7 +241,7 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "WorkerSliceGateway")
 			os.Exit(1)
 		}
-		if err = (&controllerv1alpha1.SliceQoSConfig{}).SetupWebhookWithManager(mgr, service.ValidateSliceqosConfigDelete); err != nil {
+		if err = (&controllerv1alpha1.SliceQoSConfig{}).SetupWebhookWithManager(mgr, service.ValidateSliceQosConfigCreate, service.ValidateSliceQosConfigDelete); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SliceQoSConfig")
 			os.Exit(1)
 		}

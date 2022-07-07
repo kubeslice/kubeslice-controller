@@ -33,11 +33,13 @@ var sliceqosconfiglog = logf.Log.WithName("sliceqosconfig-resource")
 type customSliceqosconfigValidation func(ctx context.Context, SliceQoSConfig *SliceQoSConfig) error
 
 var customDeleteSliceqosconfigValidation func(ctx context.Context, SliceQoSConfig *SliceQoSConfig) error = nil
+var customCreateSliceqosconfigValidation func(ctx context.Context, SliceQoSConfig *SliceQoSConfig) error = nil
 var sliceqosconfigWebhookClient client.Client
 
-func (r *SliceQoSConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateDelete customSliceqosconfigValidation) error {
+func (r *SliceQoSConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customSliceqosconfigValidation, validateDelete customSliceqosconfigValidation) error {
 	sliceqosconfigWebhookClient = mgr.GetClient()
 	customDeleteSliceqosconfigValidation = validateDelete
+	customCreateSliceqosconfigValidation = validateCreate
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -64,9 +66,9 @@ var _ webhook.Validator = &SliceQoSConfig{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *SliceQoSConfig) ValidateCreate() error {
 	sliceqosconfiglog.Info("validate create", "name", r.Name)
-
+	sliceqosConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), projectWebhookClient, nil, "ProjectValidation")
+	return customCreateSliceqosconfigValidation(sliceqosConfigCtx, r)
 	// TODO(user): fill in your validation logic upon object creation.
-	return nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
