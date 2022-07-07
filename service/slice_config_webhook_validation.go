@@ -44,7 +44,7 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err = validateClusters(ctx, sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		if err = validateQosProfile(sliceConfig); err != nil {
+		if err = validateQosProfile(ctx, sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
 		if err = validateExternalGatewayConfig(sliceConfig); err != nil {
@@ -76,7 +76,7 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateClusters(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateQosProfile(sliceConfig); err != nil {
+	if err := validateQosProfile(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if err := validateExternalGatewayConfig(sliceConfig); err != nil {
@@ -247,7 +247,16 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig) *fie
 }
 
 // validateQosProfile is a function to validate the Qos(quality of service)profile of slice
-func validateQosProfile(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if len(sliceConfig.Spec.StandardQosProfileName) > 0 && len(sliceConfig.Spec.QosProfileDetails.QueueType) > 0 {
+		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "StandardQosProfileName cannot be set when QosProfileDetails is set")
+	}
+	if len(sliceConfig.Spec.StandardQosProfileName) <= 0 && len(sliceConfig.Spec.QosProfileDetails.QueueType) <= 0 {
+		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "Either StandardQosProfileName or QosProfileDetails is required")
+	}
+	if len(sliceConfig.Spec.StandardQosProfileName) > 0 {
+		existsQosConfigFromStandardQosProfileName(ctx, sliceConfig.Namespace, sliceConfig.Spec.StandardQosProfileName)
+	}
 	if sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps < sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps {
 		return field.Invalid(field.NewPath("Spec").Child("QosProfileDetails").Child("BandwidthGuaranteedKbps"), sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps, "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
 	}
@@ -405,4 +414,17 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 		}
 	}
 	return nil
+}
+
+func existsQosConfigFromStandardQosProfileName(ctx context.Context, namespace string, qosProfileName string) bool {
+	NamespacedName := client.ObjectKey{
+		Name:      qosProfileName,
+		Namespace: namespace,
+	}
+	sliceQosConfig := &controllerv1alpha1.SliceQoSConfig{}
+	found, err := util.GetResourceIfExist(ctx, NamespacedName, sliceQosConfig)
+	if err != nil {
+		return false
+	}
+	return found
 }
