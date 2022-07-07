@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -42,8 +43,30 @@ func TestSliceqosConfigSuite(t *testing.T) {
 }
 
 var sliceqosConfigTestBed = map[string]func(*testing.T){
+	"TestValidateSliceqosConfigCreatepass": testValidateSliceqosConfigCreatepass,
+	"TestValidateSliceqosConfigCreatefail": testValidateSliceqosConfigCreatefail,
 	"TestValidateSliceqosConfigDeletepass": testValidateSliceqosConfigDeletepass,
 	"TestValidateSliceqosConfigDeletefail": testValidateSliceqosConfigDeletefail,
+}
+
+func testValidateSliceqosConfigCreatepass(t *testing.T) {
+	name := "profile1"
+	namespace := "kubeslice-cisco"
+	clientMock, sliceQosConfig, ctx := setupSliceqosConfigWebhookValidationTest(name, namespace)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
+	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+func testValidateSliceqosConfigCreatefail(t *testing.T) {
+	name := "profile1"
+	namespace := "kubeslice-cisco"
+	clientMock, sliceQosConfig, ctx := setupSliceqosConfigWebhookValidationTest(name, namespace)
+	namespaceErr := errors.New("Project Namespace error")
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(namespaceErr).Once()
+	err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
 }
 
 func testValidateSliceqosConfigDeletefail(t *testing.T) {
@@ -58,7 +81,7 @@ func testValidateSliceqosConfigDeletefail(t *testing.T) {
 			arg.Items[0].Name = "red-slice-1"
 		}
 	}).Once()
-	err := ValidateSliceqosConfigDelete(ctx, sliceQosConfig)
+	err := ValidateSliceQosConfigDelete(ctx, sliceQosConfig)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -68,7 +91,7 @@ func testValidateSliceqosConfigDeletepass(t *testing.T) {
 	clientMock, sliceQosConfig, ctx := setupSliceqosConfigWebhookValidationTest(name, namespace)
 	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Once()
-	err := ValidateSliceqosConfigDelete(ctx, sliceQosConfig)
+	err := ValidateSliceQosConfigDelete(ctx, sliceQosConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
