@@ -95,6 +95,9 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidationValidateSliceConfigCreateWithErrorInNSIsolationProfile":                                       ValidateSliceConfigCreateWithErrorInNSIsolationProfile,
 	"SliceConfigWebhookValidationValidateSliceConfigUpdateWithErrorInNSIsolationProfile":                                       ValidateSliceConfigUpdateWithErrorInNSIsolationProfile,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithServiceExportsNotEmpty":                                         DeleteValidateSliceConfigWithServiceExportsNotEmpty,
+	"SliceConfigWebhookValidation_ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent":                     ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent,
+	"SliceConfigWebhookValidation_ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent":                  ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent,
+	"SliceConfigWebhookValidation_ValidateQosProfileStandardQosProfileNameDoesNotExist":                                        ValidateQosProfileStandardQosProfileNameDoesNotExist,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1435,5 +1438,42 @@ func validateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice(t *te
 	}).Once()
 	err := validateApplicationNamespaces(ctx, sliceConfig)
 	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.StandardQosProfileName = "testQos"
+	sliceConfig.Spec.QosProfileDetails = controllerv1alpha1.QOSProfile{
+		QueueType: "someType",
+	}
+	err := validateQosProfile(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "StandardQosProfileName cannot be set when QosProfileDetails is set")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	err := validateQosProfile(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Either StandardQosProfileName or QosProfileDetails is required")
+	clientMock.AssertExpectations(t)
+}
+func ValidateQosProfileStandardQosProfileNameDoesNotExist(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	notFoundError := k8sError.NewNotFound(util.Resource("SliceConfigWebhookValidationTest"), "isNotFound")
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.StandardQosProfileName = "testQos"
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Once()
+	err := validateQosProfile(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "SliceQoSConfig not found.")
 	clientMock.AssertExpectations(t)
 }
