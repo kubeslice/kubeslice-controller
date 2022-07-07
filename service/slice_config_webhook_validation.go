@@ -248,13 +248,13 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig) *fie
 
 // validateQosProfile is a function to validate the Qos(quality of service)profile of slice
 func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
-	if len(sliceConfig.Spec.StandardQosProfileName) > 0 && len(sliceConfig.Spec.QosProfileDetails.QueueType) > 0 {
+	if sliceConfig.Spec.StandardQosProfileName != "" && sliceConfig.Spec.QosProfileDetails.QueueType != "" {
 		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "StandardQosProfileName cannot be set when QosProfileDetails is set")
 	}
-	if len(sliceConfig.Spec.StandardQosProfileName) <= 0 && len(sliceConfig.Spec.QosProfileDetails.QueueType) <= 0 {
+	if sliceConfig.Spec.StandardQosProfileName == "" && sliceConfig.Spec.QosProfileDetails.QueueType == "" {
 		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "Either StandardQosProfileName or QosProfileDetails is required")
 	}
-	if len(sliceConfig.Spec.StandardQosProfileName) > 0 {
+	if sliceConfig.Spec.StandardQosProfileName != "" {
 		exists := existsQosConfigFromStandardQosProfileName(ctx, sliceConfig.Namespace, sliceConfig.Spec.StandardQosProfileName)
 		if !exists {
 			return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "StandardQosProfileName not found.")
