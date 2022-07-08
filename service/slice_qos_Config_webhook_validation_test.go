@@ -45,6 +45,7 @@ func TestSliceqosConfigSuite(t *testing.T) {
 var sliceqosConfigTestBed = map[string]func(*testing.T){
 	"TestValidateSliceqosConfigCreatepass": testValidateSliceqosConfigCreatepass,
 	"TestValidateSliceqosConfigCreatefail": testValidateSliceqosConfigCreatefail,
+	"TestvalidateSliceQosConfigSpecFail":   testvalidateSliceQosConfigSpecFail,
 	"TestValidateSliceqosConfigDeletepass": testValidateSliceqosConfigDeletepass,
 	"TestValidateSliceqosConfigDeletefail": testValidateSliceqosConfigDeletefail,
 }
@@ -67,6 +68,27 @@ func testValidateSliceqosConfigCreatefail(t *testing.T) {
 	err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+}
+
+func testvalidateSliceQosConfigSpecFail(t *testing.T) {
+	name := "profile1"
+	namespace := "kubeslice-cisco"
+	_, _, ctx := setupSliceqosConfigWebhookValidationTest(name, namespace)
+	sliceQosConfig := &controllerv1alpha1.SliceQoSConfig{
+		TypeMeta:   metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{},
+		Spec: controllerv1alpha1.SliceQoSConfigSpec{
+			QueueType:               "",
+			Priority:                0,
+			TcType:                  "",
+			BandwidthCeilingKbps:    999,
+			BandwidthGuaranteedKbps: 1000,
+			DscpClass:               "",
+		},
+		Status: controllerv1alpha1.SliceQoSConfigStatus{},
+	}
+	err := validateSliceQosConfigSpec(ctx, sliceQosConfig)
+	require.NotNil(t, err)
 }
 
 func testValidateSliceqosConfigDeletefail(t *testing.T) {
