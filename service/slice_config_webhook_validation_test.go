@@ -54,7 +54,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithDuplicateClusters":                                              CreateValidateSliceConfigWithDuplicateClusters,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithClusterDoesNotExist":                                            CreateValidateSliceConfigWithClusterDoesNotExist,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster":                    CreateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster,
-	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster":                              CreateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster,
+	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster":                             CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster":                           CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster":      CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling":                 CreateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling,
@@ -71,7 +71,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithDuplicateClusters":                                              UpdateValidateSliceConfigWithDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithClusterDoesNotExist":                                            UpdateValidateSliceConfigWithClusterDoesNotExist,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster":                    UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster,
-	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster":                              UpdateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster":                             UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster":                           UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster":      UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling":                 UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling,
@@ -279,7 +279,7 @@ func CreateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster(t 
 	clientMock.AssertExpectations(t)
 }
 
-func CreateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster(t *testing.T) {
+func CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -301,11 +301,11 @@ func CreateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster(t *testing.T
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = ""
+		arg.Spec.NodeIPs = []string{}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters.NodeIP: Required value:")
+	require.Contains(t, err.Error(), "Spec.Clusters.NodeIPs: Required value:")
 	clientMock.AssertExpectations(t)
 }
 
@@ -331,7 +331,7 @@ func CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster(t *testin
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
@@ -363,7 +363,7 @@ func CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipa
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
@@ -450,7 +450,7 @@ func CreateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
@@ -519,7 +519,7 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -528,7 +528,7 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
@@ -578,7 +578,7 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -587,7 +587,7 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -763,7 +763,7 @@ func UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster(t 
 	clientMock.AssertExpectations(t)
 }
 
-func UpdateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster(t *testing.T) {
+func UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -779,11 +779,11 @@ func UpdateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster(t *testing.T
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = ""
+		arg.Spec.NodeIPs = []string{}
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters.NodeIP: Required value:")
+	require.Contains(t, err.Error(), "Spec.Clusters.NodeIPs: Required value:")
 	clientMock.AssertExpectations(t)
 }
 
@@ -803,7 +803,7 @@ func UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster(t *testin
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{}
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
@@ -833,7 +833,7 @@ func UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipa
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
@@ -902,7 +902,7 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
@@ -959,7 +959,7 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -968,7 +968,7 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
@@ -1012,7 +1012,7 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -1021,7 +1021,7 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -1326,7 +1326,7 @@ func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -1335,7 +1335,7 @@ func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
@@ -1370,7 +1370,7 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -1379,7 +1379,7 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
-		arg.Spec.NodeIP = "10.10.1.1"
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
