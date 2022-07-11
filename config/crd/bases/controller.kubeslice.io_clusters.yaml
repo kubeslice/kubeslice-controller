@@ -101,6 +101,10 @@ spec:
               nodeIP:
                 description: NodeIP is the IP address of the Node
                 type: string
+              nodeIPs:
+                items:
+                  type: string
+                type: array
             type: object
           status:
             description: ClusterStatus defines the observed state of Cluster

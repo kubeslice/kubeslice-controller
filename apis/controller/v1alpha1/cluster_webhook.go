@@ -20,32 +20,47 @@ import (
 	"context"
 
 	"github.com/kubeslice/kubeslice-controller/util"
+	v1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
 var clusterlog = logf.Log.WithName("cluster-resource")
 
 type customClusterValidation func(ctx context.Context, cluster *Cluster) error
+type customClusterMutation func(ctx context.Context, cluster *Cluster, req v1.AdmissionRequest) admission.Response
 
 var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) error = nil
 var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster) error = nil
 var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) error = nil
+var customClusterSpecMutatation func(ctx context.Context, cluster *Cluster, req v1.AdmissionRequest) admission.Response = nil
 
 var clusterWebhookClient client.Client
 
-func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customClusterValidation, validateUpdate customClusterValidation, validateDelete customClusterValidation) error {
+func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customClusterValidation, validateUpdate customClusterValidation, validateDelete customClusterValidation, mutateClusterSpec customClusterMutation) error {
 	customClusterCreateValidation = validateCreate
 	customClusterUpdateValidation = validateUpdate
 	customClusterDeleteValidation = validateDelete
 	clusterWebhookClient = mgr.GetClient()
+	customClusterSpecMutatation = mutateClusterSpec
+	webHookserver := mgr.GetWebhookServer()
+	webHookserver.Register("/mutate-controller-kubeslice-io-v1alpha1-cluster", &webhook.Admission{
+		Handler: r,
+	})
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
+}
+
+func (r *Cluster) Handle(ctx context.Context, req admission.Request) admission.Response {
+	clusterlog.Info("Mutate", "request", req.AdmissionRequest)
+	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
+	return customClusterSpecMutatation(clusterCtx, r, req.AdmissionRequest)
 }
 
 //+kubebuilder:webhook:path=/mutate-controller-kubeslice-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
@@ -66,7 +81,7 @@ var _ webhook.Validator = &Cluster{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() error {
-	clusterlog.Info("validate create", "name", r.Name)
+	projectlog.Info("validate create", "name", r.Name)
 	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
 
 	return customClusterCreateValidation(clusterCtx, r)
@@ -74,7 +89,7 @@ func (r *Cluster) ValidateCreate() error {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateUpdate(old runtime.Object) error {
-	clusterlog.Info("validate update", "name", r.Name)
+	projectlog.Info("validate update", "name", r.Name)
 	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
 
 	return customClusterUpdateValidation(clusterCtx, r)

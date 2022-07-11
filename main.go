@@ -221,7 +221,7 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Project")
 			os.Exit(1)
 		}
-		if err = (&controllerv1alpha1.Cluster{}).SetupWebhookWithManager(mgr, service.ValidateClusterCreate, service.ValidateClusterUpdate, service.ValidateClusterDelete); err != nil {
+		if err = (&controllerv1alpha1.Cluster{}).SetupWebhookWithManager(mgr, service.ValidateClusterCreate, service.ValidateClusterUpdate, service.ValidateClusterDelete, service.MutateClusterSpec); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
 			os.Exit(1)
 		}
