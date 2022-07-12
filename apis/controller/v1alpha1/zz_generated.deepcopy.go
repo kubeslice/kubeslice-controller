@@ -598,7 +598,11 @@ func (in *SliceConfigSpec) DeepCopyInto(out *SliceConfigSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	out.QosProfileDetails = in.QosProfileDetails
+	if in.QosProfileDetails != nil {
+		in, out := &in.QosProfileDetails, &out.QosProfileDetails
+		*out = new(QOSProfile)
+		**out = **in
+	}
 	in.NamespaceIsolationProfile.DeepCopyInto(&out.NamespaceIsolationProfile)
 	if in.ExternalGatewayConfig != nil {
 		in, out := &in.ExternalGatewayConfig, &out.ExternalGatewayConfig

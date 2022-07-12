@@ -248,10 +248,10 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig) *fie
 
 // validateQosProfile is a function to validate the Qos(quality of service)profile of slice
 func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
-	if sliceConfig.Spec.StandardQosProfileName != "" && sliceConfig.Spec.QosProfileDetails.QueueType != "" {
+	if sliceConfig.Spec.StandardQosProfileName != "" && sliceConfig.Spec.QosProfileDetails != nil {
 		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "StandardQosProfileName cannot be set when QosProfileDetails is set")
 	}
-	if sliceConfig.Spec.StandardQosProfileName == "" && sliceConfig.Spec.QosProfileDetails.QueueType == "" {
+	if sliceConfig.Spec.StandardQosProfileName == "" && sliceConfig.Spec.QosProfileDetails == nil {
 		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "Either StandardQosProfileName or QosProfileDetails is required")
 	}
 	if sliceConfig.Spec.StandardQosProfileName != "" {
@@ -261,7 +261,7 @@ func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.Sli
 
 		}
 	}
-	if sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps < sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps {
+	if sliceConfig.Spec.QosProfileDetails != nil && sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps < sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps {
 		return field.Invalid(field.NewPath("Spec").Child("QosProfileDetails").Child("BandwidthGuaranteedKbps"), sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps, "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
 	}
 

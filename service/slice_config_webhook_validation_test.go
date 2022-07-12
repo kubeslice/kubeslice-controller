@@ -1447,7 +1447,7 @@ func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent(t *
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 
 	sliceConfig.Spec.StandardQosProfileName = "testQos"
-	sliceConfig.Spec.QosProfileDetails = controllerv1alpha1.QOSProfile{
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "someType",
 	}
 	err := validateQosProfile(ctx, sliceConfig)
