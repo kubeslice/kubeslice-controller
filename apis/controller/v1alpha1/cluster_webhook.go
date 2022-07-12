@@ -39,15 +39,14 @@ var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) er
 var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster) error = nil
 var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) error = nil
 var customClusterSpecMutatation func(ctx context.Context, cluster *Cluster, req v1.AdmissionRequest) admission.Response = nil
-
 var clusterWebhookClient client.Client
 
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customClusterValidation, validateUpdate customClusterValidation, validateDelete customClusterValidation, mutateClusterSpec customClusterMutation) error {
 	customClusterCreateValidation = validateCreate
 	customClusterUpdateValidation = validateUpdate
 	customClusterDeleteValidation = validateDelete
-	clusterWebhookClient = mgr.GetClient()
 	customClusterSpecMutatation = mutateClusterSpec
+	clusterWebhookClient = mgr.GetClient()
 	webHookserver := mgr.GetWebhookServer()
 	webHookserver.Register("/mutate-controller-kubeslice-io-v1alpha1-cluster", &webhook.Admission{
 		Handler: r,
@@ -56,7 +55,6 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate custo
 		For(r).
 		Complete()
 }
-
 func (r *Cluster) Handle(ctx context.Context, req admission.Request) admission.Response {
 	clusterlog.Info("Mutate", "request", req.AdmissionRequest)
 	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
@@ -81,7 +79,7 @@ var _ webhook.Validator = &Cluster{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() error {
-	projectlog.Info("validate create", "name", r.Name)
+	clusterlog.Info("validate create", "name", r.Name)
 	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
 
 	return customClusterCreateValidation(clusterCtx, r)
@@ -89,7 +87,7 @@ func (r *Cluster) ValidateCreate() error {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateUpdate(old runtime.Object) error {
-	projectlog.Info("validate update", "name", r.Name)
+	clusterlog.Info("validate update", "name", r.Name)
 	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
 
 	return customClusterUpdateValidation(clusterCtx, r)
