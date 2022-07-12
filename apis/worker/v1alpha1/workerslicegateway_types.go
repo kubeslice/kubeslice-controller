@@ -37,12 +37,13 @@ type WorkerSliceGatewaySpec struct {
 }
 
 type SliceGatewayConfig struct {
-	NodeIp        string `json:"nodeIp,omitempty"`
-	NodePort      int    `json:"nodePort,omitempty"`
-	GatewayName   string `json:"gatewayName,omitempty"`
-	ClusterName   string `json:"clusterName,omitempty"`
-	VpnIp         string `json:"vpnIp,omitempty"`
-	GatewaySubnet string `json:"gatewaySubnet,omitempty"`
+	NodeIp        string   `json:"nodeIp,omitempty"`
+	NodeIps       []string `json:"nodeIps,omitempty"`
+	NodePort      int      `json:"nodePort,omitempty"`
+	GatewayName   string   `json:"gatewayName,omitempty"`
+	ClusterName   string   `json:"clusterName,omitempty"`
+	VpnIp         string   `json:"vpnIp,omitempty"`
+	GatewaySubnet string   `json:"gatewaySubnet,omitempty"`
 }
 
 type GatewayCredentials struct {
