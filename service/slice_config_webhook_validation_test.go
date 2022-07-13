@@ -391,9 +391,11 @@ func CreateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 	}).Once()
 	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
-	sliceConfig.Spec.QosProfileDetails.QueueType = "SomeType"
-	sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps = 5120
-	sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps = 4096
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType:               "SomeType",
+		BandwidthGuaranteedKbps: 5120,
+		BandwidthCeilingKbps:    4096,
+	}
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.QosProfileDetails.BandwidthGuaranteedKbps: Invalid value:")
@@ -565,9 +567,11 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 		},
 	}
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
-	sliceConfig.Spec.QosProfileDetails.QueueType = "SomeType"
-	sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps = 4096
-	sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps = 5120
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType:               "SomeType",
+		BandwidthGuaranteedKbps: 4096,
+		BandwidthCeilingKbps:    5120,
+	}
 	if sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces == nil {
 		sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces = make([]controllerv1alpha1.SliceNamespaceSelection, 1)
 	}
