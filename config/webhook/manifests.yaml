@@ -172,6 +172,7 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - projects
   sideEffects: None

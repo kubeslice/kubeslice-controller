@@ -196,9 +196,6 @@ func checkForProjectNamespace(namespace *corev1.Namespace) bool {
 
 // validateClusters is function to validate the cluster specification
 func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
-	if len(sliceConfig.Spec.Clusters) == 0 {
-		return field.Required(field.NewPath("Spec").Child("Clusters"), "you cannot create a slice config without including at least one cluster")
-	}
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		return field.Duplicate(field.NewPath("Spec").Child("Clusters"), strings.Join(value, ", "))
 	}
@@ -211,8 +208,8 @@ func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.Slice
 		if cluster.Spec.NetworkInterface == "" {
 			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NetworkInterface"), "for cluster "+clusterName)
 		}
-		if cluster.Spec.NodeIP == "" {
-			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NodeIP"), "for cluster "+clusterName)
+		if len(cluster.Spec.NodeIPs) == 0 {
+			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NodeIPs"), "for cluster "+clusterName)
 		}
 		if len(cluster.Status.CniSubnet) == 0 {
 			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
