@@ -100,7 +100,7 @@ func (s SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.R
 	}
 
 	// Step 4: Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet)
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, sliceConfig.Spec.MaxClusters)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

@@ -31,8 +31,13 @@ type SliceConfigSpec struct {
 	// +kubebuilder:validation:Required
 	SliceGatewayProvider WorkerSliceGatewayProvider `json:"sliceGatewayProvider"`
 	//+kubebuilder:default:=Local
-	SliceIpamType string   `json:"sliceIpamType,omitempty"`
-	Clusters      []string `json:"clusters,omitempty"`
+	SliceIpamType string `json:"sliceIpamType,omitempty"`
+	//+kubebuilder:default:=16
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:validation:Maximum=32
+	MaxClusters int      `json:"maxClusters"`
+	Clusters    []string `json:"clusters,omitempty"`
 	// +kubebuilder:validation:Required
 	// The custom QOS Profile Details
 	QosProfileDetails         QOSProfile                `json:"qosProfileDetails"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails

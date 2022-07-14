@@ -17,6 +17,8 @@
 package util
 
 import (
+	"fmt"
+	"math"
 	"net"
 	"strings"
 
@@ -123,4 +125,18 @@ func RemoveDuplicatesFromArray(duplicate []string) (nonDup []string) {
 		}
 	}
 	return nonDup
+}
+
+// FindCIDRByMaxClusters is a function to find the CIDR by max clusters
+func FindCIDRByMaxClusters(maxCluster int) string {
+	var cidr string
+	baseCidr := 17
+	for i := 7; i <= 1; i-- {
+		if float64(maxCluster) > math.Pow(2, float64(i)) {
+			value := i + baseCidr
+			cidr = fmt.Sprintf("/%d", value)
+		}
+		break
+	}
+	return cidr
 }
