@@ -54,7 +54,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithDuplicateClusters":                                              CreateValidateSliceConfigWithDuplicateClusters,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithClusterDoesNotExist":                                            CreateValidateSliceConfigWithClusterDoesNotExist,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster":                    CreateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster,
-	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster":                              CreateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster,
+	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster":                             CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster":                           CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster":      CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling":                 CreateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling,
@@ -71,7 +71,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithDuplicateClusters":                                              UpdateValidateSliceConfigWithDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithClusterDoesNotExist":                                            UpdateValidateSliceConfigWithClusterDoesNotExist,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster":                    UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster,
-	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster":                              UpdateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster":                             UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster":                           UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster":      UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling":                 UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling,
@@ -279,7 +279,7 @@ func CreateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster(t 
 	clientMock.AssertExpectations(t)
 }
 
-func CreateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster(t *testing.T) {
+func CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -763,7 +763,7 @@ func UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster(t 
 	clientMock.AssertExpectations(t)
 }
 
-func UpdateValidateSliceConfigWithNodeIPEmptyInParticipatingCluster(t *testing.T) {
+func UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
