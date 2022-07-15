@@ -47,6 +47,7 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate custo
 	customClusterDeleteValidation = validateDelete
 	customClusterSpecMutatation = mutateClusterSpec
 	clusterWebhookClient = mgr.GetClient()
+	customClusterSpecMutatation = mutateClusterSpec
 	webHookserver := mgr.GetWebhookServer()
 	webHookserver.Register("/mutate-controller-kubeslice-io-v1alpha1-cluster", &webhook.Admission{
 		Handler: r,
