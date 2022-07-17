@@ -88,7 +88,7 @@ metadata:
   name: cluster-5
 spec:
   networkInterface: eth0
-  nodeIP: 11.11.14.11
+  nodeIP:  11.11.14.189
   clusterProperty:
     telemetry:
       enabled: true
