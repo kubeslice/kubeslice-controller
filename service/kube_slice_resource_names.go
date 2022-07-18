@@ -104,6 +104,7 @@ const (
 	WorkerSliceConfigFinalizer   = "worker.kubeslice.io/worker-slice-configuration-finalizer"
 	WorkerSliceGatewayFinalizer  = "worker.kubeslice.io/worker-slice-gateway-finalizer"
 	WorkerServiceImportFinalizer = "worker.kubeslice.io/worker-service-import-finalizer"
+	SliceQoSConfigFinalizer      = "controller.kubeslice.io/slice-qos-config-finalizer"
 )
 
 // ControllerEndpoint
@@ -134,4 +135,9 @@ var (
 
 const (
 	KubesliceWorkerDeleteRequeueTime = 3
+)
+
+//StandardQoSProfileLabel name
+const (
+	StandardQoSProfileLabel = "standard-qos-profile"
 )
