@@ -21,12 +21,6 @@ import (
 	"fmt"
 	"os"
 
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
-	"github.com/kubeslice/kubeslice-controller/controllers/controller"
-	"github.com/kubeslice/kubeslice-controller/controllers/worker"
-	"github.com/kubeslice/kubeslice-controller/service"
-	"github.com/kubeslice/kubeslice-controller/util"
 	hubZap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +30,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/controllers/controller"
+	"github.com/kubeslice/kubeslice-controller/controllers/worker"
+	"github.com/kubeslice/kubeslice-controller/service"
+	"github.com/kubeslice/kubeslice-controller/util"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -205,6 +206,15 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkerServiceImport")
 		os.Exit(1)
 	}
+	if err = (&controller.SliceQoSConfigReconciler{
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		Log:                   ctrl.Log.WithName("controllers").WithName("SliceQoSConfig"),
+		SliceQoSConfigService: services.SliceQoSConfigService,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SliceQoSConfig")
+		os.Exit(1)
+	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = (&controllerv1alpha1.Project{}).SetupWebhookWithManager(mgr, service.ValidateProjectCreate, service.ValidateProjectUpdate, service.ValidateProjectDelete); err != nil {
@@ -231,7 +241,12 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "WorkerSliceGateway")
 			os.Exit(1)
 		}
+		if err = (&controllerv1alpha1.SliceQoSConfig{}).SetupWebhookWithManager(mgr, service.ValidateSliceQosConfigCreate, service.ValidateSliceQosConfigUpdate, service.ValidateSliceQosConfigDelete); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "SliceQoSConfig")
+			os.Exit(1)
+		}
 	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -252,9 +267,9 @@ func initialize(services *service.Services) {
 
 //All Controller RBACs goes here.
 
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;sliceqosconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs;workerserviceimports;workerslicegateways,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/status;workerserviceimports/status;workerslicegateways/status,verbs=get;update;patch

@@ -58,6 +58,7 @@ var WorkerSliceTestbed = map[string]func(*testing.T){
 	"TestCreateWorkerSliceConfig_NewClusterFails":         testCreateWorkerSliceConfigNewClusterFails,
 	"TestCreateWorkerSliceConfig_UpdateClusterSuccess":    testCreateWorkerSliceConfigUpdateClusterSuccess,
 	"TestCreateWorkerSliceConfig_UpdateClusterFails":      testCreateWorkerSliceConfigUpdateClusterFails,
+	"TestCreateWorkerSliceConfig_WithStandardQosProfile":  testCreateWorkerSliceConfigWithStandardQosProfile,
 }
 
 func testWorkerSliceGetsCreatedAndReturnsReconciliationSuccess(t *testing.T) {
@@ -519,4 +520,76 @@ func setupWorkerSliceTest(name string, namespace string) (WorkerSliceConfigServi
 
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceConfigController")
 	return WorkerSliceService, requestObj, clientMock, workerSlice, ctx
+}
+
+func testCreateWorkerSliceConfigWithStandardQosProfile(t *testing.T) {
+	WorkerSliceName := "red-cluster-worker-slice"
+	namespace := "controller-manager-cisco"
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	clientMock.On("Get", ctx, requestObj.NamespacedName, workerSlice).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
+		arg.Spec.SliceSubnet = "10.23.45.14/24"
+		arg.Spec.SliceType = "sliceType"
+		arg.Spec.SliceGatewayProvider = workerv1alpha1.WorkerSliceGatewayProvider{
+			SliceGatewayType: "sliceGatewayType",
+			SliceCaType:      "sliceCaType",
+		}
+		arg.Spec.SliceName = "red"
+		arg.Spec.QosProfileDetails = workerv1alpha1.QOSProfile{
+			QueueType:               "queueType",
+			Priority:                1,
+			TcType:                  "tcType",
+			BandwidthCeilingKbps:    0,
+			BandwidthGuaranteedKbps: 0,
+			DscpClass:               "dscpClass",
+		}
+		arg.Spec.NamespaceIsolationProfile = workerv1alpha1.NamespaceIsolationProfile{
+			IsolationEnabled:      false,
+			ApplicationNamespaces: nil,
+			AllowedNamespaces:     nil,
+		}
+		arg.Spec.ExternalGatewayConfig = workerv1alpha1.ExternalGatewayConfig{
+			Ingress:     workerv1alpha1.ExternalGatewayConfigOptions{Enabled: true},
+			Egress:      workerv1alpha1.ExternalGatewayConfigOptions{Enabled: true},
+			NsIngress:   workerv1alpha1.ExternalGatewayConfigOptions{Enabled: true},
+			GatewayType: "gatewayType",
+		}
+		arg.Spec.SliceIpamType = "sliceIpamType"
+		arg.Labels = map[string]string{
+			"worker-cluster": "cluster-1",
+		}
+	}).Once()
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	sliceConfig := &controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), sliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.StandardQosProfileName = "profile-1"
+		arg.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
+			{
+				Ingress:     controllerv1alpha1.ExternalGatewayConfigOptions{Enabled: true},
+				Egress:      controllerv1alpha1.ExternalGatewayConfigOptions{Enabled: true},
+				NsIngress:   controllerv1alpha1.ExternalGatewayConfigOptions{Enabled: true},
+				GatewayType: "gatewayType",
+				Clusters:    []string{"*", "cluster-1"},
+			},
+		}
+	}).Once()
+	qos := &controllerv1alpha1.SliceQoSConfig{}
+	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), qos).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceQoSConfig)
+		arg.Spec.BandwidthCeilingKbps = 5000
+		arg.Spec.BandwidthGuaranteedKbps = 2000
+		arg.Spec.DscpClass = "AF42"
+		arg.Spec.QueueType = "HTB"
+		arg.Spec.Priority = 1
+		arg.Spec.TcType = "BANDWIDTH_CONTROL"
+	}).Once()
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	result, err := WorkerSliceService.ReconcileWorkerSliceConfig(ctx, requestObj)
+	expectedResult := ctrl.Result{}
+	require.NoError(t, nil)
+	require.Equal(t, result, expectedResult)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
 }

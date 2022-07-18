@@ -31,11 +31,11 @@ type SliceConfigSpec struct {
 	// +kubebuilder:validation:Required
 	SliceGatewayProvider WorkerSliceGatewayProvider `json:"sliceGatewayProvider"`
 	//+kubebuilder:default:=Local
-	SliceIpamType string   `json:"sliceIpamType,omitempty"`
-	Clusters      []string `json:"clusters,omitempty"`
-	// +kubebuilder:validation:Required
+	SliceIpamType          string   `json:"sliceIpamType,omitempty"`
+	Clusters               []string `json:"clusters,omitempty"`
+	StandardQosProfileName string   `json:"standardQosProfileName,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
 	// The custom QOS Profile Details
-	QosProfileDetails         QOSProfile                `json:"qosProfileDetails"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
+	QosProfileDetails         *QOSProfile               `json:"qosProfileDetails,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
 	ExternalGatewayConfig     []ExternalGatewayConfig   `json:"externalGatewayConfig,omitempty"`
 }
