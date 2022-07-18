@@ -30,6 +30,19 @@ func ValidateSliceQosConfigCreate(ctx context.Context, sliceQoSConfig *controlle
 	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceQosConfig"}, sliceQoSConfig.Name, allErrs)
 }
 
+//ValidateSliceqosConfigUpdate is a function to validate the updation of SliceqosConfig
+func ValidateSliceQosConfigUpdate(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) error {
+	var allErrs field.ErrorList
+	err := validateSliceQosConfigSpec(ctx, sliceQoSConfig)
+	if err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceQosConfig"}, sliceQoSConfig.Name, allErrs)
+}
+
 func validateSliceQosConfigSpec(ctx context.Context, sliceQosConfig *controllerv1alpha1.SliceQoSConfig) *field.Error {
 	// check bandwidth
 	if sliceQosConfig.Spec.BandwidthCeilingKbps < sliceQosConfig.Spec.BandwidthGuaranteedKbps {
