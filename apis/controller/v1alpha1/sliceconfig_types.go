@@ -33,9 +33,8 @@ type SliceConfigSpec struct {
 	//+kubebuilder:default:=Local
 	SliceIpamType string `json:"sliceIpamType,omitempty"`
 	//+kubebuilder:default:=16
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=2
-	// +kubebuilder:validation:Maximum=32
+	//+kubebuilder:validation:Minimum=2
+	//+kubebuilder:validation:Maximum=32
 	MaxClusters int      `json:"maxClusters"`
 	Clusters    []string `json:"clusters,omitempty"`
 	// +kubebuilder:validation:Required
