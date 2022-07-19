@@ -119,6 +119,33 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 	slice := s.copySpecFromSliceConfigToWorkerSlice(ctx, *sliceConfig)
 	workerSliceConfig.Spec = slice.Spec
 
+	// if standardQos Found update the workerSliceConfig
+	if sliceConfig.Spec.StandardQosProfileName != "" {
+		qos := &controllerv1alpha1.SliceQoSConfig{}
+		found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
+			Name:      sliceConfig.Spec.StandardQosProfileName,
+			Namespace: req.Namespace,
+		}, qos)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !found {
+			logger.Infof("QOS profile %v not found, returning from  reconciler loop.", sliceConfig.Spec.StandardQosProfileName)
+			return ctrl.Result{}, nil
+		}
+		workerSliceConfig.Spec.QosProfileDetails = workerv1alpha1.QOSProfile{
+			QueueType:               qos.Spec.QueueType,
+			Priority:                qos.Spec.Priority,
+			TcType:                  qos.Spec.TcType,
+			BandwidthCeilingKbps:    qos.Spec.BandwidthCeilingKbps,
+			BandwidthGuaranteedKbps: qos.Spec.BandwidthGuaranteedKbps,
+			DscpClass:               qos.Spec.DscpClass,
+		}
+		workerSliceConfig.Labels["standard-qos-profile"] = sliceConfig.Spec.StandardQosProfileName
+	} else {
+		workerSliceConfig.Labels["standard-qos-profile"] = ""
+	}
+
 	// Reconcile External Gateway Configuration
 	externalGatewayConfig := workerv1alpha1.ExternalGatewayConfig{}
 	var externalGatewayControllersConfig controllerv1alpha1.ExternalGatewayConfig

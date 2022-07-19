@@ -127,6 +127,12 @@ func RemoveDuplicatesFromArray(duplicate []string) (nonDup []string) {
 	return nonDup
 }
 
+func ArrayToString(arr []string) string {
+	var str string
+	str = strings.Join(arr, ",")
+	return str
+}
+
 // FindCIDRByMaxClusters is a function to find the CIDR by max clusters
 func FindCIDRByMaxClusters(maxCluster int) string {
 	var cidr string
