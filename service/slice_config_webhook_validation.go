@@ -60,6 +60,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		if err = validateNamespaceIsolationProfile(sliceConfig); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		if err = validateMaxClusterCount(sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	if len(allErrs) == 0 {
 		return nil
@@ -89,6 +92,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		allErrs = append(allErrs, err)
 	}
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := validateMaxClusterCount(sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -431,4 +437,11 @@ func existsQosConfigFromStandardQosProfileName(ctx context.Context, namespace st
 		return false
 	}
 	return found
+}
+
+func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {
+	if s.Spec.MaxClusters < 2 || s.Spec.MaxClusters > 32 {
+		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be less than 2 or greater than 32.")
+	}
+	return nil
 }

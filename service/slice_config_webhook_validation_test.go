@@ -98,6 +98,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent":                     ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent,
 	"SliceConfigWebhookValidation_ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent":                  ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent,
 	"SliceConfigWebhookValidation_ValidateQosProfileStandardQosProfileNameDoesNotExist":                                        ValidateQosProfileStandardQosProfileNameDoesNotExist,
+	"SliceConfigWebhookValidation_ValidateMaxCluster":                                                                          ValidateMaxCluster,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -580,6 +581,7 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 	}
 	sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Namespace = "randomNamespace"
 	sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters = []string{"cluster-1"}
+	sliceConfig.Spec.MaxClusters = 2
 	clusterCniSubnet := "10.10.1.1/16"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[0],
@@ -1020,6 +1022,7 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 	}
 	newSliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Namespace = "randomNamespace"
 	newSliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.MaxClusters = 2
 	clusterCniSubnet := "10.10.1.1/16"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -1483,5 +1486,17 @@ func ValidateQosProfileStandardQosProfileNameDoesNotExist(t *testing.T) {
 	err := validateQosProfile(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "SliceQoSConfig not found.")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateMaxCluster(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.StandardQosProfileName = "testQos"
+	sliceConfig.Spec.MaxClusters = 1
+	err := validateMaxClusterCount(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "MaxClusterCount cannot be less than 2 or greater than 32.")
 	clientMock.AssertExpectations(t)
 }

@@ -314,7 +314,7 @@ func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, work
 	for _, WorkerSliceConfig := range workerSliceConfigs {
 		if WorkerSliceConfig.Spec.IpamClusterOctet != nil {
 			clusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = *WorkerSliceConfig.Spec.IpamClusterOctet
-			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = string(*WorkerSliceConfig.Spec.IpamClusterOctet)
+			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = fmt.Sprintf("%d", *WorkerSliceConfig.Spec.IpamClusterOctet)
 			usedIndexes[*WorkerSliceConfig.Spec.IpamClusterOctet] = true
 		} else {
 			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = ""
