@@ -41,7 +41,7 @@ type SliceConfigSpec struct {
 	//+kubebuilder:default:=16
 	//+kubebuilder:validation:Minimum=2
 	//+kubebuilder:validation:Maximum=32
-	MaxClusters int      `json:"maxClusters"`
+	MaxClusters int `json:"maxClusters"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/

@@ -170,7 +170,6 @@ spec:
                 type: string
             required:
             - maxClusters
-            - qosProfileDetails
             - sliceGatewayProvider
             type: object
           status:
