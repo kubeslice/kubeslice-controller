@@ -217,7 +217,6 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		return nil, err
 	}
 	clusterMap := s.ComputeClusterMap(clusters, workerSliceConfigs)
-	fmt.Println("clusterMap", clusterMap)
 	for _, cluster := range clusters {
 		logger.Debugf("Cluster Object %s", cluster)
 		workerSliceConfigName := fmt.Sprintf("%s-%s", name, cluster)
@@ -310,13 +309,15 @@ func (s *WorkerSliceConfigService) ListWorkerSliceConfigs(ctx context.Context, o
 // ComputeClusterMap - function assigns a numerical value to the cluster. The value will be from 1 to n, where n is the number of clusters in the slice.
 func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int {
 	clusterMapping := make(map[string]int, len(clusterNames))
+	tempClusterMapping := make(map[string]string, len(clusterNames))
 	usedIndexes := make(map[int]bool, 0)
 	for _, WorkerSliceConfig := range workerSliceConfigs {
 		if WorkerSliceConfig.Spec.IpamClusterOctet != nil {
 			clusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = *WorkerSliceConfig.Spec.IpamClusterOctet
+			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = string(*WorkerSliceConfig.Spec.IpamClusterOctet)
 			usedIndexes[*WorkerSliceConfig.Spec.IpamClusterOctet] = true
 		} else {
-			clusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = -1
+			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = ""
 		}
 	}
 	unUsedIndexes := make([]int, 0)
@@ -328,7 +329,7 @@ func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, work
 
 	currentIndex := 0
 	for _, clusterName := range clusterNames {
-		if clusterMapping[clusterName] == -1 {
+		if tempClusterMapping[clusterName] == "" {
 			clusterMapping[clusterName] = unUsedIndexes[currentIndex]
 			currentIndex++
 		}
