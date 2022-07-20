@@ -19,17 +19,12 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	v1 "k8s.io/api/admission/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
-
-var universalDeserializer = serializer.NewCodecFactory(runtime.NewScheme()).UniversalDeserializer()
 
 /* MutateClusterSpec function mutates the req object for cluster */
 func MutateClusterSpec(ctx context.Context, req v1.AdmissionRequest) admission.Response {
@@ -47,6 +42,5 @@ func MutateClusterSpec(ctx context.Context, req v1.AdmissionRequest) admission.R
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	fmt.Println("roshani3", cluster.GetFinalizers())
 	return admission.PatchResponseFromRaw(req.Object.Raw, marshaledcluster)
 }
