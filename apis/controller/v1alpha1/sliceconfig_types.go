@@ -38,10 +38,10 @@ type SliceConfigSpec struct {
 	QosProfileDetails         *QOSProfile               `json:"qosProfileDetails,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
 	ExternalGatewayConfig     []ExternalGatewayConfig   `json:"externalGatewayConfig,omitempty"`
-	//+kubebuilder:default:=16
 	//+kubebuilder:validation:Minimum=2
 	//+kubebuilder:validation:Maximum=32
-	MaxClusters int `json:"maxClusters"`
+	//+kubebuilder:default:=16
+	MaxClusters int `json:"maxClusters,omitempty"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/

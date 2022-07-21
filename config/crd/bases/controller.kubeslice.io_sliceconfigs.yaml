@@ -169,7 +169,6 @@ spec:
               standardQosProfileName:
                 type: string
             required:
-            - maxClusters
             - sliceGatewayProvider
             type: object
           status:
