@@ -27,16 +27,18 @@ import (
 )
 
 /* MutateClusterSpec function mutates the req object for cluster */
-func MutateClusterSpec(ctx context.Context, r *controllerv1alpha1.Cluster, req v1.AdmissionRequest) admission.Response {
-	err := json.Unmarshal(req.Object.Raw, r)
-	//mutate nodeIp
-	if len(r.Spec.NodeIPs) == 0 {
-		r.Spec.NodeIPs = append(r.Spec.NodeIPs, r.Spec.NodeIP)
-	}
+func MutateClusterSpec(ctx context.Context, req v1.AdmissionRequest) admission.Response {
+	var cluster *controllerv1alpha1.Cluster
+	err := json.Unmarshal(req.Object.Raw, &cluster)
 	if req.Operation == v1.Create {
-		r.ResourceVersion = ""
+		cluster.ResourceVersion = ""
 	}
-	marshaledcluster, err := json.Marshal(r)
+	if len(cluster.Spec.NodeIP) != 0 {
+		cluster.Spec.NodeIPs = make([]string, 0)
+		cluster.Spec.NodeIPs = append(cluster.Spec.NodeIPs, cluster.Spec.NodeIP)
+		cluster.Spec.NodeIP = ""
+	}
+	marshaledcluster, err := json.Marshal(cluster)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
