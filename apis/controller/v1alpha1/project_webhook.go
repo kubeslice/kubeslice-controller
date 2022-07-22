@@ -79,7 +79,7 @@ func (r *Project) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Project) ValidateDelete() error {
-	projectlog.Info("validate update", "name", r.Name)
+	projectlog.Info("validate delete", "name", r.Name)
 	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), projectWebhookClient, nil, "ProjectValidation")
 	return customProjectDeleteValidation(projectCtx, r)
 }

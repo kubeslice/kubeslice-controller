@@ -9,7 +9,8 @@ resources:
   - bases/worker.kubeslice.io_workersliceconfigs.yaml
   - bases/worker.kubeslice.io_workerslicegateways.yaml
   - bases/worker.kubeslice.io_workerserviceimports.yaml
-#+kubebuilder:scaffold:crdkustomizeresource
+  - bases/controller.kubeslice.io_sliceqosconfigs.yaml
+  #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
   # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
@@ -21,6 +22,7 @@ patchesStrategicMerge:
   #- patches/webhook_in_worker_slice_gateways.yaml
   #- patches/webhook_in_service_export_configs.yaml
   #- patches/webhook_in_worker_service_imports.yaml
+  #- patches/webhook_in_sliceqosconfigs.yaml
   #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
   # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -28,11 +30,12 @@ patchesStrategicMerge:
   - patches/cainjection_in_projects.yaml
   - patches/cainjection_in_clusters.yaml
   - patches/cainjection_in_slice_configs.yaml
-#- patches/cainjection_in_worker_slice_configs.yaml
-#- patches/cainjection_in_worker_slice_gateways.yaml
-#- patches/cainjection_in_service_export_configs.yaml
-#- patches/cainjection_in_worker_service_imports.yaml
-#+kubebuilder:scaffold:crdkustomizecainjectionpatch
+  #- patches/cainjection_in_worker_slice_configs.yaml
+  #- patches/cainjection_in_worker_slice_gateways.yaml
+  #- patches/cainjection_in_service_export_configs.yaml
+  #- patches/cainjection_in_worker_service_imports.yaml
+  #- patches/cainjection_in_sliceqosconfigs.yaml
+  #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.
 configurations:
