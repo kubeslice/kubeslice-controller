@@ -69,6 +69,7 @@ func testWorkerSliceGatewayReconciliationSuccess(t *testing.T) {
 		arg.Spec.GatewayHostType = "host"
 		arg.Spec.LocalGatewayConfig = workerv1alpha1.SliceGatewayConfig{
 			NodeIps:       []string{"10.10.10.10"},
+			NodeIp:        "10.10.10.10",
 			NodePort:      0,
 			GatewayName:   "1",
 			ClusterName:   "cluster",
@@ -77,6 +78,7 @@ func testWorkerSliceGatewayReconciliationSuccess(t *testing.T) {
 		}
 		arg.Spec.RemoteGatewayConfig = workerv1alpha1.SliceGatewayConfig{
 			NodeIps:       []string{""},
+			NodeIp:        "",
 			NodePort:      0,
 			GatewayName:   "",
 			ClusterName:   "",
@@ -114,6 +116,7 @@ func testWorkerSliceGatewayReconciliationIfSliceConfigNotFound(t *testing.T) {
 		arg.Spec.GatewayHostType = "host"
 		arg.Spec.LocalGatewayConfig = workerv1alpha1.SliceGatewayConfig{
 			NodeIps:       []string{"10.10.10.10"},
+			NodeIp:        "10.10.10.10",
 			NodePort:      0,
 			GatewayName:   "1",
 			ClusterName:   "cluster",
@@ -122,6 +125,7 @@ func testWorkerSliceGatewayReconciliationIfSliceConfigNotFound(t *testing.T) {
 		}
 		arg.Spec.RemoteGatewayConfig = workerv1alpha1.SliceGatewayConfig{
 			NodeIps:       []string{""},
+			NodeIp:        "",
 			NodePort:      0,
 			GatewayName:   "",
 			ClusterName:   "",
@@ -254,6 +258,7 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 					GatewayCredentials: workerv1alpha1.GatewayCredentials{},
 					LocalGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						NodeIps:       []string{""},
+						NodeIp:        "",
 						NodePort:      0,
 						GatewayName:   "",
 						ClusterName:   "cluster-1",
@@ -275,6 +280,7 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 					GatewayCredentials: workerv1alpha1.GatewayCredentials{},
 					LocalGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						NodeIps:       []string{""},
+						NodeIp:        "",
 						NodePort:      0,
 						GatewayName:   "",
 						ClusterName:   "cluster-2",
@@ -331,6 +337,7 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 					LocalGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						NodeIps:       []string{""},
 						NodePort:      0,
+						NodeIp:        "",
 						GatewayName:   "",
 						ClusterName:   "cluster-1",
 						VpnIp:         "",
@@ -351,6 +358,7 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 					GatewayCredentials: workerv1alpha1.GatewayCredentials{},
 					LocalGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						NodeIps:       []string{""},
+						NodeIp:        "",
 						NodePort:      0,
 						GatewayName:   "",
 						ClusterName:   "cluster-2",
@@ -401,6 +409,7 @@ func testDeleteWorkerSliceGatewaysByLabelExists(t *testing.T) {
 					GatewayCredentials: workerv1alpha1.GatewayCredentials{},
 					LocalGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						NodeIps:       []string{""},
+						NodeIp:        "",
 						NodePort:      0,
 						GatewayName:   "",
 						ClusterName:   "cluster-1",
@@ -422,6 +431,7 @@ func testDeleteWorkerSliceGatewaysByLabelExists(t *testing.T) {
 					GatewayCredentials: workerv1alpha1.GatewayCredentials{},
 					LocalGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						NodeIps:       []string{""},
+						NodeIp:        "",
 						NodePort:      0,
 						GatewayName:   "",
 						ClusterName:   "cluster-2",
@@ -458,6 +468,7 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 					GatewayCredentials: workerv1alpha1.GatewayCredentials{},
 					LocalGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						NodeIps:       []string{"12"},
+						NodeIp:        "12",
 						NodePort:      0,
 						GatewayName:   "",
 						ClusterName:   "cluster-1",
@@ -479,6 +490,7 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 					GatewayCredentials: workerv1alpha1.GatewayCredentials{},
 					LocalGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						NodeIps:       []string{"11"},
+						NodeIp:        "11",
 						NodePort:      0,
 						GatewayName:   "",
 						ClusterName:   "cluster-2",
@@ -513,7 +525,12 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 			ClusterName:                "",
 			ManagedFields:              nil,
 		},
-		Spec:   controllerv1alpha1.ClusterSpec{},
+		Spec: controllerv1alpha1.ClusterSpec{
+			NodeIP:           "",
+			NodeIPs:          []string{"11"},
+			NetworkInterface: "",
+			ClusterProperty:  controllerv1alpha1.ClusterProperty{},
+		},
 		Status: controllerv1alpha1.ClusterStatus{},
 	}
 	err := workerSliceGatewayService.NodeIpReconciliationOfWorkerSliceGateways(ctx, &cluster, "namespace")
