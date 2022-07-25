@@ -527,7 +527,7 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 		},
 		Spec: controllerv1alpha1.ClusterSpec{
 			NodeIP:           "",
-			NodeIPs:          []string{"11"},
+			NodeIPs:          []string{"17"},
 			NetworkInterface: "",
 			ClusterProperty:  controllerv1alpha1.ClusterProperty{},
 		},
