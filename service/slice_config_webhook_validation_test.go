@@ -95,6 +95,9 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidationValidateSliceConfigCreateWithErrorInNSIsolationProfile":                                       ValidateSliceConfigCreateWithErrorInNSIsolationProfile,
 	"SliceConfigWebhookValidationValidateSliceConfigUpdateWithErrorInNSIsolationProfile":                                       ValidateSliceConfigUpdateWithErrorInNSIsolationProfile,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithServiceExportsNotEmpty":                                         DeleteValidateSliceConfigWithServiceExportsNotEmpty,
+	"SliceConfigWebhookValidation_ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent":                     ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent,
+	"SliceConfigWebhookValidation_ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent":                  ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent,
+	"SliceConfigWebhookValidation_ValidateQosProfileStandardQosProfileNameDoesNotExist":                                        ValidateQosProfileStandardQosProfileNameDoesNotExist,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -388,8 +391,11 @@ func CreateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 	}).Once()
 	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
-	sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps = 5120
-	sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps = 4096
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType:               "SomeType",
+		BandwidthGuaranteedKbps: 5120,
+		BandwidthCeilingKbps:    4096,
+	}
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.QosProfileDetails.BandwidthGuaranteedKbps: Invalid value:")
@@ -561,8 +567,11 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 		},
 	}
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
-	sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps = 4096
-	sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps = 5120
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType:               "SomeType",
+		BandwidthGuaranteedKbps: 4096,
+		BandwidthCeilingKbps:    5120,
+	}
 	if sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces == nil {
 		sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces = make([]controllerv1alpha1.SliceNamespaceSelection, 1)
 	}
@@ -852,8 +861,11 @@ func UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling
 		Name:      name,
 		Namespace: namespace,
 	}, &existingSliceConfig).Return(nil).Once()
-	newSliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps = 5120
-	newSliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps = 4096
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType:               "SomeType",
+		BandwidthGuaranteedKbps: 5120,
+		BandwidthCeilingKbps:    4096,
+	}
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.QosProfileDetails.BandwidthGuaranteedKbps: Invalid value:")
@@ -995,8 +1007,11 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 		},
 	}
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
-	newSliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps = 4096
-	newSliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps = 5120
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType:               "SomeType",
+		BandwidthGuaranteedKbps: 4096,
+		BandwidthCeilingKbps:    5120,
+	}
 	if newSliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces == nil {
 		newSliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces = make([]controllerv1alpha1.SliceNamespaceSelection, 1)
 	}
@@ -1431,5 +1446,42 @@ func validateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice(t *te
 	}).Once()
 	err := validateApplicationNamespaces(ctx, sliceConfig)
 	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.StandardQosProfileName = "testQos"
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "someType",
+	}
+	err := validateQosProfile(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "StandardQosProfileName cannot be set when QosProfileDetails is set")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	err := validateQosProfile(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Either StandardQosProfileName or QosProfileDetails is required")
+	clientMock.AssertExpectations(t)
+}
+func ValidateQosProfileStandardQosProfileNameDoesNotExist(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	notFoundError := k8sError.NewNotFound(util.Resource("SliceConfigWebhookValidationTest"), "isNotFound")
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.StandardQosProfileName = "testQos"
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Once()
+	err := validateQosProfile(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "SliceQoSConfig not found.")
 	clientMock.AssertExpectations(t)
 }

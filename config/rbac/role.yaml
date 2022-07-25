@@ -75,6 +75,7 @@ rules:
   - projects
   - serviceexportconfigs
   - sliceconfigs
+  - sliceqosconfigs
   verbs:
   - create
   - delete
@@ -90,6 +91,7 @@ rules:
   - projects/finalizers
   - serviceexportconfigs/finalizers
   - sliceconfigs/finalizers
+  - sliceqosconfigs/finalizers
   verbs:
   - update
 - apiGroups:
@@ -99,6 +101,7 @@ rules:
   - projects/status
   - serviceexportconfigs/status
   - sliceconfigs/status
+  - sliceqosconfigs/status
   verbs:
   - get
   - patch
