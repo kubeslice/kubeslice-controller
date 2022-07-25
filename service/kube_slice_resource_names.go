@@ -17,6 +17,7 @@
 package service
 
 import (
+	rbacv1 "k8s.io/api/rbac/v1"
 	"os"
 	"time"
 )
@@ -140,4 +141,104 @@ const (
 //StandardQoSProfileLabel name
 const (
 	StandardQoSProfileLabel = "standard-qos-profile"
+)
+
+var (
+	WorkerClusterRoleRules = []rbacv1.PolicyRule{
+		{
+			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceServiceExportConfigs},
+		},
+		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceCluster},
+		},
+		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
+		},
+		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceCluster + resourceStatusSuffix},
+		},
+		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+		},
+		{
+			Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
+			APIGroups: []string{""},
+			Resources: []string{resourceSecrets},
+		},
+		{
+			Verbs:     []string{verbCreate, verbPatch},
+			APIGroups: []string{""},
+			Resources: []string{resourceEvents},
+		},
+	}
+)
+
+var (
+	ReadOnlyRoleRules = []rbacv1.PolicyRule{
+		{
+			Verbs:     []string{verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
+		},
+		{
+			Verbs:     []string{verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
+		},
+		{
+			Verbs:     []string{verbGet},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceCluster + resourceStatusSuffix, resourceSliceConfig + resourceStatusSuffix, resourceServiceExportConfigs + resourceStatusSuffix},
+		},
+		{
+			Verbs:     []string{verbGet},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+		},
+		{
+			Verbs:     []string{verbGet, verbList, verbWatch},
+			APIGroups: []string{""},
+			Resources: []string{resourceSecrets},
+		},
+	}
+)
+
+var (
+	ReadWriteRoleRules = []rbacv1.PolicyRule{
+		{
+			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
+		},
+		{
+			Verbs:     []string{verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
+		},
+		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceCluster + resourceStatusSuffix, resourceSliceConfig + resourceStatusSuffix, resourceServiceExportConfigs + resourceStatusSuffix},
+		},
+		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+		},
+		{
+			Verbs:     []string{verbGet, verbList, verbWatch},
+			APIGroups: []string{""},
+			Resources: []string{resourceSecrets},
+		},
+	}
 )
