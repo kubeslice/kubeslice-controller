@@ -18,6 +18,8 @@ package service
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -35,6 +37,10 @@ func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) e
 	if err := validateAppliedInProjectNamespace(ctx, c); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	if err := validateGeolocation(c); err != nil {
+		allErrs = append(allErrs, err)
+	}
+
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -45,6 +51,9 @@ func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) e
 func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster) error {
 	var allErrs field.ErrorList
 	if err := validateClusterSpec(ctx, c); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := validateGeolocation(c); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -96,6 +105,21 @@ func validateClusterInAnySlice(ctx context.Context, c *controllerv1alpha1.Cluste
 		if len(workerSlice.Items) > 0 {
 			return field.Invalid(field.NewPath("metadata").Child("name"), c.Name, "can't delete cluster which is participating in any slice")
 		}
+	}
+	return nil
+}
+
+func validateGeolocation(c *controllerv1alpha1.Cluster) *field.Error {
+	if len(c.Spec.ClusterProperty.GeoLocation.Latitude) == 0 && len(c.Spec.ClusterProperty.GeoLocation.Longitude) == 0 {
+		return nil
+	}
+	if strings.Contains(c.Spec.ClusterProperty.GeoLocation.Latitude, "e") || strings.Contains(c.Spec.ClusterProperty.GeoLocation.Longitude, "e") {
+		return field.Invalid(field.NewPath("spec").Child("geoLocation"), c.Name, "Latitude and longitude are not valid")
+	}
+	coord1, err1 := strconv.ParseFloat(c.Spec.ClusterProperty.GeoLocation.Latitude, 64)
+	coord2, err2 := strconv.ParseFloat(c.Spec.ClusterProperty.GeoLocation.Longitude, 64)
+	if err1 != nil || err2 != nil || coord1 < -90 || coord1 > 90 || coord2 < -180 || coord2 > 180 {
+		return field.Invalid(field.NewPath("spec").Child("geoLocation"), c.Name, "Latitude and longitude are not valid")
 	}
 	return nil
 }
