@@ -17,7 +17,10 @@
 package util
 
 import (
+	"errors"
 	"regexp"
+	"strconv"
+	"strings"
 )
 
 // IsDNSCompliant is a function to check if the given string/name is DNS compliant
@@ -26,4 +29,18 @@ func IsDNSCompliant(name string) bool {
 	compiledRegex, _ := regexp.Compile(pattern)
 	match := compiledRegex.Match([]byte(name))
 	return match
+}
+
+func ValidateCoOrdinates(latitude string, longitude string) error {
+	if strings.Contains(latitude, "e") || strings.Contains(longitude, "e") {
+		err := errors.New("Latitude and longitude are not valid")
+		return err
+	}
+	coord1, err1 := strconv.ParseFloat(latitude, 64)
+	coord2, err2 := strconv.ParseFloat(longitude, 64)
+	if err1 != nil || err2 != nil || coord1 < -90 || coord1 > 90 || coord2 < -180 || coord2 > 180 {
+		err := errors.New("Latitude and longitude are not valid")
+		return err
+	}
+	return nil
 }

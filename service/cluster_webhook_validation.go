@@ -18,8 +18,6 @@ package service
 
 import (
 	"context"
-	"strconv"
-	"strings"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -113,14 +111,11 @@ func validateGeolocation(c *controllerv1alpha1.Cluster) *field.Error {
 	if len(c.Spec.ClusterProperty.GeoLocation.Latitude) == 0 && len(c.Spec.ClusterProperty.GeoLocation.Longitude) == 0 {
 		return nil
 	}
-	if strings.Contains(c.Spec.ClusterProperty.GeoLocation.Latitude, "e") || strings.Contains(c.Spec.ClusterProperty.GeoLocation.Longitude, "e") {
-		return field.Invalid(field.NewPath("spec").Child("clusterProperty.geoLocation"), util.ArrayToString([]string{c.Spec.ClusterProperty.GeoLocation.Latitude, c.Spec.ClusterProperty.GeoLocation.Longitude}), "Latitude and longitude are not valid")
-	}
-	coord1, err1 := strconv.ParseFloat(c.Spec.ClusterProperty.GeoLocation.Latitude, 64)
-	coord2, err2 := strconv.ParseFloat(c.Spec.ClusterProperty.GeoLocation.Longitude, 64)
-	if err1 != nil || err2 != nil || coord1 < -90 || coord1 > 90 || coord2 < -180 || coord2 > 180 {
-
-		return field.Invalid(field.NewPath("spec").Child("clusterProperty.geoLocation"), util.ArrayToString([]string{c.Spec.ClusterProperty.GeoLocation.Latitude, c.Spec.ClusterProperty.GeoLocation.Longitude}), "Latitude and longitude are not valid")
+	latitude := c.Spec.ClusterProperty.GeoLocation.Latitude
+	longitude := c.Spec.ClusterProperty.GeoLocation.Longitude
+	err := util.ValidateCoOrdinates(latitude, longitude)
+	if err != nil {
+		return field.Invalid(field.NewPath("spec").Child("clusterProperty.geoLocation"), util.ArrayToString([]string{latitude, longitude}), "Latitude and longitude are not valid")
 	}
 	return nil
 }
