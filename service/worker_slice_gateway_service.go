@@ -188,9 +188,10 @@ func (s *WorkerSliceGatewayService) reconcileNodeIPAndNodePort(ctx context.Conte
 		return err
 	}
 	if found {
-		if !reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIps, remoteGateway.Spec.RemoteGatewayConfig.NodeIps) ||
+
+		if !reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIp, remoteGateway.Spec.RemoteGatewayConfig.NodeIp) ||
 			localGateway.Spec.LocalGatewayConfig.NodePort != remoteGateway.Spec.RemoteGatewayConfig.NodePort {
-			remoteGateway.Spec.RemoteGatewayConfig.NodeIps = localGateway.Spec.LocalGatewayConfig.NodeIps
+			remoteGateway.Spec.RemoteGatewayConfig.NodeIp = localGateway.Spec.LocalGatewayConfig.NodeIp
 			remoteGateway.Spec.RemoteGatewayConfig.NodePort = localGateway.Spec.LocalGatewayConfig.NodePort
 			err = util.UpdateResource(ctx, &remoteGateway)
 			if err != nil {
@@ -411,14 +412,14 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				ClusterName:   sourceCluster.Name,
 				GatewayName:   localGatewayName,
 				GatewaySubnet: gatewaySubnet,
-				NodeIps:       sourceCluster.Spec.NodeIPs,
+				NodeIp:        sourceCluster.Spec.NodeIPs[0],
 				VpnIp:         localVpnAddress,
 			},
 			RemoteGatewayConfig: v1alpha1.SliceGatewayConfig{
 				ClusterName:   destinationCluster.Name,
 				GatewayName:   remoteGatewayName,
 				GatewaySubnet: remoteGatewaySubnet,
-				NodeIps:       destinationCluster.Spec.NodeIPs,
+				NodeIp:        destinationCluster.Spec.NodeIPs[0],
 				VpnIp:         remoteVpnAddress,
 			},
 			GatewayCredentials: v1alpha1.GatewayCredentials{
@@ -496,8 +497,8 @@ func (s *WorkerSliceGatewayService) NodeIpReconciliationOfWorkerSliceGateways(ct
 		return err
 	}
 	for _, gateway := range workerSliceGateways.Items {
-		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIps, cluster.Spec.NodeIPs) {
-			gateway.Spec.LocalGatewayConfig.NodeIps = cluster.Spec.NodeIPs
+		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIp, cluster.Spec.NodeIPs[0]) {
+			gateway.Spec.LocalGatewayConfig.NodeIp = cluster.Spec.NodeIPs[0]
 			err = util.UpdateResource(ctx, &gateway)
 			if err != nil {
 				return err
