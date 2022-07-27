@@ -49,6 +49,12 @@ spec:
                       cloudRegion:
                         description: CloudRegion is the region of the cloud
                         type: string
+                      latitude:
+                        description: Latitude is the latitude of the cluster
+                        type: string
+                      longitude:
+                        description: Longitude is the longitude of the cluster
+                        type: string
                     type: object
                   monitoring:
                     description: Monitoring contains the Kubernetes Monitoring Dashboard
