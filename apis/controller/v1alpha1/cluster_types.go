@@ -59,6 +59,8 @@ type GeoLocation struct {
 	CloudProvider string `json:"cloudProvider,omitempty"`
 	//CloudRegion is the region of the cloud
 	CloudRegion string `json:"cloudRegion,omitempty"`
+	Latitude    string `json:"latitude,omitempty"`
+	Longitude   string `json:"longitude,omitempty"`
 }
 
 // Monitoring defines the field of ClusterSpec
