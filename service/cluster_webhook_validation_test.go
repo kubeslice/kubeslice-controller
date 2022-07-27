@@ -45,6 +45,7 @@ var ClusterWebHookValidationTestbed = map[string]func(*testing.T){
 	"TestValidateClusterCreateFail":                         testValidateClusterCreateControllerResourceNameEmpty,
 	"TestValidateClusterUpdateFailNetworkInterfaceNotEmpty": testValidateClusterUpdateFailNetworkInterfaceNotEmpty,
 	"TestValidateClusterDeleteFail":                         testValidateClusterDeleteFail,
+	"TestValidateClusterGeolocationFail":                    testValidateClusterGeolocationFail,
 }
 
 func testValidateClusterCreateControllerResourceNameEmpty(t *testing.T) {
@@ -96,4 +97,19 @@ func testValidateClusterDeleteFail(t *testing.T) {
 	err := ValidateClusterDelete(ctx, cluster)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
+}
+
+func testValidateClusterGeolocationFail(t *testing.T) {
+	cluster := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{ClusterProperty: controllerv1alpha1.ClusterProperty{GeoLocation: controllerv1alpha1.GeoLocation{CloudProvider: "", CloudRegion: "", Latitude: "1213", Longitude: "4567"}}},
+	}
+	err := validateGeolocation(cluster)
+	require.NotNil(t, err)
+}
+func testValidateClusterGeolocationPass(t *testing.T) {
+	cluster := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{ClusterProperty: controllerv1alpha1.ClusterProperty{GeoLocation: controllerv1alpha1.GeoLocation{CloudProvider: "", CloudRegion: "", Latitude: "23.43345", Longitude: "83.43345"}}},
+	}
+	err := validateGeolocation(cluster)
+	require.Nil(t, err)
 }
