@@ -1,0 +1,62 @@
+name: end-to-end-test
+on:
+  pull_request:
+    branches: [pr-worker-operator]
+  workflow_dispatch:
+jobs:
+  end-to-end:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: checkout the repo
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    
+    - name: build the worker-operator
+      uses: docker/build-push-action@v2
+      with:
+        tags: kind-controller:e2e-latest
+        push: false
+    
+    - name: build kind clusters
+      run: |
+        mkdir -p ${{ github.workspace }}/profile
+        sh .github/workflows/scripts/start-kind.sh
+
+    - name: Docker Run Action
+      uses: addnab/docker-run-action@v3
+      with:
+        image: aveshadev/kubeslice-e2e:latest
+        options: -v ${{ github.workspace }}/reports:/e2e/reports -v /home/runner/.kube:/e2e/assets/kubeconfig -v ${{ github.workspace }}/profile:/e2e/profile --network kind
+        run: |
+          bash run.sh kind
+
+    - name: Checkout gh-pages repo
+      uses: actions/checkout@v2
+      with:
+        repository: kubeslice/e2e-allure-reports
+        path: gh-pages
+        ref: 'gh-pages'
+
+    - name: Allure Report with history
+      uses: PavanMudigonda/allure-html-reporter-github-pages@v1.0
+      id: Allure_report_with_history
+      with:
+        allure_results: reports
+        allure_report: allure_report
+        allure_history: allure-history
+        gh_pages: gh-pages
+        keep_reports: 20
+        github_run_id: '${{ github.run_id }}'
+        github_run_num: 'Kind-${{ github.event.repository.name }}-${{ github.base_ref }}-${{ github.run_number }}'
+        report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
+        test_env: Kind
+          
+    - name: Deploy report to Github Pages
+      uses: peaceiris/actions-gh-pages@v2
+      env:
+        PUBLISH_BRANCH: gh-pages
+        PERSONAL_TOKEN: ${{ secrets.TOKEN }}
+        EXTERNAL_REPOSITORY: kubeslice/e2e-allure-reports
+        PUBLISH_DIR: allure-history
+        keep_files: true
