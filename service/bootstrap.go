@@ -87,7 +87,9 @@ func WithNameSpaceService() INamespaceService {
 
 // bootstrapping accesscontrol service
 func WithAccessControlService() IAccessControlService {
-	return &AccessControlService{}
+	return &AccessControlService{
+		ruleProvider: WithAccessControlRuleProvider(),
+	}
 }
 
 // bootstrapping secret service
@@ -107,6 +109,10 @@ func WithWorkerSliceGatewayService() IWorkerSliceGatewayService {
 // bootstrapping job service
 func WithJobService() IJobService {
 	return &JobService{}
+}
+
+func WithAccessControlRuleProvider() IAccessControlRuleProvider {
+	return &AccessControlRuleProvider{}
 }
 
 // bootstrapping worker slice config service

@@ -141,13 +141,10 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with Project Kind
 	if err = (&controller.ProjectReconciler{
-		Client:                 mgr.GetClient(),
-		Scheme:                 mgr.GetScheme(),
-		Log:                    ctrl.Log.WithName("controllers").WithName("Project"),
-		ProjectService:         services.ProjectService,
-		WorkerClusterRoleRules: service.WorkerClusterRoleRules,
-		ReadOnlyRoleRules:      service.ReadOnlyRoleRules,
-		ReadWriteRoleRules:     service.ReadWriteRoleRules,
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		Log:            ctrl.Log.WithName("controllers").WithName("Project"),
+		ProjectService: services.ProjectService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Project")
 		os.Exit(1)

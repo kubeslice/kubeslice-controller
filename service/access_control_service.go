@@ -31,9 +31,9 @@ import (
 )
 
 type IAccessControlService interface {
-	ReconcileWorkerClusterRole(ctx context.Context, namespace string, owner client.Object, workerClusterRoleRules []rbacv1.PolicyRule) (ctrl.Result, error)
-	ReconcileReadOnlyRole(ctx context.Context, namespace string, owner client.Object, readOnlyRoleRules []rbacv1.PolicyRule) (ctrl.Result, error)
-	ReconcileReadWriteRole(ctx context.Context, namespace string, owner client.Object, readWriteRoleRules []rbacv1.PolicyRule) (ctrl.Result, error)
+	ReconcileWorkerClusterRole(ctx context.Context, namespace string, owner client.Object) (ctrl.Result, error)
+	ReconcileReadOnlyRole(ctx context.Context, namespace string, owner client.Object) (ctrl.Result, error)
+	ReconcileReadWriteRole(ctx context.Context, namespace string, owner client.Object) (ctrl.Result, error)
 	ReconcileReadOnlyUserServiceAccountAndRoleBindings(ctx context.Context, namespace string,
 		names []string, owner client.Object) (ctrl.Result, error)
 	ReconcileReadWriteUserServiceAccountAndRoleBindings(ctx context.Context, namespace string,
@@ -57,11 +57,12 @@ type activeServiceAccount struct {
 }
 
 type AccessControlService struct {
+	ruleProvider IAccessControlRuleProvider
 }
 
 // ReconcileWorkerClusterRole reconciles the worker cluster role
 func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
-	namespace string, owner client.Object, workerClusterRoleRules []rbacv1.PolicyRule) (ctrl.Result, error) {
+	namespace string, owner client.Object) (ctrl.Result, error) {
 	namespacedName := client.ObjectKey{
 		Namespace: namespace,
 		Name:      roleWorkerCluster,
@@ -74,7 +75,7 @@ func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
 			Namespace: namespacedName.Namespace,
 			Labels:    labels,
 		},
-		Rules: workerClusterRoleRules,
+		Rules: a.ruleProvider.WorkerClusterRoleRules(),
 	}
 	actualRole := &rbacv1.Role{}
 	found, err := util.GetResourceIfExist(ctx, namespacedName, actualRole)
@@ -96,7 +97,7 @@ func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
 }
 
 // ReconcileReadOnlyRole reconciles the read only role for the project users
-func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namespace string, owner client.Object, readOnlyRoleRules []rbacv1.PolicyRule) (ctrl.Result,
+func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namespace string, owner client.Object) (ctrl.Result,
 	error) {
 	namespacedName := client.ObjectKey{
 		Namespace: namespace,
@@ -110,7 +111,7 @@ func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namesp
 			Namespace: namespacedName.Namespace,
 			Labels:    labels,
 		},
-		Rules: readOnlyRoleRules,
+		Rules: a.ruleProvider.ReadOnlyRoleRules(),
 	}
 	actualRole := &rbacv1.Role{}
 	found, err := util.GetResourceIfExist(ctx, namespacedName, actualRole)
@@ -133,7 +134,7 @@ func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namesp
 
 // ReconcileReadWriteRole reconciles the read write role binding for project users
 func (a *AccessControlService) ReconcileReadWriteRole(ctx context.Context,
-	namespace string, owner client.Object, readWriteRoleRules []rbacv1.PolicyRule) (ctrl.Result, error) {
+	namespace string, owner client.Object) (ctrl.Result, error) {
 	namespacedName := client.ObjectKey{
 		Namespace: namespace,
 		Name:      roleSharedReadWrite,
@@ -146,7 +147,7 @@ func (a *AccessControlService) ReconcileReadWriteRole(ctx context.Context,
 			Namespace: namespacedName.Namespace,
 			Labels:    labels,
 		},
-		Rules: readWriteRoleRules,
+		Rules: a.ruleProvider.ReadWriteRoleRules(),
 	}
 	actualRole := &rbacv1.Role{}
 	found, err := util.GetResourceIfExist(ctx, namespacedName, actualRole)

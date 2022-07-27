@@ -74,7 +74,7 @@ func TestReconcileProject_Delete_Happypath(t *testing.T) {
 	sliceConfigServiceMock.On("DeleteSliceConfigs", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	//delete finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
-	result, err := projectService.ReconcileProject(ctx, requestObj, WorkerClusterRoleRules, ReadOnlyRoleRules, ReadWriteRoleRules)
+	result, err := projectService.ReconcileProject(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
@@ -101,12 +101,12 @@ func TestReconcileProject_AddsREconciler_CreatesResourcesAndReturnsReconciliatio
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	nsServiceMock.On("ReconcileProjectNamespace", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileWorkerClusterRole", ctx, projectNamespace, mock.Anything, WorkerClusterRoleRules).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileReadOnlyRole", ctx, projectNamespace, mock.Anything, ReadOnlyRoleRules).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileReadWriteRole", ctx, projectNamespace, mock.Anything, ReadWriteRoleRules).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileWorkerClusterRole", ctx, projectNamespace, mock.Anything, workerClusterRoleRules).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileReadOnlyRole", ctx, projectNamespace, mock.Anything, readOnlyRoleRules).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileReadWriteRole", ctx, projectNamespace, mock.Anything, readWriteRoleRules).Return(ctrl.Result{}, nil).Once()
 	acsServicemOCK.On("ReconcileReadOnlyUserServiceAccountAndRoleBindings", ctx, projectNamespace, readOnlyServiceAccounts, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	acsServicemOCK.On("ReconcileReadWriteUserServiceAccountAndRoleBindings", ctx, projectNamespace, readWriteServiceAccounts, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	result, err := projectService.ReconcileProject(ctx, requestObj, WorkerClusterRoleRules, ReadOnlyRoleRules, ReadWriteRoleRules)
+	result, err := projectService.ReconcileProject(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
@@ -132,12 +132,12 @@ func TestReconcileProject_DoNotCallFinalizerIfItExists(t *testing.T) {
 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 
 	nsServiceMock.On("ReconcileProjectNamespace", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileWorkerClusterRole", ctx, projectNamespace, mock.Anything, WorkerClusterRoleRules).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileReadOnlyRole", ctx, projectNamespace, mock.Anything, ReadOnlyRoleRules).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileReadWriteRole", ctx, projectNamespace, mock.Anything, ReadWriteRoleRules).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileWorkerClusterRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileReadOnlyRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileReadWriteRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	acsServicemOCK.On("ReconcileReadOnlyUserServiceAccountAndRoleBindings", ctx, projectNamespace, readOnlyServiceAccounts, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	acsServicemOCK.On("ReconcileReadWriteUserServiceAccountAndRoleBindings", ctx, projectNamespace, readWriteServiceAccounts, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	result, err := projectService.ReconcileProject(ctx, requestObj, WorkerClusterRoleRules, ReadOnlyRoleRules, ReadWriteRoleRules)
+	result, err := projectService.ReconcileProject(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
@@ -153,7 +153,7 @@ func TestReconcileProject_ReturnsReconciliationCompleteAndErrorWhenGetProjectNam
 	_, _, projectService, requestObj, clientMock, project, ctx, _, _, _ := setupProjectTest(projectName, namespace)
 	error := errors.New("testinternalerror")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(error)
-	result, err := projectService.ReconcileProject(ctx, requestObj, WorkerClusterRoleRules, ReadOnlyRoleRules, ReadWriteRoleRules)
+	result, err := projectService.ReconcileProject(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err)
 	require.Equal(t, result, expectedResult)
@@ -167,7 +167,7 @@ func TestReconcileProject_ReturnsReconciliationCompleteAndNilErrorWhenGetProject
 	_, _, projectService, requestObj, clientMock, project, ctx, _, _, _ := setupProjectTest(projectName, namespace)
 	notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(notFoundError).Once()
-	result, err := projectService.ReconcileProject(ctx, requestObj, WorkerClusterRoleRules, ReadOnlyRoleRules, ReadWriteRoleRules)
+	result, err := projectService.ReconcileProject(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)

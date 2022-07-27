@@ -23,7 +23,6 @@ import (
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,12 +31,9 @@ import (
 // ProjectReconciler reconciles a Project object
 type ProjectReconciler struct {
 	client.Client
-	Scheme                 *runtime.Scheme
-	ProjectService         service.IProjectService
-	Log                    logr.Logger
-	WorkerClusterRoleRules []rbacv1.PolicyRule
-	ReadOnlyRoleRules      []rbacv1.PolicyRule
-	ReadWriteRoleRules     []rbacv1.PolicyRule
+	Scheme         *runtime.Scheme
+	ProjectService service.IProjectService
+	Log            logr.Logger
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -50,5 +46,5 @@ func (t *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // Reconcile is a function to reconcile the project, ProjectReconciler implements it
 func (t *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, t.Client, t.Scheme, "ProjectController")
-	return t.ProjectService.ReconcileProject(kubeSliceCtx, req, t.WorkerClusterRoleRules, t.ReadOnlyRoleRules, t.ReadWriteRoleRules)
+	return t.ProjectService.ReconcileProject(kubeSliceCtx, req)
 }

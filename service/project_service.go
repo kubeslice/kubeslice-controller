@@ -22,12 +22,11 @@ import (
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
-	rbacv1 "k8s.io/api/rbac/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type IProjectService interface {
-	ReconcileProject(ctx context.Context, req ctrl.Request, workerClusterRoleRules, readOnlyRoleRules, readWriteRoleRules []rbacv1.PolicyRule) (ctrl.Result, error)
+	ReconcileProject(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 }
 
 // ProjectService implements different service interfaces
@@ -40,7 +39,7 @@ type ProjectService struct {
 }
 
 // ReconcileProject is a function to reconcile the projects includes reconcilation of roles, clusters, project namespaces etc.
-func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request, workerClusterRoleRules, readOnlyRoleRules, readWriteRoleRules []rbacv1.PolicyRule) (ctrl.Result, error) {
+func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get project resource
 	logger := util.CtxLogger(ctx)
 	logger.Infof("Starting Recoincilation of Project with name %s in namespace %s",
@@ -79,17 +78,17 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request,
 	}
 
 	// Step 2: Worker-Cluster Role reconciliation
-	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileWorkerClusterRole(ctx, projectNamespace, project, workerClusterRoleRules)); shouldReturn {
+	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileWorkerClusterRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 	// Step 3: Create shared Read-Only and Read-Write Roles for end-users
 	// 3.1 Read-Only Shared Role
-	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadOnlyRole(ctx, projectNamespace, project, readOnlyRoleRules)); shouldReturn {
+	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadOnlyRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 
 	// 3.2 Read-Write Shared Role
-	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadWriteRole(ctx, projectNamespace, project, readWriteRoleRules)); shouldReturn {
+	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadWriteRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 

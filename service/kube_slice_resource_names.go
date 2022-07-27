@@ -17,9 +17,10 @@
 package service
 
 import (
-	rbacv1 "k8s.io/api/rbac/v1"
 	"os"
 	"time"
+
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 // Api Groups
@@ -143,8 +144,31 @@ const (
 	StandardQoSProfileLabel = "standard-qos-profile"
 )
 
+type IAccessControlRuleProvider interface {
+	WorkerClusterRoleRules() []rbacv1.PolicyRule
+	ReadOnlyRoleRules() []rbacv1.PolicyRule
+	ReadWriteRoleRules() []rbacv1.PolicyRule
+}
+
+type AccessControlRuleProvider struct {
+}
+
+func (k *AccessControlRuleProvider) WorkerClusterRoleRules() []rbacv1.PolicyRule {
+	return workerClusterRoleRules
+}
+
+func (k *AccessControlRuleProvider) ReadOnlyRoleRules() []rbacv1.PolicyRule {
+	return readOnlyRoleRules
+}
+
+func (k *AccessControlRuleProvider) ReadWriteRoleRules() []rbacv1.PolicyRule {
+	return readWriteRoleRules
+}
+
+// Rules
+
 var (
-	WorkerClusterRoleRules = []rbacv1.PolicyRule{
+	workerClusterRoleRules = []rbacv1.PolicyRule{
 		{
 			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
@@ -184,7 +208,7 @@ var (
 )
 
 var (
-	ReadOnlyRoleRules = []rbacv1.PolicyRule{
+	readOnlyRoleRules = []rbacv1.PolicyRule{
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
@@ -214,7 +238,7 @@ var (
 )
 
 var (
-	ReadWriteRoleRules = []rbacv1.PolicyRule{
+	readWriteRoleRules = []rbacv1.PolicyRule{
 		{
 			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
