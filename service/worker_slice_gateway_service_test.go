@@ -374,7 +374,13 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
 	cluster := &controllerv1alpha1.Cluster{}
-	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Twice()
+	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		if len(arg.Spec.NodeIPs) == 0 {
+			arg.Spec.NodeIPs = make([]string, 1)
+			arg.Spec.NodeIPs[0] = "11"
+		}
+	}).Twice()
 	gateway := &workerv1alpha1.WorkerSliceGateway{}
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), gateway).Return(notFoundError).Once()
