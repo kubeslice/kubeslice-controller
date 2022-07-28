@@ -11,4 +11,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: aveshadev/kubeslice-controller
-  newTag: latest-feature-slice-cidr
+  newTag: latest

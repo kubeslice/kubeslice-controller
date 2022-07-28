@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -230,6 +229,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			return clusterMap, err
 		}
 		ipamOctet := clusterMap[cluster]
+		clusterSubnetCIDR := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr))
 		if !found {
 			label["project-namespace"] = namespace
 			label["original-slice-name"] = name
@@ -244,8 +244,6 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 					Namespace: namespace,
 				},
 			}
-			ipr := strings.Split(sliceSubnet, ".")
-			clusterSubnetCIDR := fmt.Sprintf("%s.%s.%d.%s%s", ipr[0], ipr[1], clusterMap[cluster], "0", clusterCidr)
 			expectedSlice.Spec.SliceName = name
 			expectedSlice.Spec.IpamClusterOctet = &ipamOctet
 			expectedSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
@@ -261,7 +259,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		} else {
 			existingSlice.UID = ""
 			existingSlice.Spec.IpamClusterOctet = &ipamOctet
-
+			existingSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 			logger.Debug("updating slice with new ipam cluster octet", existingSlice)
 			if existingSlice.Annotations == nil {
 				existingSlice.Annotations = make(map[string]string)
