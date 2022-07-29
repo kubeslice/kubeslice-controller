@@ -124,7 +124,7 @@ func AccessControlService_ReconcileWorkerClusterRole_Create(t *testing.T) {
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
 	acsService := AccessControlService{}
-	result, err := acsService.ReconcileWorkerClusterRole(ctx, namespace, project, expectedRole.Rules)
+	result, err := acsService.ReconcileWorkerClusterRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
@@ -189,7 +189,7 @@ func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	acsService := AccessControlService{}
-	result, err := acsService.ReconcileWorkerClusterRole(ctx, namespace, project, expectedRole.Rules)
+	result, err := acsService.ReconcileWorkerClusterRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
@@ -246,7 +246,7 @@ func AccessControlService_ReconcileReadOnlyRole_Create(t *testing.T) {
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
 	acsService := AccessControlService{}
-	result, err := acsService.ReconcileReadOnlyRole(ctx, namespace, project, expectedRole.Rules)
+	result, err := acsService.ReconcileReadOnlyRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
@@ -301,7 +301,7 @@ func AccessControlService_ReconcileReadOnlyRole_Update(t *testing.T) {
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	acsService := AccessControlService{}
-	result, err := acsService.ReconcileReadOnlyRole(ctx, namespace, project, expectedRole.Rules)
+	result, err := acsService.ReconcileReadOnlyRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
@@ -357,7 +357,7 @@ func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
 	acsService := AccessControlService{}
-	result, err := acsService.ReconcileReadWriteRole(ctx, namespace, project, expectedRole.Rules)
+	result, err := acsService.ReconcileReadWriteRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
@@ -412,7 +412,7 @@ func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	acsService := AccessControlService{}
-	result, err := acsService.ReconcileReadWriteRole(ctx, namespace, project, expectedRole.Rules)
+	result, err := acsService.ReconcileReadWriteRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
