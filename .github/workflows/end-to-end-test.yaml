@@ -37,6 +37,10 @@ jobs:
         repository: kubeslice/e2e-allure-reports
         path: gh-pages
         ref: 'gh-pages'
+        
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%dT%H:%M:%S')"
 
     - name: Allure Report with history
       uses: PavanMudigonda/allure-html-reporter-github-pages@v1.0
@@ -48,7 +52,7 @@ jobs:
         gh_pages: gh-pages
         keep_reports: 20
         github_run_id: '${{ github.run_id }}'
-        github_run_num: 'Kind-${{ github.event.repository.name }}-${{ github.base_ref }}-${{ github.run_number }}'
+        github_run_num: 'Kind-${{ github.event.repository.name }}-${{ github.base_ref }}-${{ github.run_number }}-${{ steps.date.outputs.date }}'
         report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
         test_env: Kind
           
