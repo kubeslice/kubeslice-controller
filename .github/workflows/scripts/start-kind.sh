@@ -37,8 +37,8 @@ WorkerClusters:
   NodeIP: ${IP2}
 WorkerChartOptions:
   SetStrValues:
-    "operator.image": "kind-controller"
-    "operator.tag": "e2e-latest"
+    "controller.image": "kubeslice-controller"
+    "controller.tag": "e2e-latest"
 TestSuitesEnabled:
   HubSuite: true
   WorkerSuite: true
