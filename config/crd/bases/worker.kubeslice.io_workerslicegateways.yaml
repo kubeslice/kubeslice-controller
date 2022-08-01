@@ -61,10 +61,6 @@ spec:
                     type: string
                   nodeIp:
                     type: string
-                  nodeIps:
-                    items:
-                      type: string
-                    type: array
                   nodePort:
                     type: integer
                   vpnIp:
@@ -80,10 +76,6 @@ spec:
                     type: string
                   nodeIp:
                     type: string
-                  nodeIps:
-                    items:
-                      type: string
-                    type: array
                   nodePort:
                     type: integer
                   vpnIp:
