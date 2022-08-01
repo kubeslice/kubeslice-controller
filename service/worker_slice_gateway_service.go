@@ -412,14 +412,14 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				ClusterName:   sourceCluster.Name,
 				GatewayName:   localGatewayName,
 				GatewaySubnet: gatewaySubnet,
-				NodeIp:        sourceCluster.Spec.NodeIP,
+				NodeIp:        sourceCluster.Spec.NodeIPs[0],
 				VpnIp:         localVpnAddress,
 			},
 			RemoteGatewayConfig: v1alpha1.SliceGatewayConfig{
 				ClusterName:   destinationCluster.Name,
 				GatewayName:   remoteGatewayName,
 				GatewaySubnet: remoteGatewaySubnet,
-				NodeIp:        destinationCluster.Spec.NodeIP,
+				NodeIp:        destinationCluster.Spec.NodeIPs[0],
 				VpnIp:         remoteVpnAddress,
 			},
 			GatewayCredentials: v1alpha1.GatewayCredentials{
