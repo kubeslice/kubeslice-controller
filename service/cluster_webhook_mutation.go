@@ -33,11 +33,11 @@ func MutateClusterSpec(ctx context.Context, req v1.AdmissionRequest) admission.R
 	if req.Operation == v1.Create {
 		cluster.ResourceVersion = ""
 	}
-	if len(cluster.Spec.NodeIP) != 0 {
+	/* if len(cluster.Spec.NodeIP) != 0 {
 		cluster.Spec.NodeIPs = make([]string, 0)
 		cluster.Spec.NodeIPs = append(cluster.Spec.NodeIPs, cluster.Spec.NodeIP)
 		cluster.Spec.NodeIP = ""
-	}
+	} */
 	marshaledcluster, err := json.Marshal(cluster)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
