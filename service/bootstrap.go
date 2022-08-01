@@ -28,55 +28,81 @@ type Services struct {
 }
 
 // bootstrapping Services
-func WithServices() *Services {
+func WithServices(
+	wscs IWorkerSliceConfigService,
+	ps IProjectService,
+	cs IClusterService,
+	scs ISliceConfigService,
+	secs IServiceExportConfigService,
+	wsgs IWorkerSliceGatewayService,
+	wsis IWorkerServiceImportService,
+	sqcs ISliceQoSConfigService,
+) *Services {
 	return &Services{
-		ProjectService:             WithProjectService(),
-		ClusterService:             WithClusterService(),
-		SliceConfigService:         WithSliceConfigService(),
-		ServiceExportConfigService: WithServiceExportConfigService(),
-		WorkerSliceConfigService:   WithWorkerSliceConfigService(),
-		WorkerSliceGatewayService:  WithWorkerSliceGatewayService(),
-		WorkerServiceImportService: WithWorkerServiceImportService(),
-		SliceQoSConfigService:      WithSliceQoSConfigService(),
+		ProjectService:             ps,
+		ClusterService:             cs,
+		SliceConfigService:         scs,
+		ServiceExportConfigService: secs,
+		WorkerSliceConfigService:   wscs,
+		WorkerSliceGatewayService:  wsgs,
+		WorkerServiceImportService: wsis,
+		SliceQoSConfigService:      sqcs,
 	}
 }
 
 // bootstrapping Project services
-func WithProjectService() IProjectService {
+func WithProjectService(
+	ns INamespaceService,
+	acs IAccessControlService,
+	c IClusterService,
+	sc ISliceConfigService,
+	se IServiceExportConfigService,
+) IProjectService {
 	return &ProjectService{
-		ns:  WithNameSpaceService(),
-		acs: WithAccessControlService(),
-		c:   WithClusterService(),
-		sc:  WithSliceConfigService(),
-		se:  WithServiceExportConfigService(),
+		ns:  ns,
+		acs: acs,
+		c:   c,
+		sc:  sc,
+		se:  se,
 	}
 }
 
 // bootstrapping cluster service
-func WithClusterService() IClusterService {
+func WithClusterService(
+	ns INamespaceService,
+	acs IAccessControlService,
+	sgws IWorkerSliceGatewayService,
+) IClusterService {
 	return &ClusterService{
-		ns:   WithNameSpaceService(),
-		acs:  WithAccessControlService(),
-		sgws: WithWorkerSliceGatewayService(),
+		ns:   ns,
+		acs:  acs,
+		sgws: sgws,
 	}
 }
 
 // bootstrapping slice config service
-func WithSliceConfigService() ISliceConfigService {
+func WithSliceConfigService(
+	ns INamespaceService,
+	acs IAccessControlService,
+	sgs IWorkerSliceGatewayService,
+	ms IWorkerSliceConfigService,
+	si IWorkerServiceImportService,
+	se IServiceExportConfigService,
+) ISliceConfigService {
 	return &SliceConfigService{
-		ns:  WithNameSpaceService(),
-		acs: WithAccessControlService(),
-		sgs: WithWorkerSliceGatewayService(),
-		ms:  WithWorkerSliceConfigService(),
-		si:  WithWorkerServiceImportService(),
-		se:  WithServiceExportConfigService(),
+		ns:  ns,
+		acs: acs,
+		sgs: sgs,
+		ms:  ms,
+		si:  si,
+		se:  se,
 	}
 }
 
 // bootstrapping service export config service
-func WithServiceExportConfigService() IServiceExportConfigService {
+func WithServiceExportConfigService(ses IWorkerServiceImportService) IServiceExportConfigService {
 	return &ServiceExportConfigService{
-		ses: WithWorkerServiceImportService(),
+		ses: ses,
 	}
 }
 
@@ -86,8 +112,10 @@ func WithNameSpaceService() INamespaceService {
 }
 
 // bootstrapping accesscontrol service
-func WithAccessControlService() IAccessControlService {
-	return &AccessControlService{}
+func WithAccessControlService(ruleProvider IAccessControlRuleProvider) IAccessControlService {
+	return &AccessControlService{
+		ruleProvider: ruleProvider,
+	}
 }
 
 // bootstrapping secret service
@@ -96,17 +124,25 @@ func WithSecretService() ISecretService {
 }
 
 // bootstrapping slice gateway service
-func WithWorkerSliceGatewayService() IWorkerSliceGatewayService {
+func WithWorkerSliceGatewayService(
+	js IJobService,
+	sscs IWorkerSliceConfigService,
+	sc ISecretService,
+) IWorkerSliceGatewayService {
 	return &WorkerSliceGatewayService{
-		js:   WithJobService(),
-		sscs: WithWorkerSliceConfigService(),
-		sc:   WithSecretService(),
+		js:   js,
+		sscs: sscs,
+		sc:   sc,
 	}
 }
 
 // bootstrapping job service
 func WithJobService() IJobService {
 	return &JobService{}
+}
+
+func WithAccessControlRuleProvider() IAccessControlRuleProvider {
+	return &AccessControlRuleProvider{}
 }
 
 // bootstrapping worker slice config service
@@ -120,8 +156,8 @@ func WithWorkerServiceImportService() IWorkerServiceImportService {
 }
 
 // bootstrapping slice qos config service
-func WithSliceQoSConfigService() ISliceQoSConfigService {
+func WithSliceQoSConfigService(wsc IWorkerSliceConfigService) ISliceQoSConfigService {
 	return &SliceQoSConfigService{
-		wsc: WithWorkerSliceConfigService(),
+		wsc: wsc,
 	}
 }

@@ -101,9 +101,9 @@ func TestReconcileProject_AddsREconciler_CreatesResourcesAndReturnsReconciliatio
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	nsServiceMock.On("ReconcileProjectNamespace", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileWorkerClusterRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileReadOnlyRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileReadWriteRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileWorkerClusterRole", ctx, projectNamespace, mock.Anything, workerClusterRoleRules).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileReadOnlyRole", ctx, projectNamespace, mock.Anything, readOnlyRoleRules).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileReadWriteRole", ctx, projectNamespace, mock.Anything, readWriteRoleRules).Return(ctrl.Result{}, nil).Once()
 	acsServicemOCK.On("ReconcileReadOnlyUserServiceAccountAndRoleBindings", ctx, projectNamespace, readOnlyServiceAccounts, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	acsServicemOCK.On("ReconcileReadWriteUserServiceAccountAndRoleBindings", ctx, projectNamespace, readWriteServiceAccounts, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	result, err := projectService.ReconcileProject(ctx, requestObj)

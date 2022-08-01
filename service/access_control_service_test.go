@@ -98,12 +98,12 @@ func AccessControlService_ReconcileWorkerClusterRole_Create(t *testing.T) {
 			{
 				Verbs:     []string{verbUpdate, verbPatch, verbGet},
 				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix},
+				Resources: []string{resourceCluster + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbUpdate, verbPatch, verbGet},
 				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+				Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
@@ -164,12 +164,12 @@ func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
 			{
 				Verbs:     []string{verbUpdate, verbPatch, verbGet},
 				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix},
+				Resources: []string{resourceCluster + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbUpdate, verbPatch, verbGet},
 				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+				Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
@@ -225,12 +225,12 @@ func AccessControlService_ReconcileReadOnlyRole_Create(t *testing.T) {
 			{
 				Verbs:     []string{verbGet},
 				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix, resourceSliceConfig + resourceStatusSuffix, resourceServiceExportConfigs + resourceStatusSuffix},
+				Resources: []string{resourceCluster + ResourceStatusSuffix, resourceSliceConfig + ResourceStatusSuffix, resourceServiceExportConfigs + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbGet},
 				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+				Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbGet, verbList, verbWatch},
@@ -281,12 +281,12 @@ func AccessControlService_ReconcileReadOnlyRole_Update(t *testing.T) {
 			{
 				Verbs:     []string{verbGet},
 				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix, resourceSliceConfig + resourceStatusSuffix, resourceServiceExportConfigs + resourceStatusSuffix},
+				Resources: []string{resourceCluster + ResourceStatusSuffix, resourceSliceConfig + ResourceStatusSuffix, resourceServiceExportConfigs + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbGet},
 				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+				Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbGet, verbList, verbWatch},
@@ -336,12 +336,12 @@ func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
 			{
 				Verbs:     []string{verbUpdate, verbPatch, verbGet},
 				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix, resourceSliceConfig + resourceStatusSuffix, resourceServiceExportConfigs + resourceStatusSuffix},
+				Resources: []string{resourceCluster + ResourceStatusSuffix, resourceSliceConfig + ResourceStatusSuffix, resourceServiceExportConfigs + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbUpdate, verbPatch, verbGet},
 				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+				Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbGet, verbList, verbWatch},
@@ -392,12 +392,12 @@ func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
 			{
 				Verbs:     []string{verbUpdate, verbPatch, verbGet},
 				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix, resourceSliceConfig + resourceStatusSuffix, resourceServiceExportConfigs + resourceStatusSuffix},
+				Resources: []string{resourceCluster + ResourceStatusSuffix, resourceSliceConfig + ResourceStatusSuffix, resourceServiceExportConfigs + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbUpdate, verbPatch, verbGet},
 				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
+				Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
 			},
 			{
 				Verbs:     []string{verbGet, verbList, verbWatch},

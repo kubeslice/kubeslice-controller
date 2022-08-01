@@ -53,7 +53,21 @@ func init() {
 }
 
 func main() {
-	initialize(service.WithServices())
+	// Compile time dependency injection
+	ns := service.WithNameSpaceService()
+	rp := service.WithAccessControlRuleProvider()
+	acs := service.WithAccessControlService(rp)
+	js := service.WithJobService()
+	wscs := service.WithWorkerSliceConfigService()
+	ss := service.WithSecretService()
+	wsgs := service.WithWorkerSliceGatewayService(js, wscs, ss)
+	c := service.WithClusterService(ns, acs, wsgs)
+	wsi := service.WithWorkerServiceImportService()
+	se := service.WithServiceExportConfigService(wsi)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se)
+	p := service.WithProjectService(ns, acs, c, sc, se)
+	sqcs := service.WithSliceQoSConfigService(wscs)
+	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs))
 }
 
 func initLogger(logLevel zapcore.Level) {

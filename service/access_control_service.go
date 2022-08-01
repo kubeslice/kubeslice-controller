@@ -57,6 +57,7 @@ type activeServiceAccount struct {
 }
 
 type AccessControlService struct {
+	ruleProvider IAccessControlRuleProvider
 }
 
 // ReconcileWorkerClusterRole reconciles the worker cluster role
@@ -74,43 +75,7 @@ func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
 			Namespace: namespacedName.Namespace,
 			Labels:    labels,
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceServiceExportConfigs},
-			},
-			{
-				Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster},
-			},
-			{
-				Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
-			},
-			{
-				Verbs:     []string{verbUpdate, verbPatch, verbGet},
-				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix},
-			},
-			{
-				Verbs:     []string{verbUpdate, verbPatch, verbGet},
-				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
-			},
-			{
-				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
-				APIGroups: []string{""},
-				Resources: []string{resourceSecrets},
-			},
-			{
-				Verbs:     []string{verbCreate, verbPatch},
-				APIGroups: []string{""},
-				Resources: []string{resourceEvents},
-			},
-		},
+		Rules: a.ruleProvider.WorkerClusterRoleRules(),
 	}
 	actualRole := &rbacv1.Role{}
 	found, err := util.GetResourceIfExist(ctx, namespacedName, actualRole)
@@ -146,33 +111,7 @@ func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namesp
 			Namespace: namespacedName.Namespace,
 			Labels:    labels,
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				Verbs:     []string{verbGet, verbList, verbWatch},
-				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
-			},
-			{
-				Verbs:     []string{verbGet, verbList, verbWatch},
-				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
-			},
-			{
-				Verbs:     []string{verbGet},
-				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix, resourceSliceConfig + resourceStatusSuffix, resourceServiceExportConfigs + resourceStatusSuffix},
-			},
-			{
-				Verbs:     []string{verbGet},
-				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
-			},
-			{
-				Verbs:     []string{verbGet, verbList, verbWatch},
-				APIGroups: []string{""},
-				Resources: []string{resourceSecrets},
-			},
-		},
+		Rules: a.ruleProvider.ReadOnlyRoleRules(),
 	}
 	actualRole := &rbacv1.Role{}
 	found, err := util.GetResourceIfExist(ctx, namespacedName, actualRole)
@@ -208,33 +147,7 @@ func (a *AccessControlService) ReconcileReadWriteRole(ctx context.Context,
 			Namespace: namespacedName.Namespace,
 			Labels:    labels,
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
-			},
-			{
-				Verbs:     []string{verbGet, verbList, verbWatch},
-				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
-			},
-			{
-				Verbs:     []string{verbUpdate, verbPatch, verbGet},
-				APIGroups: []string{apiGroupKubeSliceControllers},
-				Resources: []string{resourceCluster + resourceStatusSuffix, resourceSliceConfig + resourceStatusSuffix, resourceServiceExportConfigs + resourceStatusSuffix},
-			},
-			{
-				Verbs:     []string{verbUpdate, verbPatch, verbGet},
-				APIGroups: []string{apiGroupKubeSliceWorker},
-				Resources: []string{resourceWorkerSliceConfig + resourceStatusSuffix, resourceWorkerSliceGateways + resourceStatusSuffix, resourceWorkerServiceImport + resourceStatusSuffix},
-			},
-			{
-				Verbs:     []string{verbGet, verbList, verbWatch},
-				APIGroups: []string{""},
-				Resources: []string{resourceSecrets},
-			},
-		},
+		Rules: a.ruleProvider.ReadWriteRoleRules(),
 	}
 	actualRole := &rbacv1.Role{}
 	found, err := util.GetResourceIfExist(ctx, namespacedName, actualRole)
