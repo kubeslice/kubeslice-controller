@@ -43,8 +43,8 @@ func ValidateWorkerSliceConfigUpdate(ctx context.Context, workerSliceConfig *wor
 func preventUpdateWorkerSliceConfig(ctx context.Context, ss *workerv1alpha1.WorkerSliceConfig) *field.Error {
 	workerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
 	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: ss.Name, Namespace: ss.Namespace}, &workerSliceConfig)
-	if workerSliceConfig.Spec.IpamClusterOctet != ss.Spec.IpamClusterOctet {
-		return field.Invalid(field.NewPath("Spec").Child("IpamClusterOctet"), ss.Spec.IpamClusterOctet, "cannot be updated")
+	if *workerSliceConfig.Spec.IpamClusterOctet != *ss.Spec.IpamClusterOctet {
+		return field.Invalid(field.NewPath("Spec").Child("IpamClusterOctet"), *ss.Spec.IpamClusterOctet, "cannot be updated")
 	}
 	return nil
 }

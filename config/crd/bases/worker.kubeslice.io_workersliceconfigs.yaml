@@ -36,6 +36,8 @@ spec:
           spec:
             description: WorkerSliceConfigSpec defines the desired state of Slice
             properties:
+              clusterSubnetCIDR:
+                type: string
               externalGatewayConfig:
                 properties:
                   egress:
@@ -128,6 +130,8 @@ spec:
               sliceType:
                 default: Application
                 type: string
+            required:
+            - ipamClusterOctet
             type: object
           status:
             description: WorkerSliceConfigStatus defines the observed state of Slice
