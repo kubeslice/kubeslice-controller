@@ -12,10 +12,10 @@ jobs:
       with:
         ref: ${{ github.event.pull_request.head.sha }}
     
-    - name: build the worker-operator
+    - name: build the kubeslice controller
       uses: docker/build-push-action@v2
       with:
-        tags: kind-controller:e2e-latest
+        tags: kubeslice-controller:e2e-latest
         push: false
     
     - name: build kind clusters
