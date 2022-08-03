@@ -80,8 +80,8 @@ func TestReconcileProject_Delete_Happypath(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 	nsServiceMock.AssertExpectations(t)
-
 }
+
 func TestReconcileProject_AddsREconciler_CreatesResourcesAndReturnsReconciliationComplete_Happypath(t *testing.T) {
 	projectName := "cisco"
 	namespace := "controller-manager"
@@ -101,9 +101,9 @@ func TestReconcileProject_AddsREconciler_CreatesResourcesAndReturnsReconciliatio
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	nsServiceMock.On("ReconcileProjectNamespace", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileWorkerClusterRole", ctx, projectNamespace, mock.Anything, workerClusterRoleRules).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileReadOnlyRole", ctx, projectNamespace, mock.Anything, readOnlyRoleRules).Return(ctrl.Result{}, nil).Once()
-	acsServicemOCK.On("ReconcileReadWriteRole", ctx, projectNamespace, mock.Anything, readWriteRoleRules).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileWorkerClusterRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileReadOnlyRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	acsServicemOCK.On("ReconcileReadWriteRole", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	acsServicemOCK.On("ReconcileReadOnlyUserServiceAccountAndRoleBindings", ctx, projectNamespace, readOnlyServiceAccounts, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	acsServicemOCK.On("ReconcileReadWriteUserServiceAccountAndRoleBindings", ctx, projectNamespace, readWriteServiceAccounts, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	result, err := projectService.ReconcileProject(ctx, requestObj)
@@ -113,8 +113,8 @@ func TestReconcileProject_AddsREconciler_CreatesResourcesAndReturnsReconciliatio
 	clientMock.AssertExpectations(t)
 	nsServiceMock.AssertExpectations(t)
 	acsServicemOCK.AssertExpectations(t)
-
 }
+
 func TestReconcileProject_DoNotCallFinalizerIfItExists(t *testing.T) {
 	projectName := "cisco"
 	namespace := "controller-manager"
@@ -144,23 +144,22 @@ func TestReconcileProject_DoNotCallFinalizerIfItExists(t *testing.T) {
 	clientMock.AssertExpectations(t)
 	nsServiceMock.AssertExpectations(t)
 	acsServicemOCK.AssertExpectations(t)
-
 }
 
 func TestReconcileProject_ReturnsReconciliationCompleteAndErrorWhenGetProjectNamespaceFailsWithErrorOtherThanNotFound(t *testing.T) {
 	projectName := "do-not-exist"
 	namespace := "controller-manager"
 	_, _, projectService, requestObj, clientMock, project, ctx, _, _, _ := setupProjectTest(projectName, namespace)
-	error := errors.New("testinternalerror")
-	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(error)
+	err1 := errors.New("testinternalerror")
+	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(err1)
 	result, err := projectService.ReconcileProject(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err)
 	require.Equal(t, result, expectedResult)
-	require.Equal(t, err, error)
+	require.Equal(t, err, err1)
 	clientMock.AssertExpectations(t)
-
 }
+
 func TestReconcileProject_ReturnsReconciliationCompleteAndNilErrorWhenGetProjectNamespaceIsNotFound(t *testing.T) {
 	projectName := "do-not-exist"
 	namespace := "controller-manager"
@@ -173,8 +172,8 @@ func TestReconcileProject_ReturnsReconciliationCompleteAndNilErrorWhenGetProject
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-
 }
+
 func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, *mocks.IAccessControlService, ProjectService, ctrl.Request, *utilMock.Client, *controllerv1alpha1.Project, context.Context, *mocks.IClusterService, *mocks.ISliceConfigService, *mocks.IServiceExportConfigService) {
 	nsServiceMock := &mocks.INamespaceService{}
 	acsServicemOCK := &mocks.IAccessControlService{}

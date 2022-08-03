@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -123,7 +124,11 @@ func AccessControlService_ReconcileWorkerClusterRole_Create(t *testing.T) {
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
-	acsService := AccessControlService{}
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+	}
+	ruleProviderMock.On("WorkerClusterRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileWorkerClusterRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
@@ -188,7 +193,11 @@ func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
 	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
-	acsService := AccessControlService{}
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+	}
+	ruleProviderMock.On("WorkerClusterRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileWorkerClusterRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
@@ -245,7 +254,11 @@ func AccessControlService_ReconcileReadOnlyRole_Create(t *testing.T) {
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
-	acsService := AccessControlService{}
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+	}
+	ruleProviderMock.On("ReadOnlyRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileReadOnlyRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
@@ -300,13 +313,18 @@ func AccessControlService_ReconcileReadOnlyRole_Update(t *testing.T) {
 	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
-	acsService := AccessControlService{}
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+	}
+	ruleProviderMock.On("ReadOnlyRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileReadOnlyRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
 	namespace := "kubeslice-controller-cisco"
 	namespacedName := client.ObjectKey{
@@ -356,7 +374,11 @@ func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
-	acsService := AccessControlService{}
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+	}
+	ruleProviderMock.On("ReadWriteRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileReadWriteRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
@@ -411,7 +433,11 @@ func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
 	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
-	acsService := AccessControlService{}
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+	}
+	ruleProviderMock.On("ReadWriteRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileReadWriteRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
