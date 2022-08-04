@@ -379,10 +379,12 @@ func (s *WorkerSliceGatewayService) buildNetworkAddresses(sliceSubnet, sourceClu
 	clusterMap map[string]int, clusterCidr string) WorkerSliceGatewayNetworkAddresses {
 	gatewayAddresses := WorkerSliceGatewayNetworkAddresses{}
 	ipr := strings.Split(sliceSubnet, ".")
-	gatewayAddresses.ServerNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], clusterMap[sourceClusterName], "0")
-	gatewayAddresses.ClientNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], clusterMap[destinationClusterName], "0")
-	gatewayAddresses.ServerSubnet = gatewayAddresses.ServerNetwork + clusterCidr
-	gatewayAddresses.ClientSubnet = gatewayAddresses.ClientNetwork + clusterCidr
+	serverSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr))
+	clientSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr))
+	gatewayAddresses.ServerNetwork = strings.SplitN(serverSubnet, "/", -1)[0]
+	gatewayAddresses.ClientNetwork = strings.SplitN(clientSubnet, "/", -1)[0]
+	gatewayAddresses.ServerSubnet = serverSubnet
+	gatewayAddresses.ClientSubnet = clientSubnet
 	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "0")
 	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "1")
 	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "2")
