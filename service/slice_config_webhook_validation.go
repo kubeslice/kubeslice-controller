@@ -97,6 +97,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateMaxClusterCount(sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	if err := preventMaxClusterCountUpdate(ctx, sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -442,6 +445,19 @@ func existsQosConfigFromStandardQosProfileName(ctx context.Context, namespace st
 func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {
 	if s.Spec.MaxClusters < 2 || s.Spec.MaxClusters > 32 {
 		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be less than 2 or greater than 32.")
+	}
+	if len(s.Spec.Clusters) > s.Spec.MaxClusters {
+		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount")
+	}
+	return nil
+}
+
+// prevent update MaxClusterCount if it is already set
+func preventMaxClusterCountUpdate(ctx context.Context, s *controllerv1alpha1.SliceConfig) *field.Error {
+	sliceConfig := controllerv1alpha1.SliceConfig{}
+	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: s.Name, Namespace: s.Namespace}, &sliceConfig)
+	if sliceConfig.Spec.MaxClusters != s.Spec.MaxClusters {
+		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be updated.")
 	}
 	return nil
 }
