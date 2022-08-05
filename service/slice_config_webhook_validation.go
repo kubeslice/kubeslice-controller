@@ -94,9 +94,6 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := validateMaxClusterCount(sliceConfig); err != nil {
-		allErrs = append(allErrs, err)
-	}
 	if err := preventMaxClusterCountUpdate(ctx, sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
