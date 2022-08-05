@@ -71,6 +71,11 @@ spec:
                       type: object
                   type: object
                 type: array
+              maxClusters:
+                default: 16
+                maximum: 32
+                minimum: 2
+                type: integer
               namespaceIsolationProfile:
                 properties:
                   allowedNamespaces:
