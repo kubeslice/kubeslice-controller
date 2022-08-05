@@ -38,7 +38,33 @@ import (
 // ValidateSliceConfigCreate is a function to verify the creation of slice config
 func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
 	if err := validateProjectNamespace(ctx, sliceConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		allErrs = append(allErrs, err)
+	} else {
+		if err = validateSliceSubnet(sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err = validateClusters(ctx, sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err = validateQosProfile(ctx, sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err = validateExternalGatewayConfig(sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err = validateApplicationNamespaces(ctx, sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err := validateAllowedNamespaces(sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		// TODO: merge validateApplicationNamespaces & validateAllowedNamespaces in one function
+		if err = validateNamespaceIsolationProfile(sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err = validateMaxClusterCount(sliceConfig); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	if err := validateSliceSubnet(sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
@@ -90,8 +116,11 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	if err := preventMaxClusterCountUpdate(ctx, sliceConfig, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	if err := preventMaxClusterCountUpdate(ctx, sliceConfig); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if len(allErrs) == 0 {
+		return nil
 	}
 	return nil
 }
@@ -477,4 +506,24 @@ func checkIfQoSConfigExists(ctx context.Context, namespace string, qosProfileNam
 		return false
 	}
 	return found
+}
+
+func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {
+	if s.Spec.MaxClusters < 2 || s.Spec.MaxClusters > 32 {
+		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be less than 2 or greater than 32.")
+	}
+	if len(s.Spec.Clusters) > s.Spec.MaxClusters {
+		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount :"+strconv.Itoa(s.Spec.MaxClusters))
+	}
+	return nil
+}
+
+// prevent update MaxClusterCount if it is already set
+func preventMaxClusterCountUpdate(ctx context.Context, s *controllerv1alpha1.SliceConfig) *field.Error {
+	sliceConfig := controllerv1alpha1.SliceConfig{}
+	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: s.Name, Namespace: s.Namespace}, &sliceConfig)
+	if sliceConfig.Spec.MaxClusters != s.Spec.MaxClusters {
+		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be updated.")
+	}
+	return nil
 }

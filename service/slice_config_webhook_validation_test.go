@@ -702,7 +702,15 @@ func UpdateValidateSliceConfigUpdatingSliceSubnet(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceSubnet: Invalid value:")
 	require.Contains(t, err.Error(), "cannot be updated")
@@ -716,7 +724,15 @@ func UpdateValidateSliceConfigUpdatingSliceType(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	newSliceConfig.Spec.SliceType = "TYPE_2"
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceType: Invalid value:")
 	require.Contains(t, err.Error(), "cannot be updated")
@@ -730,7 +746,15 @@ func UpdateValidateSliceConfigUpdatingSliceGatewayType(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = "TYPE_2"
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayType: Invalid value:")
 	require.Contains(t, err.Error(), "cannot be updated")
@@ -744,7 +768,15 @@ func UpdateValidateSliceConfigUpdatingSliceCaType(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	newSliceConfig.Spec.SliceGatewayProvider.SliceCaType = "TYPE_2"
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceCaType: Invalid value:")
 	require.Contains(t, err.Error(), "cannot be updated")
@@ -758,7 +790,15 @@ func UpdateValidateSliceConfigUpdatingSliceIpamType(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	newSliceConfig.Spec.SliceIpamType = "TYPE_2"
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	newSliceConfig.Spec.MaxClusters = 16
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &existingSliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceIpamType: Invalid value:")
 	require.Contains(t, err.Error(), "cannot be updated")
@@ -770,7 +810,15 @@ func UpdateValidateSliceConfigWithDuplicateClusters(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-1"}
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters: Duplicate value:")
 	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[0])
@@ -787,8 +835,15 @@ func UpdateValidateSliceConfigWithClusterDoesNotExist(t *testing.T) {
 		Name:      newSliceConfig.Spec.Clusters[0],
 		Namespace: namespace,
 	}, &controllerv1alpha1.Cluster{}).Return(notFoundError).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
-	t.Log(err.Error())
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters[0]: Invalid value:")
 	require.Contains(t, err.Error(), "cluster is not registered")
@@ -837,37 +892,15 @@ func UpdateValidateSliceConfigWithNewClusterRegistrationPending(t *testing.T) {
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
 	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
-	t.Log(err.Error())
-	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
-	require.Contains(t, err.Error(), "cluster registration is not completed")
-	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[2])
-	clientMock.AssertExpectations(t)
-}
-
-func UpdateValidateSliceConfigWithNewClusterUnhealthy(t *testing.T) {
-	name := "slice_config"
-	namespace := "namespace"
-	clusterCniSubnet := "10.10.1.1/16"
-	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
-	oldSliceConfig := newSliceConfig.DeepCopy()
-	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2", "cluster-3"}
+	SliceConfig := controllerv1alpha1.SliceConfig{}
 	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      newSliceConfig.Spec.Clusters[2],
+		Name:      name,
 		Namespace: namespace,
-	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.Cluster)
-		arg.Spec.NodeIPs = []string{}
-		arg.Status.CniSubnet = []string{clusterCniSubnet}
-		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
-		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
-			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusWarning,
-		}
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
 	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
-	t.Log(err.Error())
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
 	require.Contains(t, err.Error(), "cluster health is not normal")
@@ -893,7 +926,15 @@ func UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingClu
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
 	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Status.NodeIPs: Not found")
 	clientMock.AssertExpectations(t)
@@ -961,7 +1002,15 @@ func UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster(t *testin
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{}
 	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Status.CniSubnet: Not found:")
 	clientMock.AssertExpectations(t)
@@ -982,7 +1031,15 @@ func UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipa
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceSubnet: Invalid value:")
 	require.Contains(t, err.Error(), "must not overlap with CniSubnet")
@@ -999,7 +1056,15 @@ func UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling
 		BandwidthGuaranteedKbps: 5120,
 		BandwidthCeilingKbps:    4096,
 	}
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.QosProfileDetails.BandwidthGuaranteedKbps: Invalid value:")
 	require.Contains(t, err.Error(), "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
@@ -1015,10 +1080,15 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterHasAsteriskAndOthe
 			Clusters: []string{"*", "cluster-1"},
 		},
 	}
-	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
-		QueueType: "SomeType",
-	}
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
 	require.Contains(t, err.Error(), "other clusters are not allowed when * is present")
@@ -1044,10 +1114,15 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
-	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
-		QueueType: "SomeType",
-	}
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
 	require.Contains(t, err.Error(), "cluster is not participating in slice config")
@@ -1066,10 +1141,15 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOne
 			Clusters: []string{"*"},
 		},
 	}
-	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
-		QueueType: "SomeType",
-	}
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
 	require.Contains(t, err.Error(), "* is not allowed in more than one external gateways")
@@ -1109,7 +1189,15 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Duplicate value:")
 	clientMock.AssertExpectations(t)
@@ -1170,7 +1258,15 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 		arg.Status.Namespaces[0].Name = "randomNamespace"
 		arg.Status.Namespaces[0].SliceName = ""
 	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -1497,7 +1593,15 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	SliceConfig := controllerv1alpha1.SliceConfig{}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.MaxClusters = 16
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Other clusters are not allowed when * is present")
 	clientMock.AssertExpectations(t)

@@ -51,10 +51,16 @@ func UpdateValidateWorkerSliceConfigUpdatingOctet(t *testing.T) {
 	clientMock, newWorkerSliceConfig, ctx := setupWorkerSliceConfigWebhookValidationTest(name, namespace)
 	existingWorkerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
 	a1 := 1
-	existingWorkerSliceConfig.Spec.Octet = &a1
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &existingWorkerSliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
+		arg.Spec.IpamClusterOctet = &a1
+	}).Once()
 	a2 := 2
-	newWorkerSliceConfig.Spec.Octet = &a2
-	err := ValidateWorkerSliceConfigUpdate(ctx, &existingWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
+	newWorkerSliceConfig.Spec.IpamClusterOctet = &a2
+	err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Octet: Invalid value:")
 	clientMock.AssertExpectations(t)
@@ -64,9 +70,17 @@ func UpdateValidateWorkerSliceConfigWithoutErrors(t *testing.T) {
 	name := "worker_slice_config"
 	namespace := "namespace"
 	clientMock, newWorkerSliceConfig, ctx := setupWorkerSliceConfigWebhookValidationTest(name, namespace)
+	existingWorkerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
 	a1 := 1
-	newWorkerSliceConfig.Spec.Octet = &a1
-	err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, &existingWorkerSliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
+		arg.Spec.IpamClusterOctet = &a1
+	}).Once()
+	newWorkerSliceConfig.Spec.IpamClusterOctet = &a1
+	err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }

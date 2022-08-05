@@ -288,7 +288,7 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
-		octet := 0
+		IpamClusterOctet := 0
 		arg.Items = []workerv1alpha1.WorkerSliceConfig{
 			{
 				TypeMeta: k8sapimachinery.TypeMeta{},
@@ -303,7 +303,7 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					Octet:                     &octet,
+					IpamClusterOctet:          &IpamClusterOctet,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -323,7 +323,7 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					Octet:                     &octet,
+					IpamClusterOctet:          &IpamClusterOctet,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -357,7 +357,7 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
-		octet := 0
+		IpamClusterOctet := 0
 		arg.Items = []workerv1alpha1.WorkerSliceConfig{
 			{
 				TypeMeta: k8sapimachinery.TypeMeta{},
@@ -372,7 +372,7 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					Octet:                     &octet,
+					IpamClusterOctet:          &IpamClusterOctet,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -392,7 +392,7 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					Octet:                     &octet,
+					IpamClusterOctet:          &IpamClusterOctet,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -424,7 +424,7 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
-		octet := 0
+		IpamClusterOctet := 0
 		arg.Items = []workerv1alpha1.WorkerSliceConfig{
 			{
 				TypeMeta: k8sapimachinery.TypeMeta{},
@@ -439,7 +439,7 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					Octet:                     &octet,
+					IpamClusterOctet:          &IpamClusterOctet,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -459,7 +459,7 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					Octet:                     &octet,
+					IpamClusterOctet:          &IpamClusterOctet,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -491,7 +491,7 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
-		octet := 0
+		IpamClusterOctet := 0
 		arg.Items = []workerv1alpha1.WorkerSliceConfig{
 			{
 				TypeMeta: k8sapimachinery.TypeMeta{},
@@ -506,7 +506,7 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					Octet:                     &octet,
+					IpamClusterOctet:          &IpamClusterOctet,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -526,7 +526,7 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					Octet:                     &octet,
+					IpamClusterOctet:          &IpamClusterOctet,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},

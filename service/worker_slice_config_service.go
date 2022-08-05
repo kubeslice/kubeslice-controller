@@ -158,7 +158,7 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	octet := workerSliceConfig.Spec.Octet
+	ipamClusterOctet := workerSliceConfig.Spec.IpamClusterOctet
 	clusterSubnetCIDR := workerSliceConfig.Spec.ClusterSubnetCIDR
 	slice := s.copySpecFromSliceConfigToWorkerSlice(ctx, *sliceConfig)
 	workerSliceConfig.Spec = slice.Spec
@@ -239,7 +239,7 @@ outer:
 	workerSliceConfig.Spec.ExternalGatewayConfig = externalGatewayConfig
 	workerSliceConfig.Spec.NamespaceIsolationProfile = workerIsolationProfile
 	workerSliceConfig.Spec.SliceName = sliceConfig.Name
-	workerSliceConfig.Spec.Octet = octet
+	workerSliceConfig.Spec.IpamClusterOctet = ipamClusterOctet
 	workerSliceConfig.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 	err = util.UpdateResource(ctx, workerSliceConfig)
 	if err != nil {
@@ -302,7 +302,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 				},
 			}
 			expectedSlice.Spec.SliceName = name
-			expectedSlice.Spec.Octet = &ipamOctet
+			expectedSlice.Spec.IpamClusterOctet = &ipamOctet
 			expectedSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 			expectedSlice.Spec.SliceSubnet = sliceSubnet
 			err = util.CreateResource(ctx, &expectedSlice)
@@ -335,9 +335,9 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			)
 		} else {
 			existingSlice.UID = ""
-			existingSlice.Spec.Octet = &ipamOctet
+			existingSlice.Spec.IpamClusterOctet = &ipamOctet
 			existingSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
-			logger.Debug("updating slice with new octet", existingSlice)
+			logger.Debug("updating slice with new ipam cluster octet", existingSlice)
 			if existingSlice.Annotations == nil {
 				existingSlice.Annotations = make(map[string]string)
 			}
@@ -438,10 +438,10 @@ func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, work
 	tempClusterMapping := make(map[string]string, len(clusterNames))
 	usedIndexes := make(map[int]bool, 0)
 	for _, WorkerSliceConfig := range workerSliceConfigs {
-		if WorkerSliceConfig.Spec.Octet != nil {
-			clusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = *WorkerSliceConfig.Spec.Octet
-			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = fmt.Sprintf("%d", *WorkerSliceConfig.Spec.Octet)
-			usedIndexes[*WorkerSliceConfig.Spec.Octet] = true
+		if WorkerSliceConfig.Spec.IpamClusterOctet != nil {
+			clusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = *WorkerSliceConfig.Spec.IpamClusterOctet
+			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = fmt.Sprintf("%d", *WorkerSliceConfig.Spec.IpamClusterOctet)
+			usedIndexes[*WorkerSliceConfig.Spec.IpamClusterOctet] = true
 		} else {
 			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = ""
 		}
