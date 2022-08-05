@@ -35,10 +35,11 @@ func ValidateWorkerSliceConfigUpdate(ctx context.Context, workerSliceConfig *wor
 }
 
 // preventUpdateWorkerSliceConfig is a function to prevent the update of workersliceconfig
-func preventUpdateWorkerSliceConfig(ctx context.Context, ss *workerv1alpha1.WorkerSliceConfig, old runtime.Object) *field.Error {
-	workerSliceConfig := old.(*workerv1alpha1.WorkerSliceConfig)
-	if workerSliceConfig.Spec.Octet != nil && *workerSliceConfig.Spec.Octet != *ss.Spec.Octet {
-		return field.Invalid(field.NewPath("Spec").Child("Octet"), *ss.Spec.Octet, "cannot be updated")
+func preventUpdateWorkerSliceConfig(ctx context.Context, ss *workerv1alpha1.WorkerSliceConfig) *field.Error {
+	workerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
+	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: ss.Name, Namespace: ss.Namespace}, &workerSliceConfig)
+	if *workerSliceConfig.Spec.IpamClusterOctet != *ss.Spec.IpamClusterOctet {
+		return field.Invalid(field.NewPath("Spec").Child("IpamClusterOctet"), *ss.Spec.IpamClusterOctet, "cannot be updated")
 	}
 	return nil
 }
