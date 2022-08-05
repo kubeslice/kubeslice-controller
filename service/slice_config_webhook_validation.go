@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -444,7 +445,7 @@ func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {
 		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be less than 2 or greater than 32.")
 	}
 	if len(s.Spec.Clusters) > s.Spec.MaxClusters {
-		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount")
+		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount :"+strconv.Itoa(s.Spec.MaxClusters))
 	}
 	return nil
 }
