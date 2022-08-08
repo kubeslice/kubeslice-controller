@@ -35,7 +35,7 @@ WorkerClusters:
   NodeIP: ${IP1}
 - Context: kind-worker
   NodeIP: ${IP2}
-WorkerChartOptions:
+HubChartOptions:
   SetStrValues:
     "controller.image": "kubeslice-controller"
     "controller.tag": "e2e-latest"
