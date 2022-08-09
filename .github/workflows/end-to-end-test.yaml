@@ -23,8 +23,8 @@ jobs:
         mkdir -p ${{ github.workspace }}/profile
         sh .github/workflows/scripts/start-kind.sh
       env:
-        userent: "{{ secrets.ENTUSER }}"
-        passent: "{{ secrets.ENTPASS }}"
+        userent: ${{ secrets.ENTUSER }}
+        passent: ${{ secrets.ENTPASS }}
 
     - name: Docker Run Action
       uses: addnab/docker-run-action@v3
