@@ -26,6 +26,8 @@ if [ ! -f profile/kind.yaml ];then
   IP1=$(docker inspect controller-control-plane | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
   IP2=$(docker inspect worker-control-plane | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
 
+echo "${userent}"
+
   cat > profile/kind.yaml << EOF
 Kubeconfig: kinde2e.yaml
 ControllerCluster:
