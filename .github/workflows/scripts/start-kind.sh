@@ -35,10 +35,6 @@ WorkerClusters:
   NodeIP: ${IP1}
 - Context: kind-worker
   NodeIP: ${IP2}
-WorkerChartOptions:
-  Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
-  Username: ${userent}
-  Password: ${passent}
 HubChartOptions:
   Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
   Username: ${userent}
