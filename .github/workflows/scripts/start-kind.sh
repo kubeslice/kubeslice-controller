@@ -39,7 +39,6 @@ WorkerClusters:
   NodeIP: ${IP2}
 WorkerChartOptions:
   Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
-  Namespace: kubeslice-system
   Username: ${userent}
   Password: ${passent}
 HubChartOptions:
