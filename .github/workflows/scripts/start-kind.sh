@@ -35,7 +35,19 @@ WorkerClusters:
   NodeIP: ${IP1}
 - Context: kind-worker
   NodeIP: ${IP2}
+WorkerChartOptions:
+  Release:  kubeslice-worker
+  Chart: kubeslice-worker
+  Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
+  Namespace: kubeslice-system
+  Username: ${userent}
+  Password: ${passent}
+  SetStrValues:
+    "operator.image": "worker-operator"
+    "operator.tag": "e2e-latest"
 HubChartOptions:
+  Release: kubeslice-controller
+  Chart: kubeslice-controller
   Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
   Username: ${userent}
   Password: ${passent}
