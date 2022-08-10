@@ -1,7 +1,7 @@
 name: end-to-end-test
 on:
   push:
-    branches: [ pr-kind-controller ]
+    branches: [ pr-kind-controller ] 
   workflow_dispatch:
 jobs:
   end-to-end:
