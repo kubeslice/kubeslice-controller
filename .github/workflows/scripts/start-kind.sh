@@ -33,12 +33,12 @@ Kubeconfig: kinde2e.yaml
 ControllerCluster:
   Context: kind-controller
   HubChartOptions:
-  Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
-  Username: ${userent}
-  Password: ${passent}
-  SetStrValues:
-    "controller.image": "kubeslice-controller"
-    "controller.tag": "e2e-latest"
+    Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
+    Username: ${userent}
+    Password: ${passent}
+    SetStrValues:
+      "controller.image": "kubeslice-controller"
+      "controller.tag": "e2e-latest"
 WorkerClusters:
 - Context: kind-controller
   NodeIP: ${IP1}
