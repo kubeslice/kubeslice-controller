@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   end-to-end:
-    runs-on: [self-hosted, linux, X64, controller-ent ]
+    runs-on: ubuntu-20.04
     steps:
     - name: checkout the repo
       uses: actions/checkout@v3
