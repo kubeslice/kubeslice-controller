@@ -30,6 +30,11 @@ echo ${userent}
 
   cat > profile/kind.yaml << EOF
 Kubeconfig: kinde2e.yaml
+WorkerClusters:
+- Context: kind-controller
+  NodeIP: ${IP1}
+- Context: kind-worker
+  NodeIP: ${IP2}
 ControllerCluster:
   Context: kind-controller
   HubChartOptions:
@@ -37,13 +42,8 @@ ControllerCluster:
     Username: ${userent}
     Password: ${passent}
     SetStrValues:
-      "controller.image": "kubeslice-controller"
-      "controller.tag": "e2e-latest"
-WorkerClusters:
-- Context: kind-controller
-  NodeIP: ${IP1}
-- Context: kind-worker
-  NodeIP: ${IP2}
+      "kubeslice.controller.image": "kubeslice-controller"
+      "kubeslice.controller.tag": "e2e-latest"
 WorkerChartOptions:
   Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
   Username: ${userent}
