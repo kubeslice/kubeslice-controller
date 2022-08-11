@@ -4,7 +4,9 @@ metadata:
   name: cluster-1
 spec:
   networkInterface: eth0
-  nodeIP: 11.11.14.11
+ # nodeIP: 11.11.14.11
+  nodeIPs: 
+    - 1.1.1.1
   clusterProperty:
     telemetry:
       enabled: true
