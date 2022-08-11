@@ -35,6 +35,10 @@ WorkerClusters:
   NodeIP: ${IP1}
 - Context: kind-worker
   NodeIP: ${IP2}
+WorkerChartOptions:
+  Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
+  Username: ${userent}
+  Password: ${passent}
 ControllerCluster:
   Context: kind-controller
   HubChartOptions:
@@ -44,10 +48,6 @@ ControllerCluster:
     SetStrValues:
       "kubeslice.controller.image": "kubeslice-controller"
       "kubeslice.controller.tag": "e2e-latest"
-WorkerChartOptions:
-  Repo: https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/
-  Username: ${userent}
-  Password: ${passent}
 TestSuitesEnabled:
    HubSuite: true
    WorkerSuite: true
