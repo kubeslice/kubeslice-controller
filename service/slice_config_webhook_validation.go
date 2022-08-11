@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"regexp"
 	"strconv"
 	"strings"
@@ -72,9 +73,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 }
 
 // ValidateSliceConfigUpdate is function to verify the update of slice config
-func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) error {
+func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, old runtime.Object) error {
 	var allErrs field.ErrorList
-	if err := preventUpdate(ctx, sliceConfig); err != nil {
+	if err := preventUpdate(ctx, sliceConfig, old); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if err := validateClusters(ctx, sliceConfig); err != nil {
@@ -95,7 +96,7 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := preventMaxClusterCountUpdate(ctx, sliceConfig); err != nil {
+	if err := preventMaxClusterCountUpdate(ctx, sliceConfig, old); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if len(allErrs) == 0 {
@@ -171,7 +172,7 @@ func validateSliceSubnet(sliceConfig *controllerv1alpha1.SliceConfig) *field.Err
 func validateProjectNamespace(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	namespace := &corev1.Namespace{}
 	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceConfig.Namespace}, namespace)
-	if !exist || !checkForProjectNamespace(namespace) {
+	if !exist || !util.CheckForProjectNamespace(namespace) {
 		return field.Invalid(field.NewPath("metadata").Child("namespace"), sliceConfig.Namespace, "SliceConfig must be applied on project namespace")
 	}
 	return nil
@@ -194,11 +195,6 @@ func getServiceExportBySliceName(ctx context.Context, namespace string, sliceNam
 	}
 	err := util.ListResources(ctx, serviceExports, client.InNamespace(namespace), client.MatchingLabels(label))
 	return err
-}
-
-// checkForProjectNamespace is a function to check namespace is in decided format
-func checkForProjectNamespace(namespace *corev1.Namespace) bool {
-	return namespace.Labels[util.LabelName] == fmt.Sprintf(util.LabelValue, "Project", namespace.Name)
 }
 
 // validateClusters is function to validate the cluster specification
@@ -231,9 +227,10 @@ func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.Slice
 }
 
 // preventUpdate is a function to stop/avoid the update of config of slice
-func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig) *field.Error {
-	sliceConfig := controllerv1alpha1.SliceConfig{}
-	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: sc.Name, Namespace: sc.Namespace}, &sliceConfig)
+func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old runtime.Object) *field.Error {
+	//sliceConfig := controllerv1alpha1.SliceConfig{}
+	//_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: sc.Name, Namespace: sc.Namespace}, &sliceConfig)
+	sliceConfig := old.(*controllerv1alpha1.SliceConfig)
 	if sliceConfig.Spec.SliceSubnet != sc.Spec.SliceSubnet {
 		return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sc.Spec.SliceSubnet, "cannot be updated")
 	}
@@ -451,9 +448,10 @@ func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {
 }
 
 // prevent update MaxClusterCount if it is already set
-func preventMaxClusterCountUpdate(ctx context.Context, s *controllerv1alpha1.SliceConfig) *field.Error {
-	sliceConfig := controllerv1alpha1.SliceConfig{}
-	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: s.Name, Namespace: s.Namespace}, &sliceConfig)
+func preventMaxClusterCountUpdate(ctx context.Context, s *controllerv1alpha1.SliceConfig, old runtime.Object) *field.Error {
+	//sliceConfig := controllerv1alpha1.SliceConfig{}
+	//_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: s.Name, Namespace: s.Namespace}, &sliceConfig)
+	sliceConfig := old.(*controllerv1alpha1.SliceConfig)
 	if sliceConfig.Spec.MaxClusters != s.Spec.MaxClusters {
 		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be updated.")
 	}

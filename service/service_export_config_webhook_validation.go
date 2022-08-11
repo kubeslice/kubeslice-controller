@@ -134,7 +134,7 @@ func ValidateServiceExportConfigUpdate(ctx context.Context, serviceExportConfig 
 func validateServiceExportConfigNamespace(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
 	namespace := &corev1.Namespace{}
 	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Namespace}, namespace)
-	if !exist || !checkForProjectNamespace(namespace) {
+	if !exist || !util.CheckForProjectNamespace(namespace) {
 		return field.Invalid(field.NewPath("metadata").Child("namespace"), serviceExport.Namespace, "ServiceExportConfig must be applied on project namespace")
 	}
 	return nil

@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -31,33 +32,28 @@ import (
 
 // ValidateClusterCreate is a function to validate the creation of cluster
 func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) error {
-	var allErrs field.ErrorList
 	if err := validateAppliedInProjectNamespace(ctx, c); err != nil {
-		allErrs = append(allErrs, err)
+		return err
 	}
 	if err := validateGeolocation(c); err != nil {
-		allErrs = append(allErrs, err)
+		return err
 	}
-
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Cluster"}, c.Name, allErrs)
+	return nil
 }
 
 // ValidateClusterUpdate is a function to validate to the update of specification of cluster
-func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster) error {
-	var allErrs field.ErrorList
-	if err := validateClusterSpec(ctx, c); err != nil {
-		allErrs = append(allErrs, err)
+func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) error {
+	//var allErrs field.ErrorList
+	if err := validateClusterSpec(ctx, c, old); err != nil {
+		return err
 	}
 	if err := validateGeolocation(c); err != nil {
-		allErrs = append(allErrs, err)
+		return err
 	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Cluster"}, c.Name, allErrs)
+	//if len(allErrs) == 0 {
+	return nil
+	//}
+	//return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Cluster"}, c.Name, allErrs)
 }
 
 // ValidateClusterDelete is a function to validate the deletion of cluster
@@ -74,20 +70,19 @@ func ValidateClusterDelete(ctx context.Context, c *controllerv1alpha1.Cluster) e
 
 // validateAppliedInProjectNamespace is a function to validate the if the cluster is applied in project namespace or not
 func validateAppliedInProjectNamespace(ctx context.Context, c *controllerv1alpha1.Cluster) *field.Error {
-	actualNamespace := corev1.Namespace{}
-	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Namespace}, &actualNamespace)
-	if exist {
-		if actualNamespace.Labels[util.LabelName] == "" {
-			return field.Invalid(field.NewPath("metadata").Child("namespace"), c.Name, "cluster must be applied on project namespace")
-		}
+	namespace := &corev1.Namespace{}
+	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Namespace}, namespace)
+	if !exist || !util.CheckForProjectNamespace(namespace) {
+		return field.Invalid(field.NewPath("metadata").Child("namespace"), c.Namespace, "cluster must be applied on project namespace")
 	}
 	return nil
 }
 
-// validateClusterSpec is a function to to validate the specification of cluster
-func validateClusterSpec(ctx context.Context, c *controllerv1alpha1.Cluster) *field.Error {
-	cluster := controllerv1alpha1.Cluster{}
-	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Name, Namespace: c.Namespace}, &cluster)
+// validateClusterSpec is a function to validate the specification of cluster
+func validateClusterSpec(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) *field.Error {
+	//cluster := controllerv1alpha1.Cluster{}
+	cluster := old.(*controllerv1alpha1.Cluster)
+	//_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Name, Namespace: c.Namespace}, &cluster)
 	if cluster.Spec.NetworkInterface != "" && cluster.Spec.NetworkInterface != c.Spec.NetworkInterface {
 		return field.Invalid(field.NewPath("spec").Child("networkInterface"), c.Spec.NetworkInterface, "network interface can't be changed")
 	}
@@ -114,7 +109,7 @@ func validateGeolocation(c *controllerv1alpha1.Cluster) *field.Error {
 	latitude := c.Spec.ClusterProperty.GeoLocation.Latitude
 	longitude := c.Spec.ClusterProperty.GeoLocation.Longitude
 	err := util.ValidateCoOrdinates(latitude, longitude)
-	if err != nil {
+	if err == true {
 		return field.Invalid(field.NewPath("spec").Child("clusterProperty.geoLocation"), util.ArrayToString([]string{latitude, longitude}), "Latitude and longitude are not valid")
 	}
 	return nil

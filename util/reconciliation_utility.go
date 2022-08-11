@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"strings"
 
@@ -259,4 +260,9 @@ func EncodeToBase64(v interface{}) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// CheckForProjectNamespace is a function to check namespace is in decided format
+func CheckForProjectNamespace(namespace *corev1.Namespace) bool {
+	return namespace.Labels[LabelName] == fmt.Sprintf(LabelValue, "Project", namespace.Name)
 }
