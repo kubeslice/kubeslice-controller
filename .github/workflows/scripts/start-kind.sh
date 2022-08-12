@@ -56,3 +56,5 @@ TestSuitesEnabled:
 EOF
 
 fi
+
+chmod go-r /e2e/assets/kubeconfig/kinde2e.yaml 
