@@ -18,20 +18,20 @@ type IWorkerSliceGatewayService struct {
 	mock.Mock
 }
 
-// CreateMinimumWorkerSliceGateways provides a mock function with given fields: ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr
-func (_m *IWorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string) (reconcile.Result, error) {
-	ret := _m.Called(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr)
+// CreateMinimumWorkerSliceGateways provides a mock function with given fields: ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet
+func (_m *IWorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int, sliceSubnet string) (reconcile.Result, error) {
+	ret := _m.Called(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet)
 
 	var r0 reconcile.Result
-	if rf, ok := ret.Get(0).(func(context.Context, string, []string, string, map[string]string, map[string]int, string, string) reconcile.Result); ok {
-		r0 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, string, map[string]string, map[string]int, string) reconcile.Result); ok {
+		r0 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet)
 	} else {
 		r0 = ret.Get(0).(reconcile.Result)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string, []string, string, map[string]string, map[string]int, string, string) error); ok {
-		r1 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr)
+	if rf, ok := ret.Get(1).(func(context.Context, string, []string, string, map[string]string, map[string]int, string) error); ok {
+		r1 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet)
 	} else {
 		r1 = ret.Error(1)
 	}

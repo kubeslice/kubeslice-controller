@@ -230,6 +230,7 @@ func testDeleteWorkerSliceConfigByLabelSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 			},
@@ -242,6 +243,7 @@ func testDeleteWorkerSliceConfigByLabelSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 			},
@@ -264,7 +266,6 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
-		IpamClusterOctet := 0
 		arg.Items = []workerv1alpha1.WorkerSliceConfig{
 			{
 				TypeMeta: k8sapimachinery.TypeMeta{},
@@ -279,7 +280,7 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					IpamClusterOctet:          &IpamClusterOctet,
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -288,7 +289,7 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 				TypeMeta: k8sapimachinery.TypeMeta{},
 				ObjectMeta: k8sapimachinery.ObjectMeta{
 					Labels: map[string]string{
-						"worker-cluster": "cluster-2",
+						"worker-cluster": "cluster-3",
 					},
 				},
 				Spec: workerv1alpha1.WorkerSliceConfigSpec{
@@ -299,18 +300,19 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					IpamClusterOctet:          &IpamClusterOctet,
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
 			},
 		}
 	}).Twice()
+	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(notFoundError).Twice()
 	clientMock.On("Create", ctx, mock.Anything).Return(nil).Twice()
-	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
-	require.Equal(t, len(result), 2)
+	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16")
+	require.Equal(t, len(result), 3)
 	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -326,7 +328,6 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
-		IpamClusterOctet := 0
 		arg.Items = []workerv1alpha1.WorkerSliceConfig{
 			{
 				TypeMeta: k8sapimachinery.TypeMeta{},
@@ -341,7 +342,7 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					IpamClusterOctet:          &IpamClusterOctet,
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -350,7 +351,7 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 				TypeMeta: k8sapimachinery.TypeMeta{},
 				ObjectMeta: k8sapimachinery.ObjectMeta{
 					Labels: map[string]string{
-						"worker-cluster": "cluster-2",
+						"worker-cluster": "cluster-3",
 					},
 				},
 				Spec: workerv1alpha1.WorkerSliceConfigSpec{
@@ -361,20 +362,21 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					IpamClusterOctet:          &IpamClusterOctet,
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
 			},
 		}
 	}).Twice()
+	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(notFoundError).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Create", ctx, mock.Anything).Return(err1).Once()
-	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
+	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16")
 	require.Error(t, err)
-	require.Equal(t, len(result), 2)
+	require.Equal(t, len(result), 3)
 	require.Equal(t, err, err1)
 	clientMock.AssertExpectations(t)
 }
@@ -389,7 +391,6 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
-		IpamClusterOctet := 0
 		arg.Items = []workerv1alpha1.WorkerSliceConfig{
 			{
 				TypeMeta: k8sapimachinery.TypeMeta{},
@@ -404,7 +405,7 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					IpamClusterOctet:          &IpamClusterOctet,
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -413,7 +414,7 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 				TypeMeta: k8sapimachinery.TypeMeta{},
 				ObjectMeta: k8sapimachinery.ObjectMeta{
 					Labels: map[string]string{
-						"worker-cluster": "cluster-2",
+						"worker-cluster": "cluster-3",
 					},
 				},
 				Spec: workerv1alpha1.WorkerSliceConfigSpec{
@@ -424,18 +425,19 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					IpamClusterOctet:          &IpamClusterOctet,
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
 			},
 		}
 	}).Twice()
+	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(nil).Twice()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Twice()
 
-	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
-	require.Equal(t, len(result), 2)
+	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16")
+	require.Equal(t, len(result), 3)
 	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -451,7 +453,6 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
-		IpamClusterOctet := 0
 		arg.Items = []workerv1alpha1.WorkerSliceConfig{
 			{
 				TypeMeta: k8sapimachinery.TypeMeta{},
@@ -466,7 +467,7 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					IpamClusterOctet:          &IpamClusterOctet,
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
@@ -475,7 +476,7 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 				TypeMeta: k8sapimachinery.TypeMeta{},
 				ObjectMeta: k8sapimachinery.ObjectMeta{
 					Labels: map[string]string{
-						"worker-cluster": "cluster-2",
+						"worker-cluster": "cluster-3",
 					},
 				},
 				Spec: workerv1alpha1.WorkerSliceConfigSpec{
@@ -486,19 +487,20 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 					SliceIpamType:             "",
 					QosProfileDetails:         workerv1alpha1.QOSProfile{},
 					NamespaceIsolationProfile: workerv1alpha1.NamespaceIsolationProfile{},
-					IpamClusterOctet:          &IpamClusterOctet,
+					IpamClusterOctet:          0,
 					ExternalGatewayConfig:     workerv1alpha1.ExternalGatewayConfig{},
 				},
 				Status: workerv1alpha1.WorkerSliceConfigStatus{},
 			},
 		}
 	}).Twice()
+	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
-	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
+	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16")
 	require.Error(t, err)
-	require.Equal(t, len(result), 2)
+	require.Equal(t, len(result), 3)
 	require.Equal(t, err, err1)
 	clientMock.AssertExpectations(t)
 }

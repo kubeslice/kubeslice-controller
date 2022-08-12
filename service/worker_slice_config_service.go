@@ -38,7 +38,7 @@ type IWorkerSliceConfigService interface {
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
 	ListWorkerSliceConfigs(ctx context.Context, ownerLabel map[string]string, namespace string) ([]workerv1alpha1.WorkerSliceConfig, error)
 	ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int
-	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string) (map[string]int, error)
+	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string) (map[string]int, error)
 }
 
 // WorkerSliceConfigService implements the IWorkerSliceConfigService interface
@@ -114,7 +114,6 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 		return ctrl.Result{}, nil
 	}
 	ipamClusterOctet := workerSliceConfig.Spec.IpamClusterOctet
-	clusterSubnetCIDR := workerSliceConfig.Spec.ClusterSubnetCIDR
 	slice := s.copySpecFromSliceConfigToWorkerSlice(ctx, *sliceConfig)
 	workerSliceConfig.Spec = slice.Spec
 
@@ -195,7 +194,6 @@ outer:
 	workerSliceConfig.Spec.NamespaceIsolationProfile = workerIsolationProfile
 	workerSliceConfig.Spec.SliceName = sliceConfig.Name
 	workerSliceConfig.Spec.IpamClusterOctet = ipamClusterOctet
-	workerSliceConfig.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 	err = util.UpdateResource(ctx, workerSliceConfig)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -205,7 +203,7 @@ outer:
 
 // CreateMinimalWorkerSliceConfig CreateWorkerSliceConfig is a function to create the worker slice configs with minimum number of fields.
 // More fields are added in reconciliation loop.
-func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string) (map[string]int, error) {
+func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string) (map[string]int, error) {
 	logger := util.CtxLogger(ctx)
 	err := s.cleanUpSlices(ctx, label, namespace, clusters)
 	if err != nil {
@@ -228,8 +226,6 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		if err != nil {
 			return clusterMap, err
 		}
-		ipamOctet := clusterMap[cluster]
-		clusterSubnetCIDR := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr))
 		if !found {
 			label["project-namespace"] = namespace
 			label["original-slice-name"] = name
@@ -245,8 +241,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 				},
 			}
 			expectedSlice.Spec.SliceName = name
-			expectedSlice.Spec.IpamClusterOctet = &ipamOctet
-			expectedSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
+			expectedSlice.Spec.IpamClusterOctet = clusterMap[cluster]
 			expectedSlice.Spec.SliceSubnet = sliceSubnet
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
@@ -258,8 +253,8 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			}
 		} else {
 			existingSlice.UID = ""
-			existingSlice.Spec.IpamClusterOctet = &ipamOctet
-			existingSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
+
+			existingSlice.Spec.IpamClusterOctet = clusterMap[cluster]
 			logger.Debug("updating slice with new ipam cluster octet", existingSlice)
 			if existingSlice.Annotations == nil {
 				existingSlice.Annotations = make(map[string]string)
@@ -307,19 +302,13 @@ func (s *WorkerSliceConfigService) ListWorkerSliceConfigs(ctx context.Context, o
 // ComputeClusterMap - function assigns a numerical value to the cluster. The value will be from 1 to n, where n is the number of clusters in the slice.
 func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int {
 	clusterMapping := make(map[string]int, len(clusterNames))
-	tempClusterMapping := make(map[string]string, len(clusterNames))
 	usedIndexes := make(map[int]bool, 0)
 	for _, WorkerSliceConfig := range workerSliceConfigs {
-		if WorkerSliceConfig.Spec.IpamClusterOctet != nil {
-			clusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = *WorkerSliceConfig.Spec.IpamClusterOctet
-			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = fmt.Sprintf("%d", *WorkerSliceConfig.Spec.IpamClusterOctet)
-			usedIndexes[*WorkerSliceConfig.Spec.IpamClusterOctet] = true
-		} else {
-			tempClusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = ""
-		}
+		clusterMapping[WorkerSliceConfig.Labels["worker-cluster"]] = WorkerSliceConfig.Spec.IpamClusterOctet
+		usedIndexes[WorkerSliceConfig.Spec.IpamClusterOctet] = true
 	}
 	unUsedIndexes := make([]int, 0)
-	for index := 0; index < len(clusterNames); index++ {
+	for index := 1; index <= len(clusterNames); index++ {
 		if !usedIndexes[index] {
 			unUsedIndexes = append(unUsedIndexes, index)
 		}
@@ -327,7 +316,7 @@ func (s *WorkerSliceConfigService) ComputeClusterMap(clusterNames []string, work
 
 	currentIndex := 0
 	for _, clusterName := range clusterNames {
-		if tempClusterMapping[clusterName] == "" {
+		if clusterMapping[clusterName] == 0 {
 			clusterMapping[clusterName] = unUsedIndexes[currentIndex]
 			currentIndex++
 		}

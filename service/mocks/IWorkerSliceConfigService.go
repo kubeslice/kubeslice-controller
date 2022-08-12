@@ -32,13 +32,13 @@ func (_m *IWorkerSliceConfigService) ComputeClusterMap(clusterNames []string, wo
 	return r0
 }
 
-// CreateMinimalWorkerSliceConfig provides a mock function with given fields: ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr
-func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string, clusterCidr string) (map[string]int, error) {
-	ret := _m.Called(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr)
+// CreateMinimalWorkerSliceConfig provides a mock function with given fields: ctx, clusters, namespace, label, name, sliceSubnet
+func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string) (map[string]int, error) {
+	ret := _m.Called(ctx, clusters, namespace, label, name, sliceSubnet)
 
 	var r0 map[string]int
-	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string) map[string]int); ok {
-		r0 = rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr)
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string) map[string]int); ok {
+		r0 = rf(ctx, clusters, namespace, label, name, sliceSubnet)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]int)
@@ -46,8 +46,8 @@ func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []string, string, map[string]string, string, string, string) error); ok {
-		r1 = rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr)
+	if rf, ok := ret.Get(1).(func(context.Context, []string, string, map[string]string, string, string) error); ok {
+		r1 = rf(ctx, clusters, namespace, label, name, sliceSubnet)
 	} else {
 		r1 = ret.Error(1)
 	}

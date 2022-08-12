@@ -92,17 +92,15 @@ func (s SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.R
 	}
 
 	// Step 3: Creation of worker slice Objects and Cluster Labels
-	// get cluster cidr from maxClusters of slice config
-	clusterCidr := util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
-	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet, clusterCidr)
+	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Step 4: Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr)
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

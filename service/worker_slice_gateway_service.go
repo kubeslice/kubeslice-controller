@@ -41,7 +41,7 @@ const gatewayName = "%s-%s-%s"
 type IWorkerSliceGatewayService interface {
 	ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string,
-		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string) (ctrl.Result, error)
+		label map[string]string, clusterMap map[string]int, sliceSubnet string) (ctrl.Result, error)
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
@@ -246,7 +246,7 @@ type IndividualCertPairRequest struct {
 // CreateMinimumWorkerSliceGateways is a function to create gateways with minimum specification
 func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string) (ctrl.Result, error) {
+	sliceSubnet string) (ctrl.Result, error) {
 
 	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
 	if err != nil {
@@ -256,7 +256,7 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 		return ctrl.Result{}, nil
 	}
 
-	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr)
+	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -305,7 +305,7 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 // createMinimumGatewaysIfNotExists is a helper function to create the gateways between worker clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, ownerLabel map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string) (ctrl.Result, error) {
+	sliceSubnet string) (ctrl.Result, error) {
 	noClusters := len(clusterNames)
 	clusterMapping := map[string]*controllerv1alpha1.Cluster{}
 	for _, clusterName := range clusterNames {
@@ -320,7 +320,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		for j := i + 1; j < noClusters; j++ {
 			sourceCluster, destinationCluster := clusterMapping[clusterNames[i]], clusterMapping[clusterNames[j]]
 			gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
-			gatewayAddresses := s.buildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
+			gatewayAddresses := s.buildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, gatewayNumber, clusterMap)
 			err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, ownerLabel, gatewayNumber, gatewayAddresses)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -376,18 +376,16 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 
 // buildNetworkAddresses - function generates the object of WorkerSliceGatewayNetworkAddresses
 func (s *WorkerSliceGatewayService) buildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
-	clusterMap map[string]int, clusterCidr string) WorkerSliceGatewayNetworkAddresses {
+	gatewayNumber int, clusterMap map[string]int) WorkerSliceGatewayNetworkAddresses {
 	gatewayAddresses := WorkerSliceGatewayNetworkAddresses{}
 	ipr := strings.Split(sliceSubnet, ".")
-	serverSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr))
-	clientSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr))
-	gatewayAddresses.ServerNetwork = strings.SplitN(serverSubnet, "/", -1)[0]
-	gatewayAddresses.ClientNetwork = strings.SplitN(clientSubnet, "/", -1)[0]
-	gatewayAddresses.ServerSubnet = serverSubnet
-	gatewayAddresses.ClientSubnet = clientSubnet
-	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "0")
-	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "1")
-	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "2")
+	gatewayAddresses.ServerNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], clusterMap[sourceClusterName], "0")
+	gatewayAddresses.ClientNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], clusterMap[destinationClusterName], "0")
+	gatewayAddresses.ServerSubnet = gatewayAddresses.ServerNetwork + "/24"
+	gatewayAddresses.ClientSubnet = gatewayAddresses.ClientNetwork + "/24"
+	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "0")
+	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "1")
+	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "2")
 	return gatewayAddresses
 }
 
