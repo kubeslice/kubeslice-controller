@@ -55,4 +55,4 @@ EOF
 
 fi
 
-chmod go-r /e2e/assets/kubeconfig/kinde2e.yaml 
+chmod go-r /home/runner/.kube/kinde2e.yaml 
