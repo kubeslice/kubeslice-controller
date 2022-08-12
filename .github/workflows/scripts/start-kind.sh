@@ -54,5 +54,3 @@ TestSuitesEnabled:
 EOF
 
 fi
-
-chmod go-r /home/runner/.kube/kinde2e.yaml 
