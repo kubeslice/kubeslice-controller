@@ -50,7 +50,7 @@ ControllerCluster:
       "kubeslice.controller.tag": "e2e-latest"
 TestSuitesEnabled:
    HubSuite: true
-   WorkerSuite: true
+   WorkerSuite: false
 EOF
 
 fi
