@@ -51,6 +51,8 @@ ControllerCluster:
 TestSuitesEnabled:
    HubSuite: true
    WorkerSuite: true
+   EmptySuite: false
+   IstioSuite: false
 EOF
 
 fi
