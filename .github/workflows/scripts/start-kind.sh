@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Create controller kind cluster if not present
 if [ ! $(kind get clusters | grep controller) ];then
   kind create cluster --name controller --config .github/workflows/scripts/cluster.yaml --image kindest/node:v1.22.7
