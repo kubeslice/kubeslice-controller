@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"strings"
@@ -266,26 +265,4 @@ func EncodeToBase64(v interface{}) (string, error) {
 // CheckForProjectNamespace is a function to check namespace is in decided format
 func CheckForProjectNamespace(namespace *corev1.Namespace) bool {
 	return namespace.Labels[LabelName] == fmt.Sprintf(LabelValue, "Project", namespace.Name)
-}
-
-// GetServiceExportBySliceName is a function to get the service export configs by slice name
-func GetServiceExportBySliceName(ctx context.Context, namespace string, sliceName string, serviceExports *controllerv1alpha1.ServiceExportConfigList) error {
-	label := map[string]string{
-		"original-slice-name": sliceName,
-	}
-	err := ListResources(ctx, serviceExports, client.InNamespace(namespace), client.MatchingLabels(label))
-	return err
-}
-
-func CheckIfQoSConfigExists(ctx context.Context, namespace string, qosProfileName string) bool {
-	NamespacedName := client.ObjectKey{
-		Name:      qosProfileName,
-		Namespace: namespace,
-	}
-	sliceQosConfig := &controllerv1alpha1.SliceQoSConfig{}
-	found, err := GetResourceIfExist(ctx, NamespacedName, sliceQosConfig)
-	if err != nil {
-		return false
-	}
-	return found
 }
