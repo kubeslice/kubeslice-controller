@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -82,8 +83,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty":                                 DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty,
-	"SliceConfigWebhookValidation_validateAllowedNamespacesWithDuplicateClusters":                                              validateAllowedNamespacesWithDuplicateClusters,
-	"SliceConfigWebhookValidation_validateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice":                       validateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice,
+	"SliceConfigWebhookValidation_validateAllowedNamespacesWithDuplicateClusters":                                              ValidateAllowedNamespacesWithDuplicateClusters,
+	"SliceConfigWebhookValidation_validateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice":                       ValidateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice,
 	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileApplicationNSDuplicateNamespaces":                           ValidateNamespaceIsolationProfileApplicationNSDuplicateNamespaces,
 	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces":                               ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces,
 	"SliceConfigWebhookValidation_ValidateNamespaceIsolationProfileApplicationNSClusterIsNotParticipating":                     ValidateNamespaceIsolationProfileApplicationNSClusterIsNotParticipating,
@@ -424,6 +425,9 @@ func CreateValidateSliceConfigWithExternalGatewayConfigClusterHasAsteriskAndOthe
 			Clusters: []string{"*", "cluster-1"},
 		},
 	}
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
+	}
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
@@ -461,6 +465,9 @@ func CreateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 		arg.Spec.NodeIP = "10.10.1.1"
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
+	}
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
@@ -489,6 +496,9 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOne
 		{
 			Clusters: []string{"*"},
 		},
+	}
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
 	}
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
@@ -539,6 +549,9 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg.Spec.NodeIP = "10.10.1.1"
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
+	}
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Duplicate value:")
@@ -619,137 +632,72 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 }
 
 func UpdateValidateSliceConfigUpdatingSliceSubnet(t *testing.T) {
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.SliceSubnet = "10.1.0.0/16"
-	}).Once()
 	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceSubnet: Invalid value:")
+	require.Contains(t, err.Error(), "cannot be updated")
 	clientMock.AssertExpectations(t)
 }
 
 func UpdateValidateSliceConfigUpdatingSliceType(t *testing.T) {
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.SliceType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.SliceType = "TYPE_1"
-	}).Once()
 	newSliceConfig.Spec.SliceType = "TYPE_2"
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceType: Invalid value:")
+	require.Contains(t, err.Error(), "cannot be updated")
 	clientMock.AssertExpectations(t)
 }
 
 func UpdateValidateSliceConfigUpdatingSliceGatewayType(t *testing.T) {
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.SliceGatewayProvider.SliceGatewayType = "TYPE_1"
-	}).Once()
 	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = "TYPE_2"
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayType: Invalid value:")
+	require.Contains(t, err.Error(), "cannot be updated")
 	clientMock.AssertExpectations(t)
 }
 
 func UpdateValidateSliceConfigUpdatingSliceCaType(t *testing.T) {
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.SliceGatewayProvider.SliceCaType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.SliceGatewayProvider.SliceCaType = "TYPE_1"
-	}).Once()
 	newSliceConfig.Spec.SliceGatewayProvider.SliceCaType = "TYPE_2"
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceCaType: Invalid value:")
+	require.Contains(t, err.Error(), "cannot be updated")
 	clientMock.AssertExpectations(t)
 }
 
 func UpdateValidateSliceConfigUpdatingSliceIpamType(t *testing.T) {
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.SliceIpamType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.SliceIpamType = "TYPE_1"
-	}).Once()
 	newSliceConfig.Spec.SliceIpamType = "TYPE_2"
-	newSliceConfig.Spec.MaxClusters = 16
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceIpamType: Invalid value:")
+	require.Contains(t, err.Error(), "cannot be updated")
 	clientMock.AssertExpectations(t)
 }
 
@@ -757,21 +705,8 @@ func UpdateValidateSliceConfigWithDuplicateClusters(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-1"}
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters: Duplicate value:")
 	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[0])
@@ -782,28 +717,17 @@ func UpdateValidateSliceConfigWithClusterDoesNotExist(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	notFoundError := k8sError.NewNotFound(util.Resource("SliceConfigWebhookValidationTest"), "isNotFound")
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
 		Namespace: namespace,
 	}, &controllerv1alpha1.Cluster{}).Return(notFoundError).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	t.Log(err.Error())
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "cluster is not registered")
 	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[0])
 	clientMock.AssertExpectations(t)
 }
@@ -812,11 +736,6 @@ func UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster(t 
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -825,15 +744,7 @@ func UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster(t 
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = ""
 	}).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters.NetworkInterface: Required value:")
 	clientMock.AssertExpectations(t)
@@ -843,11 +754,6 @@ func UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -857,15 +763,7 @@ func UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.
 		arg.Spec.NetworkInterface = "eth0"
 		arg.Spec.NodeIP = ""
 	}).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters.NodeIP: Required value:")
 	clientMock.AssertExpectations(t)
@@ -875,11 +773,6 @@ func UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster(t *testin
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -890,15 +783,7 @@ func UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster(t *testin
 		arg.Spec.NodeIP = "10.10.1.1"
 		arg.Status.CniSubnet = []string{}
 	}).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Status.CniSubnet: Not found:")
 	clientMock.AssertExpectations(t)
@@ -908,14 +793,6 @@ func UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipa
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.SliceSubnet = "192.168.0.0/16"
-	}).Once()
 	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	clusterCniSubnet := "192.168.1.1/16"
@@ -928,17 +805,10 @@ func UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipa
 		arg.Spec.NodeIP = "10.10.1.1"
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceSubnet: Invalid value:")
+	require.Contains(t, err.Error(), "must not overlap with CniSubnet")
 	require.Contains(t, err.Error(), clusterCniSubnet)
 	clientMock.AssertExpectations(t)
 }
@@ -947,27 +817,15 @@ func UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType:               "SomeType",
 		BandwidthGuaranteedKbps: 5120,
 		BandwidthCeilingKbps:    4096,
 	}
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.QosProfileDetails.BandwidthGuaranteedKbps: Invalid value:")
+	require.Contains(t, err.Error(), "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
 	clientMock.AssertExpectations(t)
 }
 
@@ -975,27 +833,18 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterHasAsteriskAndOthe
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
 		{
 			Clusters: []string{"*", "cluster-1"},
 		},
 	}
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
+	}
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "other clusters are not allowed when * is present")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1003,11 +852,6 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
 		{
 			Clusters: []string{"cluster-1", "cluster-3"},
@@ -1024,17 +868,13 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 		arg.Spec.NodeIP = "10.10.1.1"
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
+	}
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "cluster is not participating in slice config")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1042,11 +882,6 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOne
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
 		{
 			Clusters: []string{"*"},
@@ -1055,17 +890,13 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOne
 			Clusters: []string{"*"},
 		},
 	}
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
+	}
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "* is not allowed in more than one external gateways")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1073,11 +904,6 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
 		{
 			Clusters: []string{"cluster-1"},
@@ -1087,6 +913,9 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		},
 	}
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
+	}
 	clusterCniSubnet := "10.10.1.1/16"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -1106,15 +935,7 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg.Spec.NodeIP = "10.10.1.1"
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Duplicate value:")
 	clientMock.AssertExpectations(t)
@@ -1124,11 +945,6 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
 		{
 			Clusters: []string{"cluster-1"},
@@ -1182,29 +998,9 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 		arg.Status.Namespaces[0].Name = "randomNamespace"
 		arg.Status.Namespaces[0].SliceName = ""
 	}).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-}
-
-func setupSliceConfigWebhookValidationTest(name string, namespace string) (*utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context) {
-	clientMock := &utilMock.Client{}
-	sliceConfig := &controllerv1alpha1.SliceConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-	}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest")
-	return clientMock, sliceConfig, ctx
 }
 
 func DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty(t *testing.T) {
@@ -1222,10 +1018,9 @@ func DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty(t *testing.T) {
 		}
 		arg.Items[0].Status.OnboardedAppNamespaces[0].Name = "random1"
 		arg.Items[0].Status.OnboardedAppNamespaces[1].Name = "random2"
-
 	}).Once()
-	clientMock.On("List", ctx, &controllerv1alpha1.ServiceExportConfigList{}, mock.Anything, mock.Anything).Return(nil).Once()
 	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
+	require.Contains(t, err.Error(), "Deboarding of namespaces is in progress, please try after some time.")
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -1251,8 +1046,8 @@ func DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEm
 		arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces[0] = "random1"
 		arg.Items[0].Spec.NamespaceIsolationProfile.AllowedNamespaces[1] = "random2"
 	}).Once()
-	clientMock.On("List", ctx, &controllerv1alpha1.ServiceExportConfigList{}, mock.Anything, mock.Anything).Return(nil).Once()
 	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
+	require.Contains(t, err.Error(), "Please deboard the namespaces before deletion of slice.")
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -1276,6 +1071,7 @@ func DeleteValidateSliceConfigWithServiceExportsNotEmpty(t *testing.T) {
 	}).Once()
 	err := ValidateSliceConfigDelete(ctx, newSliceConfig)
 	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "The SliceConfig can only be deleted after all the service export configs are deleted for the slice.")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1296,7 +1092,6 @@ func ValidateNamespaceIsolationProfileApplicationNSDuplicateNamespaces(t *testin
 			},
 		},
 	}
-
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
@@ -1308,7 +1103,6 @@ func ValidateNamespaceIsolationProfileApplicationNSClusterIsNotParticipating(t *
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1317,7 +1111,6 @@ func ValidateNamespaceIsolationProfileApplicationNSClusterIsNotParticipating(t *
 			},
 		},
 	}
-
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
@@ -1329,7 +1122,6 @@ func ValidateNamespaceIsolationProfileApplicationNSAsteriskAndOtherCluserPresent
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1338,7 +1130,6 @@ func ValidateNamespaceIsolationProfileApplicationNSAsteriskAndOtherCluserPresent
 			},
 		},
 	}
-
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
@@ -1350,7 +1141,6 @@ func ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces(t *testing.T)
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1363,7 +1153,6 @@ func ValidateNamespaceIsolationProfileAllowedNSDuplicateNamespaces(t *testing.T)
 			},
 		},
 	}
-
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
@@ -1375,7 +1164,6 @@ func ValidateNamespaceIsolationProfileAllowedNSClusterIsNotParticipating(t *test
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1384,7 +1172,6 @@ func ValidateNamespaceIsolationProfileAllowedNSClusterIsNotParticipating(t *test
 			},
 		},
 	}
-
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
@@ -1396,7 +1183,6 @@ func ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent(t *
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1405,18 +1191,17 @@ func ValidateNamespaceIsolationProfileAllowedNSAsteriskAndOtherCluserPresent(t *
 			},
 		},
 	}
-
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Other clusters are not allowed when * is present")
 	clientMock.AssertExpectations(t)
 }
+
 func ValidateNamespaceIsolationProfileAllowedNSNamespaceEmpty(t *testing.T) {
 	name := "slice_config"
 	namespace := ""
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1425,17 +1210,16 @@ func ValidateNamespaceIsolationProfileAllowedNSNamespaceEmpty(t *testing.T) {
 			},
 		},
 	}
-
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func ValidateNamespaceIsolationProfileApplicationNSNamespaceSpecialCharacter(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace&"
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1444,12 +1228,12 @@ func ValidateNamespaceIsolationProfileApplicationNSNamespaceSpecialCharacter(t *
 			},
 		},
 	}
-
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
 	err := validateNamespaceIsolationProfile(sliceConfig)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
@@ -1472,6 +1256,9 @@ func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
 				Clusters:  []string{"*", "cluster-1"},
 			},
 		},
+	}
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
 	}
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	clusterCniSubnet := "10.10.1.1/16"
@@ -1503,11 +1290,6 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	existingSliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingSliceConfig).Return(nil).Once()
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	clusterCniSubnet := "10.10.1.1/16"
 	newSliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
@@ -1518,7 +1300,9 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 			},
 		},
 	}
-
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType: "SomeType",
+	}
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
 		Namespace: namespace,
@@ -1537,24 +1321,16 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 		arg.Spec.NodeIP = "10.10.1.1"
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
-	SliceConfig := controllerv1alpha1.SliceConfig{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &SliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
-		arg.Spec.MaxClusters = 16
-	}).Once()
-	err := ValidateSliceConfigUpdate(ctx, newSliceConfig)
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Other clusters are not allowed when * is present")
 	clientMock.AssertExpectations(t)
 }
-func validateAllowedNamespacesWithDuplicateClusters(t *testing.T) {
+
+func ValidateAllowedNamespacesWithDuplicateClusters(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		AllowedNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1564,15 +1340,15 @@ func validateAllowedNamespacesWithDuplicateClusters(t *testing.T) {
 		},
 	}
 	err := validateAllowedNamespaces(sliceConfig)
+	require.Contains(t, err.Error(), "Spec.NamespaceIsolationProfile.AllowedNamespaces.Clusters: Duplicate value")
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
 
-func validateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice(t *testing.T) {
+func ValidateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice(t *testing.T) {
 	name := "slice_config"
 	namespace := "randomNamespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.NamespaceIsolationProfile = controllerv1alpha1.NamespaceIsolationProfile{
 		ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{
 			{
@@ -1594,6 +1370,8 @@ func validateApplicationNamespacesWithNamespaceAlreadyAcquiredByotherSlice(t *te
 	}).Once()
 	err := validateApplicationNamespaces(ctx, sliceConfig)
 	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "The given namespace: randomNamespace in cluster")
+	require.Contains(t, err.Error(), "is already acquired by other slice")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1601,7 +1379,6 @@ func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent(t *
 	name := "slice_config"
 	namespace := "randomNamespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-
 	sliceConfig.Spec.StandardQosProfileName = "testQos"
 	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "someType",
@@ -1621,6 +1398,7 @@ func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent(
 	require.Contains(t, err.Error(), "Either StandardQosProfileName or QosProfileDetails is required")
 	clientMock.AssertExpectations(t)
 }
+
 func ValidateQosProfileStandardQosProfileNameDoesNotExist(t *testing.T) {
 	name := "slice_config"
 	namespace := "randomNamespace"
@@ -1657,4 +1435,16 @@ func ValidateMaxClusterForParticipatingCluster(t *testing.T) {
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "participating clusters cannot be greater than MaxClusterCount")
 	clientMock.AssertExpectations(t)
+}
+
+func setupSliceConfigWebhookValidationTest(name string, namespace string) (*utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context) {
+	clientMock := &utilMock.Client{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest")
+	return clientMock, sliceConfig, ctx
 }

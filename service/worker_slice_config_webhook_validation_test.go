@@ -18,16 +18,15 @@ package service
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestWorkerSliceConfigWebhookValidationSuite(t *testing.T) {
@@ -52,16 +51,10 @@ func UpdateValidateWorkerSliceConfigUpdatingIpamClusterOctet(t *testing.T) {
 	clientMock, newWorkerSliceConfig, ctx := setupWorkerSliceConfigWebhookValidationTest(name, namespace)
 	existingWorkerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
 	a1 := 1
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingWorkerSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
-		arg.Spec.IpamClusterOctet = &a1
-	}).Once()
+	existingWorkerSliceConfig.Spec.IpamClusterOctet = &a1
 	a2 := 2
 	newWorkerSliceConfig.Spec.IpamClusterOctet = &a2
-	err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig)
+	err := ValidateWorkerSliceConfigUpdate(ctx, &existingWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.IpamClusterOctet: Invalid value:")
 	clientMock.AssertExpectations(t)
@@ -71,17 +64,9 @@ func UpdateValidateWorkerSliceConfigWithoutErrors(t *testing.T) {
 	name := "worker_slice_config"
 	namespace := "namespace"
 	clientMock, newWorkerSliceConfig, ctx := setupWorkerSliceConfigWebhookValidationTest(name, namespace)
-	existingWorkerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
 	a1 := 1
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingWorkerSliceConfig).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
-		arg.Spec.IpamClusterOctet = &a1
-	}).Once()
 	newWorkerSliceConfig.Spec.IpamClusterOctet = &a1
-	err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig)
+	err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }

@@ -18,6 +18,9 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"github.com/kubeslice/kubeslice-controller/util"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -42,13 +45,16 @@ func TestClusterWebhookSuite(t *testing.T) {
 }
 
 var ClusterWebHookValidationTestbed = map[string]func(*testing.T){
-	"TestValidateClusterCreateFail":                         testValidateClusterCreateControllerResourceNameEmpty,
+	"TestValidateClusterCreateFail":                         testValidateClusterCreateOtherThanProjectNamespace,
 	"TestValidateClusterUpdateFailNetworkInterfaceNotEmpty": testValidateClusterUpdateFailNetworkInterfaceNotEmpty,
 	"TestValidateClusterDeleteFail":                         testValidateClusterDeleteFail,
-	"TestValidateClusterGeolocationFail":                    testValidateClusterGeolocationFail,
+	"TestValidateClusterGeolocationFailOnCreate":            testValidateClusterGeolocationFailOnCreate,
+	"TestValidateClusterGeolocationFailOnUpdate":            testValidateClusterGeolocationFailOnUpdate,
+	"TestValidateClusterGeolocationPassOnCreate":            testValidateClusterGeolocationPassOnCreate,
+	"TestValidateClusterGeolocationPassOnUpdate":            testValidateClusterGeolocationPassOnUpdate,
 }
 
-func testValidateClusterCreateControllerResourceNameEmpty(t *testing.T) {
+func testValidateClusterCreateOtherThanProjectNamespace(t *testing.T) {
 	cluster := &controllerv1alpha1.Cluster{}
 	actualNamespace := corev1.Namespace{}
 	clientMock := &utilmock.Client{}
@@ -57,30 +63,31 @@ func testValidateClusterCreateControllerResourceNameEmpty(t *testing.T) {
 		Namespace: cluster.Name,
 		Name:      cluster.Namespace,
 	}, &actualNamespace).Return(nil).Once()
-
 	ans := ValidateClusterCreate(ctx, cluster)
 	require.NotNil(t, ans)
+	require.Contains(t, ans.Error(), "cluster must be applied on project namespace")
 	clientMock.AssertExpectations(t)
 }
 
 func testValidateClusterUpdateFailNetworkInterfaceNotEmpty(t *testing.T) {
-	cluster := &controllerv1alpha1.Cluster{}
 	clientMock := &utilmock.Client{}
-	//	var clients client.Client
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
-
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Namespace: cluster.Name,
-		Name:      cluster.Namespace,
-	}, cluster).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*controllerv1alpha1.Cluster)
-		arg.Spec.NetworkInterface = "random"
-	}).Once()
-
-	err := ValidateClusterUpdate(ctx, cluster)
+	cluster1 := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{
+			NetworkInterface: "random1",
+		},
+	}
+	cluster2 := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{
+			NetworkInterface: "random2",
+		},
+	}
+	err := ValidateClusterUpdate(ctx, cluster1, runtime.Object(cluster2))
 	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "network interface can't be changed")
 	clientMock.AssertExpectations(t)
 }
+
 func testValidateClusterDeleteFail(t *testing.T) {
 	cluster := &controllerv1alpha1.Cluster{}
 	clientMock := &utilmock.Client{}
@@ -96,20 +103,67 @@ func testValidateClusterDeleteFail(t *testing.T) {
 	}).Once()
 	err := ValidateClusterDelete(ctx, cluster)
 	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "can't delete cluster which is participating in any slice")
 	clientMock.AssertExpectations(t)
 }
 
-func testValidateClusterGeolocationFail(t *testing.T) {
+func testValidateClusterGeolocationFailOnCreate(t *testing.T) {
 	cluster := &controllerv1alpha1.Cluster{
 		Spec: controllerv1alpha1.ClusterSpec{ClusterProperty: controllerv1alpha1.ClusterProperty{GeoLocation: controllerv1alpha1.GeoLocation{CloudProvider: "", CloudRegion: "", Latitude: "1213", Longitude: "4567"}}},
 	}
-	err := validateGeolocation(cluster)
+	actualNamespace := corev1.Namespace{}
+	clientMock := &utilmock.Client{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Namespace: cluster.Name,
+		Name:      cluster.Namespace,
+	}, &actualNamespace).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		arg.Labels = map[string]string{util.LabelName: fmt.Sprintf(util.LabelValue, "Project", cluster.Namespace)}
+	}).Once()
+	err := ValidateClusterCreate(ctx, cluster)
+	require.Contains(t, err.Error(), "Latitude and longitude are not valid")
 	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
 }
-func testValidateClusterGeolocationPass(t *testing.T) {
+
+func testValidateClusterGeolocationFailOnUpdate(t *testing.T) {
+	cluster := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{ClusterProperty: controllerv1alpha1.ClusterProperty{GeoLocation: controllerv1alpha1.GeoLocation{CloudProvider: "", CloudRegion: "", Latitude: "1213", Longitude: "4567"}}},
+	}
+	clientMock := &utilmock.Client{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Latitude and longitude are not valid")
+	clientMock.AssertExpectations(t)
+}
+
+func testValidateClusterGeolocationPassOnCreate(t *testing.T) {
 	cluster := &controllerv1alpha1.Cluster{
 		Spec: controllerv1alpha1.ClusterSpec{ClusterProperty: controllerv1alpha1.ClusterProperty{GeoLocation: controllerv1alpha1.GeoLocation{CloudProvider: "", CloudRegion: "", Latitude: "23.43345", Longitude: "83.43345"}}},
 	}
-	err := validateGeolocation(cluster)
+	actualNamespace := corev1.Namespace{}
+	clientMock := &utilmock.Client{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: cluster.Namespace,
+	}, &actualNamespace).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		arg.Labels = map[string]string{util.LabelName: fmt.Sprintf(util.LabelValue, "Project", cluster.Namespace)}
+	}).Once()
+	err := ValidateClusterCreate(ctx, cluster)
 	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func testValidateClusterGeolocationPassOnUpdate(t *testing.T) {
+	cluster := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{ClusterProperty: controllerv1alpha1.ClusterProperty{GeoLocation: controllerv1alpha1.GeoLocation{CloudProvider: "", CloudRegion: "", Latitude: "23.43345", Longitude: "83.43345"}}},
+	}
+	clientMock := &utilmock.Client{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
 }
