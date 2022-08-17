@@ -33,39 +33,31 @@ import (
 // ValidateClusterCreate is a function to validate the creation of cluster
 func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) error {
 	if err := validateAppliedInProjectNamespace(ctx, c); err != nil {
-		return err
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
 	if err := validateGeolocation(c); err != nil {
-		return err
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
 	return nil
 }
 
 // ValidateClusterUpdate is a function to validate to the update of specification of cluster
 func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) error {
-	//var allErrs field.ErrorList
 	if err := validateClusterSpec(ctx, c, old); err != nil {
-		return err
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
 	if err := validateGeolocation(c); err != nil {
-		return err
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
-	//if len(allErrs) == 0 {
 	return nil
-	//}
-	//return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Cluster"}, c.Name, allErrs)
 }
 
 // ValidateClusterDelete is a function to validate the deletion of cluster
 func ValidateClusterDelete(ctx context.Context, c *controllerv1alpha1.Cluster) error {
-	var allErrs field.ErrorList
 	if err := validateClusterInAnySlice(ctx, c); err != nil {
-		allErrs = append(allErrs, err)
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Cluster"}, c.Name, allErrs)
+	return nil
 }
 
 // validateAppliedInProjectNamespace is a function to validate the if the cluster is applied in project namespace or not
@@ -80,9 +72,7 @@ func validateAppliedInProjectNamespace(ctx context.Context, c *controllerv1alpha
 
 // validateClusterSpec is a function to validate the specification of cluster
 func validateClusterSpec(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) *field.Error {
-	//cluster := controllerv1alpha1.Cluster{}
 	cluster := old.(*controllerv1alpha1.Cluster)
-	//_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Name, Namespace: c.Namespace}, &cluster)
 	if cluster.Spec.NetworkInterface != "" && cluster.Spec.NetworkInterface != c.Spec.NetworkInterface {
 		return field.Invalid(field.NewPath("spec").Child("networkInterface"), c.Spec.NetworkInterface, "network interface can't be changed")
 	}
@@ -94,10 +84,8 @@ func validateClusterInAnySlice(ctx context.Context, c *controllerv1alpha1.Cluste
 	workerSlice := &workerv1alpha1.WorkerSliceConfigList{}
 	label := map[string]string{"worker-cluster": c.Name}
 	err := util.ListResources(ctx, workerSlice, client.MatchingLabels(label), client.InNamespace(c.Namespace))
-	if err == nil {
-		if len(workerSlice.Items) > 0 {
-			return field.Invalid(field.NewPath("metadata").Child("name"), c.Name, "can't delete cluster which is participating in any slice")
-		}
+	if err == nil && len(workerSlice.Items) > 0 {
+		return field.Invalid(field.NewPath("metadata").Child("name"), c.Name, "can't delete cluster which is participating in any slice")
 	}
 	return nil
 }
