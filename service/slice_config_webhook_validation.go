@@ -132,7 +132,6 @@ func checkNamespaceDeboardingStatus(ctx context.Context, sliceConfig *controller
 					}
 				}
 			}
-
 		}
 	}
 	return nil
@@ -165,20 +164,11 @@ func validateProjectNamespace(ctx context.Context, sliceConfig *controllerv1alph
 // validateIfServiceExportConfigExists is a function to validate if ServiceExportConfig exists for the given SliceConfig
 func validateIfServiceExportConfigExists(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
-	err := getServiceExportBySliceName(ctx, sliceConfig.Namespace, sliceConfig.Name, serviceExports)
+	err := util.GetServiceExportBySliceName(ctx, sliceConfig.Namespace, sliceConfig.Name, serviceExports)
 	if err == nil && len(serviceExports.Items) > 0 {
 		return field.Forbidden(field.NewPath("ServiceExportConfig"), "The SliceConfig can only be deleted after all the service export configs are deleted for the slice.")
 	}
 	return nil
-}
-
-// getServiceExportBySliceName is a function to get the service export configs by slice name
-func getServiceExportBySliceName(ctx context.Context, namespace string, sliceName string, serviceExports *controllerv1alpha1.ServiceExportConfigList) error {
-	label := map[string]string{
-		"original-slice-name": sliceName,
-	}
-	err := util.ListResources(ctx, serviceExports, client.InNamespace(namespace), client.MatchingLabels(label))
-	return err
 }
 
 // validateClusters is function to validate the cluster specification
@@ -240,7 +230,7 @@ func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.Sli
 		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "Either StandardQosProfileName or QosProfileDetails is required")
 	}
 	if sliceConfig.Spec.StandardQosProfileName != "" {
-		exists := existsQosConfigFromStandardQosProfileName(ctx, sliceConfig.Namespace, sliceConfig.Spec.StandardQosProfileName)
+		exists := util.CheckIfQoSConfigExists(ctx, sliceConfig.Namespace, sliceConfig.Spec.StandardQosProfileName)
 		if !exists {
 			return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "SliceQoSConfig not found.")
 
@@ -401,19 +391,6 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 		}
 	}
 	return nil
-}
-
-func existsQosConfigFromStandardQosProfileName(ctx context.Context, namespace string, qosProfileName string) bool {
-	NamespacedName := client.ObjectKey{
-		Name:      qosProfileName,
-		Namespace: namespace,
-	}
-	sliceQosConfig := &controllerv1alpha1.SliceQoSConfig{}
-	found, err := util.GetResourceIfExist(ctx, NamespacedName, sliceQosConfig)
-	if err != nil {
-		return false
-	}
-	return found
 }
 
 func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {

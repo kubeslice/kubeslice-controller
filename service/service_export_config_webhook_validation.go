@@ -31,106 +31,83 @@ import (
 
 // ValidateServiceExportConfigCreate is a function to validate the create process of service export config
 func ValidateServiceExportConfigCreate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
-	var allErrs field.ErrorList
 	if err := validateServiceExportConfigNamespace(ctx, serviceExportConfig); err != nil {
-		allErrs = append(allErrs, err)
-		return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, serviceExportConfig.Name, allErrs)
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
 	}
 	if err := validateServiceExportClusterAndSlice(ctx, serviceExportConfig); err != nil {
-		allErrs = append(allErrs, err...)
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
 	}
 	if err := validateServiceEndpoint(ctx, serviceExportConfig); err != nil {
-		allErrs = append(allErrs, err...)
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
 	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, serviceExportConfig.Name, allErrs)
+	return nil
 }
 
-func validateServiceExportClusterAndSlice(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) field.ErrorList {
-	var allErrs field.ErrorList = nil
-	cluster := &controllerv1alpha1.Cluster{}
+// ValidateServiceExportConfigUpdate is a function to validate the update process of service export config
+func ValidateServiceExportConfigUpdate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
+	if err := validateServiceExportClusterAndSlice(ctx, serviceExportConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
+	}
+	if err := validateServiceEndpoint(ctx, serviceExportConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
+	}
+	return nil
+}
 
+func validateServiceExportClusterAndSlice(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
+	cluster := &controllerv1alpha1.Cluster{}
 	clusterExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Spec.SourceCluster, Namespace: serviceExport.Namespace}, cluster)
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
 	sliceExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Spec.SliceName, Namespace: serviceExport.Namespace}, sliceConfig)
 	if !sliceExist {
-		err := field.Invalid(field.NewPath("Spec").Child("SliceName"), serviceExport.Spec.SliceName, "There is no valid slice with this name")
-		allErrs = append(allErrs, err)
+		return field.Invalid(field.NewPath("Spec").Child("SliceName"), serviceExport.Spec.SliceName, "There is no valid slice with this name")
 	}
 	if !clusterExist {
-		err := field.Invalid(field.NewPath("Spec").Child("SourceCluster"), serviceExport.Spec.SourceCluster, "Cluster is not registered")
-		allErrs = append(allErrs, err)
+		return field.Invalid(field.NewPath("Spec").Child("SourceCluster"), serviceExport.Spec.SourceCluster, "Cluster is not registered")
 	}
 	if clusterExist {
 		clusterPresentInSlice := false
 		for _, clusterInSlice := range sliceConfig.Spec.Clusters {
-			util.CtxLogger(ctx).Info("clusterInSlice,sourcecluster ", clusterInSlice, serviceExport.Spec.SourceCluster)
 			if clusterInSlice == serviceExport.Spec.SourceCluster {
-				util.CtxLogger(ctx).Info("clusterPresentInSlice true")
 				clusterPresentInSlice = true
 			}
 		}
 		if !clusterPresentInSlice {
-			err := field.Invalid(field.NewPath("Spec").Child("Cluster"), serviceExport.Spec.SourceCluster, fmt.Sprintf("Cluster %s is not a part of the slice %s", serviceExport.Spec.SourceCluster, serviceExport.Spec.SliceName))
-			allErrs = append(allErrs, err)
+			return field.Invalid(field.NewPath("Spec").Child("Cluster"), serviceExport.Spec.SourceCluster, fmt.Sprintf("Cluster %s is not a part of the slice %s", serviceExport.Spec.SourceCluster, serviceExport.Spec.SliceName))
 		}
 	}
-	return allErrs
+	return nil
 }
-func validateServiceEndpoint(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) field.ErrorList {
-	var allErrs field.ErrorList = nil
+
+func validateServiceEndpoint(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
 	sliceName := serviceExport.Spec.SliceName
 	for _, serviceDiscoveryEndPoint := range serviceExport.Spec.ServiceDiscoveryEndpoints {
 		clusterName := serviceDiscoveryEndPoint.Cluster
 		cluster := &controllerv1alpha1.Cluster{}
-
 		clusterExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: serviceExport.Namespace}, cluster)
 		sliceConfig := &controllerv1alpha1.SliceConfig{}
 		sliceExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceName, Namespace: serviceExport.Namespace}, sliceConfig)
 		if !sliceExist {
-			err := field.Invalid(field.NewPath("Spec").Child("SliceName"), serviceExport.Spec.SliceName, "There is no valid slice with this name")
-			allErrs = append(allErrs, err)
+			return field.Invalid(field.NewPath("Spec").Child("SliceName"), serviceExport.Spec.SliceName, "There is no valid slice with this name")
 		}
 		if !clusterExist {
-			err := field.Invalid(field.NewPath("Spec").Child("ServiceDiscoveryEndpoints").Child("Cluster"), clusterName, "Cluster is not registered")
-			allErrs = append(allErrs, err)
+			return field.Invalid(field.NewPath("Spec").Child("ServiceDiscoveryEndpoints").Child("Cluster"), clusterName, "Cluster is not registered")
 		}
 		if clusterExist {
 			clusterPresentInSlice := false
 			for _, clusterInSlice := range sliceConfig.Spec.Clusters {
-				util.CtxLogger(ctx).Info("clusterInSlice,sourcecluster ", clusterInSlice, clusterName)
 				if clusterInSlice == clusterName {
-					util.CtxLogger(ctx).Info("clusterPresentInSlice true")
 					clusterPresentInSlice = true
 				}
 			}
 			if !clusterPresentInSlice {
-				err := field.Invalid(field.NewPath("Spec").Child("ServiceDiscoveryEndpoints").Child("Cluster"), clusterName, fmt.Sprintf("Service Discovery Endpoint Cluster %s is not a part of the slice %s", clusterName, sliceName))
-				allErrs = append(allErrs, err)
+				return field.Invalid(field.NewPath("Spec").Child("ServiceDiscoveryEndpoints").Child("Cluster"), clusterName, fmt.Sprintf("Service Discovery Endpoint Cluster %s is not a part of the slice %s", clusterName, sliceName))
 			}
 		}
 	}
-	return allErrs
+	return nil
 }
-func ValidateServiceExportConfigUpdate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
-	var allErrs field.ErrorList
-	if err := validateServiceExportConfigNamespace(ctx, serviceExportConfig); err != nil {
-		allErrs = append(allErrs, err)
-		return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, serviceExportConfig.Name, allErrs)
-	}
-	if err := validateServiceExportClusterAndSlice(ctx, serviceExportConfig); err != nil {
-		allErrs = append(allErrs, err...)
-	}
-	if err := validateServiceEndpoint(ctx, serviceExportConfig); err != nil {
-		allErrs = append(allErrs, err...)
-	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "ServiceExportConfig"}, serviceExportConfig.Name, allErrs)
-}
+
 func validateServiceExportConfigNamespace(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
 	namespace := &corev1.Namespace{}
 	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Namespace}, namespace)
