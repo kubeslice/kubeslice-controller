@@ -3,6 +3,7 @@ on:
   push:
     branches: [ PR-external ]
   workflow_dispatch:
+permissions: read-all|write-all
 jobs:
   end-to-end:
     runs-on: ubuntu-20.04
