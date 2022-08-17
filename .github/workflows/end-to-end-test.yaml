@@ -3,10 +3,11 @@ on:
   push:
     branches: [ PR-external ]
   workflow_dispatch:
-permissions: read-all|write-all
 jobs:
   end-to-end:
     runs-on: ubuntu-20.04
+    permissions:
+      contents: write
     steps:
     - name: checkout the repo
       uses: actions/checkout@v3
