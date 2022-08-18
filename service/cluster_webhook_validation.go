@@ -85,7 +85,7 @@ func validateClusterInAnySlice(ctx context.Context, c *controllerv1alpha1.Cluste
 	label := map[string]string{"worker-cluster": c.Name}
 	err := util.ListResources(ctx, workerSlice, client.MatchingLabels(label), client.InNamespace(c.Namespace))
 	if err == nil && len(workerSlice.Items) > 0 {
-		return field.Invalid(field.NewPath("metadata").Child("name"), c.Name, "can't delete cluster which is participating in any slice")
+		return field.Forbidden(field.NewPath("Cluster"), "The cluster cannot be deleted which is participating in slice config")
 	}
 	return nil
 }

@@ -103,7 +103,7 @@ func testValidateClusterDeleteFail(t *testing.T) {
 	}).Once()
 	err := ValidateClusterDelete(ctx, cluster)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "can't delete cluster which is participating in any slice")
+	require.Contains(t, err.Error(), "The cluster cannot be deleted which is participating in slice config")
 	clientMock.AssertExpectations(t)
 }
 
