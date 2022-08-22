@@ -1431,7 +1431,7 @@ func ValidateMaxClusterForParticipatingCluster(t *testing.T) {
 	sliceConfig.Spec.StandardQosProfileName = "testQos"
 	sliceConfig.Spec.MaxClusters = 2
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2", "cluster-3"}
-	err := validateMaxClusterCount(sliceConfig)
+	err := validateMaxClusterWithParticipatingCluster(sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "participating clusters cannot be greater than MaxClusterCount")
 	clientMock.AssertExpectations(t)
