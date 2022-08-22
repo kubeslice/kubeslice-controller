@@ -486,6 +486,10 @@ func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {
 	if s.Spec.MaxClusters < 2 || s.Spec.MaxClusters > 32 {
 		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be less than 2 or greater than 32.")
 	}
+	return nil
+}
+
+func validateMaxClusterWithParticipatingCluster(s *controllerv1alpha1.SliceConfig) *field.Error {
 	if len(s.Spec.Clusters) > s.Spec.MaxClusters {
 		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount :"+strconv.Itoa(s.Spec.MaxClusters))
 	}
