@@ -69,7 +69,7 @@ jobs:
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: ${{ steps.date.outputs.date }} Test run is finished
-          body: Test report ${{ steps.Allure_report_with_history.outputs.report_url }}
+          body: 'Test report ${{ steps.Allure_report_with_history.outputs.report_url }}'
           to: ns102325@gmail.com
           from: nishant.singh@aveshasystems.com
           
