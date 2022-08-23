@@ -67,7 +67,7 @@ jobs:
           server_address: smtp.gmail.com
           serverport: 465
           username: $i{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }
+          password: ${{ secrets.EMAIL_PASSWORD }}
           subject: $({ steps.date.outputs.date }} Test run is finished
           body: Test report $i{ steps.Allure_report_with_history.outputs.report_url }}
           to: ns102325@gmail.com
