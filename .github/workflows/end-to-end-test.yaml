@@ -65,11 +65,11 @@ jobs:
       uses: dawidd6/action-send-mail@v3
       with:
           server_address: smtp.gmail.com
-          serverport: 465
-          username: $i{ secrets.EMAIL_USERNAME }}
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: $({ steps.date.outputs.date }} Test run is finished
-          body: Test report $i{ steps.Allure_report_with_history.outputs.report_url }}
+          subject: ${{ steps.date.outputs.date }} Test run is finished
+          body: Test report ${{ steps.Allure_report_with_history.outputs.report_url }}
           to: ns102325@gmail.com
           from: nishant.singh@aveshasystems.com
           
