@@ -54,7 +54,7 @@ jobs:
         allure_report: allure_report
         allure_history: allure-history
         gh_pages: gh-pages
-        keep_reports: 501
+        keep_reports: 500
         github_run_id: '${{ github.run_id }}'
         github_run_num: 'Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}'
         report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
