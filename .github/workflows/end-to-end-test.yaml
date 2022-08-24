@@ -60,13 +60,7 @@ jobs:
         report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
         test_env: Kind
         
-    - name: Prepare report
-      uses: Xotabu4/send-to-allure-server-action@1
-      id: allure-report
-      #always ()needed because we want report for failed tests as well
-      if: ${{ always() }}
-      with:
-              allure-server-url: "https://kubeslice.github.io/e2e-allure-reports/"
+
     
     - name: Send email notification
       if: always()
@@ -77,7 +71,7 @@ jobs:
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: ${{ steps.date.outputs.date }} Test run is finished
-          body: Test report ${{ steps.allure-report.outputs.report-url }}
+          body: Test report ${{ steps.Allure_report_with_history.outputs }}
           to: ns102325@gmail.com
           from: nishant.singh@aveshasystems.com
           
