@@ -18,31 +18,25 @@ package service
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
-	"github.com/kubeslice/kubeslice-controller/util"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ValidateWorkerSliceConfigUpdate is a function to verify the update of config of workerslice
-func ValidateWorkerSliceConfigUpdate(ctx context.Context, workerSliceConfig *workerv1alpha1.WorkerSliceConfig) error {
-	var allErrs field.ErrorList
-	if err := preventUpdateWorkerSliceConfig(ctx, workerSliceConfig); err != nil {
-		allErrs = append(allErrs, err)
+func ValidateWorkerSliceConfigUpdate(ctx context.Context, workerSliceConfig *workerv1alpha1.WorkerSliceConfig, old runtime.Object) error {
+	if err := preventUpdateWorkerSliceConfig(ctx, workerSliceConfig, old); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceWorker, Kind: "WorkerSliceConfig"}, workerSliceConfig.Name, field.ErrorList{err})
 	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "worker.kubeslice.io", Kind: "WorkerSliceConfig"}, workerSliceConfig.Name, allErrs)
+	return nil
 }
 
 // preventUpdateWorkerSliceConfig is a function to prevent the update of workersliceconfig
-func preventUpdateWorkerSliceConfig(ctx context.Context, ss *workerv1alpha1.WorkerSliceConfig) *field.Error {
-	workerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
-	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: ss.Name, Namespace: ss.Namespace}, &workerSliceConfig)
+func preventUpdateWorkerSliceConfig(ctx context.Context, ss *workerv1alpha1.WorkerSliceConfig, old runtime.Object) *field.Error {
+	workerSliceConfig := old.(*workerv1alpha1.WorkerSliceConfig)
 	if *workerSliceConfig.Spec.IpamClusterOctet != *ss.Spec.IpamClusterOctet {
 		return field.Invalid(field.NewPath("Spec").Child("IpamClusterOctet"), *ss.Spec.IpamClusterOctet, "cannot be updated")
 	}

@@ -19,6 +19,8 @@ package service
 import (
 	"context"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"os"
 	"strings"
 
@@ -26,77 +28,57 @@ import (
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ValidateProjectCreate is a function to validate the creation of project
 func ValidateProjectCreate(ctx context.Context, project *controllerv1alpha1.Project) error {
-	var allErrs field.ErrorList
-	if err := validateAppliedInAveshaNamespace(ctx, project); err != nil {
-		allErrs = append(allErrs, err)
-	} else {
-		if err = validateProjectName(project.Name); err != nil {
-			allErrs = append(allErrs, err)
-		}
-		projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.Name)
-		if err := validateProjectNamespaceIfAlreadyExists(ctx, projectNamespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-		errors := validateDNSCompliantSANames(project)
-		allErrs = append(allErrs, errors...)
+	if err := validateAppliedInControllerNamespace(ctx, project); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	if len(allErrs) == 0 {
-		return nil
+	if err := validateProjectName(project.Name); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, project.Name, allErrs)
+	if err := validateProjectNamespaceIfAlreadyExists(ctx, project.Name); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+	}
+	if err := validateDNSCompliantSANames(ctx, project); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+	}
+	return nil
 }
 
 // ValidateProjectUpdate is a function to verify the project - service account, role binding, service account names
 func ValidateProjectUpdate(ctx context.Context, project *controllerv1alpha1.Project) error {
-	var allErrs field.ErrorList
-	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.Name)
-	if err := validateServiceAccount(ctx, project, projectNamespace); err != nil {
-		allErrs = append(allErrs, err)
+	if err := validateServiceAccount(ctx, project); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	if err := validateRoleBinding(ctx, project, projectNamespace); err != nil {
-		allErrs = append(allErrs, err)
+	if err := validateRoleBinding(ctx, project); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	errors := validateDNSCompliantSANames(project)
-	allErrs = append(allErrs, errors...)
-	if len(allErrs) == 0 {
-		return nil
+	if err := validateDNSCompliantSANames(ctx, project); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, project.Name, allErrs)
+	return nil
 }
 
 func ValidateProjectDelete(ctx context.Context, project *controllerv1alpha1.Project) error {
-	var allErrs field.ErrorList
-	exists, err := validateIfSliceConfigExists(ctx, project)
-	if err != nil {
-		return err
-	}
-	if exists {
+	if exists := validateIfSliceConfigExists(ctx, project); exists {
 		err := field.Forbidden(field.NewPath("Project"), "The Project can be delete only after deleting the slice config")
-		allErrs = append(allErrs, err)
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "Project"}, project.Name, allErrs)
+	return nil
 }
 
-func validateIfSliceConfigExists(ctx context.Context, project *controllerv1alpha1.Project) (bool, error) {
+func validateIfSliceConfigExists(ctx context.Context, project *controllerv1alpha1.Project) bool {
 	sliceConfig := &controllerv1alpha1.SliceConfigList{}
 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 	err := util.ListResources(ctx, sliceConfig, client.InNamespace(projectNamespace))
-	if len(sliceConfig.Items) > 0 {
-		return true, nil
+	if err == nil && len(sliceConfig.Items) > 0 {
+		return true
 	}
-	return false, err
+	return false
 }
 
 func validateProjectName(name string) *field.Error {
@@ -109,8 +91,8 @@ func validateProjectName(name string) *field.Error {
 	return nil
 }
 
-// validateAppliedInAveshaNamespace is a function to verify if project is applied in kubeslice
-func validateAppliedInAveshaNamespace(ctx context.Context, project *controllerv1alpha1.Project) *field.Error {
+// validateAppliedInControllerNamespace is a function to verify if project is applied in kubeslice
+func validateAppliedInControllerNamespace(ctx context.Context, project *controllerv1alpha1.Project) *field.Error {
 	if project.Namespace != os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE") {
 		return field.Invalid(field.NewPath("namespace"), project.Namespace, "project must be applied on kubeslice-manager namespace - "+os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"))
 	}
@@ -118,37 +100,34 @@ func validateAppliedInAveshaNamespace(ctx context.Context, project *controllerv1
 }
 
 // validateProjectNamespaceIfAlreadyExists is a function validate the whether the project namespace already exists or not
-func validateProjectNamespaceIfAlreadyExists(ctx context.Context, projectNamespace string) *field.Error {
-	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: projectNamespace}, &corev1.Namespace{})
-	if exist {
+func validateProjectNamespaceIfAlreadyExists(ctx context.Context, projectName string) *field.Error {
+	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, projectName)
+	if exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: projectNamespace}, &corev1.Namespace{}); exist {
 		return field.Invalid(field.NewPath("project namespace"), projectNamespace, "already exists")
 	}
 	return nil
 }
 
 // validateDNSCompliantSANames is a function to validate the service account name whether it is DNS compliant
-func validateDNSCompliantSANames(project *controllerv1alpha1.Project) []*field.Error {
+func validateDNSCompliantSANames(ctx context.Context, project *controllerv1alpha1.Project) *field.Error {
 	readNames := project.Spec.ServiceAccount.ReadOnly
-	var errors []*field.Error
 	for _, name := range readNames {
 		if !util.IsDNSCompliant(name) {
-			invalidError := field.Invalid(field.NewPath("spec").Child("serviceAccount").Child("readOnly"), name, "is not valid.")
-			errors = append(errors, invalidError)
+			return field.Invalid(field.NewPath("spec").Child("serviceAccount").Child("readOnly"), name, "is not valid.")
 		}
 	}
 	writeNames := project.Spec.ServiceAccount.ReadWrite
 	for _, name := range writeNames {
 		if !util.IsDNSCompliant(name) {
-			invalidError := field.Invalid(field.NewPath("spec").Child("serviceAccount").Child("readWrite"), name, "is not valid.")
-			errors = append(errors, invalidError)
+			return field.Invalid(field.NewPath("spec").Child("serviceAccount").Child("readWrite"), name, "is not valid.")
 		}
 	}
-	return errors
+	return nil
 }
 
 // validateServiceAccount is a function to validate the service account
-func validateServiceAccount(ctx context.Context, project *controllerv1alpha1.Project, projectNamespace string) *field.Error {
-	// The field helpers from the kubernetes API machinery help us return nicely
+func validateServiceAccount(ctx context.Context, project *controllerv1alpha1.Project) *field.Error {
+	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.Name)
 	// structured validation errors.
 	err := validateSANamesIfAlreadyExists(ctx, project, project.Spec.ServiceAccount.ReadOnly, projectNamespace, ServiceAccountReadOnlyUser, "readOnly")
 	if err != nil {
@@ -162,8 +141,8 @@ func validateServiceAccount(ctx context.Context, project *controllerv1alpha1.Pro
 }
 
 // validateRoleBindingIfExists is a function to verify the role like read only, readwrite
-func validateRoleBinding(ctx context.Context, project *controllerv1alpha1.Project, projectNamespace string) *field.Error {
-	// The field helpers from the kubernetes API machinery help us return nicely
+func validateRoleBinding(ctx context.Context, project *controllerv1alpha1.Project) *field.Error {
+	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.Name)
 	// structured validation errors.
 	err := validateRoleBindingIfExists(ctx, project, project.Spec.ServiceAccount.ReadOnly, projectNamespace, RoleBindingReadOnlyUser, "readOnly")
 	if err != nil {

@@ -53,7 +53,6 @@ var ServiceExportConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateServiceExportConfigCreate_ServiceEndpointInvalidSlice":   testValidateServiceExportConfigCreateServiceEndpointInvalidSlice,
 	"TestValidateServiceExportConfigCreate_ServiceEndpointInvalidCluster": testValidateServiceExportConfigCreateServiceEndpointInvalidCluster,
 	"TestValidateServiceExportConfigUpdate_ServiceEndpointInvalidCluster": testValidateServiceExportConfigUpdateServiceEndpointInvalidCluster,
-	"TestValidateServiceExportConfigUpdate_DoesNotExist":                  testValidateServiceExportConfigUpdateDoesNotExist,
 	"ValidateServiceExportConfigCreateIfClusterIsPresentInSlice":          ValidateServiceExportConfigCreateIfClusterIsPresentInSlice,
 }
 
@@ -213,7 +212,7 @@ func testValidateServiceExportConfigCreateServiceEndpointInvalidSlice(t *testing
 			Port:    0,
 		},
 	}
-	serviceExportConfig.Spec.SourceCluster = "cluster"
+	serviceExportConfig.Spec.SourceCluster = "cluster1"
 	serviceExportConfig.Spec.SliceName = "slice"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name: namespace,
@@ -236,7 +235,7 @@ func testValidateServiceExportConfigCreateServiceEndpointInvalidSlice(t *testing
 	clientMock.On("Get", ctx, mock.Anything, sliceConfig).Return(notFoundError).Once()
 	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.SliceName: Invalid value:")
+	require.Contains(t, err.Error(), "There is no valid slice with this name")
 	require.Contains(t, err.Error(), serviceExportConfig.Spec.SliceName)
 	clientMock.AssertExpectations(t)
 }
@@ -255,7 +254,7 @@ func testValidateServiceExportConfigCreateServiceEndpointInvalidCluster(t *testi
 			Port:    0,
 		},
 	}
-	serviceExportConfig.Spec.SourceCluster = "cluster"
+	serviceExportConfig.Spec.SourceCluster = "cluster1"
 	serviceExportConfig.Spec.SliceName = "slice"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name: namespace,
@@ -279,6 +278,7 @@ func testValidateServiceExportConfigCreateServiceEndpointInvalidCluster(t *testi
 	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ServiceDiscoveryEndpoints.Cluster: Invalid value:")
+	require.Contains(t, err.Error(), "Cluster is not registered")
 	require.Contains(t, err.Error(), serviceExportConfig.Spec.ServiceDiscoveryEndpoints[0].Cluster)
 	clientMock.AssertExpectations(t)
 }
@@ -287,7 +287,7 @@ func testValidateServiceExportConfigUpdateServiceEndpointInvalidCluster(t *testi
 	name := "service_export_config"
 	namespace := "namespace"
 	clientMock, serviceExportConfig, ctx := setupServiceExportConfigWebhookValidationTest(name, namespace)
-	serviceExportConfig.Spec.SourceCluster = "cluster"
+	serviceExportConfig.Spec.SourceCluster = "cluster1"
 	serviceExportConfig.Spec.ServiceDiscoveryEndpoints = []controllerv1alpha1.ServiceDiscoveryEndpoint{
 		{
 			PodName: "pod1",
@@ -297,18 +297,8 @@ func testValidateServiceExportConfigUpdateServiceEndpointInvalidCluster(t *testi
 			Port:    0,
 		},
 	}
-	serviceExportConfig.Spec.SourceCluster = "cluster"
+	serviceExportConfig.Spec.SourceCluster = "cluster1"
 	serviceExportConfig.Spec.SliceName = "slice"
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name: namespace,
-	}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*corev1.Namespace)
-		if arg.Labels == nil {
-			arg.Labels = make(map[string]string)
-		}
-		arg.Name = namespace
-		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
-	}).Once()
 	cluster := &controllerv1alpha1.Cluster{}
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
 	notFoundError := k8sError.NewNotFound(util.Resource("SliceConfigWebhookValidationTest"), "isNotFound")
@@ -322,21 +312,6 @@ func testValidateServiceExportConfigUpdateServiceEndpointInvalidCluster(t *testi
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ServiceDiscoveryEndpoints.Cluster: Invalid value:")
 	require.Contains(t, err.Error(), serviceExportConfig.Spec.ServiceDiscoveryEndpoints[0].Cluster)
-	clientMock.AssertExpectations(t)
-}
-
-func testValidateServiceExportConfigUpdateDoesNotExist(t *testing.T) {
-	name := "service_export_config"
-	namespace := "namespace"
-	clientMock, serviceExportConfig, ctx := setupServiceExportConfigWebhookValidationTest(name, namespace)
-	notFoundError := k8sError.NewNotFound(util.Resource("ServiceExportConfigWebhookValidationServiceTest"), "isNotFound")
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name: namespace,
-	}, &corev1.Namespace{}).Return(notFoundError).Once()
-	err := ValidateServiceExportConfigUpdate(ctx, serviceExportConfig)
-	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "metadata.namespace: Invalid value:")
-	require.Contains(t, err.Error(), namespace)
 	clientMock.AssertExpectations(t)
 }
 

@@ -30,9 +30,9 @@ import (
 // log is for logging in this package.
 var workerslicegatewaylog = logf.Log.WithName("workerslicegateway-resource")
 
-type customWorkerSliceGatewayValidation func(ctx context.Context, workerSliceGateway *WorkerSliceGateway) error
+type customWorkerSliceGatewayValidation func(ctx context.Context, workerSliceGateway *WorkerSliceGateway, old runtime.Object) error
 
-var customWorkerSliceGatewayUpdateValidation func(ctx context.Context, workerSliceGateway *WorkerSliceGateway) error = nil
+var customWorkerSliceGatewayUpdateValidation func(ctx context.Context, workerSliceGateway *WorkerSliceGateway, old runtime.Object) error = nil
 var workerSliceGatewayWebhookClient client.Client
 
 func (r *WorkerSliceGateway) SetupWebhookWithManager(mgr ctrl.Manager, validateUpdate customWorkerSliceGatewayValidation) error {
@@ -67,7 +67,7 @@ func (r *WorkerSliceGateway) ValidateCreate() error {
 func (r *WorkerSliceGateway) ValidateUpdate(old runtime.Object) error {
 	workerslicegatewaylog.Info("validate update", "name", r.Name)
 	workerSliceGatewayCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), workerSliceGatewayWebhookClient, nil, "WorkerSliceGatewayValidation")
-	return customWorkerSliceGatewayUpdateValidation(workerSliceGatewayCtx, r)
+	return customWorkerSliceGatewayUpdateValidation(workerSliceGatewayCtx, r, old)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
