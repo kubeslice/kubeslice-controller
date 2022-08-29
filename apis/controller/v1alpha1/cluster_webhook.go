@@ -30,15 +30,16 @@ import (
 // log is for logging in this package.
 var clusterlog = logf.Log.WithName("cluster-resource")
 
-type customClusterValidation func(ctx context.Context, cluster *Cluster) error
+type clusterValidation func(ctx context.Context, cluster *Cluster) error
+type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error
 
 var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) error = nil
-var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster) error = nil
+var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error = nil
 var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) error = nil
 
 var clusterWebhookClient client.Client
 
-func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customClusterValidation, validateUpdate customClusterValidation, validateDelete customClusterValidation) error {
+func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clusterValidation, validateUpdate clusterUpdateValidation, validateDelete clusterValidation) error {
 	customClusterCreateValidation = validateCreate
 	customClusterUpdateValidation = validateUpdate
 	customClusterDeleteValidation = validateDelete
@@ -77,7 +78,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	clusterlog.Info("validate update", "name", r.Name)
 	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
 
-	return customClusterUpdateValidation(clusterCtx, r)
+	return customClusterUpdateValidation(clusterCtx, r, old)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type

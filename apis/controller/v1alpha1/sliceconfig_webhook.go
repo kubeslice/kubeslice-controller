@@ -30,14 +30,15 @@ import (
 // log is for logging in this package.
 var sliceconfigurationlog = logf.Log.WithName("sliceconfig-resource")
 
-type customSliceConfigValidation func(ctx context.Context, sliceConfig *SliceConfig) error
+type sliceConfigValidation func(ctx context.Context, sliceConfig *SliceConfig) error
+type sliceConfigUpdateValidation func(ctx context.Context, sliceConfig *SliceConfig, old runtime.Object) error
 
 var customSliceConfigCreateValidation func(ctx context.Context, sliceConfig *SliceConfig) error = nil
-var customSliceConfigUpdateValidation func(ctx context.Context, sliceConfig *SliceConfig) error = nil
+var customSliceConfigUpdateValidation func(ctx context.Context, sliceConfig *SliceConfig, old runtime.Object) error = nil
 var customSliceConfigDeleteValidation func(ctx context.Context, sliceConfig *SliceConfig) error = nil
 var sliceConfigWebhookClient client.Client
 
-func (r *SliceConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customSliceConfigValidation, validateUpdate customSliceConfigValidation, validateDelete customSliceConfigValidation) error {
+func (r *SliceConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate sliceConfigValidation, validateUpdate sliceConfigUpdateValidation, validateDelete sliceConfigValidation) error {
 	sliceConfigWebhookClient = mgr.GetClient()
 	customSliceConfigCreateValidation = validateCreate
 	customSliceConfigUpdateValidation = validateUpdate
@@ -73,7 +74,7 @@ func (r *SliceConfig) ValidateUpdate(old runtime.Object) error {
 	sliceconfigurationlog.Info("validate update", "name", r.Name)
 	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation")
 
-	return customSliceConfigUpdateValidation(sliceConfigCtx, r)
+	return customSliceConfigUpdateValidation(sliceConfigCtx, r, old)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
