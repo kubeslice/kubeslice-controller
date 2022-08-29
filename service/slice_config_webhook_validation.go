@@ -454,9 +454,6 @@ func preventMaxClusterCountUpdate(ctx context.Context, s *controllerv1alpha1.Sli
 	if sliceConfig.Spec.MaxClusters != s.Spec.MaxClusters {
 		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be updated.")
 	}
-	if len(s.Spec.Clusters) > s.Spec.MaxClusters {
-		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount :"+strconv.Itoa(s.Spec.MaxClusters))
-	}
 	return nil
 }
 
@@ -480,28 +477,4 @@ func checkIfQoSConfigExists(ctx context.Context, namespace string, qosProfileNam
 		return false
 	}
 	return found
-}
-
-func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {
-	if s.Spec.MaxClusters < 2 || s.Spec.MaxClusters > 32 {
-		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be less than 2 or greater than 32.")
-	}
-	return nil
-}
-
-func validateMaxClusterWithParticipatingCluster(s *controllerv1alpha1.SliceConfig) *field.Error {
-	if len(s.Spec.Clusters) > s.Spec.MaxClusters {
-		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount :"+strconv.Itoa(s.Spec.MaxClusters))
-	}
-	return nil
-}
-
-// prevent update MaxClusterCount if it is already set
-func preventMaxClusterCountUpdate(ctx context.Context, s *controllerv1alpha1.SliceConfig) *field.Error {
-	sliceConfig := controllerv1alpha1.SliceConfig{}
-	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: s.Name, Namespace: s.Namespace}, &sliceConfig)
-	if sliceConfig.Spec.MaxClusters != s.Spec.MaxClusters {
-		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be updated.")
-	}
-	return nil
 }
