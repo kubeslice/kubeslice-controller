@@ -13,34 +13,36 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//ValidateSliceqosConfigCreate is a function to validate the creation of SliceqosConfig
+// ValidateSliceQosConfigCreate is a function to validate the creation of SliceQosConfig
 func ValidateSliceQosConfigCreate(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) error {
-	var allErrs field.ErrorList
-	err := validateSliceQosConfigAppliedInProjectNamespace(ctx, sliceQoSConfig)
-	if err != nil {
-		allErrs = append(allErrs, err)
+	if err := validateSliceQosConfigAppliedInProjectNamespace(ctx, sliceQoSConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
 	}
-	err = validateSliceQosConfigSpec(ctx, sliceQoSConfig)
-	if err != nil {
-		allErrs = append(allErrs, err)
+	if err := validateSliceQosConfigSpec(ctx, sliceQoSConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
 	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceQosConfig"}, sliceQoSConfig.Name, allErrs)
+	return nil
 }
 
-//ValidateSliceqosConfigUpdate is a function to validate the updation of SliceqosConfig
+// ValidateSliceQosConfigUpdate is a function to validate the update of SliceQosConfig
 func ValidateSliceQosConfigUpdate(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) error {
-	var allErrs field.ErrorList
-	err := validateSliceQosConfigSpec(ctx, sliceQoSConfig)
+	if err := validateSliceQosConfigSpec(ctx, sliceQoSConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
+	}
+	return nil
+}
+
+// ValidateSliceQosConfigDelete is a function to validate the deletion of SliceQosConfig
+func ValidateSliceQosConfigDelete(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) error {
+	exists, slices, err := validateIfQosExistsOnAnySlice(ctx, sliceQoSConfig)
 	if err != nil {
-		allErrs = append(allErrs, err)
+		return err
 	}
-	if len(allErrs) == 0 {
-		return nil
+	if exists {
+		err := field.Forbidden(field.NewPath("SliceQoSConfig"), "The SliceQoSProfile "+sliceQoSConfig.Name+" cannot be deleted. It is present on slices [ "+util.ArrayToString(slices)+" ]")
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
 	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceQosConfig"}, sliceQoSConfig.Name, allErrs)
+	return nil
 }
 
 func validateSliceQosConfigSpec(ctx context.Context, sliceQosConfig *controllerv1alpha1.SliceQoSConfig) *field.Error {
@@ -52,33 +54,13 @@ func validateSliceQosConfigSpec(ctx context.Context, sliceQosConfig *controllerv
 }
 
 // validateAppliedInProjectNamespace is a function to validate the if the SliceQosConfig is applied in project namespace or not
-func validateSliceQosConfigAppliedInProjectNamespace(ctx context.Context, c *controllerv1alpha1.SliceQoSConfig) *field.Error {
-	actualNamespace := corev1.Namespace{}
-	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Namespace}, &actualNamespace)
-	if exist {
-		if actualNamespace.Labels[util.LabelName] == "" {
-			return field.Invalid(field.NewPath("metadata").Child("namespace"), c.Name, "SliceQosConfig must be applied on project namespace")
-		}
+func validateSliceQosConfigAppliedInProjectNamespace(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) *field.Error {
+	namespace := &corev1.Namespace{}
+	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceQoSConfig.Namespace}, namespace)
+	if !exist || !util.CheckForProjectNamespace(namespace) {
+		return field.Invalid(field.NewPath("metadata").Child("namespace"), sliceQoSConfig.Name, "SliceQosConfig must be applied on project namespace")
 	}
 	return nil
-}
-
-// ValidateSliceqosConfigDelete is a function to validate the deletion of SliceqosConfig
-func ValidateSliceQosConfigDelete(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) error {
-	var allErrs field.ErrorList
-	exists, slices, err := validateIfQosExistsOnAnySlice(ctx, sliceQoSConfig)
-	if err != nil {
-		return err
-	}
-	if exists {
-		err := field.Forbidden(field.NewPath("SliceQoSConfig"), "The SliceqosProfile "+sliceQoSConfig.Name+" cannot be deleted. It is present on slices [ "+util.ArrayToString(slices)+" ]")
-		allErrs = append(allErrs, err)
-	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-
-	return apierrors.NewInvalid(schema.GroupKind{Group: "controller.kubeslice.io", Kind: "SliceQosConfig"}, sliceQoSConfig.Name, allErrs)
 }
 
 /* validateIfQosProfileExists function to check if qos profile exists on any of workerslices */
@@ -94,10 +76,10 @@ func validateIfQosExistsOnAnySlice(ctx context.Context, sliceQosConfig *controll
 		return false, slices, err
 	}
 	if len(workerSlices.Items) > 0 {
-		for _, workerslice := range workerSlices.Items {
-			if _, ok := sliceMap[workerslice.Spec.SliceName]; !ok {
-				sliceMap[workerslice.Spec.SliceName] = true
-				slices = append(slices, workerslice.Spec.SliceName)
+		for _, workerSlice := range workerSlices.Items {
+			if _, ok := sliceMap[workerSlice.Spec.SliceName]; !ok {
+				sliceMap[workerSlice.Spec.SliceName] = true
+				slices = append(slices, workerSlice.Spec.SliceName)
 			}
 		}
 		return true, slices, nil

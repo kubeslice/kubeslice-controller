@@ -17,7 +17,6 @@
 package util
 
 import (
-	"errors"
 	"regexp"
 	"strconv"
 )
@@ -30,12 +29,11 @@ func IsDNSCompliant(name string) bool {
 	return match
 }
 
-func ValidateCoOrdinates(latitude string, longitude string) error {
+func ValidateCoOrdinates(latitude string, longitude string) bool {
 	coord1, err1 := strconv.ParseFloat(latitude, 64)
 	coord2, err2 := strconv.ParseFloat(longitude, 64)
 	if err1 != nil || err2 != nil || coord1 < -90 || coord1 > 90 || coord2 < -180 || coord2 > 180 {
-		err := errors.New("Latitude and longitude are not valid")
-		return err
+		return true
 	}
-	return nil
+	return false
 }
