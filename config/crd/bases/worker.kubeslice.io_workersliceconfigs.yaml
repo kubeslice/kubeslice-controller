@@ -77,6 +77,8 @@ spec:
                     default: false
                     type: boolean
                 type: object
+              octet:
+                type: integer
               qosProfileDetails:
                 description: QOSProfile is the QOS Profile configuration from backend
                 properties:
@@ -131,7 +133,7 @@ spec:
                 default: Application
                 type: string
             required:
-            - ipamClusterOctet
+            - octet
             type: object
           status:
             description: WorkerSliceConfigStatus defines the observed state of Slice
