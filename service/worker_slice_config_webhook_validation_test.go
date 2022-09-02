@@ -41,22 +41,22 @@ func TestWorkerSliceConfigWebhookValidationSuite(t *testing.T) {
 }
 
 var WorkerSliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
-	"WorkerSliceConfigWebhookValidation_UpdateValidateWorkerSliceConfigUpdatingIpamClusterOctet": UpdateValidateWorkerSliceConfigUpdatingIpamClusterOctet,
-	"WorkerSliceConfigWebhookValidation_UpdateValidateWorkerSliceConfigWithoutErrors":            UpdateValidateWorkerSliceConfigWithoutErrors,
+	"WorkerSliceConfigWebhookValidation_UpdateValidateWorkerSliceConfigUpdatingOctet": UpdateValidateWorkerSliceConfigUpdatingOctet,
+	"WorkerSliceConfigWebhookValidation_UpdateValidateWorkerSliceConfigWithoutErrors": UpdateValidateWorkerSliceConfigWithoutErrors,
 }
 
-func UpdateValidateWorkerSliceConfigUpdatingIpamClusterOctet(t *testing.T) {
+func UpdateValidateWorkerSliceConfigUpdatingOctet(t *testing.T) {
 	name := "worker_slice_config"
 	namespace := "namespace"
 	clientMock, newWorkerSliceConfig, ctx := setupWorkerSliceConfigWebhookValidationTest(name, namespace)
 	existingWorkerSliceConfig := workerv1alpha1.WorkerSliceConfig{}
 	a1 := 1
-	existingWorkerSliceConfig.Spec.IpamClusterOctet = &a1
+	existingWorkerSliceConfig.Spec.Octet = &a1
 	a2 := 2
-	newWorkerSliceConfig.Spec.IpamClusterOctet = &a2
+	newWorkerSliceConfig.Spec.Octet = &a2
 	err := ValidateWorkerSliceConfigUpdate(ctx, &existingWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.IpamClusterOctet: Invalid value:")
+	require.Contains(t, err.Error(), "Spec.Octet: Invalid value:")
 	clientMock.AssertExpectations(t)
 }
 
@@ -65,7 +65,7 @@ func UpdateValidateWorkerSliceConfigWithoutErrors(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newWorkerSliceConfig, ctx := setupWorkerSliceConfigWebhookValidationTest(name, namespace)
 	a1 := 1
-	newWorkerSliceConfig.Spec.IpamClusterOctet = &a1
+	newWorkerSliceConfig.Spec.Octet = &a1
 	err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
