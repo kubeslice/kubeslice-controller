@@ -5,7 +5,7 @@ metadata:
 spec:
   sliceSubnet: 10.1.0.0/16
   sliceType: Application
-  #maxClusters: 14
+  maxClusters: 14
   sliceGatewayProvider:
     sliceGatewayType: OpenVPN
     sliceCaType: Local
