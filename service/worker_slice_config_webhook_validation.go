@@ -37,7 +37,7 @@ func ValidateWorkerSliceConfigUpdate(ctx context.Context, workerSliceConfig *wor
 // preventUpdateWorkerSliceConfig is a function to prevent the update of workersliceconfig
 func preventUpdateWorkerSliceConfig(ctx context.Context, ss *workerv1alpha1.WorkerSliceConfig, old runtime.Object) *field.Error {
 	workerSliceConfig := old.(*workerv1alpha1.WorkerSliceConfig)
-	if *workerSliceConfig.Spec.Octet != *ss.Spec.Octet {
+	if workerSliceConfig.Spec.Octet != nil && *workerSliceConfig.Spec.Octet != *ss.Spec.Octet {
 		return field.Invalid(field.NewPath("Spec").Child("Octet"), *ss.Spec.Octet, "cannot be updated")
 	}
 	return nil
