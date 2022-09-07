@@ -31,8 +31,9 @@ type WorkerSliceConfigSpec struct {
 	SliceIpamType             string                    `json:"sliceIpamType,omitempty"`
 	QosProfileDetails         QOSProfile                `json:"qosProfileDetails,omitempty"`
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
+	IpamClusterOctet          int                       `json:"ipamClusterOctet,omitempty"`
 	//+kubebuilder:validation:Required
-	IpamClusterOctet      *int                  `json:"ipamClusterOctet"`
+	Octet                 *int                  `json:"octet"`
 	ClusterSubnetCIDR     string                `json:"clusterSubnetCIDR,omitempty"`
 	ExternalGatewayConfig ExternalGatewayConfig `json:"externalGatewayConfig,omitempty"`
 }
