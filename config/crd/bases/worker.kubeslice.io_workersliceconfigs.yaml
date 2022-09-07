@@ -132,7 +132,7 @@ spec:
                 default: Application
                 type: string
             required:
-            - ipamClusterOctet
+            - octet
             type: object
           status:
             description: WorkerSliceConfigStatus defines the observed state of Slice
