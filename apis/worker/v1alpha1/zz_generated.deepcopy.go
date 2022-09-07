@@ -440,8 +440,6 @@ func (in *WorkerSliceConfigSpec) DeepCopyInto(out *WorkerSliceConfigSpec) {
 	in.NamespaceIsolationProfile.DeepCopyInto(&out.NamespaceIsolationProfile)
 	if in.Octet != nil {
 		in, out := &in.Octet, &out.Octet
-	if in.IpamClusterOctet != nil {
-		in, out := &in.IpamClusterOctet, &out.IpamClusterOctet
 		*out = new(int)
 		**out = **in
 	}
