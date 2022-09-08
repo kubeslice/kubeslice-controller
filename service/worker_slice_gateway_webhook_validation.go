@@ -18,31 +18,25 @@ package service
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
-	"github.com/kubeslice/kubeslice-controller/util"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ValidateWorkerSliceGatewayUpdate is function to validate the updation of gateways
-func ValidateWorkerSliceGatewayUpdate(ctx context.Context, workerSliceGateway *workerv1alpha1.WorkerSliceGateway) error {
-	var allErrs field.ErrorList
-	if err := preventUpdateWorkerSliceGateway(ctx, workerSliceGateway); err != nil {
-		allErrs = append(allErrs, err)
+// ValidateWorkerSliceGatewayUpdate is function to validate the update of gateways
+func ValidateWorkerSliceGatewayUpdate(ctx context.Context, workerSliceGateway *workerv1alpha1.WorkerSliceGateway, old runtime.Object) error {
+	if err := preventUpdateWorkerSliceGateway(ctx, workerSliceGateway, old); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceWorker, Kind: "WorkerSliceGateway"}, workerSliceGateway.Name, field.ErrorList{err})
 	}
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return apierrors.NewInvalid(schema.GroupKind{Group: "worker.kubeslice.io", Kind: "WorkerSliceGateway"}, workerSliceGateway.Name, allErrs)
+	return nil
 }
 
-// preventUpdateWorkerSliceGateway is a function to check the gatewaynumber of workerslice
-func preventUpdateWorkerSliceGateway(workerSliceGatewayCtx context.Context, sg *workerv1alpha1.WorkerSliceGateway) *field.Error {
-	workerSliceGateway := workerv1alpha1.WorkerSliceGateway{}
-	_, _ = util.GetResourceIfExist(workerSliceGatewayCtx, client.ObjectKey{Name: sg.Name, Namespace: sg.Namespace}, &workerSliceGateway)
+// preventUpdateWorkerSliceGateway is a function to check the GatewayNumber of WorkerSliceGateway
+func preventUpdateWorkerSliceGateway(workerSliceGatewayCtx context.Context, sg *workerv1alpha1.WorkerSliceGateway, old runtime.Object) *field.Error {
+	workerSliceGateway := old.(*workerv1alpha1.WorkerSliceGateway)
 	if workerSliceGateway.Spec.GatewayNumber != sg.Spec.GatewayNumber {
 		return field.Invalid(field.NewPath("Spec").Child("GatewayNumber"), sg.Spec.GatewayNumber, "cannot be updated")
 	}

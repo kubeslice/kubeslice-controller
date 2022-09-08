@@ -297,7 +297,7 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 	//environment := make(map[string]string, 5)
 	//jobMock.On("CreateJob", ctx, requestObj.Namespace, "image", environment).Return(ctrl.Result{}, nil).Once()
 
-	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16")
+	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16")
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
@@ -373,7 +373,7 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 	clientMock.On("Create", ctx, mock.Anything).Return(nil).Times(2)
 	jobMock.On("CreateJob", ctx, jobNamespace, JobImage, mock.Anything).Return(ctrl.Result{}, nil).Once()
 
-	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16")
+	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16")
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)

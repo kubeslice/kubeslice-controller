@@ -3,10 +3,8 @@ kind: Cluster
 metadata:
   name: cluster-1
 spec:
-  networkInterface: eth0
- # nodeIP: 11.11.14.11
-  nodeIPs: 
-    - 1.1.1.1
+  networkInterface: eth1
+  nodeIP: 11.11.14.114
   clusterProperty:
     telemetry:
       enabled: true

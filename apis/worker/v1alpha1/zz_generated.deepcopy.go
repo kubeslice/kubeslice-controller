@@ -362,6 +362,11 @@ func (in *WorkerSliceConfigSpec) DeepCopyInto(out *WorkerSliceConfigSpec) {
 	out.SliceGatewayProvider = in.SliceGatewayProvider
 	out.QosProfileDetails = in.QosProfileDetails
 	in.NamespaceIsolationProfile.DeepCopyInto(&out.NamespaceIsolationProfile)
+	if in.Octet != nil {
+		in, out := &in.Octet, &out.Octet
+		*out = new(int)
+		**out = **in
+	}
 	out.ExternalGatewayConfig = in.ExternalGatewayConfig
 }
 

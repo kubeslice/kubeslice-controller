@@ -36,7 +36,7 @@ type customClusterValidation func(ctx context.Context, cluster *Cluster) error
 type customClusterMutation func(ctx context.Context, req v1.AdmissionRequest) admission.Response
 
 var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) error = nil
-var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster) error = nil
+var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error = nil
 var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) error = nil
 var customClusterSpecMutatation func(ctx context.Context, req v1.AdmissionRequest) admission.Response = nil
 var clusterWebhookClient client.Client
@@ -89,7 +89,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	clusterlog.Info("validate update", "name", r.Name)
 	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
 
-	return customClusterUpdateValidation(clusterCtx, r)
+	return customClusterUpdateValidation(clusterCtx, r, old)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type

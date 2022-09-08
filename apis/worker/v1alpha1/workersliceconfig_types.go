@@ -32,7 +32,10 @@ type WorkerSliceConfigSpec struct {
 	QosProfileDetails         QOSProfile                `json:"qosProfileDetails,omitempty"`
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
 	IpamClusterOctet          int                       `json:"ipamClusterOctet,omitempty"`
-	ExternalGatewayConfig     ExternalGatewayConfig     `json:"externalGatewayConfig,omitempty"`
+	//+kubebuilder:validation:Required
+	Octet                 *int                  `json:"octet"`
+	ClusterSubnetCIDR     string                `json:"clusterSubnetCIDR,omitempty"`
+	ExternalGatewayConfig ExternalGatewayConfig `json:"externalGatewayConfig,omitempty"`
 }
 
 // WorkerSliceGatewayProvider defines the configuration for slicegateway

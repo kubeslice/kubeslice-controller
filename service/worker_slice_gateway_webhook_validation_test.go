@@ -18,16 +18,15 @@ package service
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestWorkerSliceGatewayWebhookValidationSuite(t *testing.T) {
@@ -51,15 +50,9 @@ func UpdateValidateWorkerSliceGatewayUpdatingGatewayNumber(t *testing.T) {
 	namespace := "namespace"
 	clientMock, newWorkerSliceGateway, ctx := setupWorkerSliceGatewayWebhookValidationTest(name, namespace)
 	existingWorkerSliceGateway := workerv1alpha1.WorkerSliceGateway{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingWorkerSliceGateway).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*workerv1alpha1.WorkerSliceGateway)
-		arg.Spec.GatewayNumber = 1
-	}).Once()
+	existingWorkerSliceGateway.Spec.GatewayNumber = 1
 	newWorkerSliceGateway.Spec.GatewayNumber = 2
-	err := ValidateWorkerSliceGatewayUpdate(ctx, newWorkerSliceGateway)
+	err := ValidateWorkerSliceGatewayUpdate(ctx, &existingWorkerSliceGateway, runtime.Object(newWorkerSliceGateway))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.GatewayNumber: Invalid value:")
 	clientMock.AssertExpectations(t)
@@ -69,16 +62,7 @@ func UpdateValidateWorkerSliceGatewayWithoutErrors(t *testing.T) {
 	name := "worker_slice_Gateway"
 	namespace := "namespace"
 	clientMock, newWorkerSliceGateway, ctx := setupWorkerSliceGatewayWebhookValidationTest(name, namespace)
-	existingWorkerSliceGateway := workerv1alpha1.WorkerSliceGateway{}
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, &existingWorkerSliceGateway).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*workerv1alpha1.WorkerSliceGateway)
-		arg.Spec.GatewayNumber = 1
-	}).Once()
-	newWorkerSliceGateway.Spec.GatewayNumber = 1
-	err := ValidateWorkerSliceGatewayUpdate(ctx, newWorkerSliceGateway)
+	err := ValidateWorkerSliceGatewayUpdate(ctx, newWorkerSliceGateway, runtime.Object(newWorkerSliceGateway))
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
