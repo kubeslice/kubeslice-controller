@@ -34,6 +34,8 @@ var clusterlog = logf.Log.WithName("cluster-resource")
 
 type customClusterValidation func(ctx context.Context, cluster *Cluster) error
 type customClusterMutation func(ctx context.Context, req v1.AdmissionRequest) admission.Response
+type clusterValidation func(ctx context.Context, cluster *Cluster) error
+type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error
 
 var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) error = nil
 var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error = nil
@@ -41,7 +43,7 @@ var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) er
 var customClusterSpecMutatation func(ctx context.Context, req v1.AdmissionRequest) admission.Response = nil
 var clusterWebhookClient client.Client
 
-func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customClusterValidation, validateUpdate customClusterValidation, validateDelete customClusterValidation, mutateClusterSpec customClusterMutation) error {
+func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clusterValidation, validateUpdate clusterUpdateValidation, validateDelete clusterValidation, mutateClusterSpec customClusterMutation) error {
 	customClusterCreateValidation = validateCreate
 	customClusterUpdateValidation = validateUpdate
 	customClusterDeleteValidation = validateDelete
