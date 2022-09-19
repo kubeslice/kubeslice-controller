@@ -33,7 +33,6 @@ import (
 var clusterlog = logf.Log.WithName("cluster-resource")
 
 type customClusterValidation func(ctx context.Context, cluster *Cluster) error
-type customClusterMutation func(ctx context.Context, req v1.AdmissionRequest) admission.Response
 type clusterValidation func(ctx context.Context, cluster *Cluster) error
 type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error
 
@@ -43,23 +42,15 @@ var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) er
 var customClusterSpecMutatation func(ctx context.Context, req v1.AdmissionRequest) admission.Response = nil
 var clusterWebhookClient client.Client
 
-func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clusterValidation, validateUpdate clusterUpdateValidation, validateDelete clusterValidation, mutateClusterSpec customClusterMutation) error {
+func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clusterValidation, validateUpdate clusterUpdateValidation, validateDelete clusterValidation) error {
 	customClusterCreateValidation = validateCreate
 	customClusterUpdateValidation = validateUpdate
 	customClusterDeleteValidation = validateDelete
-	customClusterSpecMutatation = mutateClusterSpec
 	clusterWebhookClient = mgr.GetClient()
-	webHookserver := mgr.GetWebhookServer()
-	webHookserver.Register("/mutate-controller-kubeslice-io-v1alpha1-cluster", &webhook.Admission{
-		Handler: r,
-	})
+
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
-}
-func (r *Cluster) Handle(ctx context.Context, req admission.Request) admission.Response {
-	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
-	return customClusterSpecMutatation(clusterCtx, req.AdmissionRequest)
 }
 
 //+kubebuilder:webhook:path=/mutate-controller-kubeslice-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1

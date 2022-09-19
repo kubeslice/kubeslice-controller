@@ -498,6 +498,13 @@ func (s *WorkerSliceGatewayService) NodeIpReconciliationOfWorkerSliceGateways(ct
 		return err
 	}
 	for _, gateway := range workerSliceGateways.Items {
+		if len(gateway.Spec.LocalGatewayConfig.NodeIps) == 0 {
+			gateway.Spec.LocalGatewayConfig.NodeIps = append(gateway.Spec.LocalGatewayConfig.NodeIps, gateway.Spec.LocalGatewayConfig.NodeIp)
+			err = util.UpdateResource(ctx, &gateway)
+			if err != nil {
+				return err
+			}
+		}
 		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIps, cluster.Spec.NodeIPs) {
 			gateway.Spec.LocalGatewayConfig.NodeIps = cluster.Spec.NodeIPs
 			err = util.UpdateResource(ctx, &gateway)
