@@ -1,23 +1,25 @@
 name: end-to-end-test
 on:
-  pull_request:
+  pull_request_target:
     branches: [ master ]
   workflow_dispatch:
 jobs:
   end-to-end:
     runs-on: ubuntu-20.04
-    permissions:
-      contents: write
     steps:
     - name: checkout the repo
       uses: actions/checkout@v3
       with:
         ref: ${{ github.event.pull_request.head.sha }}
     
+    - name: Set outputs
+      id: vars
+      run: echo "::set-output name=sha_commit::$(git rev-parse HEAD)"
+
     - name: build the kubeslice controller
       uses: docker/build-push-action@v2
       with:
-        tags: kubeslice-controller:e2e-latest
+        tags: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
         build-args: |
           PLATFORM=amd64
         push: false
@@ -26,6 +28,8 @@ jobs:
       run: |
         mkdir -p ${{ github.workspace }}/profile
         sh .github/workflows/scripts/start-kind.sh
+      env: 
+         GITHUB_HEAD_COMMIT: ${{ steps.vars.outputs.sha_commit }}
 
     - name: Docker Run Action
       uses: addnab/docker-run-action@v3
@@ -54,7 +58,7 @@ jobs:
         allure_report: allure_report
         allure_history: allure-history
         gh_pages: gh-pages
-        keep_reports: 501
+        keep_reports: 500
         github_run_id: '${{ github.run_id }}'
         github_run_num: 'Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}'
         report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
@@ -68,3 +72,22 @@ jobs:
         EXTERNAL_REPOSITORY: kubeslice/e2e-allure-reports
         PUBLISH_DIR: allure-history
         keep_files: true
+    
+    - name: wait for report deploy on site ( you can check report here also )
+      run: |
+         sleep 200
+         echo 'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'
+      
+    - name: Report link on Pull Request comment
+      uses: thollander/actions-comment-pull-request@v1
+      with:
+        message: |
+                 report link  'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+    
+    - name: Run Quality Gate Check
+      uses: ./quality-gate
+      with:
+         ENABLE_QUALITY_GATE: true
+         MINIMUM_PASS_PERCENTAGE: 75 
+         ALLURE_BEHAVIORS_CSV: '/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}/allure-history/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/data/behaviors.csv'
