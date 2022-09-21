@@ -99,7 +99,8 @@ spec:
                   the cluster.
                 type: string
               nodeIP:
-                description: NodeIP is the IP address of the Node
+                description: NodeIP is the IP address of the Node - deprecated field
+                  use Plural NodeIPs
                 type: string
               nodeIPs:
                 items:
