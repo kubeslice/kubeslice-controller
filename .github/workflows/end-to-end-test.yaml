@@ -1,11 +1,12 @@
 name: end-to-end-test
 on:
   pull_request_target:
-    branches: [ master ]
+    types: [ labeled ] 
   workflow_dispatch:
 jobs:
   end-to-end:
     runs-on: ubuntu-20.04
+    if: ${{ github.event.label.name == 'ready-to-test' }}
     steps:
     - name: checkout the repo
       uses: actions/checkout@v3
