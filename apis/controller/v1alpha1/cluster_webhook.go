@@ -20,13 +20,11 @@ import (
 	"context"
 
 	"github.com/kubeslice/kubeslice-controller/util"
-	v1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -39,7 +37,6 @@ type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old run
 var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) error = nil
 var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error = nil
 var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) error = nil
-var customClusterSpecMutatation func(ctx context.Context, req v1.AdmissionRequest) admission.Response = nil
 var clusterWebhookClient client.Client
 
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clusterValidation, validateUpdate clusterUpdateValidation, validateDelete clusterValidation) error {

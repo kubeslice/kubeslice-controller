@@ -37,6 +37,7 @@ type WorkerSliceGatewaySpec struct {
 }
 
 type SliceGatewayConfig struct {
+	//+kubebuilder:deprecatedversion:warning="worker/v1alpha1 NodeIp is deprecated...use NodeIps"
 	NodeIp        string   `json:"nodeIp,omitempty"`
 	NodeIps       []string `json:"nodeIps,omitempty"`
 	NodePort      int      `json:"nodePort,omitempty"`
