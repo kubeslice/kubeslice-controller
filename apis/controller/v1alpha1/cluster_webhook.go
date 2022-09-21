@@ -30,7 +30,6 @@ import (
 // log is for logging in this package.
 var clusterlog = logf.Log.WithName("cluster-resource")
 
-type customClusterValidation func(ctx context.Context, cluster *Cluster) error
 type clusterValidation func(ctx context.Context, cluster *Cluster) error
 type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error
 
