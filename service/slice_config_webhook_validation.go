@@ -409,6 +409,9 @@ func preventMaxClusterCountUpdate(ctx context.Context, s *controllerv1alpha1.Sli
 	if sliceConfig.Spec.MaxClusters != s.Spec.MaxClusters {
 		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be updated.")
 	}
+	if len(s.Spec.Clusters) > s.Spec.MaxClusters {
+		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount :"+strconv.Itoa(s.Spec.MaxClusters))
+	}
 	return nil
 }
 
