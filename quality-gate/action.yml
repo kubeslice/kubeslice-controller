@@ -1,0 +1,91 @@
+name: 'allure-quality-gate'
+description: 'Allure Quality Gate'
+author: 'Pavan Mudigonda'
+branding:
+  icon: 'layout'
+  color: 'green'
+inputs:
+  ALLURE_BEHAVIORS_CSV:
+    description: 'ALLURE Behaviors CSV File'
+    required: true
+    default: '**/data/behaviors.csv'
+  ENABLE_QUALITY_GATE:
+    description: 'ALLURE Behaviors CSV File'
+    required: true
+    default: 'false'
+  MINIMUM_PASS_PERCENTAGE:
+    description: 'Minimum Pass Percentage Required to Pass Build'
+    required: false
+    default: 100
+    
+runs:
+  using: 'composite'
+  steps:
+      
+    - name: set variable
+      shell: bash
+      run: echo "ALLURE_BEHAVIORS_CSV=${{ inputs.ALLURE_BEHAVIORS_CSV }}" >> $GITHUB_ENV
+    - name: Script
+      if: ${{ inputs.ENABLE_QUALITY_GATE == 'true' }}
+      id: csv_reporter
+      shell: pwsh
+      run: |        
+        Write-Host "IMPORTING A CSV FILE IN POWERSHELL"
+        $CSV_CONTENT = Import-Csv -Path "$Env:ALLURE_BEHAVIORS_CSV"
+        $PASSED_TESTS =  ($CSV_CONTENT).PASSED
+        $FAILED_TESTS =  ($CSV_CONTENT).FAILED
+        $SKIPPED_TESTS = ($CSV_CONTENT).SKIPPED
+        $UNKNOWN_TESTS = ($CSV_CONTENT).UNKNOWN  
+        echo "FAILED_TESTS=[int]$FAILED_TESTS" >> $GITHUB_ENV
+        echo "PASSED_TESTS=[int]$PASSED_TESTS" >> $GITHUB_ENV
+        echo "SKIPPED_TESTS=[int]$SKIPPED_TESTS" >> $GITHUB_ENV
+        echo "UNKNOWN_TESTS=[int]$UNKNOWN_TESTS" >> $GITHUB_ENV
+        Write-Output $PASSED_TESTS
+        Write-Output $FAILED_TESTS
+        Write-Output $SKIPPED_TESTS
+        Write-Output $UNKNOWN_TESTS
+        echo "##[set-output name=PASSED_TESTS;]${PASSED_TESTS}"
+        echo "##[set-output name=FAILED_TESTS;]${FAILED_TESTS}"
+        echo "##[set-output name=SKIPPED_TESTS;]${SKIPPED_TESTS}"
+        echo "##[set-output name=UNKNOWN_TESTS;]${UNKNOWN_TESTS}"
+        $MIN_PERCENTAGE = [int]${{ inputs.MINIMUM_PASS_PERCENTAGE }}
+        echo "Minimum Percentage required is : $MIN_PERCENTAGE "
+        $PASSED_TESTS = [int]${PASSED_TESTS}
+        Write-Output "Passed Tests: $PASSED_TESTS"
+        $FAILED_TESTS = [int]$FAILED_TESTS
+        Write-Output "Failed Tests: $FAILED_TESTS"
+        $SKIPPED_TESTS = [int]$SKIPPED_TESTS
+        Write-Output "Skipped Tests: $SKIPPED_TESTS"
+        $UNKNOWN_TESTS = [int]$UNKNOWN_TESTS
+        Write-Output "Unkown Tests: $UNKNOWN_TESTS"        
+        $TOTAL_TESTS = $PASSED_TESTS + $FAILED_TESTS + $SKIPPED_TESTS + $UNKNOWN_TESTS
+        Write-Output "Total Tests: $TOTAL_TESTS"
+        if ( ($FAILED_TESTS + $SKIPPED_TESTS) -ne 0 ) {
+                  $PASS_PERCENTAGE_INT = ($PASSED_TESTS / $TOTAL_TESTS ) * 100
+                  $PASS_PERCENTAGE_STRING = ($PASSED_TESTS / $TOTAL_TESTS ).tostring("P")
+          }
+          else
+          {
+            Write-Output "None of the tests failed"
+            exit 0
+          }
+        if ( $PASS_PERCENTAGE_INT -ge $MIN_PERCENTAGE ) {
+          Write-Output "Achieved Pass Percentage of $PASS_PERCENTAGE_STRING, which is greater than or equal to Minium Percentage Set: $MIN_PERCENTAGE "
+          exit 0
+        }
+        else {
+          Write-Output "Minimum Pass Percentage Required is $MIN_PERCENTAGE, But Achieved is $PASS_PERCENTAGE_STRING"
+          exit 1
+        }
+        
+    - name: print summary
+      if: always()
+      shell: bash
+      run: |
+        echo "Minimum Percentage Required: $MIN_PERCENTAGE" >> $GITHUB_STEP_SUMMARY
+        echo "Passed Tests: ${PASSED_TESTS}" >> $GITHUB_STEP_SUMMARY
+        echo "Failed Tests: ${PASSED_TESTS}" >> $GITHUB_STEP_SUMMARY
+        echo "Skipped Tests: ${SKIPPED_TESTS}" >> $GITHUB_STEP_SUMMARY
+        echo "Total Tests: ${SKIPPED_TESTS}" >> $GITHUB_STEP_SUMMARY
+        echo "Unknown Tests: ${UNKNOWN_TESTS}" >> $GITHUB_STEP_SUMMARY
+        echo "Pass Percentage Achieved: ${PASS_PERCENTAGE_STRING}" >> $GITHUB_STEP_SUMMARY

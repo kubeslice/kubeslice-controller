@@ -38,7 +38,7 @@ ControllerCluster:
       Repo: "https://kubeslice.github.io/kubeslice/"
       SetStrValues:
              "kubeslice.controller.image": "kubeslice-controller"
-             "kubeslice.controller.tag": "e2e-latest"
+             "kubeslice.controller.tag": "${GITHUB_HEAD_COMMIT}"
 WorkerClusters:
 - Context: kind-controller
   NodeIP: ${IP1}
