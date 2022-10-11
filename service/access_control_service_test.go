@@ -468,9 +468,18 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 		},
 	}
 	actualServiceAccount := &corev1.ServiceAccount{}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        expectedServiceAccount.Name,
+			Annotations: map[string]string{"kubernetes.io/service-account.name": expectedServiceAccount.Name},
+			Namespace:   namespace,
+		},
+		Type: "kubernetes.io/service-account-token",
+	}
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, serviceAccountNamespacedName, actualServiceAccount).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedServiceAccount).Return(nil)
+	clientMock.On("Create", ctx, secret).Return(nil)
 	roleBindingNamespacedName := client.ObjectKey{
 		Namespace: namespace,
 		Name:      fmt.Sprintf(RoleBindingWorkerCluster, readonlynames[0]),
@@ -805,9 +814,19 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 		},
 	}
 	actualServiceAccount := &corev1.ServiceAccount{}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        expectedServiceAccount.Name,
+			Annotations: map[string]string{"kubernetes.io/service-account.name": expectedServiceAccount.Name},
+			Namespace:   namespace,
+		},
+		Type: "kubernetes.io/service-account-token",
+	}
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, serviceAccountNamespacedName, actualServiceAccount).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedServiceAccount).Return(nil)
+	clientMock.On("Create", ctx, secret).Return(nil)
+
 	roleBindingNamespacedName := client.ObjectKey{
 		Namespace: namespace,
 		Name:      fmt.Sprintf(RoleBindingReadOnlyUser, readonlynames[0]),
@@ -920,9 +939,19 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 		},
 	}
 	actualServiceAccount := &corev1.ServiceAccount{}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        expectedServiceAccount.Name,
+			Annotations: map[string]string{"kubernetes.io/service-account.name": expectedServiceAccount.Name},
+			Namespace:   namespace,
+		},
+		Type: "kubernetes.io/service-account-token",
+	}
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, serviceAccountNamespacedName, actualServiceAccount).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedServiceAccount).Return(nil)
+	clientMock.On("Create", ctx, secret).Return(nil).Once()
+
 	roleBindingNamespacedName := client.ObjectKey{
 		Namespace: namespace,
 		Name:      fmt.Sprintf(RoleBindingReadWriteUser, readonlynames[0]),
@@ -1037,9 +1066,18 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 		},
 	}
 	actualServiceAccount := &corev1.ServiceAccount{}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        expectedServiceAccount.Name,
+			Annotations: map[string]string{"kubernetes.io/service-account.name": expectedServiceAccount.Name},
+			Namespace:   namespace,
+		},
+		Type: "kubernetes.io/service-account-token",
+	}
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, serviceAccountNamespacedName, actualServiceAccount).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedServiceAccount).Return(nil)
+	clientMock.On("Create", ctx, secret).Return(nil)
 	roleBindingNamespacedName := client.ObjectKey{
 		Namespace: namespace,
 		Name:      fmt.Sprintf(RoleBindingWorkerCluster, readonlynames[0]),
