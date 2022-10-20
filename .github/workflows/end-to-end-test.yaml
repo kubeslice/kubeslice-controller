@@ -3,10 +3,14 @@ on:
   pull_request_target:
     types: [ labeled ] 
   workflow_dispatch:
+env:
+  chartuser: ${{ secrets.DEV_CHARTS_USERNAME }}
+  chartpassword: ${{ secrets.DEV_CHARTS_PASSWORD }}
+
 jobs:
   end-to-end:
-    runs-on: ubuntu-20.04
     if: ${{ github.event.label.name == 'ready-to-test' }}
+    runs-on: ubuntu-20.04
     steps:
     - name: checkout the repo
       uses: actions/checkout@v3
@@ -28,7 +32,7 @@ jobs:
     - name: build kind clusters
       run: |
         mkdir -p ${{ github.workspace }}/profile
-        sh .github/workflows/scripts/start-kind.sh
+        bash .github/workflows/scripts/start-kind.sh
       env: 
          GITHUB_HEAD_COMMIT: ${{ steps.vars.outputs.sha_commit }}
 
@@ -86,6 +90,25 @@ jobs:
                  report link  'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'
         GITHUB_TOKEN: ${{ secrets.TOKEN }}
     
+    - name: get email
+      id: test
+      uses: evvanErb/get-github-email-by-username-action@v1.25
+      with:
+          github-username: ${{github.actor}}
+          token: ${{ secrets.TOKEN }}
+
+    - name: Send mail
+      uses: dawidd6/action-send-mail@v3
+      with:
+       server_address: smtp.gmail.com
+       server_port: 465
+       username: ${{secrets.MAIL_USERNAME}}
+       password: ${{secrets.MAIL_PASSWORD}}
+       subject: Github Actions job result
+       to: ${{ steps.test.outputs.email }}
+       fr.om: ${{github.actor}}
+       body: Build job of ${{github.repository}} completed successfully! and the report url is https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html
+
     - name: Run Quality Gate Check
       uses: ./quality-gate
       with:
