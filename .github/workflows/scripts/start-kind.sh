@@ -176,8 +176,8 @@ IstioDChartOptions:
   Namespace: "istio-system"
 TestSuitesEnabled:
   EmptySuite: false
-  HubSuite: false
-  WorkerSuite: true
+  HubSuite: true
+  WorkerSuite: false
   IstioSuite: false
 EOF
 
