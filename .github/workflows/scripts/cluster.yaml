@@ -1,10 +1,23 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  # By default kind takes kindnet CNI but we are disabling this to use netpol feature
+  disableDefaultCNI: true # disable kindnet 
+  podSubnet: 192.168.0.0/16 # set to Calico's default subnet
 nodes:
 - role: control-plane
+  image: kindest/node:v1.23.12@sha256:9402cf1330bbd3a0d097d2033fa489b2abe40d479cc5ef47d0b6a6960613148a
   kubeadmConfigPatches:
   - |
     kind: InitConfiguration
     nodeRegistration:
       kubeletExtraArgs:
         node-labels: "kubeslice.io/node-type=gateway"
+- role: worker
+  image: kindest/node:v1.23.12@sha256:9402cf1330bbd3a0d097d2033fa489b2abe40d479cc5ef47d0b6a6960613148a
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+          node-labels: "kubeslice.io/node-type=gateway"
