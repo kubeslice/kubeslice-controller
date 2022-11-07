@@ -38,7 +38,7 @@ ControllerCluster:
     Chart: cert-manager
     Repo: "https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/"
     Namespace: cert-manager
-    Version: 1.7.0
+    Version: v1.7.0
     Username: ${chartuser}
     Password: ${chartpassword}
   HubChartOptions:
