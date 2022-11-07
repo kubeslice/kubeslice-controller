@@ -33,21 +33,56 @@ if [ ! -f profile/kind.yaml ];then
 Kubeconfig: kinde2e.yaml
 ControllerCluster:
   Context: kind-controller
+  CertManagerOptions:
+    Release: cert-manager
+    Chart: cert-manager
+    Repo: "https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/"
+    Namespace: cert-manager
+    Version: 1.7.0
+    Username: ${chartuser}
+    Password: ${chartpassword}
   HubChartOptions:
-      Repo: "https://kubeslice.github.io/kubeslice/"
-      SetStrValues:
-             "kubeslice.controller.image": "kubeslice-controller"
-             "kubeslice.controller.tag": "${GITHUB_HEAD_COMMIT}"
+    Release: kubeslice-controller
+    Chart: kubeslice-controller
+    Repo: "https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/"
+    Namespace: kubeslice-controller
+    Username: ${chartuser}
+    Password: ${chartpassword}
+    SetStrValues:
+      "kubeslice.controller.image": "kubeslice-controller"
+      "kubeslice.controller.tag": "${GITHUB_HEAD_COMMIT}"
 WorkerClusters:
 - Context: kind-controller
   NodeIP: ${IP1}
 - Context: kind-worker
   NodeIP: ${IP2}
 WorkerChartOptions:
-  Repo: https://kubeslice.github.io/kubeslice/
+  Release: kubeslice-worker
+  Chart: kubeslice-worker
+  Repo: "https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/"
+  Namespace: kubeslice-system
+  Username: ${chartuser}
+  Password: ${chartpassword}
+IstioBaseChartOptions:
+  Release:   "istio-base"
+  Chart:     "istio-base"
+  Repo:      "https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/"
+  Username: ${chartuser}
+  Password: ${chartpassword}
+  Namespace: "istio-system"
+IstioDChartOptions:
+  Release:   "istiod"
+  Chart:     "istio-discovery"
+  Repo:      "https://raw.githubusercontent.com/kubeslice/dev-charts/gh-pages/"
+  Username: ${chartuser}
+  Password: ${chartpassword}
+  Namespace: "istio-system"
 TestSuitesEnabled:
+  EmptySuite: false
   HubSuite: true
-  WorkerSuite: true
+  WorkerSuite: false
+  IstioSuite: false
+  
 EOF
 
 fi
