@@ -189,7 +189,9 @@ func (s *WorkerSliceGatewayService) reconcileNodeIPAndNodePort(ctx context.Conte
 	}
 	if found {
 		if !reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIps, remoteGateway.Spec.RemoteGatewayConfig.NodeIps) ||
+			!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIp, remoteGateway.Spec.RemoteGatewayConfig.NodeIp) ||
 			localGateway.Spec.LocalGatewayConfig.NodePort != remoteGateway.Spec.RemoteGatewayConfig.NodePort {
+			remoteGateway.Spec.RemoteGatewayConfig.NodeIp = localGateway.Spec.LocalGatewayConfig.NodeIp
 			remoteGateway.Spec.RemoteGatewayConfig.NodeIps = localGateway.Spec.LocalGatewayConfig.NodeIps
 			remoteGateway.Spec.RemoteGatewayConfig.NodePort = localGateway.Spec.LocalGatewayConfig.NodePort
 			err = util.UpdateResource(ctx, &remoteGateway)
@@ -414,6 +416,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				GatewayName:   localGatewayName,
 				GatewaySubnet: gatewaySubnet,
 				NodeIps:       sourceCluster.Spec.NodeIPs,
+				NodeIp:        sourceCluster.Spec.NodeIP,
 				VpnIp:         localVpnAddress,
 			},
 			RemoteGatewayConfig: v1alpha1.SliceGatewayConfig{
@@ -421,6 +424,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				GatewayName:   remoteGatewayName,
 				GatewaySubnet: remoteGatewaySubnet,
 				NodeIps:       destinationCluster.Spec.NodeIPs,
+				NodeIp:        destinationCluster.Spec.NodeIP,
 				VpnIp:         remoteVpnAddress,
 			},
 			GatewayCredentials: v1alpha1.GatewayCredentials{

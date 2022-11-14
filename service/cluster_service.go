@@ -125,7 +125,6 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	if cluster.Spec.NodeIPs == nil && len(cluster.Spec.NodeIP) != 0 {
 		cluster.Spec.NodeIPs = make([]string, 1)
 		cluster.Spec.NodeIPs[0] = cluster.Spec.NodeIP
-		cluster.Spec.NodeIP = ""
 		err = util.UpdateResource(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, err
