@@ -29,7 +29,6 @@ import (
 )
 
 var (
-	logLevel string
 	// ControlPlaneNamespace is the namespace where kubeslice controller is running
 	ControlPlaneNamespace = "kubeslice-controller"
 )
@@ -42,13 +41,6 @@ var logLevelSeverity = map[string]zapcore.Level{
 }
 
 type loggerKey struct{}
-
-func init() {
-	logLevel = os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "INFO"
-	}
-}
 
 // WithLogger takes in a context and returns a context with key as loggerKey{} and value as logger(of type logr.Logger) passed
 func WithLogger(ctx context.Context, logger logr.Logger) context.Context {
@@ -79,7 +71,7 @@ func NewLogger() *uzap.SugaredLogger {
 
 	// info and debug level enabler
 	debugInfoLevel := uzap.LevelEnablerFunc(func(level zapcore.Level) bool {
-		return level >= logLevelSeverity[logLevel] && level < zapcore.ErrorLevel
+		return level >= logLevelSeverity[LoglevelString] && level < zapcore.ErrorLevel
 	})
 
 	// error and fatal level enabler
