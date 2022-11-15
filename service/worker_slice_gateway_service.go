@@ -516,6 +516,14 @@ func (s *WorkerSliceGatewayService) NodeIpReconciliationOfWorkerSliceGateways(ct
 				return err
 			}
 		}
+		// For backward compatibility.
+		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIp, cluster.Spec.NodeIP) {
+			gateway.Spec.LocalGatewayConfig.NodeIp = cluster.Spec.NodeIP
+			err = util.UpdateResource(ctx, &gateway)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
