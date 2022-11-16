@@ -28,16 +28,12 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	// ControlPlaneNamespace is the namespace where kubeslice controller is running
-	ControlPlaneNamespace = "kubeslice-controller"
-)
-
 var logLevelSeverity = map[string]zapcore.Level{
-	"DEBUG":   zapcore.DebugLevel,
-	"INFO":    zapcore.InfoLevel,
-	"WARNING": zapcore.WarnLevel,
-	"ERROR":   zapcore.ErrorLevel,
+	"debug":   zapcore.DebugLevel,
+	"info":    zapcore.InfoLevel,
+	"warning": zapcore.WarnLevel,
+	"error":   zapcore.ErrorLevel,
+	"":        zapcore.InfoLevel,
 }
 
 type loggerKey struct{}
@@ -103,8 +99,6 @@ func NewLogger() *uzap.SugaredLogger {
 		),
 	)
 
-	// finally construct the logger with the tee core
-	logger := uzap.New(core).Sugar()
-
-	return logger.With("namespace", ControlPlaneNamespace, "sliceCluster")
+	// finally return the logger with the tee core
+	return uzap.New(core).Sugar()
 }
