@@ -48,9 +48,10 @@ func PrepareKubeSliceControllersRequestContext(ctx context.Context, client Clien
 	var log *zap.SugaredLogger
 
 	if Loglevel == zap.DebugLevel {
-		log = NewLogger().
-			With("RequestId", string(uuid)).
-			With("Controller", controllerName)
+		log = NewLogger().With(
+			zap.String("RequestId", string(uuid)),
+			zap.String("Controller", controllerName),
+		)
 	} else {
 		log = NewLogger()
 	}

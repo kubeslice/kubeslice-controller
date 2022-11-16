@@ -41,8 +41,11 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
+	//setupLog = ctrl.Log.WithName("setup")
+	setupLog = util.NewLogger().With(
+		hubZap.String("name", "setup"),
+	)
 )
 
 func init() {
@@ -72,10 +75,24 @@ func main() {
 
 func initLogger(logLevel zapcore.Level) {
 
-	config := hubZap.NewDevelopmentConfig()
-	config.Level = hubZap.NewAtomicLevelAt(logLevel)
-	log, _ := config.Build()
-	hubZap.ReplaceGlobals(log)
+	//config := hubZap.NewProductionEncoderConfig()
+	//config.Level = hubZap.NewAtomicLevelAt(logLevel)
+	//log, _ := config.Build()
+	//hubZap.ReplaceGlobals(log)
+	////
+	//var log *zap.SugaredLogger
+	//
+	//if Loglevel == zap.DebugLevel {
+	//	log = NewLogger().With(
+	//		zap.String("RequestId", string(uuid)),
+	//		zap.String("Controller", controllerName),
+	//	)
+	//} else {
+	//	log = NewLogger()
+	//}
+
+	//log := util.NewLogger()
+	//hubZap.ReplaceGlobals(log)
 }
 
 func initialize(services *service.Services) {
@@ -117,6 +134,9 @@ func initialize(services *service.Services) {
 	flag.Parse()
 
 	// initialize logger
+	if logLevel == "" {
+		logLevel = "info"
+	}
 	zapLogLevel := util.GetZapLogLevel(logLevel)
 	initLogger(zapLogLevel)
 	opts := zap.Options{

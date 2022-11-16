@@ -19,13 +19,9 @@
 package util
 
 import (
-	"context"
-	"os"
-
-	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
 	uzap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
 )
 
 var logLevelSeverity = map[string]zapcore.Level{
@@ -34,31 +30,6 @@ var logLevelSeverity = map[string]zapcore.Level{
 	"warning": zapcore.WarnLevel,
 	"error":   zapcore.ErrorLevel,
 	"":        zapcore.InfoLevel,
-}
-
-type loggerKey struct{}
-
-// WithLogger takes in a context and returns a context with key as loggerKey{} and value as logger(of type logr.Logger) passed
-func WithLogger(ctx context.Context, logger logr.Logger) context.Context {
-	return context.WithValue(ctx, loggerKey{}, logger)
-}
-
-// FromContext returns a logger from the context.
-func FromContext(ctx context.Context) logr.Logger {
-
-	if v, ok := ctx.Value(loggerKey{}).(logr.Logger); ok {
-		return v
-	}
-
-	return NewWrappedLogger()
-}
-
-// NewWrappedLogger Creates a new zap logger, wraps it to logr.Logger using zapr
-// Required for controller-runtime logging
-func NewWrappedLogger() logr.Logger {
-	logger := NewLogger()
-
-	return zapr.NewLogger(logger.Desugar())
 }
 
 // NewLogger Creates a new SugaredLogger instance with predefined standard fields
