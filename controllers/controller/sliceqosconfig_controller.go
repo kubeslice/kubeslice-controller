@@ -18,9 +18,9 @@ package controller
 
 import (
 	"context"
-	"github.com/go-logr/logr"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
+	"go.uber.org/zap"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,7 +34,7 @@ type SliceQoSConfigReconciler struct {
 	client.Client
 	Scheme                *runtime.Scheme
 	SliceQoSConfigService service.ISliceQoSConfigService
-	Log                   logr.Logger
+	Log                   *zap.SugaredLogger
 }
 
 // SetupWithManager sets up the controller with the Manager.
