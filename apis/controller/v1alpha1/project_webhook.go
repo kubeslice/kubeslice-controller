@@ -18,17 +18,15 @@ package v1alpha1
 
 import (
 	"context"
-
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
-var projectlog = logf.Log.WithName("project-resource")
+var projectlog = util.NewLogger().With("name", "project-resource")
 
 type customProjectValidation func(ctx context.Context, project *Project) error
 

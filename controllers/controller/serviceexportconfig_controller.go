@@ -18,8 +18,8 @@ package controller
 
 import (
 	"context"
+	"go.uber.org/zap"
 
-	"github.com/go-logr/logr"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -33,7 +33,7 @@ type ServiceExportConfigReconciler struct {
 	client.Client
 	Scheme                     *runtime.Scheme
 	ServiceExportConfigService service.IServiceExportConfigService
-	Log                        logr.Logger
+	Log                        *zap.SugaredLogger
 }
 
 // Reconcile is a function to reconcile the ServiceExportConfig, ServiceExportConfigReconciler implements it
