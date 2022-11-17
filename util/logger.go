@@ -29,7 +29,6 @@ var logLevelSeverity = map[string]zapcore.Level{
 	"info":    zapcore.InfoLevel,
 	"warning": zapcore.WarnLevel,
 	"error":   zapcore.ErrorLevel,
-	"":        zapcore.InfoLevel,
 }
 
 // NewLogger Creates a new SugaredLogger instance with predefined standard fields
