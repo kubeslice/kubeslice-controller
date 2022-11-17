@@ -18,8 +18,8 @@ package controller
 
 import (
 	"context"
+	"go.uber.org/zap"
 
-	"github.com/go-logr/logr"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -33,7 +33,7 @@ type ClusterReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
 	ClusterService service.IClusterService
-	Log            logr.Logger
+	Log            *zap.SugaredLogger
 }
 
 // SetupWithManager sets up the controller with the Manager.

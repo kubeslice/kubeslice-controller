@@ -18,8 +18,8 @@ package worker
 
 import (
 	"context"
+	"go.uber.org/zap"
 
-	"github.com/go-logr/logr"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 
@@ -35,7 +35,7 @@ type WorkerSliceConfigReconciler struct {
 	client.Client
 	Scheme             *runtime.Scheme
 	WorkerSliceService service.IWorkerSliceConfigService
-	Log                logr.Logger
+	Log                *zap.SugaredLogger
 }
 
 // SetupWithManager sets up the controller with the Manager.
