@@ -18,7 +18,6 @@ package util
 
 import (
 	"context"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,12 +48,12 @@ func PrepareKubeSliceControllersRequestContext(ctx context.Context, client Clien
 	var log *zap.SugaredLogger
 
 	if Loglevel == zap.DebugLevel {
-		log = zap.S().With(
+		log = NewLogger().With(
 			zap.String("RequestId", string(uuid)),
 			zap.String("Controller", controllerName),
 		)
 	} else {
-		log = zap.S()
+		log = NewLogger()
 	}
 
 	ctxVal := &kubeSliceControllerRequestContext{

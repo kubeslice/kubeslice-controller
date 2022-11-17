@@ -18,8 +18,8 @@ package controller
 
 import (
 	"context"
+	"go.uber.org/zap"
 
-	"github.com/go-logr/logr"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -34,7 +34,7 @@ type SliceConfigReconciler struct {
 	client.Client
 	Scheme             *runtime.Scheme
 	SliceConfigService service.ISliceConfigService
-	Log                logr.Logger
+	Log                *zap.SugaredLogger
 }
 
 // Reconcile is a function to reconcile the slice config, SliceConfigReconciler implements it
