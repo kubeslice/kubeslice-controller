@@ -23,12 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
-var serviceexportlog = logf.Log.WithName("serviceexport-resource")
+var serviceexportlog = util.NewLogger().With("name", "serviceexport-resource")
 
 type customValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) error
 

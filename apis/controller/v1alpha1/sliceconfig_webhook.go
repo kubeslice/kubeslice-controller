@@ -23,12 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
-var sliceconfigurationlog = logf.Log.WithName("sliceconfig-resource")
+var sliceconfigurationlog = util.NewLogger().With("name", "sliceconfig-resource")
 
 type sliceConfigValidation func(ctx context.Context, sliceConfig *SliceConfig) error
 type sliceConfigUpdateValidation func(ctx context.Context, sliceConfig *SliceConfig, old runtime.Object) error
