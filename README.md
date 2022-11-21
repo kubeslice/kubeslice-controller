@@ -1,12 +1,13 @@
 # kubeslice-controller
 
-kubeslice-controller uses Kubebuilder, a framework for building Kubernetes APIs
-using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions).
-
 [![multicloud-opensource](https://github.com/kubeslice/nightly-build/actions/workflows/multicloud-opensource.yaml/badge.svg?branch=master)](https://github.com/kubeslice/nightly-build/actions/workflows/multicloud-opensource.yaml)
 [![kind-opensource](https://github.com/kubeslice/nightly-build/actions/workflows/kind-opensource.yaml/badge.svg?branch=master)](https://github.com/kubeslice/nightly-build/actions/workflows/kind-opensource.yaml) 
 [![multicloud-opensource-uat](https://github.com/kubeslice/nightly-build/actions/workflows/multicloud-oss-uat.yml/badge.svg)](https://github.com/kubeslice/nightly-build/actions/workflows/multicloud-oss-uat.yml) 
 [![kind-opensource-uat](https://github.com/kubeslice/nightly-build/actions/workflows/kind-oss-uat.yml/badge.svg)](https://github.com/kubeslice/nightly-build/actions/workflows/kind-oss-uat.yml) 
+
+
+kubeslice-controller uses Kubebuilder, a framework for building Kubernetes APIs
+using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions).
 
 ## Getting Started
 
