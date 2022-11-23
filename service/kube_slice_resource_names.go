@@ -41,6 +41,7 @@ const (
 	resourceSecrets              = "secrets"
 	resourceEvents               = "events"
 	ResourceStatusSuffix         = "/status"
+	resourceWorkerSliceGwRecycler = "workerslicegwrecyclers"
 )
 
 // Verbs
@@ -183,6 +184,11 @@ var (
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceWorker},
 			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
+		},
+		{
+			Verbs:     []string{verbCreate,verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceGwRecycler},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},

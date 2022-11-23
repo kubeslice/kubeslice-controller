@@ -25,17 +25,25 @@ import (
 
 // WorkerSliceGwRecyclerSpec defines the desired state of WorkerSliceGwRecycler
 type WorkerSliceGwRecyclerSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	GwPair GwPair `json:"gwPair,omitempty"`
+	State string `json:"state,omitempty"`
+	Request string `json:"request,omitempty"`
+}
 
-	// Foo is an example field of WorkerSliceGwRecycler. Edit workerslicegwrecycler_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+type GwPair struct {
+	ClientID string `json:"clientId,omitempty"`
+	ServerID string `json:"serverId,omitempty"`
 }
 
 // WorkerSliceGwRecyclerStatus defines the observed state of WorkerSliceGwRecycler
 type WorkerSliceGwRecyclerStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Client ClientStatus `json:"client,omitempty"`
+	ServersToRecycle []string `json:"serversToRecycle,omitempty"`
+	RecycledServers []string `json:"recycledServers,omitempty"`
+}
+type ClientStatus struct {
+	Response string `json:"response,omitempty"`
+	RecycledClient string `json:"recycledClient,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -37,14 +37,37 @@ spec:
           spec:
             description: WorkerSliceGwRecyclerSpec defines the desired state of WorkerSliceGwRecycler
             properties:
-              foo:
-                description: Foo is an example field of WorkerSliceGwRecycler. Edit
-                  workerslicegwrecycler_types.go to remove/update
+              gwPair:
+                properties:
+                  clientId:
+                    type: string
+                  serverId:
+                    type: string
+                type: object
+              request:
+                type: string
+              state:
                 type: string
             type: object
           status:
             description: WorkerSliceGwRecyclerStatus defines the observed state of
               WorkerSliceGwRecycler
+            properties:
+              client:
+                properties:
+                  recycledClient:
+                    type: string
+                  response:
+                    type: string
+                type: object
+              recycledServers:
+                items:
+                  type: string
+                type: array
+              serversToRecycle:
+                items:
+                  type: string
+                type: array
             type: object
         type: object
     served: true
