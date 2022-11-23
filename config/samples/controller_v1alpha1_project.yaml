@@ -6,3 +6,4 @@ spec:
   serviceAccount:
     readWrite:
       - john
+      - abc
