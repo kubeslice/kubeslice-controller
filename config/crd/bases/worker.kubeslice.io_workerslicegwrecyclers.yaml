@@ -46,7 +46,9 @@ spec:
                 type: object
               request:
                 type: string
-              sliceGwName:
+              sliceGwClient:
+                type: string
+              sliceGwServer:
                 type: string
               state:
                 type: string
