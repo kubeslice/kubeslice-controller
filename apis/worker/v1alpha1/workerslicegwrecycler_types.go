@@ -25,6 +25,7 @@ import (
 
 // WorkerSliceGwRecyclerSpec defines the desired state of WorkerSliceGwRecycler
 type WorkerSliceGwRecyclerSpec struct {
+	SliceGwName string `json:"sliceGwName,omitempty"`
 	GwPair GwPair `json:"gwPair,omitempty"`
 	State string `json:"state,omitempty"`
 	Request string `json:"request,omitempty"`

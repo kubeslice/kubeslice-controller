@@ -46,6 +46,8 @@ spec:
                 type: object
               request:
                 type: string
+              sliceGwName:
+                type: string
               state:
                 type: string
             type: object
