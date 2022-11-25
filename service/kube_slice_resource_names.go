@@ -188,7 +188,7 @@ var (
 		{
 			Verbs:     []string{verbCreate,verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceGwRecycler},
+			Resources: []string{resourceWorkerSliceGwRecycler,resourceWorkerSliceGwRecycler+ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},

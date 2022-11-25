@@ -30,6 +30,8 @@ type WorkerSliceGwRecyclerSpec struct {
 	GwPair GwPair `json:"gwPair,omitempty"`
 	State string `json:"state,omitempty"`
 	Request string `json:"request,omitempty"`
+	SliceName string `json:"sliceName,omitempty"`
+
 }
 
 type GwPair struct {

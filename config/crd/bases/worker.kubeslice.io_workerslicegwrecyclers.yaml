@@ -50,6 +50,8 @@ spec:
                 type: string
               sliceGwServer:
                 type: string
+              sliceName:
+                type: string
               state:
                 type: string
             type: object
