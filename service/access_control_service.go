@@ -259,7 +259,21 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 		if !foundSa {
 			err = util.CreateResource(ctx, expectedServiceAccount)
 			if err != nil {
-				logger.With(zap.Error(err)).Errorf("Couldnt create serviceaccoubt")
+				logger.With(zap.Error(err)).Errorf("Couldnt create serviceaccount")
+				return ctrl.Result{}, err
+			}
+			// crete secret for the service account
+			secret := corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        expectedServiceAccount.Name,
+					Annotations: map[string]string{"kubernetes.io/service-account.name": expectedServiceAccount.Name},
+					Namespace:   namespace,
+				},
+				Type: "kubernetes.io/service-account-token",
+			}
+			err = util.CreateResource(ctx, &secret)
+			if err != nil {
+				logger.With(zap.Error(err)).Errorf("Couldnt create secret")
 				return ctrl.Result{}, err
 			}
 		}

@@ -23,13 +23,12 @@ clusterName=$1
 server=$2
 # the Namespace and ServiceAccount name that is used for the config
 namespace=$3
-serviceAccount=$4
+secretName=$4
 
 ######################
 # actual script starts
 set -o errexit
 
-secretName=$(kubectl --namespace $namespace get serviceAccount $serviceAccount -o jsonpath='{.secrets[0].name}')
 ca=$(kubectl --namespace $namespace get secret/$secretName -o jsonpath='{.data.ca\.crt}')
 token=$(kubectl --namespace $namespace get secret/$secretName -o jsonpath='{.data.token}' | base64 --decode)
 
@@ -43,14 +42,14 @@ clusters:
       certificate-authority-data: ${ca}
       server: ${server}
 contexts:
-  - name: ${serviceAccount}@${clusterName}
+  - name: ${secretName}@${clusterName}
     context:
       cluster: ${clusterName}
       namespace: ${namespace}
-      user: ${serviceAccount}
+      user: ${secretName}
 users:
-  - name: ${serviceAccount}
+  - name: ${secretName}
     user:
       token: ${token}
-current-context: ${serviceAccount}@${clusterName}
+current-context: ${secretName}@${clusterName}
 "
