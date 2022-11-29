@@ -59,7 +59,6 @@ var ClusterTestbed = map[string]func(*testing.T){
 	"TestDeleteClusterDeleteFail":                  testDeleteClusterDeleteFail,
 	"TestClusterPass":                              testClusterPass,
 	"TestReconcileClusterUpdateSecretFail":         testReconcileClusterUpdateSecretFail,
-	"TestReconcileClusterServiceAccountSecretNil":  testReconcileClusterServiceAccountSecretNil,
 }
 
 func testReconcileClusterClusterNotFound(t *testing.T) {
@@ -176,12 +175,6 @@ func testReconcileClusterSecretNotFound(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	cluster := &controllerv1alpha1.Cluster{}
 	nsResource := &corev1.Namespace{}
-
-	//	secret := corev1.Secret{}
-	serviceAccountSecretNamespacedName := types.NamespacedName{
-		Namespace: requestObj.Namespace,
-		Name:      "random",
-	}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, requestObj.NamespacedName, cluster).Return(nil)
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -204,7 +197,7 @@ func testReconcileClusterSecretNotFound(t *testing.T) {
 		arg.Secrets[0].Name = "random"
 	})
 	acsService.On("ReconcileWorkerClusterServiceAccountAndRoleBindings", ctx, requestObj.Name, requestObj.Namespace, mock.Anything).Return(ctrl.Result{}, nil)
-	clientMock.On("Get", ctx, serviceAccountSecretNamespacedName, mock.Anything).Return(kubeerrors.NewNotFound(util.Resource("ClusterTest"), " secret not found"))
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(kubeerrors.NewNotFound(util.Resource("ClusterTest"), " secret not found"))
 	result, err := clusterService.ReconcileCluster(ctx, requestObj)
 	require.False(t, result.Requeue)
 	require.NotNil(t, err)
@@ -288,10 +281,6 @@ func testClusterPass(t *testing.T) {
 	nsResource := &corev1.Namespace{}
 
 	secret := &corev1.Secret{}
-	serviceAccountSecretNamespacedName := types.NamespacedName{
-		Namespace: requestObj.Namespace,
-		Name:      "random",
-	}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, requestObj.NamespacedName, cluster).Return(nil)
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -316,7 +305,7 @@ func testClusterPass(t *testing.T) {
 		}
 	}).Once()
 	acsService.On("ReconcileWorkerClusterServiceAccountAndRoleBindings", ctx, requestObj.Name, requestObj.Namespace, mock.Anything).Return(ctrl.Result{}, nil)
-	clientMock.On("Get", ctx, serviceAccountSecretNamespacedName, secret).Return(nil).Run(func(args mock.Arguments) {
+	clientMock.On("Get", ctx, mock.Anything, secret).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*corev1.Secret)
 		if arg.Data == nil {
 			arg.Data = make(map[string][]byte, 2)
@@ -356,10 +345,6 @@ func testReconcileClusterUpdateSecretFail(t *testing.T) {
 	nsResource := &corev1.Namespace{}
 
 	secret := &corev1.Secret{}
-	serviceAccountSecretNamespacedName := types.NamespacedName{
-		Namespace: requestObj.Namespace,
-		Name:      "random",
-	}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, requestObj.NamespacedName, cluster).Return(nil)
 	clientMock.On("Get", ctx, client.ObjectKey{
@@ -384,7 +369,7 @@ func testReconcileClusterUpdateSecretFail(t *testing.T) {
 		}
 	}).Once()
 	acsService.On("ReconcileWorkerClusterServiceAccountAndRoleBindings", ctx, requestObj.Name, requestObj.Namespace, mock.Anything).Return(ctrl.Result{}, nil)
-	clientMock.On("Get", ctx, serviceAccountSecretNamespacedName, secret).Return(nil).Run(func(args mock.Arguments) {
+	clientMock.On("Get", ctx, mock.Anything, secret).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*corev1.Secret)
 		if arg.Data == nil {
 			arg.Data = make(map[string][]byte, 2)
@@ -396,56 +381,5 @@ func testReconcileClusterUpdateSecretFail(t *testing.T) {
 	result, err := clusterService.ReconcileCluster(ctx, requestObj)
 	require.False(t, result.Requeue)
 	require.NotNil(t, err)
-	clientMock.AssertExpectations(t)
-}
-
-func testReconcileClusterServiceAccountSecretNil(t *testing.T) {
-	nsServiceMock := &mocks.INamespaceService{}
-	acsService := &mocks.IAccessControlService{}
-	clusterService := ClusterService{
-		ns:  nsServiceMock,
-		acs: acsService,
-	}
-
-	clusterName := types.NamespacedName{
-		Namespace: "cisco",
-		Name:      "cluster-1",
-	}
-	requestObj := ctrl.Request{
-		clusterName,
-	}
-	clientMock := &utilmock.Client{}
-	cluster := &controllerv1alpha1.Cluster{}
-	nsResource := &corev1.Namespace{}
-
-	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	//timeStamp := kubermachine.Date(0000, 0, 0, 0, 0, 0, 0, time.UTC)
-	clientMock.On("Get", ctx, requestObj.NamespacedName, cluster).Return(nil).Once()
-	clientMock.On("Get", ctx, client.ObjectKey{
-		Name: requestObj.Namespace,
-	}, nsResource).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*corev1.Namespace)
-		if arg.Labels == nil {
-			arg.Labels = make(map[string]string)
-		}
-		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
-		arg.Name = "cisco"
-	})
-
-	//finaliser
-	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
-	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), mock.AnythingOfType("*v1alpha1.Cluster")).Return(nil).Once()
-	serviceAccount := &corev1.ServiceAccount{} //Secrets: nil, //secret= nil should return requeue true and requeuetime>0
-	serviceAccountNamespacedName := types.NamespacedName{Name: fmt.Sprintf(ServiceAccountWorkerCluster, cluster.Name),
-		Namespace: requestObj.Namespace}
-	clientMock.On("Get", ctx, serviceAccountNamespacedName, serviceAccount).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(2).(*corev1.ServiceAccount)
-		arg.Secrets = nil
-	}).Once()
-	acsService.On("ReconcileWorkerClusterServiceAccountAndRoleBindings", ctx, requestObj.Name, requestObj.Namespace, mock.Anything).Return(ctrl.Result{}, nil)
-
-	result, err := clusterService.ReconcileCluster(ctx, requestObj)
-	require.True(t, result.Requeue)
-	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
