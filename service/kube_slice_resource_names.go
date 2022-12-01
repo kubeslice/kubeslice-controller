@@ -186,7 +186,7 @@ var (
 			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
 		},
 		{
-			Verbs:     []string{verbCreate,verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			Verbs:     []string{verbCreate,verbUpdate, verbPatch, verbGet, verbList, verbWatch,verbDelete},
 			APIGroups: []string{apiGroupKubeSliceWorker},
 			Resources: []string{resourceWorkerSliceGwRecycler,resourceWorkerSliceGwRecycler+ResourceStatusSuffix},
 		},
