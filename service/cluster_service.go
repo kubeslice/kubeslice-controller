@@ -90,11 +90,16 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	if shouldReturn, result, reconErr := util.IsReconciled(c.acs.ReconcileWorkerClusterServiceAccountAndRoleBindings(ctx, req.Name, req.Namespace, cluster)); shouldReturn {
 		return result, reconErr
 	}
+
+	if serviceAccount.Secrets == nil {
+		logger.Infof("Service Account Token not populated. Requeuing")
+		return ctrl.Result{Requeue: true, RequeueAfter: RequeueTime}, nil
+	}
 	//Step 4: Get Secret
 	secret := corev1.Secret{}
 	serviceAccountSecretNamespacedName := types.NamespacedName{
 		Namespace: req.Namespace,
-		Name:      serviceAccount.Name,
+		Name:      serviceAccount.Secrets[0].Name,
 	}
 	found, err = util.GetResourceIfExist(ctx, serviceAccountSecretNamespacedName, &secret)
 	if err != nil {

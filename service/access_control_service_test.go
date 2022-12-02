@@ -466,6 +466,7 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeClusterReadWrite,
 			},
 		},
+		Secrets: []corev1.ObjectReference{{Name: serviceAccountNamespacedName.Name}},
 	}
 	actualServiceAccount := &corev1.ServiceAccount{}
 	secret := &corev1.Secret{
@@ -767,7 +768,7 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 			Name:        "validsa1",
 			Annotations: map[string]string{annotationKey: annotationValue},
 		},
-		Secrets:                      nil,
+		Secrets:                      []corev1.ObjectReference{{Name: "validsa1"}},
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
@@ -776,7 +777,7 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 			Name:        "validsa1",
 			Annotations: map[string]string{annotationKey: "some invalid value"},
 		},
-		Secrets:                      nil,
+		Secrets:                      []corev1.ObjectReference{{Name: "validsa1"}},
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
@@ -812,6 +813,7 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeReadOnly,
 			},
 		},
+		Secrets: []corev1.ObjectReference{{Name: serviceAccountNamespacedName.Name}},
 	}
 	actualServiceAccount := &corev1.ServiceAccount{}
 	secret := &corev1.Secret{
@@ -892,7 +894,7 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 			Name:        "validsa1",
 			Annotations: map[string]string{annotationKey: annotationValue},
 		},
-		Secrets:                      nil,
+		Secrets:                      []corev1.ObjectReference{{Name: "validsa1"}},
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
@@ -901,7 +903,7 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 			Name:        "validsa1",
 			Annotations: map[string]string{annotationKey: "some invalid value"},
 		},
-		Secrets:                      nil,
+		Secrets:                      []corev1.ObjectReference{{Name: "validsa1"}},
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
@@ -937,6 +939,7 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeReadWrite,
 			},
 		},
+		Secrets: []corev1.ObjectReference{{Name: serviceAccountNamespacedName.Name}},
 	}
 	actualServiceAccount := &corev1.ServiceAccount{}
 	secret := &corev1.Secret{
@@ -1019,7 +1022,9 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 			Name:        "validsa1",
 			Annotations: map[string]string{annotationKey: annotationValue},
 		},
-		Secrets:                      nil,
+		Secrets: []corev1.ObjectReference{
+			{Name: "validsa1"},
+		},
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
@@ -1028,7 +1033,11 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 			Name:        "validsa1",
 			Annotations: map[string]string{annotationKey: "some invalid value"},
 		},
-		Secrets:                      nil,
+		Secrets: []corev1.ObjectReference{
+			{
+				Name: "validsa1",
+			},
+		},
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
@@ -1062,6 +1071,11 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 			Labels:    labels,
 			Annotations: map[string]string{
 				fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): AccessTypeClusterReadWrite,
+			},
+		},
+		Secrets: []corev1.ObjectReference{
+			{
+				Name: serviceAccountNamespacedName.Name,
 			},
 		},
 	}

@@ -249,6 +249,11 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 					fmt.Sprintf("%s/%s", annotationKubeSliceControllers, AccessTypeAnnotationLabel): accessType,
 				},
 			},
+			Secrets: []corev1.ObjectReference{
+				{
+					Name: serviceAccountNamespacedName.Name,
+				},
+			},
 		}
 		actualServiceAccount := &corev1.ServiceAccount{}
 		foundSa, err := util.GetResourceIfExist(ctx, serviceAccountNamespacedName, actualServiceAccount)
@@ -257,12 +262,13 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			return ctrl.Result{}, err
 		}
 		if !foundSa {
+			// create service account
 			err = util.CreateResource(ctx, expectedServiceAccount)
 			if err != nil {
 				logger.With(zap.Error(err)).Errorf("Couldnt create serviceaccount")
 				return ctrl.Result{}, err
 			}
-			// crete secret for the service account
+			// create secret for the service account
 			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        expectedServiceAccount.Name,
