@@ -1,5 +1,9 @@
 # kubeslice-controller
 
+[![multicloud-opensource](https://github.com/kubeslice/nightly-build/actions/workflows/multicloud-opensource.yaml/badge.svg?branch=master)](https://github.com/kubeslice/nightly-build/actions/workflows/multicloud-opensource.yaml)
+[![kind-opensource](https://github.com/kubeslice/nightly-build/actions/workflows/kind-opensource.yaml/badge.svg?branch=master)](https://github.com/kubeslice/nightly-build/actions/workflows/kind-opensource.yaml) 
+[![multicloud-opensource-uat](https://github.com/kubeslice/nightly-build/actions/workflows/multicloud-oss-uat.yml/badge.svg)](https://github.com/kubeslice/nightly-build/actions/workflows/multicloud-oss-uat.yml) 
+[![kind-opensource-uat](https://github.com/kubeslice/nightly-build/actions/workflows/kind-oss-uat.yml/badge.svg)](https://github.com/kubeslice/nightly-build/actions/workflows/kind-oss-uat.yml) 
 
 
 kubeslice-controller uses Kubebuilder, a framework for building Kubernetes APIs
