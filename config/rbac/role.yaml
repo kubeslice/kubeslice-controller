@@ -126,6 +126,7 @@ rules:
   - workerserviceimports
   - workersliceconfigs
   - workerslicegateways
+  - workerslicegwrecyclers
   verbs:
   - create
   - delete
@@ -139,7 +140,8 @@ rules:
   resources:
   - workerserviceimports/finalizers
   - workersliceconfigs/finalizers
-  - workerslicegateways/
+  - workerslicegateways/finalizers
+  - workerslicegwrecyclers/finalizers
   verbs:
   - update
 - apiGroups:
@@ -148,6 +150,7 @@ rules:
   - workerserviceimports/status
   - workersliceconfigs/status
   - workerslicegateways/status
+  - workerslicegwrecyclers/status
   verbs:
   - get
   - patch

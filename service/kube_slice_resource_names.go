@@ -31,17 +31,17 @@ const (
 
 // Resources
 const (
-	resourceProjects             = "projects"
-	resourceCluster              = "clusters"
-	resourceSliceConfig          = "sliceconfigs"
-	resourceWorkerSliceConfig    = "workersliceconfigs"
-	resourceWorkerSliceGateways  = "workerslicegateways"
-	resourceServiceExportConfigs = "serviceexportconfigs"
-	resourceWorkerServiceImport  = "workerserviceimports"
-	resourceSecrets              = "secrets"
-	resourceEvents               = "events"
-	ResourceStatusSuffix         = "/status"
+	resourceProjects              = "projects"
+	resourceCluster               = "clusters"
+	resourceSliceConfig           = "sliceconfigs"
+	resourceWorkerSliceConfig     = "workersliceconfigs"
+	resourceWorkerSliceGateways   = "workerslicegateways"
+	resourceServiceExportConfigs  = "serviceexportconfigs"
+	resourceWorkerServiceImport   = "workerserviceimports"
 	resourceWorkerSliceGwRecycler = "workerslicegwrecyclers"
+	resourceSecrets               = "secrets"
+	resourceEvents                = "events"
+	ResourceStatusSuffix          = "/status"
 )
 
 // Verbs
@@ -115,7 +115,7 @@ var (
 	ControllerEndpoint = "https://controller.cisco.com:6443/"
 )
 
-// Project Namespace prefix. Customer can over ride this.
+// Project Namespace prefix. Customer can override this.
 var (
 	ProjectNamespacePrefix = "kubeslice-controller-project-"
 )
@@ -140,7 +140,7 @@ const (
 	KubesliceWorkerDeleteRequeueTime = 3
 )
 
-//StandardQoSProfileLabel name
+// StandardQoSProfileLabel name
 const (
 	StandardQoSProfileLabel = "standard-qos-profile"
 )
@@ -172,8 +172,8 @@ var (
 	workerClusterRoleRules = []rbacv1.PolicyRule{
 		{
 			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceServiceExportConfigs},
+			APIGroups: []string{apiGroupKubeSliceControllers, apiGroupKubeSliceWorker},
+			Resources: []string{resourceServiceExportConfigs, resourceWorkerSliceGwRecycler, resourceWorkerSliceGwRecycler + ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
@@ -184,11 +184,6 @@ var (
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceWorker},
 			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
-		},
-		{
-			Verbs:     []string{verbCreate,verbUpdate, verbPatch, verbGet, verbList, verbWatch,verbDelete},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceGwRecycler,resourceWorkerSliceGwRecycler+ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
