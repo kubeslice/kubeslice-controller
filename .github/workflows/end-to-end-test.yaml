@@ -28,6 +28,12 @@ jobs:
         build-args: |
           PLATFORM=amd64
         push: false
+        
+    - name: Scanning image for vulnerablilities
+      uses: aquasecurity/trivy-action@master
+      with:
+          image-ref: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
+          format: 'table'
     
     - name: build kind clusters
       run: |
