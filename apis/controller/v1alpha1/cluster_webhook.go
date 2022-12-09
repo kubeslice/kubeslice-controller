@@ -18,17 +18,15 @@ package v1alpha1
 
 import (
 	"context"
-
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
-var clusterlog = logf.Log.WithName("cluster-resource")
+var clusterlog = util.NewLogger().With("name", "cluster-resource")
 
 type clusterValidation func(ctx context.Context, cluster *Cluster) error
 type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error

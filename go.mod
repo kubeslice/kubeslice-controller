@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/dailymotion/allure-go v0.7.0
 	github.com/go-logr/logr v0.4.0
+	github.com/go-logr/zapr v0.4.0
 	github.com/jinzhu/copier v0.3.4
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.19.0
@@ -29,7 +30,6 @@ require (
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/go-logr/zapr v0.4.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect

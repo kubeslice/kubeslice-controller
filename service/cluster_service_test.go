@@ -176,7 +176,6 @@ func testReconcileClusterSecretNotFound(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	cluster := &controllerv1alpha1.Cluster{}
 	nsResource := &corev1.Namespace{}
-
 	//	secret := corev1.Secret{}
 	serviceAccountSecretNamespacedName := types.NamespacedName{
 		Namespace: requestObj.Namespace,
