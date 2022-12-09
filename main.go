@@ -64,14 +64,14 @@ func main() {
 	c := service.WithClusterService(ns, acs, wsgs)
 	wsi := service.WithWorkerServiceImportService()
 	se := service.WithServiceExportConfigService(wsi)
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se)
+	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs)
 	p := service.WithProjectService(ns, acs, c, sc, se)
 	sqcs := service.WithSliceQoSConfigService(wscs)
-	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs))
+	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
 }
 
 func initLogger(logLevel zapcore.Level) {
-
 	config := hubZap.NewDevelopmentConfig()
 	config.Level = hubZap.NewAtomicLevelAt(logLevel)
 	log, _ := config.Build()

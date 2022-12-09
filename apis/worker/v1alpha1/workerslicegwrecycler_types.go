@@ -27,11 +27,10 @@ import (
 type WorkerSliceGwRecyclerSpec struct {
 	SliceGwServer string `json:"sliceGwServer,omitempty"`
 	SliceGwClient string `json:"sliceGwClient,omitempty"`
-	GwPair GwPair `json:"gwPair,omitempty"`
-	State string `json:"state,omitempty"`
-	Request string `json:"request,omitempty"`
-	SliceName string `json:"sliceName,omitempty"`
-
+	GwPair        GwPair `json:"gwPair,omitempty"`
+	State         string `json:"state,omitempty"`
+	Request       string `json:"request,omitempty"`
+	SliceName     string `json:"sliceName,omitempty"`
 }
 
 type GwPair struct {
@@ -41,12 +40,12 @@ type GwPair struct {
 
 // WorkerSliceGwRecyclerStatus defines the observed state of WorkerSliceGwRecycler
 type WorkerSliceGwRecyclerStatus struct {
-	Client ClientStatus `json:"client,omitempty"`
-	ServersToRecycle []string `json:"serversToRecycle,omitempty"`
-	RecycledServers []string `json:"recycledServers,omitempty"`
+	Client           ClientStatus `json:"client,omitempty"`
+	ServersToRecycle []string     `json:"serversToRecycle,omitempty"`
+	RecycledServers  []string     `json:"recycledServers,omitempty"`
 }
 type ClientStatus struct {
-	Response string `json:"response,omitempty"`
+	Response       string `json:"response,omitempty"`
 	RecycledClient string `json:"recycledClient,omitempty"`
 }
 
