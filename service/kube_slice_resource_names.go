@@ -172,8 +172,13 @@ var (
 	workerClusterRoleRules = []rbacv1.PolicyRule{
 		{
 			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceControllers, apiGroupKubeSliceWorker},
-			Resources: []string{resourceServiceExportConfigs, resourceWorkerSliceGwRecycler, resourceWorkerSliceGwRecycler + ResourceStatusSuffix},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceServiceExportConfigs},
+		},
+		{
+			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceGwRecycler},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
@@ -193,7 +198,7 @@ var (
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
 			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
+			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix, resourceWorkerSliceGwRecycler + ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
