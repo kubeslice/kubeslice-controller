@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// GetObjectKindis a function which return the kind of existing resource
-func Cleanup_GetObjectKind(obj runtime.Object) string {
+// GetObjectKind is a function which return the kind of existing resource
+func CleanupGetObjectKind(obj runtime.Object) string {
 	kindPath := reflect.TypeOf(obj)
 	kindPathName := kindPath.String()
 	kindPathNameParts := strings.Split(kindPathName, ".")
@@ -38,21 +38,21 @@ func Cleanup_GetObjectKind(obj runtime.Object) string {
 }
 
 // GetResourceIfExist is a function to get the given resource is in namespace
-func Cleanup_GetResourceIfExist(ctx context.Context, namespacedName client.ObjectKey, object client.Object) (bool,
+func CleanupGetResourceIfExist(ctx context.Context, namespacedName client.ObjectKey, object client.Object) (bool,
 	error) {
 	logger := CtxLogger(ctx)
-	logger.Debugf("Fetching %s %s in namespace %s", Cleanup_GetObjectKind(object),
+	logger.Debugf("Fetching %s %s in namespace %s", CleanupGetObjectKind(object),
 		namespacedName.Name, namespacedName.Namespace)
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Get(ctx, namespacedName, object)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.Debugf("%s %s in namespace %s not found", Cleanup_GetObjectKind(object),
+			logger.Debugf("%s %s in namespace %s not found", CleanupGetObjectKind(object),
 				namespacedName.Name, namespacedName.Namespace)
 			return false, nil
 		} else {
 			logger.With(zap.Error(err)).Errorf("%s Error retrieving object of kind %s with name %s in namespace %s", Err,
-				Cleanup_GetObjectKind(object), namespacedName.Name, namespacedName.Namespace)
+				CleanupGetObjectKind(object), namespacedName.Name, namespacedName.Namespace)
 			return false, err
 		}
 	}
@@ -60,9 +60,9 @@ func Cleanup_GetResourceIfExist(ctx context.Context, namespacedName client.Objec
 }
 
 // UpdateResource is a function to update resource
-func Cleanup_UpdateResource(ctx context.Context, object client.Object) error {
+func CleanupUpdateResource(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
-	logger.Debugf("Updating %s %s in namespace %s", Cleanup_GetObjectKind(object), object.GetName(),
+	logger.Debugf("Updating %s %s in namespace %s", CleanupGetObjectKind(object), object.GetName(),
 		object.GetNamespace())
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Update(ctx, object)
@@ -70,15 +70,15 @@ func Cleanup_UpdateResource(ctx context.Context, object client.Object) error {
 		logger.With(zap.Error(err)).Errorf("Failed to update resource: %v", object)
 		return err
 	}
-	logger.Infof("%s Updated %s %s in namespace %s", Tick, Cleanup_GetObjectKind(object), object.GetName(),
+	logger.Infof("%s Updated %s %s in namespace %s", Tick, CleanupGetObjectKind(object), object.GetName(),
 		object.GetNamespace())
 	return err
 }
 
 // UpdateStatus is a function to update the status of given resource
-func Cleanup_UpdateStatus(ctx context.Context, object client.Object) error {
+func CleanupUpdateStatus(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
-	logger.Debugf("Updating status of %s with name %s in namespace %s", Cleanup_GetObjectKind(object), object.GetName(),
+	logger.Debugf("Updating status of %s with name %s in namespace %s", CleanupGetObjectKind(object), object.GetName(),
 		object.GetNamespace())
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Status().Update(ctx, object)
@@ -86,7 +86,7 @@ func Cleanup_UpdateStatus(ctx context.Context, object client.Object) error {
 		logger.With(zap.Error(err)).Errorf("%s Failed to update status: %v", Err, object)
 		return err
 	}
-	logger.Infof("%s Updated status of %s %s in namespace %s", Tick, Cleanup_GetObjectKind(object), object.GetName(),
+	logger.Infof("%s Updated status of %s %s in namespace %s", Tick, CleanupGetObjectKind(object), object.GetName(),
 		object.GetNamespace())
 	err = kubeSliceCtx.Get(ctx, client.ObjectKey{
 		Namespace: object.GetNamespace(),
@@ -99,24 +99,24 @@ func Cleanup_UpdateStatus(ctx context.Context, object client.Object) error {
 }
 
 // DeleteResource is a function to delete the resource of given kind
-func Cleanup_DeleteResource(ctx context.Context, object client.Object) error {
+func CleanupDeleteResource(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
-	logger.Debugf("Deleting %s %s in namespace %s", Cleanup_GetObjectKind(object), object.GetName(),
+	logger.Debugf("Deleting %s %s in namespace %s", CleanupGetObjectKind(object), object.GetName(),
 		object.GetNamespace())
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Delete(ctx, object)
 	if err != nil {
 		return err
 	}
-	logger.Infof("%s Deleted %s %s in namespace %s", Recycle, Cleanup_GetObjectKind(object), object.GetName(),
+	logger.Infof("%s Deleted %s %s in namespace %s", Recycle, CleanupGetObjectKind(object), object.GetName(),
 		object.GetNamespace())
 	return nil
 }
 
 // ListResources is a function to list down the resources/objects of given kind
-func Cleanup_ListResources(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+func CleanupListResources(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	logger := CtxLogger(ctx)
-	logger.Debugf("Listing %s with options %v", Cleanup_GetObjectKind(list), opts)
+	logger.Debugf("Listing %s with options %v", CleanupGetObjectKind(list), opts)
 
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.List(ctx, list, opts...)
@@ -124,7 +124,7 @@ func Cleanup_ListResources(ctx context.Context, list client.ObjectList, opts ...
 }
 
 // GetOwnerLabel is a function returns the label of object
-func Cleanup_GetOwnerLabel(completeResourceName string) map[string]string {
+func CleanupGetOwnerLabel(completeResourceName string) map[string]string {
 	label := map[string]string{}
 	for key, value := range LabelsKubeSliceController {
 		label[key] = value
@@ -132,7 +132,7 @@ func Cleanup_GetOwnerLabel(completeResourceName string) map[string]string {
 	lenCompleteResourceName := len(completeResourceName)
 	i := 0
 	j := 0
-	//resourceName = fmt.Sprintf(LabelValue, Cleanup_GetObjectKind(owner), owner.GetName())
+	//resourceName = fmt.Sprintf(LabelValue, CleanupGetObjectKind(owner), owner.GetName())
 	if lenCompleteResourceName > 63 {
 		noOfLabels := lenCompleteResourceName / 63
 		label["kubeslice-controller-resource-name"] = completeResourceName[j:63]
