@@ -84,7 +84,7 @@ func CreateResource(ctx context.Context, object client.Object) error {
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Create(ctx, object)
 	if err != nil {
-		//logger.With(zap.Error(err)).Errorf("Failed to create resource: %v in namespace", object)
+		logger.With(zap.Error(err)).Errorf("Failed to create resource: %v in namespace", object)
 		return err
 	}
 	logger.Infof("Created object kind %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
