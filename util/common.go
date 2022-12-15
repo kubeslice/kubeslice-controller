@@ -17,11 +17,13 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.uber.org/zap/zapcore"
 )
@@ -148,7 +150,7 @@ func FindCIDRByMaxClusters(maxCluster int) string {
 	return cidr
 }
 
-//intPow compute a**b using binary powering algorithm
+// intPow compute a**b using binary powering algorithm
 func intPow(a, b int) int {
 	p := 1
 	for b > 0 {
@@ -161,8 +163,8 @@ func intPow(a, b int) int {
 	return p
 }
 
-//subnetOctetDiff calculates the controlling octet of the subnet along with the difference factor of the octet from cidr
-//for eg: a cidr of /20 means 3rd octet controls the subnet and has a difference of 16 (3, 16)
+// subnetOctetDiff calculates the controlling octet of the subnet along with the difference factor of the octet from cidr
+// for eg: a cidr of /20 means 3rd octet controls the subnet and has a difference of 16 (3, 16)
 // returns -1, -1 for invalid cidr
 func subnetOctetDiff(cidr int) (int, int) {
 	if cidr <= 24 && cidr > 0 {
@@ -187,4 +189,23 @@ func GetClusterPrefixPool(sliceSubnet string, ipamInt int, subnetCidr string) st
 	}
 	octetList[3] += fmt.Sprintf("/%d", cidr)
 	return strings.Join(octetList, ".")
+}
+
+// Retry tries to execute the funtion, If failed reattempts till backoffLimit
+func Retry(ctx context.Context, backoffLimit int, sleep time.Duration, f func() error) (err error) {
+	logger := CtxLogger(ctx)
+	start := time.Now()
+	for i := 0; i < backoffLimit; i++ {
+		if i > 0 {
+			logger.Infof("%s Waiting %d seconds before retrying as an error occured: %s", Wait, int(sleep.Seconds()), err.Error())
+			time.Sleep(sleep)
+			sleep *= 2
+		}
+		err = f()
+		if err == nil {
+			return nil
+		}
+	}
+	elapsed := time.Since(start)
+	return fmt.Errorf("retry failed after %d attempts (took %d seconds), last error: %s", backoffLimit, int(elapsed.Seconds()), err)
 }
