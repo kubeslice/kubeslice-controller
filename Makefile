@@ -145,6 +145,10 @@ apply-sample: ## Generate sample manifests.
 webhookCA: ## Install the Cert Manager for Admission controller Webhooks.
 	kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.0/cert-manager.yaml
 
+.PHONY: cleanup
+cleanup: 
+	kubectl apply -f config/cleanup/cleanup_job.yaml -n=kubeslice-controller
+
 .PHONY: generate-mocks
 generate-mocks: ## Generate mocks for the controller-runtime.
 	mockery --dir service/ --all  --output service/mocks
