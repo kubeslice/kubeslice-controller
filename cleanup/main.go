@@ -32,5 +32,4 @@ func main() {
 	cs := &service.CleanupService{}
 	// Cleanup resources
 	cs.CleanupResources(ctx)
-
 }
