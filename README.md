@@ -14,7 +14,7 @@ using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/acce
 The KubeSlice Controller orchestrates the creation and management of slices on worker clusters.
 It is strongly recommended to use a released version. Follow the instructions provided in this [document](https://kubeslice.io/documentation/open-source/0.5.0/cloud-cluster-quick-start).
 
-## Building and Deploying a KubeSlice Controller on a Local Kind Cluster
+## Building and Deploying a KubeSlice Controller on a Kind Cluster
 
 See our documentation on [installing the KubeSlice Controller on a Kind Cluster](https://kubeslice.io/documentation/open-source/0.5.0/tutorials/kind-install-kubeslice-controller).
 
@@ -56,7 +56,7 @@ cd kubeslice-controller
 ```console
 make docker-build
 ```
-### Running Local Image on a Kind Clusters
+### Running Local Image on Kind Clusters
 
 1. Loading kubeslice-controller image into your kind cluster ([kind](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)).
    If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
@@ -114,7 +114,7 @@ kubeslice:
    make chart-deploy VALUESFILE=yourvaluesfile.yaml
    ```
    
-### Verify the installation
+### Verify the Installation
 
 Verify the installation of the KubeSlice Controller by checking the pods belonging to the `kubeslice-controller` namespace using the following command:
 
