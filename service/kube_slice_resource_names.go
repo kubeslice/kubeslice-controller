@@ -34,6 +34,7 @@ const (
 	resourceProjects             = "projects"
 	resourceCluster              = "clusters"
 	resourceSliceConfig          = "sliceconfigs"
+	resourceSliceQoSConfig       = "sliceqosconfigs"
 	resourceWorkerSliceConfig    = "workersliceconfigs"
 	resourceWorkerSliceGateways  = "workerslicegateways"
 	resourceServiceExportConfigs = "serviceexportconfigs"
@@ -139,7 +140,7 @@ const (
 	KubesliceWorkerDeleteRequeueTime = 3
 )
 
-//StandardQoSProfileLabel name
+// StandardQoSProfileLabel name
 const (
 	StandardQoSProfileLabel = "standard-qos-profile"
 )
@@ -212,7 +213,7 @@ var (
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
+			Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
@@ -242,7 +243,7 @@ var (
 		{
 			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
+			Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
