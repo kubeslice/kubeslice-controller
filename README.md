@@ -16,7 +16,7 @@ It is strongly recommended to use a released version. Follow the instructions pr
 
 ## Building and Deploying a KubeSlice Controller on a Kind Cluster
 
-See our documentation on [installing the KubeSlice Controller on a Kind Cluster](https://kubeslice.io/documentation/open-source/0.5.0/tutorials/kind-install-kubeslice-controller).
+See our documentation on [installing the KubeSlice Controller on a kind cluster](https://kubeslice.io/documentation/open-source/0.5.0/tutorials/kind-install-kubeslice-controller).
 
 ### Prerequisites
 
