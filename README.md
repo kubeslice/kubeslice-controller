@@ -12,17 +12,20 @@ using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/acce
 ## Getting Started
 
 The KubeSlice Controller orchestrates the creation and management of slices on worker clusters.
-It is strongly recommended to use a released version. Follow the instructions provided in this [document](https://docs.avesha.io/documentation/open-source/0.2.0/getting-started-with-cloud-clusters/installing-kubeslice/installing-the-kubeslice-controller).
+It is strongly recommended to use a released version. Follow the instructions provided in this [document](https://kubeslice.io/documentation/open-source/0.5.0/cloud-cluster-quick-start).
 
-## Building and Deploying `kubeslice-controller` in a Local Kind Cluster
-For more information, see [getting started with kind clusters](https://docs.avesha.io/documentation/open-source/0.2.0/getting-started-with-kind-clusters).
+## Building and Deploying a KubeSlice Controller on a Local Kind Cluster
+
+See our documentation on [installing the KubeSlice Controller on a Kind Cluster](https://kubeslice.io/documentation/open-source/0.5.0/tutorials/kind-install-kubeslice-controller).
 
 ### Prerequisites
 
-* Docker installed and running in your local machine
-* A running [`kind`](https://kind.sigs.k8s.io/)  cluster
-* [`kubectl`](https://kubernetes.io/docs/tasks/tools/) installed and configured
-* Follow the getting started from above to install [`kubeslice-controller`](https://github.com/kubeslice/kubeslice-controller) and [`worker-operator`](https://github.com/kubeslice/worker-operator).
+Before you begin, make sure the following prerequisites are met:
+
+* Docker is installed and running on your local machine.
+* A running [`kind`](https://kind.sigs.k8s.io/) cluster.
+* [`kubectl`](https://kubernetes.io/docs/tasks/tools/) is installed and configured.
+* You have prepared the environment for the installation of [`kubeslice-controller`](https://github.com/kubeslice/kubeslice-controller) on the controller cluster and [`worker-operator`](https://github.com/kubeslice/worker-operator) on the worker cluster. For more information, see [Prerequisites](https://kubeslice.io/documentation/open-source/0.5.0/getting-started-with-cloud-clusters/prerequisites/)
 
 ### Setting up Your Helm Repo
 If you have not added avesha helm repo yet, add it.
@@ -53,7 +56,7 @@ cd kubeslice-controller
 ```console
 make docker-build
 ```
-### Running Local Image on Kind Clusters
+### Running Local Image on a Kind Clusters
 
 1. Loading kubeslice-controller image into your kind cluster ([kind](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)).
    If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
@@ -111,22 +114,23 @@ kubeslice:
    make chart-deploy VALUESFILE=yourvaluesfile.yaml
    ```
    
-### Verify if the Operator is Running
+### Verify the installation
 
+Verify the installation of the KubeSlice Controller by checking the pods belonging to the `kubeslice-controller` namespace using the following command:
 
 ```console
 kubectl get pods -n kubeslice-controller
 ```
 
-Sample output to expect
+Example Output
 
 ```
 NAME                                            READY   STATUS    RESTARTS   AGE
 kubeslice-controller-manager-5b548fb865-kzb7c   2/2     Running   0          102s
 ```
 
-### Uninstalling the kubeslice-controller
-For more information, see [uninstalling KubeSlice](https://docs.avesha.io/documentation/open-source/0.2.0/getting-started-with-cloud-clusters/uninstalling-kubeslice).
+### Uninstalling the KubeSlice Controller
+For more information, see [uninstalling KubeSlice](https://kubeslice.io/documentation/open-source/0.5.0/getting-started-with-cloud-clusters/uninstalling-kubeslice/offboarding-namespaces).
 
 ```console
 make chart-undeploy
