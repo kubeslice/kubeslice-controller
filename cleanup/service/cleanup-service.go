@@ -24,6 +24,7 @@ var (
 	projects             *controllerv1alpha1.ProjectList
 	sliceConfigs         *controllerv1alpha1.SliceConfigList
 	serviceExportConfigs *controllerv1alpha1.ServiceExportConfigList
+	sliceQosConfigs      *controllerv1alpha1.SliceQoSConfigList
 	clusters             *controllerv1alpha1.ClusterList
 	workerSliceConfigs   *workerv1alpha1.WorkerSliceConfigList
 	logger               = util.NewLogger().With("controller", "GracefulCleanup")
@@ -40,6 +41,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 	sliceConfigs = &controllerv1alpha1.SliceConfigList{}
 	serviceExportConfigs = &controllerv1alpha1.ServiceExportConfigList{}
 	clusters = &controllerv1alpha1.ClusterList{}
+	sliceQosConfigs = &controllerv1alpha1.SliceQoSConfigList{}
 	workerSliceConfigs = &workerv1alpha1.WorkerSliceConfigList{}
 
 	// Delete all Projects
@@ -128,6 +130,21 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 			})
 			if err != nil {
 				logger.Errorf("%s Error deleting SliceConfig %s. %s", util.Err, sliceConfig.GetName(), err.Error())
+			}
+		}
+		// Delete all sliceQosConfigs
+		logger.Infof("%s Fetching all SliceQosConfigs for Project %s", util.Find, project.GetName())
+		err = util.ListResources(ctx, sliceQosConfigs, client.InNamespace(projectNamespace))
+		if err != nil {
+			logger.Error("%s Error fetching sliceQosConfigs %s", util.Err, err.Error())
+		}
+		for _, sliceQosConfig := range sliceQosConfigs.Items {
+			logger.Infof("%s  Deleting SliceQosConfigs %s", util.Bin, sliceQosConfig.GetName())
+			err = util.Retry(ctx, noOfRetries, sleepDuration, func() (err error) {
+				return util.CleanupDeleteResource(ctx, &sliceQosConfig)
+			})
+			if err != nil {
+				logger.Errorf("%s Error deleting SliceQosConfigs %s. %s", util.Err, sliceQosConfig.GetName(), err.Error())
 			}
 		}
 
