@@ -27,6 +27,7 @@ var (
 	sliceQosConfigs      *controllerv1alpha1.SliceQoSConfigList
 	clusters             *controllerv1alpha1.ClusterList
 	workerSliceConfigs   *workerv1alpha1.WorkerSliceConfigList
+	workerServiceImports *workerv1alpha1.WorkerServiceImportList
 	logger               = util.NewLogger().With("controller", "GracefulCleanup")
 )
 
@@ -43,6 +44,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 	clusters = &controllerv1alpha1.ClusterList{}
 	sliceQosConfigs = &controllerv1alpha1.SliceQoSConfigList{}
 	workerSliceConfigs = &workerv1alpha1.WorkerSliceConfigList{}
+	workerServiceImports = &workerv1alpha1.WorkerServiceImportList{}
 
 	// Delete all Projects
 	logger.Infof("%s Fetching all Projects", util.Find)
@@ -161,6 +163,22 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 			})
 			if err != nil {
 				logger.Errorf("%s Error deleting Cluster %s. %s", util.Err, cluster.GetName(), err.Error())
+			}
+		}
+
+		// Delete all WorkerServiceImports (if Remaining)
+		logger.Infof("%s Fetching all WorkerServiceImports for Project %s", util.Find, project.GetName())
+		err = util.ListResources(ctx, workerServiceImports, client.InNamespace(projectNamespace))
+		if err != nil {
+			logger.Error("%s Error fetching WorkerServiceImports %s", util.Err, err.Error())
+		}
+		for _, cluster := range workerServiceImports.Items {
+			logger.Infof("%s  Deleting WorkerServiceImport %s", util.Bin, cluster.GetName())
+			err = util.Retry(ctx, noOfRetries, sleepDuration, func() (err error) {
+				return util.CleanupDeleteResource(ctx, &cluster)
+			})
+			if err != nil {
+				logger.Errorf("%s Error deleting workerServiceImport %s. %s", util.Err, cluster.GetName(), err.Error())
 			}
 		}
 
