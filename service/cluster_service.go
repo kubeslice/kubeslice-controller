@@ -94,33 +94,36 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	if serviceAccount.Secrets == nil {
 		logger.Infof("Service Account Token not populated. Requeuing")
 		return ctrl.Result{Requeue: true, RequeueAfter: RequeueTime}, nil
-	}
-	//Step 4: Get Secret
-	secret := corev1.Secret{}
-	serviceAccountSecretNamespacedName := types.NamespacedName{
-		Namespace: req.Namespace,
-		Name:      serviceAccount.Secrets[0].Name,
-	}
-	found, err = util.GetResourceIfExist(ctx, serviceAccountSecretNamespacedName, &secret)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if !found {
-		err = fmt.Errorf("could not find secret")
-		logger.Errorf(err.Error())
-		return ctrl.Result{}, err
-	}
-	//Step 5: Update Cluster with Secret
-	cluster.Status.SecretName = secret.Name
-	err = util.UpdateStatus(ctx, cluster)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	secret.Data["controllerEndpoint"] = []byte(ControllerEndpoint)
-	secret.Data["clusterName"] = []byte(cluster.Name)
-	err = util.UpdateResource(ctx, &secret)
-	if err != nil {
-		return ctrl.Result{}, err
+	} else {
+		for i, _ := range serviceAccount.Secrets {
+			//Step 4: Get Secret
+			secret := corev1.Secret{}
+			serviceAccountSecretNamespacedName := types.NamespacedName{
+				Namespace: req.Namespace,
+				Name:      serviceAccount.Secrets[i].Name,
+			}
+			found, err = util.GetResourceIfExist(ctx, serviceAccountSecretNamespacedName, &secret)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if !found {
+				err = fmt.Errorf("could not find secret")
+				logger.Errorf(err.Error())
+				return ctrl.Result{}, err
+			}
+			//Step 5: Update Cluster with Secret
+			cluster.Status.SecretName = secret.Name
+			err = util.UpdateStatus(ctx, cluster)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			secret.Data["controllerEndpoint"] = []byte(ControllerEndpoint)
+			secret.Data["clusterName"] = []byte(cluster.Name)
+			err = util.UpdateResource(ctx, &secret)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 	//Step 6: NodeIP Reconciliation to WorkerSliceGateways
 	err = c.sgws.NodeIpReconciliationOfWorkerSliceGateways(ctx, cluster, req.Namespace)
