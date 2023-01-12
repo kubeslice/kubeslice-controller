@@ -24,8 +24,10 @@ var (
 	projects             *controllerv1alpha1.ProjectList
 	sliceConfigs         *controllerv1alpha1.SliceConfigList
 	serviceExportConfigs *controllerv1alpha1.ServiceExportConfigList
+	sliceQosConfigs      *controllerv1alpha1.SliceQoSConfigList
 	clusters             *controllerv1alpha1.ClusterList
 	workerSliceConfigs   *workerv1alpha1.WorkerSliceConfigList
+	workerServiceImports *workerv1alpha1.WorkerServiceImportList
 	logger               = util.NewLogger().With("controller", "GracefulCleanup")
 )
 
@@ -34,13 +36,16 @@ type CleanupService struct {
 
 func (cs *CleanupService) CleanupResources(ctx context.Context) {
 	controllerManagerNamespace = os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE")
+	hasErrors := false
 
 	// Initialize Resource Types
 	projects = &controllerv1alpha1.ProjectList{}
 	sliceConfigs = &controllerv1alpha1.SliceConfigList{}
 	serviceExportConfigs = &controllerv1alpha1.ServiceExportConfigList{}
 	clusters = &controllerv1alpha1.ClusterList{}
+	sliceQosConfigs = &controllerv1alpha1.SliceQoSConfigList{}
 	workerSliceConfigs = &workerv1alpha1.WorkerSliceConfigList{}
+	workerServiceImports = &workerv1alpha1.WorkerServiceImportList{}
 
 	// Delete all Projects
 	logger.Infof("%s Fetching all Projects", util.Find)
@@ -63,12 +68,14 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 
 		err := util.ListResources(ctx, serviceExportConfigs, client.InNamespace(projectNamespace))
 		if err != nil {
+			hasErrors = true
 			logger.Errorf("%sError fetching ServiceExports. %s", util.Err, err.Error())
 		}
 		for _, serviceExportConfig := range serviceExportConfigs.Items {
 			logger.Infof("%s  Deleting ServiceExportConfig %s", util.Bin, serviceExportConfig.GetName())
 			err := util.CleanupDeleteResource(ctx, &serviceExportConfig)
 			if err != nil {
+				hasErrors = true
 				logger.Errorf("%s Error deleting ServiceExport %s. %s", util.Err, serviceExportConfig.GetName(), err.Error())
 			}
 		}
@@ -76,6 +83,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 		logger.Infof("%s Fetching all SliceConfigs for Project %s", util.Find, project.GetName())
 		err = util.ListResources(ctx, sliceConfigs, client.InNamespace(projectNamespace))
 		if err != nil {
+			hasErrors = true
 			logger.Errorf("%s Error fetching SliceConfigs. %s", util.Err, err.Error())
 		}
 		for _, sliceConfig := range sliceConfigs.Items {
@@ -86,6 +94,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 				sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces = nil
 				err := util.CleanupUpdateResource(ctx, &sliceConfig)
 				if err != nil {
+					hasErrors = true
 					logger.Errorf("%s Error offboarding Application Namespaces from SliceConfig %s. %s", util.Err, sliceConfig.GetName(), err.Error())
 				}
 			}
@@ -94,6 +103,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 			ownershipLabel := util.GetOwnerLabel(completeResourceName)
 			err := util.ListResources(ctx, workerSliceConfigs, client.MatchingLabels(ownershipLabel), client.InNamespace(projectNamespace))
 			if err != nil {
+				hasErrors = true
 				logger.Errorf("%s Error fetching WorkerSliceConfigs %s", util.Err, err)
 			}
 			for _, workerSliceConfig := range workerSliceConfigs.Items {
@@ -111,11 +121,13 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 					return fmt.Errorf("application Namespaces not offboarded")
 				})
 				if err != nil {
+					hasErrors = true
 					logger.Infof("%s WorkerSliceConfig status not updated %s", util.Sad, err.Error())
 					// After timeout update status of workerSliceConfig
 					workerSliceConfig.Status.OnboardedAppNamespaces = nil
 					err = util.CleanupUpdateStatus(ctx, &workerSliceConfig)
 					if err != nil {
+						hasErrors = true
 						logger.Errorf("%s Error updating status of WorkerSliceConfig %s. %s", util.Err, workerSliceConfig.GetName(), err.Error())
 					}
 				}
@@ -127,7 +139,43 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 				return util.CleanupDeleteResource(ctx, &sliceConfig)
 			})
 			if err != nil {
+				hasErrors = true
 				logger.Errorf("%s Error deleting SliceConfig %s. %s", util.Err, sliceConfig.GetName(), err.Error())
+			}
+		}
+		// Delete all sliceQosConfigs
+		logger.Infof("%s Fetching all SliceQosConfigs for Project %s", util.Find, project.GetName())
+		err = util.ListResources(ctx, sliceQosConfigs, client.InNamespace(projectNamespace))
+		if err != nil {
+			hasErrors = true
+			logger.Error("%s Error fetching sliceQosConfigs %s", util.Err, err.Error())
+		}
+		for _, sliceQosConfig := range sliceQosConfigs.Items {
+			logger.Infof("%s  Deleting SliceQosConfigs %s", util.Bin, sliceQosConfig.GetName())
+			err = util.Retry(ctx, noOfRetries, sleepDuration, func() (err error) {
+				return util.CleanupDeleteResource(ctx, &sliceQosConfig)
+			})
+			if err != nil {
+				hasErrors = true
+				logger.Errorf("%s Error deleting SliceQosConfigs %s. %s", util.Err, sliceQosConfig.GetName(), err.Error())
+			}
+		}
+
+		// Delete all WorkerServiceImports (if Remaining)
+		logger.Infof("%s Fetching all WorkerServiceImports for Project %s", util.Find, project.GetName())
+		err = util.ListResources(ctx, workerServiceImports, client.InNamespace(projectNamespace))
+		if err != nil {
+			hasErrors = true
+			logger.Error("%s Error fetching WorkerServiceImports %s", util.Err, err.Error())
+		}
+		for _, cluster := range workerServiceImports.Items {
+			logger.Infof("%s  Deleting WorkerServiceImport %s", util.Bin, cluster.GetName())
+			err = util.Retry(ctx, noOfRetries, sleepDuration, func() (err error) {
+				return util.CleanupDeleteResource(ctx, &cluster)
+			})
+			if err != nil {
+				hasErrors = true
+				logger.Errorf("%s Error deleting workerServiceImport %s. %s", util.Err, cluster.GetName(), err.Error())
 			}
 		}
 
@@ -135,6 +183,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 		logger.Infof("%s Fetching all Clusters for Project %s", util.Find, project.GetName())
 		err = util.ListResources(ctx, clusters, client.InNamespace(projectNamespace))
 		if err != nil {
+			hasErrors = true
 			logger.Error("%s Error fetching Clusters %s", util.Err, err.Error())
 		}
 		for _, cluster := range clusters.Items {
@@ -143,6 +192,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 				return util.CleanupDeleteResource(ctx, &cluster)
 			})
 			if err != nil {
+				hasErrors = true
 				logger.Errorf("%s Error deleting Cluster %s. %s", util.Err, cluster.GetName(), err.Error())
 			}
 		}
@@ -153,10 +203,13 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 			return util.CleanupDeleteResource(ctx, &project)
 		})
 		if err != nil {
+			hasErrors = true
 			logger.Errorf("%s Error deleting Project %s. %s", util.Err, project.GetName(), err.Error())
 		}
 	}
-	if err == nil {
+	if !hasErrors {
 		logger.Infof("%s Successfully cleaned up all Kubeslice resources.", util.Party)
+	} else {
+		logger.Infof("%s Cleanup job finished with errors.", util.Sad)
 	}
 }
