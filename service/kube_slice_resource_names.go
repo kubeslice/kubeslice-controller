@@ -34,7 +34,7 @@ const (
 	resourceProjects              = "projects"
 	resourceCluster               = "clusters"
 	resourceSliceConfig           = "sliceconfigs"
-	resourceSliceQoSConfig       = "sliceqosconfigs"
+	resourceSliceQoSConfig        = "sliceqosconfigs"
 	resourceWorkerSliceConfig     = "workersliceconfigs"
 	resourceWorkerSliceGateways   = "workerslicegateways"
 	resourceServiceExportConfigs  = "serviceexportconfigs"
@@ -184,7 +184,7 @@ var (
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
+			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport, resourceWorkerSliceGwRecycler},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
@@ -194,7 +194,7 @@ var (
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
 			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
+			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix, resourceWorkerSliceGwRecycler + ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
@@ -214,7 +214,7 @@ var (
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
+			Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
@@ -244,7 +244,7 @@ var (
 		{
 			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
+			Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
