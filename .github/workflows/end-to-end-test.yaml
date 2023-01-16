@@ -19,10 +19,10 @@ jobs:
     
     - name: Set outputs
       id: vars
-      run: echo "::set-output name=sha_commit::$(git rev-parse HEAD)"
+      run: echo "sha_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
     - name: build the kubeslice controller
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v3
       with:
         tags: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
         build-args: |
@@ -51,7 +51,7 @@ jobs:
           bash run.sh kind
 
     - name: Checkout gh-pages repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: kubeslice/e2e-allure-reports
         path: gh-pages
@@ -76,7 +76,7 @@ jobs:
         test_env: Kind
           
     - name: Deploy report to Github Pages
-      uses: peaceiris/actions-gh-pages@v2
+      uses: peaceiris/actions-gh-pages@v3
       env:
         PUBLISH_BRANCH: gh-pages
         PERSONAL_TOKEN: ${{ secrets.TOKEN }}
@@ -90,7 +90,7 @@ jobs:
          echo 'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'
       
     - name: Report link on Pull Request comment
-      uses: thollander/actions-comment-pull-request@v1
+      uses: thollander/actions-comment-pull-request@v2
       with:
         message: |
                  report link  'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'

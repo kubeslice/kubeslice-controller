@@ -34,6 +34,7 @@ const (
 	resourceProjects              = "projects"
 	resourceCluster               = "clusters"
 	resourceSliceConfig           = "sliceconfigs"
+	resourceSliceQoSConfig       = "sliceqosconfigs"
 	resourceWorkerSliceConfig     = "workersliceconfigs"
 	resourceWorkerSliceGateways   = "workerslicegateways"
 	resourceServiceExportConfigs  = "serviceexportconfigs"
@@ -115,7 +116,7 @@ var (
 	ControllerEndpoint = "https://controller.cisco.com:6443/"
 )
 
-// Project Namespace prefix. Customer can override this.
+// Project Namespace prefix. Customer can over ride this.
 var (
 	ProjectNamespacePrefix = "kubeslice-controller-project-"
 )
@@ -140,7 +141,7 @@ const (
 	KubesliceWorkerDeleteRequeueTime = 3
 )
 
-// StandardQoSProfileLabel name
+//StandardQoSProfileLabel name
 const (
 	StandardQoSProfileLabel = "standard-qos-profile"
 )
@@ -176,11 +177,6 @@ var (
 			Resources: []string{resourceServiceExportConfigs},
 		},
 		{
-			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceGwRecycler},
-		},
-		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
 			Resources: []string{resourceCluster},
@@ -198,7 +194,7 @@ var (
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
 			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix, resourceWorkerSliceGwRecycler + ResourceStatusSuffix},
+			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
