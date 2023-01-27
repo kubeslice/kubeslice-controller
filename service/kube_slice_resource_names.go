@@ -182,9 +182,14 @@ var (
 			Resources: []string{resourceCluster},
 		},
 		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch,verbCreate,verbDelete},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceGwRecycler},
+		},
+		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport, resourceWorkerSliceGwRecycler},
+			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
