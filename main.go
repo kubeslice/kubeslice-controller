@@ -63,10 +63,11 @@ func main() {
 	c := service.WithClusterService(ns, acs, wsgs)
 	wsi := service.WithWorkerServiceImportService()
 	se := service.WithServiceExportConfigService(wsi)
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se)
+	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs)
 	p := service.WithProjectService(ns, acs, c, sc, se)
 	sqcs := service.WithSliceQoSConfigService(wscs)
-	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs))
+	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
 }
 
 func initialize(services *service.Services) {
@@ -278,9 +279,9 @@ func initialize(services *service.Services) {
 //+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers,verbs=update
 
-//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs;workerserviceimports;workerslicegateways,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/status;workerserviceimports/status;workerslicegateways/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/finalizers;workerserviceimports/finalizers;workerslicegateways/finalizers ,verbs=update
+//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs;workerserviceimports;workerslicegateways;workerslicegwrecyclers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/status;workerserviceimports/status;workerslicegateways/status;workerslicegwrecyclers/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/finalizers;workerserviceimports/finalizers;workerslicegateways/finalizers;workerslicegwrecyclers/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create;update;patch;delete;escalate

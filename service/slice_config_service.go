@@ -34,16 +34,17 @@ type ISliceConfigService interface {
 
 // SliceConfigService implements different interfaces -
 type SliceConfigService struct {
-	ns  INamespaceService
-	acs IAccessControlService
-	sgs IWorkerSliceGatewayService
-	ms  IWorkerSliceConfigService
-	si  IWorkerServiceImportService
-	se  IServiceExportConfigService
+	ns    INamespaceService
+	acs   IAccessControlService
+	sgs   IWorkerSliceGatewayService
+	ms    IWorkerSliceConfigService
+	si    IWorkerServiceImportService
+	se    IServiceExportConfigService
+	wsgrs IWorkerSliceGatewayRecyclerService
 }
 
 // ReconcileSliceConfig is a function to reconcile the sliceconfig
-func (s SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get SliceConfig resource
 	logger := util.CtxLogger(ctx)
 	logger.Infof("Started Recoincilation of SliceConfig %v", req.NamespacedName)
@@ -142,6 +143,13 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 	err = s.ms.DeleteWorkerSliceConfigByLabel(ctx, ownershipLabel, namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	recyclerLabel := map[string]string{
+		"slice_name": slice.Name,
+	}
+	err = s.wsgrs.DeleteWorkerSliceGatewayRecyclersByLabel(ctx, recyclerLabel, namespace)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

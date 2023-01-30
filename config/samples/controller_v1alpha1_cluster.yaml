@@ -25,7 +25,7 @@ metadata:
   name: cluster-2
 spec:
   networkInterface: eth0
-  nodeIP: 11.11.12.115
+  nodeIP: 11.11.12.11
   clusterProperty:
     telemetry:
       enabled: true
