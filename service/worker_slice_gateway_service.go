@@ -188,11 +188,14 @@ func (s *WorkerSliceGatewayService) reconcileNodeIPAndNodePort(ctx context.Conte
 		return err
 	}
 	if found {
-
-		if !reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIp, remoteGateway.Spec.RemoteGatewayConfig.NodeIp) ||
-			localGateway.Spec.LocalGatewayConfig.NodePort != remoteGateway.Spec.RemoteGatewayConfig.NodePort {
+		if !reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIps, remoteGateway.Spec.RemoteGatewayConfig.NodeIps) ||
+			!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIp, remoteGateway.Spec.RemoteGatewayConfig.NodeIp) ||
+			localGateway.Spec.LocalGatewayConfig.NodePort != remoteGateway.Spec.RemoteGatewayConfig.NodePort ||
+			!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodePorts, remoteGateway.Spec.RemoteGatewayConfig.NodePorts) {
 			remoteGateway.Spec.RemoteGatewayConfig.NodeIp = localGateway.Spec.LocalGatewayConfig.NodeIp
+			remoteGateway.Spec.RemoteGatewayConfig.NodeIps = localGateway.Spec.LocalGatewayConfig.NodeIps
 			remoteGateway.Spec.RemoteGatewayConfig.NodePort = localGateway.Spec.LocalGatewayConfig.NodePort
+			remoteGateway.Spec.RemoteGatewayConfig.NodePorts = localGateway.Spec.LocalGatewayConfig.NodePorts
 			err = util.UpdateResource(ctx, &remoteGateway)
 			if err != nil {
 				return err
@@ -414,6 +417,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				ClusterName:   sourceCluster.Name,
 				GatewayName:   localGatewayName,
 				GatewaySubnet: gatewaySubnet,
+				NodeIps:       sourceCluster.Spec.NodeIPs,
 				NodeIp:        sourceCluster.Spec.NodeIP,
 				VpnIp:         localVpnAddress,
 			},
@@ -421,6 +425,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				ClusterName:   destinationCluster.Name,
 				GatewayName:   remoteGatewayName,
 				GatewaySubnet: remoteGatewaySubnet,
+				NodeIps:       destinationCluster.Spec.NodeIPs,
 				NodeIp:        destinationCluster.Spec.NodeIP,
 				VpnIp:         remoteVpnAddress,
 			},
@@ -499,6 +504,21 @@ func (s *WorkerSliceGatewayService) NodeIpReconciliationOfWorkerSliceGateways(ct
 		return err
 	}
 	for _, gateway := range workerSliceGateways.Items {
+		if len(gateway.Spec.LocalGatewayConfig.NodeIps) == 0 {
+			gateway.Spec.LocalGatewayConfig.NodeIps = append(gateway.Spec.LocalGatewayConfig.NodeIps, gateway.Spec.LocalGatewayConfig.NodeIp)
+			err = util.UpdateResource(ctx, &gateway)
+			if err != nil {
+				return err
+			}
+		}
+		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIps, cluster.Spec.NodeIPs) {
+			gateway.Spec.LocalGatewayConfig.NodeIps = cluster.Spec.NodeIPs
+			err = util.UpdateResource(ctx, &gateway)
+			if err != nil {
+				return err
+			}
+		}
+		// For backward compatibility.
 		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIp, cluster.Spec.NodeIP) {
 			gateway.Spec.LocalGatewayConfig.NodeIp = cluster.Spec.NodeIP
 			err = util.UpdateResource(ctx, &gateway)

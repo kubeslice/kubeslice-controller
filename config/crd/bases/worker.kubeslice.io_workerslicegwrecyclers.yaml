@@ -5,20 +5,21 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: sliceqosconfigs.controller.kubeslice.io
+  name: workerslicegwrecyclers.worker.kubeslice.io
 spec:
-  group: controller.kubeslice.io
+  group: worker.kubeslice.io
   names:
-    kind: SliceQoSConfig
-    listKind: SliceQoSConfigList
-    plural: sliceqosconfigs
-    singular: sliceqosconfig
+    kind: WorkerSliceGwRecycler
+    listKind: WorkerSliceGwRecyclerList
+    plural: workerslicegwrecyclers
+    singular: workerslicegwrecycler
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: SliceQoSConfig is the Schema for the sliceqosconfigs API
+        description: WorkerSliceGwRecycler is the Schema for the workerslicegwrecyclers
+          API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,49 +34,45 @@ spec:
           metadata:
             type: object
           spec:
-            description: SliceQoSConfigSpec defines the desired state of SliceQoSConfig
+            description: WorkerSliceGwRecyclerSpec defines the desired state of WorkerSliceGwRecycler
             properties:
-              bandwidthCeilingKbps:
-                type: integer
-              bandwidthGuaranteedKbps:
-                type: integer
-              dscpClass:
-                enum:
-                - Default
-                - AF11
-                - AF12
-                - AF13
-                - AF21
-                - AF22
-                - AF23
-                - AF31
-                - AF32
-                - AF33
-                - AF41
-                - AF42
-                - AF43
-                - EF
+              gwPair:
+                properties:
+                  clientId:
+                    type: string
+                  serverId:
+                    type: string
+                type: object
+              request:
                 type: string
-              priority:
-                type: integer
-              queueType:
-                enum:
-                - HTB
+              sliceGwClient:
                 type: string
-              tcType:
-                enum:
-                - BANDWIDTH_CONTROL
+              sliceGwServer:
                 type: string
-            required:
-            - bandwidthCeilingKbps
-            - bandwidthGuaranteedKbps
-            - dscpClass
-            - priority
-            - queueType
-            - tcType
+              sliceName:
+                type: string
+              state:
+                type: string
             type: object
           status:
-            description: SliceQoSConfigStatus defines the observed state of SliceQoSConfig
+            description: WorkerSliceGwRecyclerStatus defines the observed state of
+              WorkerSliceGwRecycler
+            properties:
+              client:
+                properties:
+                  recycledClient:
+                    type: string
+                  response:
+                    type: string
+                type: object
+              recycledServers:
+                items:
+                  type: string
+                type: array
+              serversToRecycle:
+                items:
+                  type: string
+                type: array
             type: object
         type: object
     served: true

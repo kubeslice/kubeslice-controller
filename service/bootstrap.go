@@ -17,14 +17,15 @@
 package service
 
 type Services struct {
-	ProjectService             IProjectService
-	ClusterService             IClusterService
-	SliceConfigService         ISliceConfigService
-	ServiceExportConfigService IServiceExportConfigService
-	WorkerSliceConfigService   IWorkerSliceConfigService
-	WorkerSliceGatewayService  IWorkerSliceGatewayService
-	WorkerServiceImportService IWorkerServiceImportService
-	SliceQoSConfigService      ISliceQoSConfigService
+	ProjectService                    IProjectService
+	ClusterService                    IClusterService
+	SliceConfigService                ISliceConfigService
+	ServiceExportConfigService        IServiceExportConfigService
+	WorkerSliceConfigService          IWorkerSliceConfigService
+	WorkerSliceGatewayService         IWorkerSliceGatewayService
+	WorkerServiceImportService        IWorkerServiceImportService
+	SliceQoSConfigService             ISliceQoSConfigService
+	WorkerSliceGatewayRecyclerService IWorkerSliceGatewayRecyclerService
 }
 
 // bootstrapping Services
@@ -37,16 +38,18 @@ func WithServices(
 	wsgs IWorkerSliceGatewayService,
 	wsis IWorkerServiceImportService,
 	sqcs ISliceQoSConfigService,
+	wsgrs IWorkerSliceGatewayRecyclerService,
 ) *Services {
 	return &Services{
-		ProjectService:             ps,
-		ClusterService:             cs,
-		SliceConfigService:         scs,
-		ServiceExportConfigService: secs,
-		WorkerSliceConfigService:   wscs,
-		WorkerSliceGatewayService:  wsgs,
-		WorkerServiceImportService: wsis,
-		SliceQoSConfigService:      sqcs,
+		ProjectService:                    ps,
+		ClusterService:                    cs,
+		SliceConfigService:                scs,
+		ServiceExportConfigService:        secs,
+		WorkerSliceConfigService:          wscs,
+		WorkerSliceGatewayService:         wsgs,
+		WorkerServiceImportService:        wsis,
+		SliceQoSConfigService:             sqcs,
+		WorkerSliceGatewayRecyclerService: wsgrs,
 	}
 }
 
@@ -88,14 +91,16 @@ func WithSliceConfigService(
 	ms IWorkerSliceConfigService,
 	si IWorkerServiceImportService,
 	se IServiceExportConfigService,
+	wsgrs IWorkerSliceGatewayRecyclerService,
 ) ISliceConfigService {
 	return &SliceConfigService{
-		ns:  ns,
-		acs: acs,
-		sgs: sgs,
-		ms:  ms,
-		si:  si,
-		se:  se,
+		ns:    ns,
+		acs:   acs,
+		sgs:   sgs,
+		ms:    ms,
+		si:    si,
+		se:    se,
+		wsgrs: wsgrs,
 	}
 }
 
@@ -134,6 +139,11 @@ func WithWorkerSliceGatewayService(
 		sscs: sscs,
 		sc:   sc,
 	}
+}
+
+// WithWorkerSliceGatewayRecyclerService bootstraps slice gateway_recycler service
+func WithWorkerSliceGatewayRecyclerService() IWorkerSliceGatewayRecyclerService {
+	return &WorkerSliceGatewayRecyclerService{}
 }
 
 // bootstrapping job service
