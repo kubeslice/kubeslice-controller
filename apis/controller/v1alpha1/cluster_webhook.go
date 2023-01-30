@@ -34,7 +34,6 @@ type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old run
 var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) error = nil
 var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error = nil
 var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) error = nil
-
 var clusterWebhookClient client.Client
 
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clusterValidation, validateUpdate clusterUpdateValidation, validateDelete clusterValidation) error {
@@ -42,6 +41,7 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clust
 	customClusterUpdateValidation = validateUpdate
 	customClusterDeleteValidation = validateDelete
 	clusterWebhookClient = mgr.GetClient()
+
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()

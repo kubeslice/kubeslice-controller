@@ -25,8 +25,10 @@ import (
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	//NodeIP is the IP address of the Node
-	NodeIP string `json:"nodeIP,omitempty"`
+	//NodeIP is the IP address of the Node - deprecated field use Plural NodeIPs
+	//+kubebuilder:deprecatedversion:warning="controller/v1alpha1 NodeIP is deprecated...use NodeIPs"
+	NodeIP  string   `json:"nodeIP,omitempty"`
+	NodeIPs []string `json:"nodeIPs,omitempty"`
 	// NetworkInterface is the network interface attached with the cluster.
 	NetworkInterface string `json:"networkInterface,omitempty"`
 	//put in an object

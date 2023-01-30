@@ -19,10 +19,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -185,8 +186,8 @@ func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.Slice
 		if cluster.Spec.NetworkInterface == "" {
 			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NetworkInterface"), "for cluster "+clusterName)
 		}
-		if len(cluster.Spec.NodeIP) == 0 {
-			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NodeIP"), "for cluster "+clusterName)
+		if len(cluster.Spec.NodeIPs) == 0 {
+			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NodeIPs"), "for cluster "+clusterName)
 		}
 		if len(cluster.Status.CniSubnet) == 0 {
 			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
