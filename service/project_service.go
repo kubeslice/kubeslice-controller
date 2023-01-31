@@ -103,6 +103,16 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		projectNamespace, project.Spec.ServiceAccount.ReadWrite, project)); shouldReturn {
 		return result, reconErr
 	}
+
+	// Step 6: adding ProjectNamespace in labels
+	labels := make(map[string]string)
+	labels["kubeslice-project-namespace"] = projectNamespace
+	project.Labels = labels
+	err = util.UpdateResource(ctx, project)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	logger.Infof("project %s reconciled", req.Name)
 	return ctrl.Result{}, nil
 }

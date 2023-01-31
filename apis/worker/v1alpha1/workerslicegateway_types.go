@@ -37,12 +37,15 @@ type WorkerSliceGatewaySpec struct {
 }
 
 type SliceGatewayConfig struct {
-	NodeIp        string `json:"nodeIp,omitempty"`
-	NodePort      int    `json:"nodePort,omitempty"`
-	GatewayName   string `json:"gatewayName,omitempty"`
-	ClusterName   string `json:"clusterName,omitempty"`
-	VpnIp         string `json:"vpnIp,omitempty"`
-	GatewaySubnet string `json:"gatewaySubnet,omitempty"`
+	//+kubebuilder:deprecatedversion:warning="worker/v1alpha1 NodeIp is deprecated...use NodeIps"
+	NodeIp        string   `json:"nodeIp,omitempty"`
+	NodeIps       []string `json:"nodeIps,omitempty"`
+	NodePort      int      `json:"nodePort,omitempty"`
+	NodePorts     []int    `json:"nodePorts,omitempty"`
+	GatewayName   string   `json:"gatewayName,omitempty"`
+	ClusterName   string   `json:"clusterName,omitempty"`
+	VpnIp         string   `json:"vpnIp,omitempty"`
+	GatewaySubnet string   `json:"gatewaySubnet,omitempty"`
 }
 
 type GatewayCredentials struct {

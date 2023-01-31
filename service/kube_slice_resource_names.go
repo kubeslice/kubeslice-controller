@@ -31,16 +31,18 @@ const (
 
 // Resources
 const (
-	resourceProjects             = "projects"
-	resourceCluster              = "clusters"
-	resourceSliceConfig          = "sliceconfigs"
-	resourceWorkerSliceConfig    = "workersliceconfigs"
-	resourceWorkerSliceGateways  = "workerslicegateways"
-	resourceServiceExportConfigs = "serviceexportconfigs"
-	resourceWorkerServiceImport  = "workerserviceimports"
-	resourceSecrets              = "secrets"
-	resourceEvents               = "events"
-	ResourceStatusSuffix         = "/status"
+	resourceProjects              = "projects"
+	resourceCluster               = "clusters"
+	resourceSliceConfig           = "sliceconfigs"
+	resourceSliceQoSConfig        = "sliceqosconfigs"
+	resourceWorkerSliceConfig     = "workersliceconfigs"
+	resourceWorkerSliceGateways   = "workerslicegateways"
+	resourceServiceExportConfigs  = "serviceexportconfigs"
+	resourceWorkerServiceImport   = "workerserviceimports"
+	resourceWorkerSliceGwRecycler = "workerslicegwrecyclers"
+	resourceSecrets               = "secrets"
+	resourceEvents                = "events"
+	ResourceStatusSuffix          = "/status"
 )
 
 // Verbs
@@ -180,6 +182,11 @@ var (
 			Resources: []string{resourceCluster},
 		},
 		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch,verbCreate,verbDelete},
+			APIGroups: []string{apiGroupKubeSliceWorker},
+			Resources: []string{resourceWorkerSliceGwRecycler},
+		},
+		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceWorker},
 			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
@@ -192,7 +199,7 @@ var (
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
 			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
+			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix, resourceWorkerSliceGwRecycler + ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
@@ -212,7 +219,7 @@ var (
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
+			Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
@@ -242,7 +249,7 @@ var (
 		{
 			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster, resourceSliceConfig, resourceServiceExportConfigs},
+			Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
 		},
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},

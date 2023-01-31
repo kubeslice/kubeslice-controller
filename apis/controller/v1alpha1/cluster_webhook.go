@@ -18,31 +18,30 @@ package v1alpha1
 
 import (
 	"context"
-
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
-var clusterlog = logf.Log.WithName("cluster-resource")
+var clusterlog = util.NewLogger().With("name", "cluster-resource")
 
-type customClusterValidation func(ctx context.Context, cluster *Cluster) error
+type clusterValidation func(ctx context.Context, cluster *Cluster) error
+type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error
 
 var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) error = nil
-var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster) error = nil
+var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error = nil
 var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) error = nil
-
 var clusterWebhookClient client.Client
 
-func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customClusterValidation, validateUpdate customClusterValidation, validateDelete customClusterValidation) error {
+func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clusterValidation, validateUpdate clusterUpdateValidation, validateDelete clusterValidation) error {
 	customClusterCreateValidation = validateCreate
 	customClusterUpdateValidation = validateUpdate
 	customClusterDeleteValidation = validateDelete
 	clusterWebhookClient = mgr.GetClient()
+
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -77,7 +76,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	clusterlog.Info("validate update", "name", r.Name)
 	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation")
 
-	return customClusterUpdateValidation(clusterCtx, r)
+	return customClusterUpdateValidation(clusterCtx, r, old)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type

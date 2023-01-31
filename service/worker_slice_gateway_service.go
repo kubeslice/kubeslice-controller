@@ -41,7 +41,7 @@ const gatewayName = "%s-%s-%s"
 type IWorkerSliceGatewayService interface {
 	ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string,
-		label map[string]string, clusterMap map[string]int, sliceSubnet string) (ctrl.Result, error)
+		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string) (ctrl.Result, error)
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
@@ -188,11 +188,14 @@ func (s *WorkerSliceGatewayService) reconcileNodeIPAndNodePort(ctx context.Conte
 		return err
 	}
 	if found {
-
-		if !reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIp, remoteGateway.Spec.RemoteGatewayConfig.NodeIp) ||
-			localGateway.Spec.LocalGatewayConfig.NodePort != remoteGateway.Spec.RemoteGatewayConfig.NodePort {
+		if !reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIps, remoteGateway.Spec.RemoteGatewayConfig.NodeIps) ||
+			!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIp, remoteGateway.Spec.RemoteGatewayConfig.NodeIp) ||
+			localGateway.Spec.LocalGatewayConfig.NodePort != remoteGateway.Spec.RemoteGatewayConfig.NodePort ||
+			!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodePorts, remoteGateway.Spec.RemoteGatewayConfig.NodePorts) {
 			remoteGateway.Spec.RemoteGatewayConfig.NodeIp = localGateway.Spec.LocalGatewayConfig.NodeIp
+			remoteGateway.Spec.RemoteGatewayConfig.NodeIps = localGateway.Spec.LocalGatewayConfig.NodeIps
 			remoteGateway.Spec.RemoteGatewayConfig.NodePort = localGateway.Spec.LocalGatewayConfig.NodePort
+			remoteGateway.Spec.RemoteGatewayConfig.NodePorts = localGateway.Spec.LocalGatewayConfig.NodePorts
 			err = util.UpdateResource(ctx, &remoteGateway)
 			if err != nil {
 				return err
@@ -246,7 +249,7 @@ type IndividualCertPairRequest struct {
 // CreateMinimumWorkerSliceGateways is a function to create gateways with minimum specification
 func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
-	sliceSubnet string) (ctrl.Result, error) {
+	sliceSubnet string, clusterCidr string) (ctrl.Result, error) {
 
 	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
 	if err != nil {
@@ -256,7 +259,7 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 		return ctrl.Result{}, nil
 	}
 
-	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet)
+	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -305,7 +308,7 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 // createMinimumGatewaysIfNotExists is a helper function to create the gateways between worker clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, ownerLabel map[string]string, clusterMap map[string]int,
-	sliceSubnet string) (ctrl.Result, error) {
+	sliceSubnet string, clusterCidr string) (ctrl.Result, error) {
 	noClusters := len(clusterNames)
 	clusterMapping := map[string]*controllerv1alpha1.Cluster{}
 	for _, clusterName := range clusterNames {
@@ -320,7 +323,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		for j := i + 1; j < noClusters; j++ {
 			sourceCluster, destinationCluster := clusterMapping[clusterNames[i]], clusterMapping[clusterNames[j]]
 			gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
-			gatewayAddresses := s.buildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, gatewayNumber, clusterMap)
+			gatewayAddresses := s.buildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
 			err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, ownerLabel, gatewayNumber, gatewayAddresses)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -376,16 +379,18 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 
 // buildNetworkAddresses - function generates the object of WorkerSliceGatewayNetworkAddresses
 func (s *WorkerSliceGatewayService) buildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
-	gatewayNumber int, clusterMap map[string]int) WorkerSliceGatewayNetworkAddresses {
+	clusterMap map[string]int, clusterCidr string) WorkerSliceGatewayNetworkAddresses {
 	gatewayAddresses := WorkerSliceGatewayNetworkAddresses{}
 	ipr := strings.Split(sliceSubnet, ".")
-	gatewayAddresses.ServerNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], clusterMap[sourceClusterName], "0")
-	gatewayAddresses.ClientNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], clusterMap[destinationClusterName], "0")
-	gatewayAddresses.ServerSubnet = gatewayAddresses.ServerNetwork + "/24"
-	gatewayAddresses.ClientSubnet = gatewayAddresses.ClientNetwork + "/24"
-	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "0")
-	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "1")
-	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 156+gatewayNumber, "2")
+	serverSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr))
+	clientSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr))
+	gatewayAddresses.ServerNetwork = strings.SplitN(serverSubnet, "/", -1)[0]
+	gatewayAddresses.ClientNetwork = strings.SplitN(clientSubnet, "/", -1)[0]
+	gatewayAddresses.ServerSubnet = serverSubnet
+	gatewayAddresses.ClientSubnet = clientSubnet
+	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "0")
+	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "1")
+	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "2")
 	return gatewayAddresses
 }
 
@@ -412,6 +417,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				ClusterName:   sourceCluster.Name,
 				GatewayName:   localGatewayName,
 				GatewaySubnet: gatewaySubnet,
+				NodeIps:       sourceCluster.Spec.NodeIPs,
 				NodeIp:        sourceCluster.Spec.NodeIP,
 				VpnIp:         localVpnAddress,
 			},
@@ -419,6 +425,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				ClusterName:   destinationCluster.Name,
 				GatewayName:   remoteGatewayName,
 				GatewaySubnet: remoteGatewaySubnet,
+				NodeIps:       destinationCluster.Spec.NodeIPs,
 				NodeIp:        destinationCluster.Spec.NodeIP,
 				VpnIp:         remoteVpnAddress,
 			},
@@ -497,6 +504,21 @@ func (s *WorkerSliceGatewayService) NodeIpReconciliationOfWorkerSliceGateways(ct
 		return err
 	}
 	for _, gateway := range workerSliceGateways.Items {
+		if len(gateway.Spec.LocalGatewayConfig.NodeIps) == 0 {
+			gateway.Spec.LocalGatewayConfig.NodeIps = append(gateway.Spec.LocalGatewayConfig.NodeIps, gateway.Spec.LocalGatewayConfig.NodeIp)
+			err = util.UpdateResource(ctx, &gateway)
+			if err != nil {
+				return err
+			}
+		}
+		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIps, cluster.Spec.NodeIPs) {
+			gateway.Spec.LocalGatewayConfig.NodeIps = cluster.Spec.NodeIPs
+			err = util.UpdateResource(ctx, &gateway)
+			if err != nil {
+				return err
+			}
+		}
+		// For backward compatibility.
 		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIp, cluster.Spec.NodeIP) {
 			gateway.Spec.LocalGatewayConfig.NodeIp = cluster.Spec.NodeIP
 			err = util.UpdateResource(ctx, &gateway)

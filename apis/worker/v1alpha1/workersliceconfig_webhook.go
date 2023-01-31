@@ -23,16 +23,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
-var workersliceconfiglog = logf.Log.WithName("workersliceconfig-resource")
+var workersliceconfiglog = util.NewLogger().With("name", "workersliceconfig-resource")
 
-type customWorkerSliceConfigValidation func(ctx context.Context, workerSliceConfig *WorkerSliceConfig) error
+type customWorkerSliceConfigValidation func(ctx context.Context, workerSliceConfig *WorkerSliceConfig, old runtime.Object) error
 
-var customWorkerSliceConfigUpdateValidation func(ctx context.Context, workerSliceConfig *WorkerSliceConfig) error = nil
+var customWorkerSliceConfigUpdateValidation func(ctx context.Context, workerSliceConfig *WorkerSliceConfig, old runtime.Object) error = nil
 var workerSliceConfigWebhookClient client.Client
 
 func (r *WorkerSliceConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateUpdate customWorkerSliceConfigValidation) error {
@@ -67,7 +66,7 @@ func (r *WorkerSliceConfig) ValidateCreate() error {
 func (r *WorkerSliceConfig) ValidateUpdate(old runtime.Object) error {
 	workersliceconfiglog.Info("validate update", "name", r.Name)
 	workerSliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), workerSliceConfigWebhookClient, nil, "WorkerSliceConfigValidation")
-	return customWorkerSliceConfigUpdateValidation(workerSliceConfigCtx, r)
+	return customWorkerSliceConfigUpdateValidation(workerSliceConfigCtx, r, old)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type

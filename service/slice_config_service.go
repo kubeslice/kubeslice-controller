@@ -34,16 +34,17 @@ type ISliceConfigService interface {
 
 // SliceConfigService implements different interfaces -
 type SliceConfigService struct {
-	ns  INamespaceService
-	acs IAccessControlService
-	sgs IWorkerSliceGatewayService
-	ms  IWorkerSliceConfigService
-	si  IWorkerServiceImportService
-	se  IServiceExportConfigService
+	ns    INamespaceService
+	acs   IAccessControlService
+	sgs   IWorkerSliceGatewayService
+	ms    IWorkerSliceConfigService
+	si    IWorkerServiceImportService
+	se    IServiceExportConfigService
+	wsgrs IWorkerSliceGatewayRecyclerService
 }
 
 // ReconcileSliceConfig is a function to reconcile the sliceconfig
-func (s SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get SliceConfig resource
 	logger := util.CtxLogger(ctx)
 	logger.Infof("Started Recoincilation of SliceConfig %v", req.NamespacedName)
@@ -92,15 +93,17 @@ func (s SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.R
 	}
 
 	// Step 3: Creation of worker slice Objects and Cluster Labels
+	// get cluster cidr from maxClusters of slice config
+	clusterCidr := util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
-	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet)
+	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet, clusterCidr)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Step 4: Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet)
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -140,6 +143,13 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 	err = s.ms.DeleteWorkerSliceConfigByLabel(ctx, ownershipLabel, namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	recyclerLabel := map[string]string{
+		"slice_name": slice.Name,
+	}
+	err = s.wsgrs.DeleteWorkerSliceGatewayRecyclersByLabel(ctx, recyclerLabel, namespace)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

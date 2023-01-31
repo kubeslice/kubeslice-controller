@@ -18,8 +18,8 @@ package worker
 
 import (
 	"context"
+	"go.uber.org/zap"
 
-	"github.com/go-logr/logr"
 	"github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -34,7 +34,7 @@ type WorkerServiceImportReconciler struct {
 	client.Client
 	Scheme                     *runtime.Scheme
 	WorkerServiceImportService service.IWorkerServiceImportService
-	Log                        logr.Logger
+	Log                        *zap.SugaredLogger
 }
 
 // Reconcile is a function to reconcile the workerServiceImport, WorkerServiceImportReconciler implements it

@@ -1,0 +1,140 @@
+name: end-to-end-test
+on:
+  pull_request_target:
+    types: [ labeled ] 
+  workflow_dispatch:
+  
+env:
+  chartuser: ${{ secrets.DEV_CHARTS_USERNAME }}
+  chartpassword: ${{ secrets.DEV_CHARTS_PASSWORD }}
+  ENFORCE_CRITICAL_CHECK: ${{ secrets.ENFORCE_CRITICAL_CHECK }}
+
+jobs:
+  end-to-end:
+    runs-on: ubuntu-20.04
+    if: ${{ github.event.label.name == 'ready-to-test' }}
+    steps:
+    - name: checkout the repo
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    
+    - name: Set outputs
+      id: vars
+      run: echo "sha_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+    - name: build the kubeslice controller
+      uses: docker/build-push-action@v3
+      with:
+        tags: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
+        build-args: |
+          PLATFORM=amd64
+        push: false
+        
+    - name: Scanning image for vulnerablilities
+      uses: aquasecurity/trivy-action@master
+      with:
+          image-ref: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
+          format: 'table'
+          output: 'scan.txt'
+
+    - name: check files
+      run: |
+        ls -ltr
+        cat scan.txt
+
+    - name: extract lines for base and binary image
+      run: |
+        bash .github/workflows/scripts/line-extractor.sh
+
+    - name: check file is created or not
+      run: |
+        ls -ltr
+        echo "base image file content:"
+        cat final.txt
+        echo "binary image file content:"
+        cat binary.txt
+
+    - name: break the bulid if critical vulunerablitites in base image
+      if: env.ENFORCE_CRITICAL_CHECK == 'true'
+      run: |
+        bash .github/workflows/scripts/base-image-critical.sh
+
+    - name: break the bulid if critical vulunerablitites in binary image
+      if: env.ENFORCE_CRITICAL_CHECK == 'true'
+      run: |
+        bash .github/workflows/scripts/binary-image-critical.sh
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+          name: trivy-scan
+          path: scan.txt
+    
+    - name: build kind clusters
+      run: |
+        mkdir -p ${{ github.workspace }}/profile
+        sh .github/workflows/scripts/start-kind.sh
+      env: 
+         GITHUB_HEAD_COMMIT: ${{ steps.vars.outputs.sha_commit }}
+
+    - name: Docker Run Action
+      uses: addnab/docker-run-action@v3
+      with:
+        image: aveshadev/kubeslice-e2e:latest
+        options: -v ${{ github.workspace }}/reports:/e2e/reports -v /home/runner/.kube:/e2e/assets/kubeconfig -v ${{ github.workspace }}/profile:/e2e/profile --network kind
+        run: |
+          bash run.sh kind
+
+    - name: Checkout gh-pages repo
+      uses: actions/checkout@v3
+      with:
+        repository: kubeslice/e2e-allure-reports
+        path: gh-pages
+        ref: 'gh-pages'
+    
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%dT%H:%M:%S')"
+
+    - name: Allure Report with history
+      uses: PavanMudigonda/allure-html-reporter-github-pages@v1.0
+      id: Allure_report_with_history
+      with:
+        allure_results: reports
+        allure_report: allure_report
+        allure_history: allure-history
+        gh_pages: gh-pages
+        keep_reports: 500
+        github_run_id: '${{ github.run_id }}'
+        github_run_num: 'Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}'
+        report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
+        test_env: Kind
+          
+    - name: Deploy report to Github Pages
+      uses: peaceiris/actions-gh-pages@v3
+      env:
+        PUBLISH_BRANCH: gh-pages
+        PERSONAL_TOKEN: ${{ secrets.TOKEN }}
+        EXTERNAL_REPOSITORY: kubeslice/e2e-allure-reports
+        PUBLISH_DIR: allure-history
+        keep_files: true
+    
+    - name: wait for report deploy on site ( you can check report here also )
+      run: |
+         sleep 200
+         echo 'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'
+      
+    - name: Report link on Pull Request comment
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        message: |
+                 report link  'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+    
+    - name: Run Quality Gate Check
+      uses: ./quality-gate
+      with:
+         ENABLE_QUALITY_GATE: true
+         MINIMUM_PASS_PERCENTAGE: 75 
+         ALLURE_BEHAVIORS_CSV: '/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}/allure-history/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/data/behaviors.csv'

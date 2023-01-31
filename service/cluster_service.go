@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"fmt"
-
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +43,7 @@ type ClusterService struct {
 func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get cluster resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Starting Recoincilation of Cluster %v", req.NamespacedName)
+	logger.Infof("Starting Reconcilation of Cluster %v", req.NamespacedName)
 	cluster := &controllerv1alpha1.Cluster{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, cluster)
 	if err != nil {
@@ -91,6 +90,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	if shouldReturn, result, reconErr := util.IsReconciled(c.acs.ReconcileWorkerClusterServiceAccountAndRoleBindings(ctx, req.Name, req.Namespace, cluster)); shouldReturn {
 		return result, reconErr
 	}
+
 	if serviceAccount.Secrets == nil {
 		logger.Infof("Service Account Token not populated. Requeuing")
 		return ctrl.Result{Requeue: true, RequeueAfter: RequeueTime}, nil
@@ -121,6 +121,17 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	err = util.UpdateResource(ctx, &secret)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+	// this logic is for backward compatibility- check crds for more.
+	if len(cluster.Spec.NodeIPs) < 2 && len(cluster.Spec.NodeIP) != 0 {
+		if len(cluster.Spec.NodeIPs) == 0 {
+			cluster.Spec.NodeIPs = make([]string, 1)
+		}
+		cluster.Spec.NodeIPs[0] = cluster.Spec.NodeIP
+		err = util.UpdateResource(ctx, cluster)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	//Step 6: NodeIP Reconciliation to WorkerSliceGateways
 	err = c.sgws.NodeIpReconciliationOfWorkerSliceGateways(ctx, cluster, req.Namespace)

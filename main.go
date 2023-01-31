@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"os"
 
-	hubZap "go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -41,8 +39,9 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme        = runtime.NewScheme()
+	setupLog      = util.NewLogger().With("name", "setup")
+	controllerLog = util.NewLogger().With("name", "controllers")
 )
 
 func init() {
@@ -64,18 +63,11 @@ func main() {
 	c := service.WithClusterService(ns, acs, wsgs)
 	wsi := service.WithWorkerServiceImportService()
 	se := service.WithServiceExportConfigService(wsi)
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se)
+	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs)
 	p := service.WithProjectService(ns, acs, c, sc, se)
 	sqcs := service.WithSliceQoSConfigService(wscs)
-	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs))
-}
-
-func initLogger(logLevel zapcore.Level) {
-
-	config := hubZap.NewDevelopmentConfig()
-	config.Level = hubZap.NewAtomicLevelAt(logLevel)
-	log, _ := config.Build()
-	hubZap.ReplaceGlobals(log)
+	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
 }
 
 func initialize(services *service.Services) {
@@ -117,10 +109,12 @@ func initialize(services *service.Services) {
 	flag.Parse()
 
 	// initialize logger
+	if logLevel == "" {
+		logLevel = "info"
+	}
 	zapLogLevel := util.GetZapLogLevel(logLevel)
-	initLogger(zapLogLevel)
 	opts := zap.Options{
-		Development: true,
+		Development: false,
 		Level:       zapLogLevel,
 	}
 	opts.BindFlags(flag.CommandLine)
@@ -157,7 +151,7 @@ func initialize(services *service.Services) {
 	if err = (&controller.ProjectReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
-		Log:            ctrl.Log.WithName("controllers").WithName("Project"),
+		Log:            controllerLog.With("name", "Project"),
 		ProjectService: services.ProjectService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Project")
@@ -167,7 +161,7 @@ func initialize(services *service.Services) {
 	if err = (&controller.ClusterReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
-		Log:            ctrl.Log.WithName("controllers").WithName("Cluster"),
+		Log:            controllerLog.With("name", "Cluster"),
 		ClusterService: services.ClusterService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
@@ -177,7 +171,7 @@ func initialize(services *service.Services) {
 	if err = (&controller.SliceConfigReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
-		Log:                ctrl.Log.WithName("controllers").WithName("SliceConfig"),
+		Log:                controllerLog.With("name", "SliceConfig"),
 		SliceConfigService: services.SliceConfigService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SliceConfig")
@@ -187,7 +181,7 @@ func initialize(services *service.Services) {
 	if err = (&controller.ServiceExportConfigReconciler{
 		Client:                     mgr.GetClient(),
 		Scheme:                     mgr.GetScheme(),
-		Log:                        ctrl.Log.WithName("controllers").WithName("ServiceExportConfig"),
+		Log:                        controllerLog.With("name", "ServiceExportConfig"),
 		ServiceExportConfigService: services.ServiceExportConfigService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceExportConfig")
@@ -196,7 +190,7 @@ func initialize(services *service.Services) {
 	if err = (&worker.WorkerSliceGatewayReconciler{
 		Client:                    mgr.GetClient(),
 		Scheme:                    mgr.GetScheme(),
-		Log:                       ctrl.Log.WithName("controllers").WithName("WorkerSliceGateway"),
+		Log:                       controllerLog.With("name", "WorkerSliceGateway"),
 		WorkerSliceGatewayService: services.WorkerSliceGatewayService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkerSliceGateway")
@@ -205,7 +199,7 @@ func initialize(services *service.Services) {
 	if err = (&worker.WorkerSliceConfigReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
-		Log:                ctrl.Log.WithName("controllers").WithName("WorkerSliceConfig"),
+		Log:                controllerLog.With("name", "WorkerSliceConfig"),
 		WorkerSliceService: services.WorkerSliceConfigService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkerSliceConfig")
@@ -214,7 +208,7 @@ func initialize(services *service.Services) {
 	if err = (&worker.WorkerServiceImportReconciler{
 		Client:                     mgr.GetClient(),
 		Scheme:                     mgr.GetScheme(),
-		Log:                        ctrl.Log.WithName("controllers").WithName("WorkerServiceImport"),
+		Log:                        controllerLog.With("name", "WorkerServiceImport"),
 		WorkerServiceImportService: services.WorkerServiceImportService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkerServiceImport")
@@ -223,7 +217,7 @@ func initialize(services *service.Services) {
 	if err = (&controller.SliceQoSConfigReconciler{
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
-		Log:                   ctrl.Log.WithName("controllers").WithName("SliceQoSConfig"),
+		Log:                   controllerLog.With("name", "SliceQoSConfig"),
 		SliceQoSConfigService: services.SliceQoSConfigService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SliceQoSConfig")
@@ -285,9 +279,9 @@ func initialize(services *service.Services) {
 //+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers,verbs=update
 
-//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs;workerserviceimports;workerslicegateways,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/status;workerserviceimports/status;workerslicegateways/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/finalizers;workerserviceimports/finalizers;workerslicegateways/finalizers ,verbs=update
+//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs;workerserviceimports;workerslicegateways;workerslicegwrecyclers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/status;workerserviceimports/status;workerslicegateways/status;workerslicegwrecyclers/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/finalizers;workerserviceimports/finalizers;workerslicegateways/finalizers;workerslicegwrecyclers/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create;update;patch;delete;escalate

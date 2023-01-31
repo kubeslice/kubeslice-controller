@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
   name: workersliceconfigs.worker.kubeslice.io
 spec:
@@ -36,6 +35,8 @@ spec:
           spec:
             description: WorkerSliceConfigSpec defines the desired state of Slice
             properties:
+              clusterSubnetCIDR:
+                type: string
               externalGatewayConfig:
                 properties:
                   egress:
@@ -75,6 +76,8 @@ spec:
                     default: false
                     type: boolean
                 type: object
+              octet:
+                type: integer
               qosProfileDetails:
                 description: QOSProfile is the QOS Profile configuration from backend
                 properties:
@@ -128,6 +131,8 @@ spec:
               sliceType:
                 default: Application
                 type: string
+            required:
+            - octet
             type: object
           status:
             description: WorkerSliceConfigStatus defines the observed state of Slice

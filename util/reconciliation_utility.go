@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"strings"
 
@@ -83,7 +84,7 @@ func CreateResource(ctx context.Context, object client.Object) error {
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Create(ctx, object)
 	if err != nil {
-		//logger.With(zap.Error(err)).Errorf("Failed to create resource: %v in namespace", object)
+		logger.With(zap.Error(err)).Errorf("Failed to create resource: %v in namespace", object)
 		return err
 	}
 	logger.Infof("Created object kind %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
@@ -246,7 +247,7 @@ func GetOwnerLabel(completeResourceName string) map[string]string {
 	return label
 }
 
-// EncodeToBase64 is a function to to encode the string
+// EncodeToBase64 is a function to encode the string
 func EncodeToBase64(v interface{}) (string, error) {
 	var buf bytes.Buffer
 	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
@@ -259,4 +260,9 @@ func EncodeToBase64(v interface{}) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// CheckForProjectNamespace is a function to check namespace is in decided format
+func CheckForProjectNamespace(namespace *corev1.Namespace) bool {
+	return namespace.Labels[LabelName] == fmt.Sprintf(LabelValue, "Project", namespace.Name)
 }

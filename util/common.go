@@ -17,8 +17,13 @@
 package util
 
 import (
+	"context"
+	"fmt"
+	"math"
 	"net"
+	"strconv"
 	"strings"
+	"time"
 
 	"go.uber.org/zap/zapcore"
 )
@@ -129,4 +134,78 @@ func ArrayToString(arr []string) string {
 	var str string
 	str = strings.Join(arr, ",")
 	return str
+}
+
+// FindCIDRByMaxClusters is a function to find the CIDR by max clusters
+func FindCIDRByMaxClusters(maxCluster int) string {
+	var cidr string
+	baseCidr := 17
+	for i := 7; i >= 0; i-- {
+		if float64(maxCluster) > math.Pow(2, float64(i)) {
+			value := i + baseCidr
+			cidr = fmt.Sprintf("/%d", value)
+			break
+		}
+	}
+	return cidr
+}
+
+// intPow compute a**b using binary powering algorithm
+func intPow(a, b int) int {
+	p := 1
+	for b > 0 {
+		if b&1 != 0 {
+			p *= a
+		}
+		b >>= 1
+		a *= a
+	}
+	return p
+}
+
+// subnetOctetDiff calculates the controlling octet of the subnet along with the difference factor of the octet from cidr
+// for eg: a cidr of /20 means 3rd octet controls the subnet and has a difference of 16 (3, 16)
+// returns -1, -1 for invalid cidr
+func subnetOctetDiff(cidr int) (int, int) {
+	if cidr <= 24 && cidr > 0 {
+		cidrDiv := 32 / cidr
+		return 4 - cidrDiv, intPow(2, 32-cidr) / (256 * cidrDiv)
+	} else if cidr > 24 && cidr <= 32 {
+		return 4, intPow(2, 32-cidr)
+	}
+	return -1, -1
+}
+
+func GetClusterPrefixPool(sliceSubnet string, ipamInt int, subnetCidr string) string {
+	cidrInt := strings.Replace(subnetCidr, "/", "", -1)
+	cidr, _ := strconv.Atoi(cidrInt)
+	octetList := strings.Split(sliceSubnet, ".")
+	controlOctet, controlOctetDiff := subnetOctetDiff(cidr)
+	ipamInt *= controlOctetDiff
+	ipamOctet := strconv.Itoa(ipamInt)
+	octetList[controlOctet-1] = ipamOctet
+	for i := controlOctet; i <= 3; i++ {
+		octetList[i] = "0"
+	}
+	octetList[3] += fmt.Sprintf("/%d", cidr)
+	return strings.Join(octetList, ".")
+}
+
+// Retry tries to execute the funtion, If failed reattempts till backoffLimit
+func Retry(ctx context.Context, backoffLimit int, sleep time.Duration, f func() error) (err error) {
+	logger := CtxLogger(ctx)
+	start := time.Now()
+	for i := 0; i < backoffLimit; i++ {
+		if i > 0 {
+			logger.Infof("%s Waiting %d seconds before retrying as an error occured: %s", Wait, int(sleep.Seconds()), err.Error())
+			time.Sleep(sleep)
+			sleep *= 2
+		}
+		err = f()
+		if err == nil {
+			return nil
+		}
+	}
+	elapsed := time.Since(start)
+	return fmt.Errorf("retry failed after %d attempts (took %d seconds), last error: %s", backoffLimit, int(elapsed.Seconds()), err)
 }
