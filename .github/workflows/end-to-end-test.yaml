@@ -7,6 +7,8 @@ on:
 env:
   chartuser: ${{ secrets.DEV_CHARTS_USERNAME }}
   chartpassword: ${{ secrets.DEV_CHARTS_PASSWORD }}
+  ENFORCE_CRITICAL_CHECK: ${{ secrets.ENFORCE_CRITICAL_CHECK }}
+
 jobs:
   end-to-end:
     runs-on: ubuntu-20.04
@@ -34,6 +36,40 @@ jobs:
       with:
           image-ref: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
           format: 'table'
+          output: 'scan.txt'
+
+    - name: check files
+      run: |
+        ls -ltr
+        cat scan.txt
+
+    - name: extract lines for base and binary image
+      run: |
+        bash .github/workflows/scripts/line-extractor.sh
+
+    - name: check file is created or not
+      run: |
+        ls -ltr
+        echo "base image file content:"
+        cat final.txt
+        echo "binary image file content:"
+        cat binary.txt
+
+    - name: break the bulid if critical vulunerablitites in base image
+      if: env.ENFORCE_CRITICAL_CHECK == 'true'
+      run: |
+        bash .github/workflows/scripts/base-image-critical.sh
+
+    - name: break the bulid if critical vulunerablitites in binary image
+      if: env.ENFORCE_CRITICAL_CHECK == 'true'
+      run: |
+        bash .github/workflows/scripts/binary-image-critical.sh
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+          name: trivy-scan
+          path: scan.txt
     
     - name: build kind clusters
       run: |
