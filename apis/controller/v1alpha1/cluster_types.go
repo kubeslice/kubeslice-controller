@@ -20,8 +20,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+type ComponentHealthStatus string
+
+const (
+	ComponentHealthStatusNormal  = "Normal"
+	ComponentHealthStatusWarning = "Warning"
+	ComponentHealthStatusError   = "Error"
+)
+
+type ClusterHealthStatus string
+
+const (
+	ClusterHealthStatusNormal  = "Normal"
+	ClusterHealthStatusWarning = "Warning"
+)
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
@@ -92,6 +104,25 @@ type ClusterStatus struct {
 	CniSubnet []string `json:"cniSubnet,omitempty"`
 	// Namespaces present in cluster
 	Namespaces []NamespacesConfig `json:"namespaces,omitempty"`
+	// ClusterHealth shows the health of the worker cluster
+	ClusterHealth *ClusterHealth `json:"clusterHealth,omitempty"`
+}
+
+type ClusterHealth struct {
+	// ClusterHealthStatus shows the overall health status of the cluster
+	//+kubebuilder:validation:Enum:=Normal;Warning
+	ClusterHealthStatus ClusterHealthStatus `json:"clusterHealthStatus,omitempty"`
+	// ComponentStatuses shows the health status of individual components in the cluster
+	ComponentStatuses []ComponentStatus `json:"componentStatuses,omitempty"`
+	// LastUpdated is the timestamp when healthstatus was updated
+	LastUpdated metav1.Time `json:"lastUpdated,omitempty"`
+}
+
+type ComponentStatus struct {
+	// Component name
+	Component string `json:"component"`
+	//+kubebuilder:validation:Enum:=Normal;Warning;Error
+	ComponentHealthStatus ComponentHealthStatus `json:"componentHealthStatus"`
 }
 
 type NamespacesConfig struct {
