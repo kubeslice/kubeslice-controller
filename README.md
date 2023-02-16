@@ -41,7 +41,7 @@ helm repo update
 ```
 
 ### Build Your Docker Image
-#### Latest docker image - [kubeslice-controller](https://hub.docker.com/r/aveshasystems/kubeslice-controller)
+To download the latest docker image for `kubeslice-controller`, click [here](https://hub.docker.com/r/aveshasystems/kubeslice-controller).
 
 1. Clone the latest version of kubeslice-controller from  the `master` branch.
 
@@ -50,8 +50,8 @@ helm repo update
    cd kubeslice-controller
    ```
 
-2. Adjust image name variable `IMG` in the [`Makefile`](Makefile) to change the docker tag to be built.
-   Default image is set as `IMG ?= aveshasystems/kubeslice-controller:latest`. Modify this if required.
+2. Edit the image name variable `IMG` in the [`Makefile`](Makefile) to change the docker tag to be built.
+   The default image is set as `IMG ?= aveshasystems/kubeslice-controller:latest`. Modify this if required.
 
    ```console
    make docker-build
@@ -59,8 +59,8 @@ helm repo update
 
 ### Run Local Image on Kind Clusters
 
-1. Loading kubeslice-controller image into your kind cluster ([kind](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)).
-   If needed, replace `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
+1. Load the kubeslice-controller image into your kind cluster ([kind](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)).
+   If needed, modify `aveshasystems/kubeslice-controller` with your locally built image name in the previous step.
    
 * Note: If you use a named cluster, you must specify the name of the cluster you wish to load the images into. See [loading an image into your kind cluster](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster).
 
@@ -73,17 +73,17 @@ helm repo update
    kind load docker-image aveshasystems/kubeslice-controller --name kind
    ```
 
-2. Check the loaded image in the cluster. Modify node name if required.
+2. Check the loaded image in the cluster. Modify the node name if required.
    
-   :::note
-  `kind-control-plane` is the name of the Docker container. Modify if needed.
-  :::
+ * Note: `kind-control-plane` is the name of the Docker container. Modify the name if needed.
+  
 
 ```console
 docker exec -it kind-control-plane crictl images
 ```
 ### Deploy on a Cluster
-1. Create chart values file `yourvaluesfile.yaml`. Refer to [values.yaml](https://github.com/kubeslice/charts/blob/master/charts/kubeslice-controller/values.yaml) on how to adjust this and update the `kubeslice-controller` image to the local build image.
+1. Create chart values file `yourvaluesfile.yaml`. Refer to [values.yaml](https://github.com/kubeslice/charts/blob/master/charts/kubeslice-controller/values.yaml) 
+  to update the `kubeslice-controller` image to the local build image.
 
    From the sample:
 
@@ -111,7 +111,7 @@ docker exec -it kind-control-plane crictl images
          tag: <unique-tag>
    ```
 
-2. Deploy the updated chart
+2. Deploy the updated chart.
 
    ```console
    make chart-deploy VALUESFILE=yourvaluesfile.yaml
@@ -132,8 +132,8 @@ NAME                                            READY   STATUS    RESTARTS   AGE
 kubeslice-controller-manager-5b548fb865-kzb7c   2/2     Running   0          102s
 ```
 
-### Uninstalling the KubeSlice Controller
-For more information, see [uninstalling KubeSlice](https://kubeslice.io/documentation/open-source/0.6.0/getting-started-with-cloud-clusters/uninstalling-kubeslice/offboarding-namespaces).
+### Uninstall the KubeSlice Controller
+For more information, see [uninstall KubeSlice](https://kubeslice.io/documentation/open-source/0.6.0/getting-started-with-cloud-clusters/uninstalling-kubeslice/offboarding-namespaces).
 
 ```console
 make chart-undeploy
