@@ -81,9 +81,8 @@ To download the latest docker image for `kubeslice-controller`, click [here](htt
 ```console
 docker exec -it kind-control-plane crictl images
 ```
-### Deploy on a Cluster
-1. Create chart values file `yourvaluesfile.yaml`. Refer to [values.yaml](https://github.com/kubeslice/charts/blob/master/charts/kubeslice-controller/values.yaml) 
-  to update the `kubeslice-controller` image to the local build image.
+### Deploy the KubeSlice Controller on a Cluster
+1. Create a chart values file called `yourvaluesfile.yaml`. Refer to [values.yaml](https://github.com/kubeslice/charts/blob/master/charts/kubeslice-controller/values.yaml) to update the `kubeslice-controller` image to the local build image.
 
    From the sample:
 
