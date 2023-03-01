@@ -1,0 +1,7 @@
+events:
+  - name: NetPolViolation
+    reason: PolicyViolation
+    action: PolicyMonitoring
+    type: Warning
+    reportingController: worker
+    message: Network policy violation - please ask admin to check the network policy configuration on the worker cluster. <link to tech doc event-list>

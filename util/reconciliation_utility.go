@@ -266,3 +266,12 @@ func EncodeToBase64(v interface{}) (string, error) {
 func CheckForProjectNamespace(namespace *corev1.Namespace) bool {
 	return namespace.Labels[LabelName] == fmt.Sprintf(LabelValue, "Project", namespace.Name)
 }
+
+// GetProjectName is function to get the project name from the namespace
+func GetProjectName(namespace string) string {
+	d := strings.Split(namespace, NamespacePrefix)
+	if len(d) > 1 {
+		return d[1]
+	}
+	return ""
+}
