@@ -160,6 +160,11 @@ spec:
                       type: string
                   type: object
                 type: array
+              nodeIPs:
+                description: NodeIPs of the gateway node of worker cluster
+                items:
+                  type: string
+                type: array
               secretName:
                 description: SecretName is the name of the secret for the worker cluster.
                 type: string
