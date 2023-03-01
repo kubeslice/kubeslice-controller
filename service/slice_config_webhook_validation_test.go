@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -72,7 +73,9 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithDuplicateClusters":                                              UpdateValidateSliceConfigWithDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithClusterDoesNotExist":                                            UpdateValidateSliceConfigWithClusterDoesNotExist,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster":                    UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster,
-	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster":                             UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingCluster":             UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingCluster,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess":                                         UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsInStatusIsSuccess":                                       UpdateValidateSliceConfigWithNodeIPsInStatusIsSuccess,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster":                           UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster":      UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling":                 UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling,
@@ -750,10 +753,11 @@ func UpdateValidateSliceConfigWithNetworkInterfaceEmptyInParticipatingCluster(t 
 	clientMock.AssertExpectations(t)
 }
 
-func UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.T) {
+func UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingCluster(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clusterCniSubnet := "10.10.1.1/16"
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -762,10 +766,61 @@ func UpdateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NetworkInterface = "eth0"
 		arg.Spec.NodeIPs = []string{}
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters.NodeIPs: Required value:")
+	clientMock.AssertExpectations(t)
+}
+func UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clusterCniSubnet := "10.10.1.1/16"
+	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType:               "SomeType",
+		BandwidthGuaranteedKbps: 5120,
+		BandwidthCeilingKbps:    5122,
+	}
+	newSliceConfig.Spec.MaxClusters = 2
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NetworkInterface = "eth0"
+		arg.Spec.NodeIPs = []string{"11.11.14.114"}
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+func UpdateValidateSliceConfigWithNodeIPsInStatusIsSuccess(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clusterCniSubnet := "10.10.1.1/16"
+	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
+		QueueType:               "SomeType",
+		BandwidthGuaranteedKbps: 5120,
+		BandwidthCeilingKbps:    5122,
+	}
+	newSliceConfig.Spec.MaxClusters = 2
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NetworkInterface = "eth0"
+		arg.Status.NodeIPs = []string{"11.11.14.114"}
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
+	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
 
