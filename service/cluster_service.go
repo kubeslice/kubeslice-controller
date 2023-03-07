@@ -180,7 +180,7 @@ func (c *ClusterService) DeleteClusters(ctx context.Context, namespace string) (
 		c.loadEventRecorder(ctx, util.GetProjectName(cluster.Namespace), cluster.Name, cluster.Namespace)
 		if err != nil {
 			//Register an event for cluster deletion fail
-			util.RecordEvent(ctx, c.eventRecorder, &cluster, "cluster deletion failed")
+			util.RecordEvent(ctx, c.eventRecorder, &cluster, schema.EventClusterDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for cluster deletion

@@ -184,7 +184,7 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigByParticipatingSli
 			err = util.DeleteResource(ctx, &serviceExport)
 			if err != nil {
 				//Register an event for service export config deletion
-				util.RecordEvent(ctx, s.eventRecorder, &serviceExport, "service-export-config-deletion-failed")
+				util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeletionFailed)
 				return err
 			}
 			//Register an event for service export config deletion
