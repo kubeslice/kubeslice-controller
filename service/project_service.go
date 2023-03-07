@@ -40,19 +40,7 @@ type ProjectService struct {
 	eventRecorder events.EventRecorder
 }
 
-func (t *ProjectService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	t.eventRecorder = events.EventRecorder{
-		Client:    util.CtxClient(ctx),
-		Logger:    util.CtxLogger(ctx),
-		Scheme:    util.CtxScheme(ctx),
-		Project:   project,
-		Namespace: namespace,
-		Component: "controller",
-	}
-	return
-}
-
-// ReconcileProject is a function to reconcile the projects includes reconcilation of roles, clusters, project namespaces etc.
+// ReconcileProject is a function to reconcile the projects includes reconciliation of roles, clusters, project namespaces etc.
 func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get project resource
 	logger := util.CtxLogger(ctx)
@@ -83,10 +71,12 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 			return result, reconErr
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, project, ProjectFinalizer)); shouldReturn {
+			//Register an event for project deletion fail
+			util.RecordEvent(ctx, t.eventRecorder, project, schema.EventProjectDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for project deletion
-		t.recordEvent(ctx, project, schema.EventProjectDeleted)
+		util.RecordEvent(ctx, t.eventRecorder, project, schema.EventProjectDeleted)
 		return ctrl.Result{}, nil
 	}
 
@@ -122,20 +112,10 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		return result, reconErr
 	}
 
-	//Register an event for project creation
-	if project.Generation == 1 {
-		t.recordEvent(ctx, project, schema.EventProjectCreated)
-	}
-
 	// Step 6: adding ProjectNamespace in labels
 	labels := make(map[string]string)
 	labels["kubeslice-project-namespace"] = projectNamespace
 	project.Labels = labels
-
-	//Register an event for project update
-	if project.Generation > 1 {
-		t.recordEvent(ctx, project, schema.EventProjectUpdated)
-	}
 
 	err = util.UpdateResource(ctx, project)
 	if err != nil {
@@ -162,10 +142,15 @@ func (t *ProjectService) CleanUpProjectResources(ctx context.Context, namespace 
 	return ctrl.Result{}, nil
 }
 
-func (t *ProjectService) recordEvent(ctx context.Context, project *controllerv1alpha1.Project, name string) {
-	t.eventRecorder.RecordEvent(ctx, &events.Event{
-		Object:            project,
-		ReportingInstance: "controller",
-		Name:              name,
-	})
+// loadEventRecorder is function to load the event recorder
+func (t *ProjectService) loadEventRecorder(ctx context.Context, project, namespace string) {
+	t.eventRecorder = events.EventRecorder{
+		Client:    util.CtxClient(ctx),
+		Logger:    util.CtxLogger(ctx),
+		Scheme:    util.CtxScheme(ctx),
+		Project:   project,
+		Namespace: namespace,
+		Component: util.ComponentController,
+	}
+	return
 }

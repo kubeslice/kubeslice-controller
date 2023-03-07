@@ -1,10 +1,4 @@
 events:
-  - name: SliceDeletionFailed
-    reason: SliceDeletionFailed
-    action: SliceDeletion
-    type: Warning
-    reportingController: controller
-    message: Slice deletion failed - please ask admin to check the slice configuration on the worker cluster. <link to tech doc event-list>
   - name: LicenseSecretNotFound
     reason: LicenseNotFound
     action: LicenseValidation
@@ -16,130 +10,372 @@ events:
     action: FetchMachineFileFromSecret
     type: Warning
     reportingController: controller
-    message: Machine File not present in license secret.Please contact kubeslice support team.
+    message: Machine File not present in license secret. Please contact kubeslice support team.
   - name: MachineFileInvalid
     reason: MachineFileInvalid
     action: VerifyMachineFile
     type: Warning
     reportingController: controller
-    message: Machine File is invalid in license secret.Please contact kubeslice support team.
+    message: Machine File is invalid in license secret. Please contact kubeslice support team.
   - name: LicenseKeyInvalid
     reason: LicenseKeyInvalid
     action: DecryptMachineFile
     type: Warning
     reportingController: controller
-    message: License Key is invalid in license secret.Please contact kubeslice support team.
+    message: License Key is invalid in license secret. Please contact kubeslice support team.
   - name: LicenseExpired
     reason: LicenseExpired
     action: ValidateLicense
     type: Warning
     reportingController: controller
-    message: License Expired , please contact kubeslice support team to get it renewed!
+    message: License Expired, please contact kubeslice support team to get it renewed!
   - name: LicenseExpiredGracePeriodOn
     reason: LicenseExpiredGracePeriodOn
     action: ValidateLicense
     type: Warning
     reportingController: controller
-    message: License Expired , grace period is on ,please contact kubeslice support team to get it renewed!
+    message: License Expired, grace period is on, please contact kubeslice support team to get it renewed!
+  - name: MachineFingerPrintErr
+    reason: MachineFingerPrintErr
+    action: GetMachineFingerPrint
+    type: Warning
+    reportingController: kubeslice-controller
+    message: Unable to fetch MachineFingerPrint. Please look at the kubeslice-controller logs for more details.
+  - name: GotMachineFingerPrint
+    reason: GotMachineFingerPrint
+    action: GetMachineFingerPrint
+    type: Normal
+    reportingController: kubeslice-controller
+    message: Got MachineFingerPrint successfully
+  - name: ConfigMapErr
+    reason: ConfigMapErr
+    action: GetConfigMap
+    type: Warning
+    reportingController: kubeslice-controller
+    message: Unable to validate license keys from configmap. Please contact kubeslice support team
+  - name: GotConfigMap
+    reason: GotConfigMap
+    action: GetConfigMap
+    type: Normal
+    reportingController: kubeslice-controller
+    message: Got ConfigMap and kubeslice-license public keys successfully.
+  # license job
+  - name: LicenseProxyUnreachable
+    reason: LicenseProxyUnreachable
+    action: LicenseProxy
+    type: Warning
+    reportingController: kubeslice-controller
+    message: Failed to get response from license proxy for automatic license creation. Please contact Avesha to obtain licernse manually.
+  - name: LicenseDeployError
+    reason: LicenseDeployError
+    action: LicenseDeploy
+    type: Warning
+    reportingController: kubeslice-controller
+    message: Failed to deploy license secret.
+  - name: LicenseDeploySuccess
+    reason: LicenseDeploySuccess
+    action: LicenseDeploy
+    type: Normal
+    reportingController: kubeslice-controller
+    message: Successfully fetched license data & deployed license secret.
+  - name: ClusterMetadataCollectionFailed
+    reason: ClusterMetadataCollectionFailed
+    action: CollectClusterMetadata
+    type: Warning
+    reportingController: kubeslice-controller
+    message: Failed to collect cluster metadata for cluster creation.
+  - name: ClusterMetadataCollectionSuccess
+    reason: ClusterMetadataCollectionSuccess
+    action: CollectClusterMetadata
+    type: Normal
+    reportingController: kubeslice-controller
+    message: Successfully collected cluster metadata for license creation.
+  - name: LicenseDataFetchError
+    reason: LicenseDataFetchError
+    action: LicenseDataFetch
+    type: Warning
+    reportingController: kubeslice-controller
+    message: Failed to fetch license data from license proxy.
+  - name: LicenseDataFetchSuccess
+    reason: LicenseDataFetchSuccess
+    action: LicenseDataFetch
+    type: Normal
+    reportingController: kubeslice-controller
+    message: Successfully fetched license data from license proxy.
+  - name: LicenseSecretCreationFailed
+    reason: LicenseSecretCreationFailed
+    action: LicenseSecretCreation
+    type: Warning
+    reportingController: kubeslice-controller
+    message: Failed to create license secret.
+  - name: LicenseSecretCreationSuccess
+    reason: LicenseSecretCreationSuccess
+    action: LicenseSecretCreation
+    type: Normal
+    reportingController: kubeslice-controller
+    message: Successfully created license secret.
+    #Controller Objects
   - name: ProjectDeleted
     reason: ProjectDeleted
     action: DeleteProject
     type: Warning
     reportingController: controller
-    message: Project got deleted, please contact kubeslice support team to get it restored!
-  - name: ProjectCreated
-    reason: ProjectCreated
-    action: CreateProject
-    type: Normal
+    message: Project got deleted.
+  - name: ProjectDeletionFailed
+    reason: ProjectDeletionFailed
+    action: DeleteProject
+    type: Warning
     reportingController: controller
-    message: Project got created!
-  - name: ProjectUpdated
-    reason: ProjectUpdated
-    action: UpdateProject
-    type: Normal
-    reportingController: controller
-    message: Project got updated!
-  - name: UserCreated
-    reason: UserCreated
-    action: CreateUser
-    type: Normal
-    reportingController: controller
-    message: User got created!
-  - name: UserRemoved
-    reason: UserRemoved
-    action: RemoveUser
-    type: Normal
-    reportingController: controller
-    message: User got removed, please contact kubeslice support team to get it restored!
+    message: Project deletion failed.
   - name: ClusterDeleted
     reason: ClusterDeleted
     action: DeleteCluster
     type: Warning
     reportingController: controller
-    message: Cluster got deleted, please contact kubeslice support team to get it restored!
-  - name: ClusterCreated
-    reason: ClusterCreated
-    action: CreateCluster
-    type: Normal
+    message: Cluster got deleted.
+  - name: ClusterDeletionFailed
+    reason: ClusterDeletionFailed
+    action: DeleteCluster
+    type: Warning
     reportingController: controller
-    message: Cluster got created!
-  - name: ClusterUpdated
-    reason: ClusterUpdated
-    action: UpdateCluster
-    type: Normal
-    reportingController: controller
-    message: Cluster got updated!
+    message: Cluster deletion failed.
   - name: SliceConfigDeleted
     reason: SliceConfigDeleted
     action: DeleteSliceConfig
     type: Warning
     reportingController: controller
-    message: Slice config got deleted, please contact kubeslice support team to get it restored!
-  - name: SliceConfigCreated
-    reason: SliceConfigCreated
-    action: CreateSliceConfig
-    type: Normal
+    message: Slice config got deleted.
+  - name: SliceConfigDeletionFailed
+    reason: SliceConfigDeletionFailed
+    action: DeleteSliceConfig
+    type: Warning
     reportingController: controller
-    message: Slice config got created!
-  - name: SliceConfigUpdated
-    reason: SliceConfigUpdated
-    action: UpdateSliceConfig
-    type: Normal
-    reportingController: controller
-    message: Slice config got updated!
+    message: Slice config deletion failed.
   - name: ServiceExportConfigDeleted
     reason: ServiceExportConfigDeleted
     action: DeleteServiceExportConfig
     type: Warning
     reportingController: controller
-    message: Service export config got deleted, please contact kubeslice support team to get it restored!
-  - name: ServiceExportConfigCreated
-    reason: ServiceExportConfigCreated
-    action: CreateServiceExportConfig
-    type: Normal
+    message: Service export config got deleted.
+  - name: ServiceExportConfigDeletionFailed
+    reason: ServiceExportConfigDeletionFailed
+    action: DeleteServiceExportConfig
+    type: Warning
     reportingController: controller
-    message: Service export config got created!
-  - name: ServiceExportConfigUpdated
-    reason: ServiceExportConfigUpdated
-    action: UpdateServiceExportConfig
-    type: Normal
-    reportingController: controller
-    message: Service export config got updated!
+    message: Service export config deletion failed.
   - name: SliceQoSConfigDeleted
     reason: SliceQoSConfigDeleted
     action: DeleteSliceQoSConfig
     type: Warning
     reportingController: controller
-    message: Slice QoS config got deleted, please contact kubeslice support team to get it restored!
-  - name: SliceQoSConfigCreated
-    reason: SliceQoSConfigCreated
-    action: CreateSliceQoSConfig
+    message: Slice QoS config got deleted.
+  - name: SliceQoSConfigDeletionFailed
+    reason: SliceQoSConfigDeletionFailed
+    action: DeleteSliceQoSConfig
+    type: Warning
+    reportingController: controller
+    message: Slice QoS config deletion failed.
+  - name: SecretDeleted
+    reason: SecretDeleted
+    action: DeleteSecret
+    type: Warning
+    reportingController: controller
+    message: Secret got deleted.
+  - name: SecretDeletionFailed
+    reason: SecretDeletionFailed
+    action: DeleteSecret
+    type: Warning
+    reportingController: controller
+    message: Secret deletion failed.
+  - name: NamespaceCreated
+    reason: NamespaceCreated
+    action: CreateNamespace
     type: Normal
     reportingController: controller
-    message: Slice QoS config got created!
-  - name: SliceQoSConfigUpdated
-    reason: SliceQoSConfigUpdated
-    action: UpdateSliceQoSConfig
+    message: Namespace got created.
+  - name: NamespaceCreationFailed
+    reason: NamespaceCreationFailed
+    action: CreateNamespace
+    type: Warning
+    reportingController: controller
+    message: Namespace creation failed.
+  - name: NamespaceDeleted
+    reason: NamespaceDeleted
+    action: DeleteNamespace
+    type: Warning
+    reportingController: controller
+    message: Namespace got deleted.
+  - name: NamespaceDeletionFailed
+    reason: NamespaceDeletionFailed
+    action: DeleteNamespace
+    type: Warning
+    reportingController: controller
+    message: Namespace deletion failed.
+  - name: WorkerClusterRoleCreated
+    reason: WorkerClusterRoleCreated
+    action: CreateWorkerClusterRole
     type: Normal
     reportingController: controller
-    message: Slice QoS config got updated!
+    message: Worker cluster role got created.
+  - name: WorkerClusterRoleCreationFailed
+    reason: WorkerClusterRoleCreationFailed
+    action: CreateWorkerClusterRole
+    type: Warning
+    reportingController: controller
+    message: Worker cluster role creation failed.
+  - name: WorkerClusterRoleUpdated
+    reason: WorkerClusterRoleUpdated
+    action: UpdateWorkerClusterRole
+    type: Normal
+    reportingController: controller
+    message: Worker cluster role got updated.
+  - name: WorkerClusterRoleUpdateFailed
+    reason: WorkerClusterRoleUpdateFailed
+    action: UpdateWorkerClusterRole
+    type: Warning
+    reportingController: controller
+    message: Worker cluster role update failed.
+  - name: ReadOnlyRoleCreated
+    reason: ReadOnlyRoleCreated
+    action: CreateReadOnlyRole
+    type: Normal
+    reportingController: controller
+    message: Read only role got created.
+  - name: ReadOnlyRoleCreationFailed
+    reason: ReadOnlyRoleCreationFailed
+    action: CreateReadOnlyRole
+    type: Warning
+    reportingController: controller
+    message: Read only role creation failed.
+  - name: ReadOnlyRoleUpdated
+    reason: ReadOnlyRoleUpdated
+    action: UpdateReadOnlyRole
+    type: Normal
+    reportingController: controller
+    message: Read only role got updated.
+  - name: ReadOnlyRoleUpdateFailed
+    reason: ReadOnlyRoleUpdateFailed
+    action: UpdateReadOnlyRole
+    type: Warning
+    reportingController: controller
+    message: Read only role update failed.
+  - name: ReadWriteRoleCreated
+    reason: ReadWriteRoleCreated
+    action: CreateReadWriteRole
+    type: Normal
+    reportingController: controller
+    message: Read write role got created.
+  - name: ReadWriteRoleCreationFailed
+    reason: ReadWriteRoleCreationFailed
+    action: CreateReadWriteRole
+    type: Warning
+    reportingController: controller
+    message: Read write role creation failed.
+  - name: ReadWriteRoleUpdated
+    reason: ReadWriteRoleUpdated
+    action: UpdateReadWriteRole
+    type: Normal
+    reportingController: controller
+    message: Read write role got updated.
+  - name: ReadWriteRoleUpdateFailed
+    reason: ReadWriteRoleUpdateFailed
+    action: UpdateReadWriteRole
+    type: Warning
+    reportingController: controller
+    message: Read write role update failed.
+  - name: ServiceAccountCreated
+    reason: ServiceAccountCreated
+    action: CreateServiceAccount
+    type: Normal
+    reportingController: controller
+    message: Service account got created.
+  - name: ServiceAccountCreationFailed
+    reason: ServiceAccountCreationFailed
+    action: CreateServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Service account creation failed.
+  - name: ServiceAccountSecretCreated
+    reason: ServiceAccountSecretCreated
+    action: CreateServiceAccountSecret
+    type: Normal
+    reportingController: controller
+    message: Service account secret got created.
+  - name: ServiceAccountSecretCreationFailed
+    reason: ServiceAccountSecretCreationFailed
+    action: CreateServiceAccountSecret
+    type: Warning
+    reportingController: controller
+    message: Service account secret creation failed.
+  - name: DefaultRoleBindingCreated
+    reason: DefaultRoleBindingCreated
+    action: CreateDefaultRoleBinding
+    type: Normal
+    reportingController: controller
+    message: Default role binding got created.
+  - name: DefaultRoleBindingCreationFailed
+    reason: DefaultRoleBindingCreationFailed
+    action: CreateDefaultRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Default role binding creation failed.
+  - name: DefaultRoleBindingUpdated
+    reason: DefaultRoleBindingUpdated
+    action: UpdateDefaultRoleBinding
+    type: Normal
+    reportingController: controller
+    message: Default role binding got updated.
+  - name: DefaultRoleBindingUpdateFailed
+    reason: DefaultRoleBindingUpdateFailed
+    action: UpdateDefaultRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Default role binding update failed.
+  - name: DefaultRoleBindingDeleted
+    reason: DefaultRoleBindingDeleted
+    action: DeleteDefaultRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Default role binding got deleted.
+  - name: DefaultRoleBindingDeletionFailed
+    reason: DefaultRoleBindingDeletionFailed
+    action: DeleteDefaultRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Default role binding deletion failed.
+  - name: InactiveRoleBindingDeleted
+    reason: InactiveRoleBindingDeleted
+    action: DeleteInactiveRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Inactive role binding got deleted.
+  - name: InactiveRoleBindingDeletionFailed
+    reason: InactiveRoleBindingDeletionFailed
+    action: DeleteInactiveRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Inactive role binding deletion failed.
+  - name: InactiveServiceAccountDeleted
+    reason: InactiveServiceAccountDeleted
+    action: DeleteInactiveServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Inactive service account got deleted.
+  - name: InactiveServiceAccountDeletionFailed
+    reason: InactiveServiceAccountDeletionFailed
+    action: DeleteInactiveServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Inactive service account deletion failed.
+  - name: ServiceAccountDeleted
+    reason: ServiceAccountDeleted
+    action: DeleteServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Service account got deleted.
+  - name: ServiceAccountDeletionFailed
+    reason: ServiceAccountDeletionFailed
+    action: DeleteServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Service account deletion failed.

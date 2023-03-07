@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"strings"
@@ -274,4 +275,12 @@ func GetProjectName(namespace string) string {
 		return d[1]
 	}
 	return ""
+}
+
+func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runtime.Object, name string) {
+	recorder.RecordEvent(ctx, &events.Event{
+		Object:            object,
+		ReportingInstance: InstanceController,
+		Name:              name,
+	})
 }

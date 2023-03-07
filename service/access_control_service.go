@@ -19,6 +19,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/schema"
 	"strings"
 
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -57,7 +59,8 @@ type activeServiceAccount struct {
 }
 
 type AccessControlService struct {
-	ruleProvider IAccessControlRuleProvider
+	ruleProvider  IAccessControlRuleProvider
+	eventRecorder events.EventRecorder
 }
 
 // ReconcileWorkerClusterRole reconciles the worker cluster role
@@ -82,16 +85,22 @@ func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	//Load Event Recorder with project name and namespace
+	a.loadEventRecorder(ctx, util.GetProjectName(namespace), namespace)
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
+			util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventWorkerClusterRoleCreationFailed)
 			return ctrl.Result{}, err
 		}
+		util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventWorkerClusterRoleCreated)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
+			util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventWorkerClusterRoleUpdateFailed)
 			return ctrl.Result{}, err
 		}
+		util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventWorkerClusterRoleUpdated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -118,16 +127,22 @@ func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namesp
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	//Load Event Recorder with project name and namespace
+	a.loadEventRecorder(ctx, util.GetProjectName(namespace), namespace)
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
+			util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventReadOnlyRoleCreationFailed)
 			return ctrl.Result{}, err
 		}
+		util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventReadOnlyRoleCreated)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
+			util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventReadOnlyRoleUpdateFailed)
 			return ctrl.Result{}, err
 		}
+		util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventReadOnlyRoleUpdated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -154,16 +169,22 @@ func (a *AccessControlService) ReconcileReadWriteRole(ctx context.Context,
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	//Load Event Recorder with project name and namespace
+	a.loadEventRecorder(ctx, util.GetProjectName(namespace), namespace)
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
+			util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventReadWriteRoleCreationFailed)
 			return ctrl.Result{}, err
 		}
+		util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventReadWriteRoleCreated)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
+			util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventReadWriteRoleUpdateFailed)
 			return ctrl.Result{}, err
 		}
+		util.RecordEvent(ctx, a.eventRecorder, expectedRole, schema.EventReadWriteRoleUpdated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -232,6 +253,8 @@ func (a *AccessControlService) RemoveWorkerClusterServiceAccountAndRoleBindings(
 func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx context.Context, namespace string,
 	names []string, svcAccNamePattern string, roleBindingNamePatterns string, accessType string, roleName string, owner client.Object) (ctrl.Result, error) {
 	logger := util.CtxLogger(ctx)
+	//Load Event Recorder with project name and namespace
+	a.loadEventRecorder(ctx, util.GetProjectName(namespace), namespace)
 	for _, name := range names {
 		// Create or update service account
 		serviceAccountNamespacedName := client.ObjectKey{
@@ -266,8 +289,10 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			err = util.CreateResource(ctx, expectedServiceAccount)
 			if err != nil {
 				logger.With(zap.Error(err)).Errorf("Couldnt create serviceaccount")
+				util.RecordEvent(ctx, a.eventRecorder, expectedServiceAccount, schema.EventServiceAccountCreationFailed)
 				return ctrl.Result{}, err
 			}
+			util.RecordEvent(ctx, a.eventRecorder, expectedServiceAccount, schema.EventServiceAccountCreated)
 			// create secret for the service account
 			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -280,8 +305,10 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			err = util.CreateResource(ctx, &secret)
 			if err != nil {
 				logger.With(zap.Error(err)).Errorf("Couldnt create secret")
+				util.RecordEvent(ctx, a.eventRecorder, &secret, schema.EventServiceAccountSecretCreationFailed)
 				return ctrl.Result{}, err
 			}
+			util.RecordEvent(ctx, a.eventRecorder, &secret, schema.EventServiceAccountSecretCreated)
 		}
 	}
 	for _, name := range names {
@@ -321,13 +348,17 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 		if !foundRb {
 			err = util.CreateResource(ctx, expectedRoleBinding)
 			if err != nil {
+				util.RecordEvent(ctx, a.eventRecorder, expectedRoleBinding, schema.EventDefaultRoleBindingCreationFailed)
 				return ctrl.Result{}, err
 			}
+			util.RecordEvent(ctx, a.eventRecorder, expectedRoleBinding, schema.EventDefaultRoleBindingCreated)
 		} else {
 			err = util.UpdateResource(ctx, expectedRoleBinding)
 			if err != nil {
+				util.RecordEvent(ctx, a.eventRecorder, expectedRoleBinding, schema.EventDefaultRoleBindingUpdateFailed)
 				return ctrl.Result{}, err
 			}
+			util.RecordEvent(ctx, a.eventRecorder, expectedRoleBinding, schema.EventDefaultRoleBindingUpdated)
 		}
 	}
 	return ctrl.Result{}, nil
@@ -376,13 +407,18 @@ func (a *AccessControlService) cleanupObsoleteServiceAccountsAndRoleBindings(ctx
 		activeRoleBindings[fmt.Sprintf(roleBindingNamePatterns, strings.ToLower(name))] = activeRoleBinding{active: true}
 	}
 
+	//Load Event Recorder with project name and namespace
+	a.loadEventRecorder(ctx, util.GetProjectName(namespace), namespace)
+
 	// Delete additional role bindings
 	for _, activeObj := range activeRoleBindings {
 		if !activeObj.active {
 			err = util.DeleteResource(ctx, &activeObj.object)
 			if err != nil {
+				util.RecordEvent(ctx, a.eventRecorder, &activeObj.object, schema.EventInactiveRoleBindingDeletionFailed)
 				return ctrl.Result{}, err
 			}
+			util.RecordEvent(ctx, a.eventRecorder, &activeObj.object, schema.EventInactiveRoleBindingDeleted)
 		}
 	}
 
@@ -391,8 +427,10 @@ func (a *AccessControlService) cleanupObsoleteServiceAccountsAndRoleBindings(ctx
 		if !activeObj.active {
 			err = util.DeleteResource(ctx, &activeObj.object)
 			if err != nil {
+				util.RecordEvent(ctx, a.eventRecorder, &activeObj.object, schema.EventInactiveServiceAccountDeletionFailed)
 				return ctrl.Result{}, err
 			}
+			util.RecordEvent(ctx, a.eventRecorder, &activeObj.object, schema.EventInactiveServiceAccountDeleted)
 		}
 	}
 	return ctrl.Result{}, err
@@ -418,13 +456,18 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 		return ctrl.Result{}, err
 	}
 
+	//Load Event Recorder with project name and namespace
+	a.loadEventRecorder(ctx, util.GetProjectName(namespace), namespace)
+
 	// Delete role bindings
 	if len(roleBindings.Items) > 0 {
 		for _, rb := range roleBindings.Items {
 			err = util.DeleteResource(ctx, &rb)
 			if err != nil {
+				util.RecordEvent(ctx, a.eventRecorder, &rb, schema.EventDefaultRoleBindingDeletionFailed)
 				return ctrl.Result{}, err
 			}
+			util.RecordEvent(ctx, a.eventRecorder, &rb, schema.EventDefaultRoleBindingDeleted)
 		}
 	}
 
@@ -433,9 +476,24 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 		for _, sa := range serviceAccounts.Items {
 			err = util.DeleteResource(ctx, &sa)
 			if err != nil {
+				util.RecordEvent(ctx, a.eventRecorder, &sa, schema.EventServiceAccountDeletionFailed)
 				return ctrl.Result{}, err
 			}
+			util.RecordEvent(ctx, a.eventRecorder, &sa, schema.EventServiceAccountDeleted)
 		}
 	}
 	return ctrl.Result{}, err
+}
+
+// loadEventRecorder is function to load the event recorder
+func (a *AccessControlService) loadEventRecorder(ctx context.Context, project, namespace string) {
+	a.eventRecorder = events.EventRecorder{
+		Client:    util.CtxClient(ctx),
+		Logger:    util.CtxLogger(ctx),
+		Scheme:    util.CtxScheme(ctx),
+		Project:   project,
+		Namespace: namespace,
+		Component: util.ComponentController,
+	}
+	return
 }

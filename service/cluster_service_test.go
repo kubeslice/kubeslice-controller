@@ -130,8 +130,9 @@ func testReconcileClusterDeletionClusterFail(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	cluster := &controllerv1alpha1.Cluster{}
 	nsResource := &corev1.Namespace{}
-
-	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareTestContext(context.Background(), clientMock, scheme)
 	timeStamp := kubemachine.Now()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, cluster).Return(nil).Once().Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
@@ -229,6 +230,7 @@ func testDeleteClustersListFail(t *testing.T) {
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func testDeleteClusterDeleteFail(t *testing.T) {
 	//clusters := &controllerv1alpha1.ClusterList{}
 	nsServiceMock := &mocks.INamespaceService{}
@@ -241,7 +243,9 @@ func testDeleteClusterDeleteFail(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	deleteerr := errors.New("delete failed")
 	namespace := "cisco"
-	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("List", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*controllerv1alpha1.ClusterList)
 		if arg.Items == nil {

@@ -199,9 +199,10 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 	}
 	clientMock := &utilMock.Client{}
 	project := &controllerv1alpha1.Project{}
-	//projectResult := &controllerv1alpha1.Project{}
 
-	ctx := prepareProjectTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareProjectTestContext(context.Background(), clientMock, scheme)
 	return nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, clusterServiceMock, sliceConfigServiceMock, serviceExportConfigServiceMock
 }
 
