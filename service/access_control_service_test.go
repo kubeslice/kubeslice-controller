@@ -120,7 +120,9 @@ func AccessControlService_ReconcileWorkerClusterRole_Create(t *testing.T) {
 	}
 	actualRole := &rbacv1.Role{}
 	clientMock := &utilMock.Client{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
@@ -135,6 +137,7 @@ func AccessControlService_ReconcileWorkerClusterRole_Create(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
 	namespace := "kubeslice-controller-cisco"
 	namespacedName := client.ObjectKey{
@@ -190,7 +193,9 @@ func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
 	}
 	actualRole := &rbacv1.Role{}
 	clientMock := &utilMock.Client{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
@@ -250,7 +255,9 @@ func AccessControlService_ReconcileReadOnlyRole_Create(t *testing.T) {
 	}
 	actualRole := &rbacv1.Role{}
 	clientMock := &utilMock.Client{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
@@ -265,6 +272,7 @@ func AccessControlService_ReconcileReadOnlyRole_Create(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func AccessControlService_ReconcileReadOnlyRole_Update(t *testing.T) {
 	namespace := "kubeslice-controller-cisco"
 	namespacedName := client.ObjectKey{
@@ -310,7 +318,9 @@ func AccessControlService_ReconcileReadOnlyRole_Update(t *testing.T) {
 	}
 	actualRole := &rbacv1.Role{}
 	clientMock := &utilMock.Client{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
@@ -370,7 +380,9 @@ func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
 	}
 	actualRole := &rbacv1.Role{}
 	clientMock := &utilMock.Client{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
@@ -385,6 +397,7 @@ func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
 	namespace := "kubeslice-controller-cisco"
 	namespacedName := client.ObjectKey{
@@ -430,7 +443,9 @@ func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
 	}
 	actualRole := &rbacv1.Role{}
 	clientMock := &utilMock.Client{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
@@ -444,10 +459,13 @@ func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	acsService := AccessControlService{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	readonlynames := []string{"user1"}
 	namespace := "cisco"
 	project := &controllerv1alpha1.Project{}
@@ -515,10 +533,13 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_SA_exists_RoleBinding_exists_update(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	acsService := AccessControlService{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	readonlynames := []string{"user1"}
 	namespace := "cisco"
 	project := &controllerv1alpha1.Project{}
@@ -570,7 +591,9 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_SA_exists_RoleBinding_exis
 func ACS_removeServiceAccountsAndRoleBindingsByLabel_happypath(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	acsService := AccessControlService{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	clusterName := []string{"cluster-1"}
 	namespace := "cisco"
 	cluster := &controllerv1alpha1.Cluster{}
@@ -622,7 +645,9 @@ func ACS_removeServiceAccountsAndRoleBindingsByLabel_happypath(t *testing.T) {
 func ACS_cleanupObsoleteServiceAccountsAndRoleBindings_happypath(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	acsService := AccessControlService{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	readonlynames := []string{"user1"}
 	namespace := "cisco"
 	project := &controllerv1alpha1.Project{}
@@ -685,10 +710,13 @@ func ACS_cleanupObsoleteServiceAccountsAndRoleBindings_happypath(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func ACS_RemoveWorkerClusterServiceAccountAndRoleBindings_Happypath(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	acsService := AccessControlService{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	clusterNameString := "cluster-1"
 	//clusterName := []string{clusterNameString}
 
@@ -738,10 +766,13 @@ func ACS_RemoveWorkerClusterServiceAccountAndRoleBindings_Happypath(t *testing.T
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	acsService := AccessControlService{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	readonlynames := []string{"user1"}
 	namespace := "cisco"
 	project := &controllerv1alpha1.Project{}
@@ -864,10 +895,13 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	acsService := AccessControlService{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	readonlynames := []string{"user1"}
 	namespace := "cisco"
 	project := &controllerv1alpha1.Project{}
@@ -990,10 +1024,13 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	acsService := AccessControlService{}
-	ctx := prepareACSTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	name := "user1"
 	readonlynames := []string{name}
 	namespace := "cisco"
@@ -1127,6 +1164,7 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func prepareACSTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
 	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController")

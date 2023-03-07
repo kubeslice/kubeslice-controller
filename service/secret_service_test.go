@@ -19,6 +19,8 @@ package service
 import (
 	"context"
 	"errors"
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -102,12 +104,14 @@ func SecretFoundButErrorOnDelete(t *testing.T) {
 func setupSecretTest(name string, namespace string) (SecretService, *utilMock.Client, *corev1.Secret, context.Context) {
 	secretService := SecretService{}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 	}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SecretServiceTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SecretServiceTest")
 	return secretService, clientMock, secret, ctx
 }
