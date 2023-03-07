@@ -403,6 +403,15 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 	labels["kubeslice-manager"] = "controller"
 	labels["project-namespace"] = namespace
 	labels["original-slice-name"] = sliceName
+	sourceClusterNodeIPs := sourceCluster.Spec.NodeIPs
+	destinationClusterNodeIPs := destinationCluster.Spec.NodeIPs
+
+	if len(sourceClusterNodeIPs) == 0 {
+		sourceClusterNodeIPs = sourceCluster.Status.NodeIPs
+	}
+	if len(destinationClusterNodeIPs) == 0 {
+		destinationClusterNodeIPs = destinationCluster.Status.NodeIPs
+	}
 
 	return &v1alpha1.WorkerSliceGateway{
 		TypeMeta: metav1.TypeMeta{},
@@ -417,7 +426,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				ClusterName:   sourceCluster.Name,
 				GatewayName:   localGatewayName,
 				GatewaySubnet: gatewaySubnet,
-				NodeIps:       sourceCluster.Spec.NodeIPs,
+				NodeIps:       sourceClusterNodeIPs,
 				NodeIp:        sourceCluster.Spec.NodeIP,
 				VpnIp:         localVpnAddress,
 			},
@@ -425,7 +434,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 				ClusterName:   destinationCluster.Name,
 				GatewayName:   remoteGatewayName,
 				GatewaySubnet: remoteGatewaySubnet,
-				NodeIps:       destinationCluster.Spec.NodeIPs,
+				NodeIps:       destinationClusterNodeIPs,
 				NodeIp:        destinationCluster.Spec.NodeIP,
 				VpnIp:         remoteVpnAddress,
 			},
@@ -511,8 +520,12 @@ func (s *WorkerSliceGatewayService) NodeIpReconciliationOfWorkerSliceGateways(ct
 				return err
 			}
 		}
-		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIps, cluster.Spec.NodeIPs) {
-			gateway.Spec.LocalGatewayConfig.NodeIps = cluster.Spec.NodeIPs
+		nodeIPs := cluster.Spec.NodeIPs
+		if len(nodeIPs) == 0 {
+			nodeIPs = cluster.Status.NodeIPs
+		}
+		if !reflect.DeepEqual(gateway.Spec.LocalGatewayConfig.NodeIps, nodeIPs) {
+			gateway.Spec.LocalGatewayConfig.NodeIps = nodeIPs
 			err = util.UpdateResource(ctx, &gateway)
 			if err != nil {
 				return err

@@ -138,3 +138,24 @@ jobs:
          ENABLE_QUALITY_GATE: true
          MINIMUM_PASS_PERCENTAGE: 75 
          ALLURE_BEHAVIORS_CSV: '/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}/allure-history/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/data/behaviors.csv'
+    
+    - name: Send mail
+      if: always()
+      uses: dawidd6/action-send-mail@v3
+      with:
+       server_address: smtp.gmail.com
+       server_port: 465
+       username: ${{secrets.MAIL_USERNAME}}
+       password: ${{secrets.MAIL_PASSWORD}}
+       cc: nishant.singh@aveshasystems.com
+       subject: Kubeslice-controller | end-to-end-test | ${{ steps.date.outputs.date }}
+       to: richie@aveshasystems.com
+       from: no-reply@aveshasystems.com
+       attachments: result-summary.txt
+       body: Pipeline for the repo ${{github.repository}} is triggered by ${{github.actor}} from the branch ${{ steps.branch-name.outputs.current_branch }} !
+             Run id for the pipeline is ${{ github.run_id }} .
+             Check your logs in github action here https://github.com/kubeslice/kubeslice-controller/actions/runs/${{ github.run_id }} .
+             for downloading the logs zip file in your local use this API url in curl command https://api.github.com/repos/kubeslice/kubeslice-controller/actions/runs/${{ github.run_id }}/logs
+             the report url is https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html. 
+             for looking all the allure reports (including old ones ) please visit at https://kubeslice.github.io/e2e-allure-reports/ .
+             please look result-summary.txt file for more info regarding test cases ( please note you will get result-summary.txt file only if your quality gate check steps ran successfully ). 
