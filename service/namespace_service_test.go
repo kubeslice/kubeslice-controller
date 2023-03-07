@@ -48,9 +48,8 @@ func TestNamespaceSuite(t *testing.T) {
 var NamespaceTestbed = map[string]func(*testing.T){
 	"TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsReconciliationComplete_Happypath": TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsReconciliationComplete_Happypath,
 	"TestReconcileProjectNamespace_DoesNothingIfNamespaceExistAlready":                                           TestReconcileProjectNamespace_DoesNothingIfNamespaceExistAlready,
-	//"TestDeleteNamespace_DoesNothigIfNamespaceValueIsEmpty": TestDeleteNamespace_DoesNothingIfNamespaceValueIsEmpty,
-	"TestDeleteNamespace_DeletesObjectWithReconciliationComplete": TestDeleteNamespace_DeletesObjectWithReconciliationComplete,
-	"TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist":        TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist,
+	"TestDeleteNamespace_DeletesObjectWithReconciliationComplete":                                                TestDeleteNamespace_DeletesObjectWithReconciliationComplete,
+	"TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist":                                                       TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist,
 }
 
 func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsReconciliationComplete_Happypath(t *testing.T) {
@@ -61,8 +60,10 @@ func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsR
 		Name: namespaceName,
 	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
 	notFoundError := k8sError.NewNotFound(util.Resource("namespacetest"), "isnotFound")
-	ctx := prepareNamespaceTestContext(context.Background(), clientMock, nil)
+	ctx := prepareNamespaceTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("Get", ctx, namespaceObject, namespace).Return(notFoundError)
 
 	project := &controllerv1alpha1.Project{}
@@ -84,6 +85,7 @@ func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsR
 	clientMock.AssertExpectations(t)
 
 }
+
 func TestReconcileProjectNamespace_DoesNothingIfNamespaceExistAlready(t *testing.T) {
 	namespaceName := "cisco"
 	namespaceService := NamespaceService{}
@@ -93,8 +95,9 @@ func TestReconcileProjectNamespace_DoesNothingIfNamespaceExistAlready(t *testing
 		Name: namespaceName,
 	}
 	clientMock := &utilMock.Client{}
-
-	ctx := prepareNamespaceTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareNamespaceTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("Get", ctx, namespaceObject, namespace).Return(nil)
 	project := &controllerv1alpha1.Project{}
 	project.ObjectMeta.Labels = map[string]string{"testLabel": "testValue"}
@@ -115,8 +118,9 @@ func TestDeleteNamespace_DeletesObjectWithReconciliationComplete(t *testing.T) {
 		Name: namespaceName,
 	}
 	clientMock := &utilMock.Client{}
-
-	ctx := prepareNamespaceTestContext(context.Background(), clientMock, nil)
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareNamespaceTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("Get", ctx, namespaceObject, namespace).Return(nil)
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil)
 	result, err := namespaceService.DeleteNamespace(ctx, namespaceName)
@@ -126,6 +130,7 @@ func TestDeleteNamespace_DeletesObjectWithReconciliationComplete(t *testing.T) {
 	clientMock.AssertExpectations(t)
 
 }
+
 func TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist(t *testing.T) {
 	namespaceName := "cisco"
 	namespaceService := NamespaceService{}
@@ -135,8 +140,10 @@ func TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist(t *testing.T) {
 		Name: namespaceName,
 	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
 	notFoundError := k8sError.NewNotFound(util.Resource("namespacetest"), "isnotFound")
-	ctx := prepareNamespaceTestContext(context.Background(), clientMock, nil)
+	ctx := prepareNamespaceTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("Get", ctx, namespaceObject, namespace).Return(notFoundError)
 	result, err := namespaceService.DeleteNamespace(ctx, namespaceName)
 	expectedResult := ctrl.Result{}
@@ -145,6 +152,7 @@ func TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist(t *testing.T) {
 	clientMock.AssertExpectations(t)
 
 }
+
 func prepareNamespaceTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
 	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "NamespaceTestController")

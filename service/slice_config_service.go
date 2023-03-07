@@ -19,6 +19,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/schema"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -34,13 +36,14 @@ type ISliceConfigService interface {
 
 // SliceConfigService implements different interfaces -
 type SliceConfigService struct {
-	ns    INamespaceService
-	acs   IAccessControlService
-	sgs   IWorkerSliceGatewayService
-	ms    IWorkerSliceConfigService
-	si    IWorkerServiceImportService
-	se    IServiceExportConfigService
-	wsgrs IWorkerSliceGatewayRecyclerService
+	ns            INamespaceService
+	acs           IAccessControlService
+	sgs           IWorkerSliceGatewayService
+	ms            IWorkerSliceConfigService
+	si            IWorkerServiceImportService
+	se            IServiceExportConfigService
+	wsgrs         IWorkerSliceGatewayRecyclerService
+	eventRecorder events.EventRecorder
 }
 
 // ReconcileSliceConfig is a function to reconcile the sliceconfig
@@ -57,6 +60,8 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
+	//Load Event Recorder with slice name and namespace
+	s.loadEventRecorder(ctx, util.GetProjectName(sliceConfig.Namespace), "", sliceConfig.Name, sliceConfig.Namespace)
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		logger.Infof("Duplicate cluster name %v found in sliceConfig %v", value, req.NamespacedName)
 		return ctrl.Result{}, nil
@@ -74,8 +79,12 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 			return result, reconErr
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceConfig, SliceConfigFinalizer)); shouldReturn {
+			//Register an event for slice config deletion fail
+			util.RecordEvent(ctx, s.eventRecorder, sliceConfig, schema.EventSliceConfigDeletionFailed)
 			return result, reconErr
 		}
+		//Register an event for slice config deletion
+		util.RecordEvent(ctx, s.eventRecorder, sliceConfig, schema.EventSliceConfigDeleted)
 		return ctrl.Result{}, err
 	}
 
@@ -164,10 +173,16 @@ func (s *SliceConfigService) DeleteSliceConfigs(ctx context.Context, namespace s
 		return ctrl.Result{}, err
 	}
 	for _, sliceConfig := range sliceConfigs.Items {
+		//Load Event Recorder with slice name and namespace
+		s.loadEventRecorder(ctx, util.GetProjectName(sliceConfig.Namespace), "", sliceConfig.Name, sliceConfig.Namespace)
 		err = util.DeleteResource(ctx, &sliceConfig)
 		if err != nil {
+			//Register an event for slice config deletion fail
+			util.RecordEvent(ctx, s.eventRecorder, &sliceConfig, schema.EventSliceConfigDeletionFailed)
 			return ctrl.Result{}, err
 		}
+		//Register an event for slice config deletion
+		util.RecordEvent(ctx, s.eventRecorder, &sliceConfig, schema.EventSliceConfigDeleted)
 	}
 	return ctrl.Result{}, nil
 }
@@ -191,4 +206,19 @@ func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig 
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
 	ownerLabels = util.GetOwnerLabel(completeResourceName)
 	return ownerLabels
+}
+
+// loadEventRecorder is function to load the event recorder
+func (s *SliceConfigService) loadEventRecorder(ctx context.Context, project, cluster, slice, namespace string) {
+	s.eventRecorder = events.EventRecorder{
+		Client:    util.CtxClient(ctx),
+		Logger:    util.CtxLogger(ctx),
+		Scheme:    util.CtxScheme(ctx),
+		Project:   project,
+		Cluster:   cluster,
+		Slice:     slice,
+		Namespace: namespace,
+		Component: util.ComponentController,
+	}
+	return
 }

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/schema"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,9 +36,10 @@ type IClusterService interface {
 
 // ClusterService struct implements different service interfaces
 type ClusterService struct {
-	ns   INamespaceService
-	acs  IAccessControlService
-	sgws IWorkerSliceGatewayService
+	ns            INamespaceService
+	acs           IAccessControlService
+	sgws          IWorkerSliceGatewayService
+	eventRecorder events.EventRecorder
 }
 
 // ReconcileCluster is function to reconcile cluster
@@ -53,6 +56,8 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		logger.Infof("cluster %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
+	//Load Event Recorder with cluster name and namespace
+	c.loadEventRecorder(ctx, util.GetProjectName(cluster.Namespace), cluster.Name, cluster.Namespace)
 	// Step 0: check if cluster is in project namespace
 	nsResource := &corev1.Namespace{}
 	found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
@@ -76,8 +81,12 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			return result, reconErr
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterFinalizer)); shouldReturn {
+			//Register an event for cluster deletion fail
+			util.RecordEvent(ctx, c.eventRecorder, cluster, schema.EventClusterDeletionFailed)
 			return result, reconErr
 		}
+		//Register an event for cluster deletion
+		util.RecordEvent(ctx, c.eventRecorder, cluster, schema.EventClusterDeleted)
 		return ctrl.Result{}, err
 	}
 	//Step 2: Get ServiceAccount
@@ -110,6 +119,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		logger.Errorf(err.Error())
 		return ctrl.Result{}, err
 	}
+
 	//Step 5: Update Cluster with Secret
 	cluster.Status.SecretName = secret.Name
 	err = util.UpdateStatus(ctx, cluster)
@@ -128,6 +138,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			cluster.Spec.NodeIPs = make([]string, 1)
 		}
 		cluster.Spec.NodeIPs[0] = cluster.Spec.NodeIP
+
 		err = util.UpdateResource(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -165,9 +176,29 @@ func (c *ClusterService) DeleteClusters(ctx context.Context, namespace string) (
 	}
 	for _, cluster := range clusters.Items {
 		err = util.DeleteResource(ctx, &cluster)
+		//Load Event Recorder with cluster name and namespace
+		c.loadEventRecorder(ctx, util.GetProjectName(cluster.Namespace), cluster.Name, cluster.Namespace)
 		if err != nil {
+			//Register an event for cluster deletion fail
+			util.RecordEvent(ctx, c.eventRecorder, &cluster, schema.EventClusterDeletionFailed)
 			return ctrl.Result{}, err
 		}
+		//Register an event for cluster deletion
+		util.RecordEvent(ctx, c.eventRecorder, &cluster, schema.EventClusterDeleted)
 	}
 	return ctrl.Result{}, nil
+}
+
+// loadEventRecorder is function to load the event recorder
+func (c *ClusterService) loadEventRecorder(ctx context.Context, project, cluster, namespace string) {
+	c.eventRecorder = events.EventRecorder{
+		Client:    util.CtxClient(ctx),
+		Logger:    util.CtxLogger(ctx),
+		Scheme:    util.CtxScheme(ctx),
+		Project:   project,
+		Cluster:   cluster,
+		Namespace: namespace,
+		Component: util.ComponentController,
+	}
+	return
 }
