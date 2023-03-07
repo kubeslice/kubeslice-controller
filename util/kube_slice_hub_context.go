@@ -78,3 +78,13 @@ func CtxLogger(ctx context.Context) *zap.SugaredLogger {
 	logg := GetKubeSliceControllerRequestContext(ctx).Log
 	return logg
 }
+
+// CtxClient is a function to get the Client
+func CtxClient(ctx context.Context) Client {
+	return GetKubeSliceControllerRequestContext(ctx).Client
+}
+
+// CtxScheme is a function to get the Scheme
+func CtxScheme(ctx context.Context) *runtime.Scheme {
+	return GetKubeSliceControllerRequestContext(ctx).Scheme
+}

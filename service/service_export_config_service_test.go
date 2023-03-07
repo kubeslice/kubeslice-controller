@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -452,7 +453,9 @@ func setupServiceExportTest(name string, namespace string) (*mocks.IWorkerServic
 		NamespacedName: namespacedName,
 	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
 	serviceExport := &controllerv1alpha1.ServiceExportConfig{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "ServiceExportConfigServiceTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ServiceExportConfigServiceTest")
 	return workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx
 }

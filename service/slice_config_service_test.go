@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -425,7 +426,6 @@ func SliceConfigRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
 		"slice_name": requestObj.Name,
 	}
 	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
-	//remove finalizer
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
@@ -626,7 +626,9 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 		NamespacedName: namespacedName,
 	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigServiceTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceConfigServiceTest")
 	return workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, workerServiceImportMock, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj
 }

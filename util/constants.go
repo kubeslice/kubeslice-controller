@@ -11,3 +11,8 @@ const (
 	Recycle = string(rune(0x267D))
 	Party   = string(rune(0x1F389))
 )
+
+const (
+	ComponentController = "controller"
+	InstanceController  = "controller"
+)

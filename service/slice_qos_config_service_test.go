@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -204,7 +205,9 @@ func setupSliceQoSConfigTest(name string, namespace string) (*mocks.IWorkerSlice
 		NamespacedName: namespacedName,
 	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
 	sliceQosConfig := &controllerv1alpha1.SliceQoSConfig{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceQoSConfigServiceTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceQoSConfigServiceTest")
 	return workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService
 }
