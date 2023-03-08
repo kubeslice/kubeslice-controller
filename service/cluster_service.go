@@ -197,6 +197,7 @@ func (c *ClusterService) loadEventRecorder(ctx context.Context, project, cluster
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
 		Cluster:   cluster,
+		Slice:     util.NotAvailable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}

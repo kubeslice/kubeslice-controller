@@ -110,6 +110,8 @@ func (n *NamespaceService) loadEventRecorder(ctx context.Context, project, names
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
+		Cluster:   util.ClusterController,
+		Slice:     util.NotAvailable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}

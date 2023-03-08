@@ -15,4 +15,9 @@ const (
 const (
 	ComponentController = "controller"
 	InstanceController  = "controller"
+	ClusterController   = "controller"
+)
+
+const (
+	NotAvailable = "N/A"
 )

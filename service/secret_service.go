@@ -77,6 +77,8 @@ func (s *SecretService) loadEventRecorder(ctx context.Context, project, namespac
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
+		Cluster:   util.ClusterController,
+		Slice:     util.NotAvailable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}
