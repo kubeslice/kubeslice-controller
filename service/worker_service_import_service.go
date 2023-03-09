@@ -34,7 +34,7 @@ import (
 type IWorkerServiceImportService interface {
 	ReconcileWorkerServiceImport(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	CreateMinimalWorkerServiceImport(ctx context.Context, clusters []string, namespace string, label map[string]string,
-		serviceName string, serviceNamespace string, sliceName string) error
+		serviceName string, serviceNamespace string, sliceName string, aliases []string) error
 	DeleteWorkerServiceImportByLabel(ctx context.Context, label map[string]string, namespace string) error
 	ListWorkerServiceImport(ctx context.Context, ownerLabel map[string]string, namespace string) ([]workerv1alpha1.WorkerServiceImport, error)
 	ForceReconciliation(ctx context.Context, list []workerv1alpha1.WorkerServiceImport) error
@@ -127,7 +127,7 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 
 // CreateMinimalWorkerServiceImport is a function to create the service import on worker object/cluster
 func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx context.Context, clusters []string,
-	namespace string, label map[string]string, serviceName string, serviceNamespace string, sliceName string) error {
+	namespace string, label map[string]string, serviceName string, serviceNamespace string, sliceName string, aliases []string) error {
 	logger := util.CtxLogger(ctx)
 	err := s.cleanUpWorkerServiceImportsForRemovedClusters(ctx, label, namespace, clusters)
 	if err != nil {
@@ -151,6 +151,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 				ServiceName:      serviceName,
 				ServiceNamespace: serviceNamespace,
 				SliceName:        sliceName,
+				Aliases:          aliases,
 			},
 		}
 		existingWorkerServiceImport := &workerv1alpha1.WorkerServiceImport{}
@@ -245,6 +246,7 @@ func (s *WorkerServiceImportService) copySpecFromServiceExportConfigToWorkerServ
 		ServiceName:      serviceExport.Spec.ServiceName,
 		ServiceNamespace: serviceExport.Spec.ServiceNamespace,
 		SliceName:        serviceExport.Spec.SliceName,
+		Aliases:          serviceExport.Spec.Aliases,
 	}
 	sc := make([]string, 0)
 	sde := make([]workerv1alpha1.ServiceDiscoveryEndpoint, 0)
