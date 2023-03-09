@@ -36,6 +36,12 @@ spec:
           spec:
             description: ServiceExportConfigSpec defines the desired state of ServiceExportConfig
             properties:
+              aliases:
+                description: Alias names for the exported service. The service could
+                  be addressed by the alias names in addition to the slice.local name.
+                items:
+                  type: string
+                type: array
               serviceDiscoveryEndpoints:
                 description: the service discovery endpoint array
                 items:

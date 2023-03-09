@@ -73,7 +73,7 @@ func ServiceExportReconciliationCompleteHappyCase(t *testing.T) {
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Twice()
-	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	result, err := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -252,7 +252,7 @@ func ServiceExportErrorOnCreateWorkerServiceImport(t *testing.T) {
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Twice()
 	err1 := errors.New("internal_error")
-	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(err1).Once()
+	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(err1).Once()
 	result, err2 := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -276,7 +276,7 @@ func ServiceExportUpdateHappyCase(t *testing.T) {
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Twice()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
-	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	result, err := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -319,7 +319,7 @@ func ServiceExportLabelsNullOnUpdate(t *testing.T) {
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Twice()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
-	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	result, err := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)

@@ -306,7 +306,7 @@ func testCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail(t *t
 	clientMock.On("List", ctx, workerServiceImports, mock.Anything, mock.Anything).Return(nil).Once()
 	getError := errors.New("existingWorkerServiceImport not found")
 	clientMock.On("Get", ctx, mock.Anything, existingWorkerServiceImport).Return(getError).Once()
-	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -330,7 +330,7 @@ func testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail(t
 	clientMock.On("Get", ctx, mock.Anything, existingWorkerServiceImport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(updatetError).Once()
-	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -351,7 +351,7 @@ func testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail(t
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(getError).Once()
 	existserr := errors.New("IsAlreadyExists")
 	clientMock.On("Create", ctx, mock.Anything).Return(existserr).Once()
-	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -381,7 +381,7 @@ func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatch
 
 	deleteError := errors.New("existingWorkerServiceImport delete failed")
 	clientMock.On("Delete", ctx, mock.Anything).Return(deleteError).Once()
-	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
