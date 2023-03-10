@@ -183,9 +183,6 @@ func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.Slice
 		if !exist {
 			return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster is not registered")
 		}
-		if cluster.Spec.NetworkInterface == "" {
-			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NetworkInterface"), "for cluster "+clusterName)
-		}
 		if len(cluster.Spec.NodeIPs) == 0 && len(cluster.Status.NodeIPs) == 0 {
 			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NodeIPs"), "for cluster "+clusterName)
 		}
