@@ -57,7 +57,7 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 	}
 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 	//Load Event Recorder with project name and namespace
-	t.loadEventRecorder(ctx, project.Name, projectNamespace)
+	t.loadEventRecorder(ctx, project.Name, ControllerNamespace)
 	//Finalizers
 	if project.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(project.GetFinalizers(), ProjectFinalizer) {

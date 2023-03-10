@@ -48,19 +48,21 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 		return ctrl.Result{}, err
 	}
 	//Load Event Recorder with project name and namespace
-	n.loadEventRecorder(ctx, util.GetProjectName(namespace), namespace)
+	n.loadEventRecorder(ctx, util.GetProjectName(namespace), ControllerNamespace)
 	if !found {
-		err := util.CreateResource(ctx, &corev1.Namespace{
+		expectedNS := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   namespace,
 				Labels: n.getResourceLabel(namespace, owner),
 			},
-		})
+		}
+		err := util.CreateResource(ctx, expectedNS)
+		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, n.eventRecorder, nsResource, schema.EventNamespaceCreationFailed)
+			util.RecordEvent(ctx, n.eventRecorder, expectedNS, schema.EventNamespaceCreationFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, n.eventRecorder, nsResource, schema.EventNamespaceCreated)
+		util.RecordEvent(ctx, n.eventRecorder, expectedNS, schema.EventNamespaceCreated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -72,7 +74,7 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		Name: namespace,
 	}, nsResource)
 	//Load Event Recorder with project name and namespace
-	n.loadEventRecorder(ctx, util.GetProjectName(namespace), namespace)
+	n.loadEventRecorder(ctx, util.GetProjectName(namespace), ControllerNamespace)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -80,16 +82,18 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		return ctrl.Result{}, err
 	}
 	if found {
-		err := util.DeleteResource(ctx, &corev1.Namespace{
+		nsToBeDeleted := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
 			},
-		})
+		}
+		err := util.DeleteResource(ctx, nsToBeDeleted)
+		nsToBeDeleted.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, n.eventRecorder, nsResource, schema.EventNamespaceDeletionFailed)
+			util.RecordEvent(ctx, n.eventRecorder, nsToBeDeleted, schema.EventNamespaceDeletionFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, n.eventRecorder, nsResource, schema.EventNamespaceDeleted)
+		util.RecordEvent(ctx, n.eventRecorder, nsToBeDeleted, schema.EventNamespaceDeleted)
 	}
 	return ctrl.Result{}, nil
 }
