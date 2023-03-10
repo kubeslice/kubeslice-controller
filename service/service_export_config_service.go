@@ -113,7 +113,7 @@ func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Co
 		}
 	}
 	ownerLabels := s.getOwnerLabelsForServiceExport(serviceExportConfig)
-	err = s.ses.CreateMinimalWorkerServiceImport(ctx, slice.Spec.Clusters, req.Namespace, ownerLabels, serviceExportConfig.Spec.ServiceName, serviceExportConfig.Spec.ServiceNamespace, serviceExportConfig.Spec.SliceName)
+	err = s.ses.CreateMinimalWorkerServiceImport(ctx, slice.Spec.Clusters, req.Namespace, ownerLabels, serviceExportConfig.Spec.ServiceName, serviceExportConfig.Spec.ServiceNamespace, serviceExportConfig.Spec.SliceName, serviceExportConfig.Spec.Aliases)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
