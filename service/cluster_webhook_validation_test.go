@@ -19,9 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
-	"testing"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -45,13 +46,12 @@ func TestClusterWebhookSuite(t *testing.T) {
 }
 
 var ClusterWebHookValidationTestbed = map[string]func(*testing.T){
-	"TestValidateClusterCreateFail":                         testValidateClusterCreateOtherThanProjectNamespace,
-	"TestValidateClusterUpdateFailNetworkInterfaceNotEmpty": testValidateClusterUpdateFailNetworkInterfaceNotEmpty,
-	"TestValidateClusterDeleteFail":                         testValidateClusterDeleteFail,
-	"TestValidateClusterGeolocationFailOnCreate":            testValidateClusterGeolocationFailOnCreate,
-	"TestValidateClusterGeolocationFailOnUpdate":            testValidateClusterGeolocationFailOnUpdate,
-	"TestValidateClusterGeolocationPassOnCreate":            testValidateClusterGeolocationPassOnCreate,
-	"TestValidateClusterGeolocationPassOnUpdate":            testValidateClusterGeolocationPassOnUpdate,
+	"TestValidateClusterCreateFail":              testValidateClusterCreateOtherThanProjectNamespace,
+	"TestValidateClusterDeleteFail":              testValidateClusterDeleteFail,
+	"TestValidateClusterGeolocationFailOnCreate": testValidateClusterGeolocationFailOnCreate,
+	"TestValidateClusterGeolocationFailOnUpdate": testValidateClusterGeolocationFailOnUpdate,
+	"TestValidateClusterGeolocationPassOnCreate": testValidateClusterGeolocationPassOnCreate,
+	"TestValidateClusterGeolocationPassOnUpdate": testValidateClusterGeolocationPassOnUpdate,
 }
 
 func testValidateClusterCreateOtherThanProjectNamespace(t *testing.T) {
@@ -66,25 +66,6 @@ func testValidateClusterCreateOtherThanProjectNamespace(t *testing.T) {
 	ans := ValidateClusterCreate(ctx, cluster)
 	require.NotNil(t, ans)
 	require.Contains(t, ans.Error(), "cluster must be applied on project namespace")
-	clientMock.AssertExpectations(t)
-}
-
-func testValidateClusterUpdateFailNetworkInterfaceNotEmpty(t *testing.T) {
-	clientMock := &utilmock.Client{}
-	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	cluster1 := &controllerv1alpha1.Cluster{
-		Spec: controllerv1alpha1.ClusterSpec{
-			NetworkInterface: "random1",
-		},
-	}
-	cluster2 := &controllerv1alpha1.Cluster{
-		Spec: controllerv1alpha1.ClusterSpec{
-			NetworkInterface: "random2",
-		},
-	}
-	err := ValidateClusterUpdate(ctx, cluster1, runtime.Object(cluster2))
-	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "network interface can't be changed")
 	clientMock.AssertExpectations(t)
 }
 
