@@ -57,10 +57,10 @@ func main() {
 	// Compile time dependency injection
 	ns := service.WithNameSpaceService(&eventRecorder)
 	rp := service.WithAccessControlRuleProvider()
-	acs := service.WithAccessControlService(rp)
+	acs := service.WithAccessControlService(rp, &eventRecorder)
 	js := service.WithJobService()
 	wscs := service.WithWorkerSliceConfigService()
-	ss := service.WithSecretService()
+	ss := service.WithSecretService(&eventRecorder)
 	wsgs := service.WithWorkerSliceGatewayService(js, wscs, ss)
 	c := service.WithClusterService(ns, acs, wsgs, &eventRecorder)
 	wsi := service.WithWorkerServiceImportService()
