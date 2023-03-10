@@ -16,6 +16,8 @@
 
 package service
 
+import "github.com/kubeslice/kubeslice-monitoring/pkg/events"
+
 type Services struct {
 	ProjectService                    IProjectService
 	ClusterService                    IClusterService
@@ -60,13 +62,15 @@ func WithProjectService(
 	c IClusterService,
 	sc ISliceConfigService,
 	se IServiceExportConfigService,
+	er *events.EventRecorder,
 ) IProjectService {
 	return &ProjectService{
-		ns:  ns,
-		acs: acs,
-		c:   c,
-		sc:  sc,
-		se:  se,
+		ns:            ns,
+		acs:           acs,
+		c:             c,
+		sc:            sc,
+		se:            se,
+		eventRecorder: er,
 	}
 }
 
@@ -75,11 +79,13 @@ func WithClusterService(
 	ns INamespaceService,
 	acs IAccessControlService,
 	sgws IWorkerSliceGatewayService,
+	er *events.EventRecorder,
 ) IClusterService {
 	return &ClusterService{
-		ns:   ns,
-		acs:  acs,
-		sgws: sgws,
+		ns:            ns,
+		acs:           acs,
+		sgws:          sgws,
+		eventRecorder: er,
 	}
 }
 
@@ -92,40 +98,48 @@ func WithSliceConfigService(
 	si IWorkerServiceImportService,
 	se IServiceExportConfigService,
 	wsgrs IWorkerSliceGatewayRecyclerService,
+	er *events.EventRecorder,
 ) ISliceConfigService {
 	return &SliceConfigService{
-		ns:    ns,
-		acs:   acs,
-		sgs:   sgs,
-		ms:    ms,
-		si:    si,
-		se:    se,
-		wsgrs: wsgrs,
+		ns:            ns,
+		acs:           acs,
+		sgs:           sgs,
+		ms:            ms,
+		si:            si,
+		se:            se,
+		wsgrs:         wsgrs,
+		eventRecorder: er,
 	}
 }
 
 // bootstrapping service export config service
-func WithServiceExportConfigService(ses IWorkerServiceImportService) IServiceExportConfigService {
+func WithServiceExportConfigService(ses IWorkerServiceImportService, er *events.EventRecorder) IServiceExportConfigService {
 	return &ServiceExportConfigService{
-		ses: ses,
+		ses:           ses,
+		eventRecorder: er,
 	}
 }
 
 // bootstrapping namespace service
-func WithNameSpaceService() INamespaceService {
-	return &NamespaceService{}
+func WithNameSpaceService(er *events.EventRecorder) INamespaceService {
+	return &NamespaceService{
+		eventRecorder: er,
+	}
 }
 
 // bootstrapping accesscontrol service
-func WithAccessControlService(ruleProvider IAccessControlRuleProvider) IAccessControlService {
+func WithAccessControlService(ruleProvider IAccessControlRuleProvider, er *events.EventRecorder) IAccessControlService {
 	return &AccessControlService{
-		ruleProvider: ruleProvider,
+		ruleProvider:  ruleProvider,
+		eventRecorder: er,
 	}
 }
 
 // bootstrapping secret service
-func WithSecretService() ISecretService {
-	return &SecretService{}
+func WithSecretService(er *events.EventRecorder) ISecretService {
+	return &SecretService{
+		eventRecorder: er,
+	}
 }
 
 // bootstrapping slice gateway service
@@ -166,8 +180,9 @@ func WithWorkerServiceImportService() IWorkerServiceImportService {
 }
 
 // bootstrapping slice qos config service
-func WithSliceQoSConfigService(wsc IWorkerSliceConfigService) ISliceQoSConfigService {
+func WithSliceQoSConfigService(wsc IWorkerSliceConfigService, er *events.EventRecorder) ISliceQoSConfigService {
 	return &SliceQoSConfigService{
-		wsc: wsc,
+		wsc:           wsc,
+		eventRecorder: er,
 	}
 }
