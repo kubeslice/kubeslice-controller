@@ -107,7 +107,7 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 			},
 		}
 	}).Once()
-	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, sliceConfig.Spec.Clusters, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, sliceConfig.Spec.Clusters, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -592,7 +592,7 @@ func SliceConfigErrorOnCreateOrUpdateServiceImport(t *testing.T) {
 			},
 		}
 	}).Once()
-	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, sliceConfig.Spec.Clusters, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(err1).Once()
+	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, sliceConfig.Spec.Clusters, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(err1).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err)

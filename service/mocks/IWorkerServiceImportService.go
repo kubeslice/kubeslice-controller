@@ -15,12 +15,12 @@ type IWorkerServiceImportService struct {
 }
 
 // CreateMinimalWorkerServiceImport provides a mock function with given fields: ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName
-func (_m *IWorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx context.Context, clusters []string, namespace string, label map[string]string, serviceName string, serviceNamespace string, sliceName string) error {
-	ret := _m.Called(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+func (_m *IWorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx context.Context, clusters []string, namespace string, label map[string]string, serviceName string, serviceNamespace string, sliceName string, aliases []string) error {
+	ret := _m.Called(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, aliases)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string) error); ok {
-		r0 = rf(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string, []string) error); ok {
+		r0 = rf(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, aliases)
 	} else {
 		r0 = ret.Error(0)
 	}
