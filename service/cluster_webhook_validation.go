@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -43,9 +44,6 @@ func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) e
 
 // ValidateClusterUpdate is a function to validate to the update of specification of cluster
 func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) error {
-	if err := validateClusterSpec(ctx, c, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
-	}
 	if err := validateGeolocation(c); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
@@ -66,15 +64,6 @@ func validateAppliedInProjectNamespace(ctx context.Context, c *controllerv1alpha
 	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Namespace}, namespace)
 	if !exist || !util.CheckForProjectNamespace(namespace) {
 		return field.Invalid(field.NewPath("metadata").Child("namespace"), c.Namespace, "cluster must be applied on project namespace")
-	}
-	return nil
-}
-
-// validateClusterSpec is a function to validate the specification of cluster
-func validateClusterSpec(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) *field.Error {
-	cluster := old.(*controllerv1alpha1.Cluster)
-	if cluster.Spec.NetworkInterface != "" && cluster.Spec.NetworkInterface != c.Spec.NetworkInterface {
-		return field.Invalid(field.NewPath("spec").Child("networkInterface"), c.Spec.NetworkInterface, "network interface can't be changed")
 	}
 	return nil
 }
