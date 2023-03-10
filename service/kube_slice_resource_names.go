@@ -29,6 +29,11 @@ const (
 	apiGroupKubeSliceWorker      = "worker.kubeslice.io"
 )
 
+// ControllerNamespace Controller Namespace
+const (
+	ControllerNamespace = "kubeslice-controller"
+)
+
 // Resources
 const (
 	resourceProjects              = "projects"

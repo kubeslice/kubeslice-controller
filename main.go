@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +43,7 @@ var (
 	scheme        = runtime.NewScheme()
 	setupLog      = util.NewLogger().With("name", "setup")
 	controllerLog = util.NewLogger().With("name", "controllers")
+	eventRecorder = events.EventRecorder{}
 )
 
 func init() {
@@ -53,20 +55,20 @@ func init() {
 
 func main() {
 	// Compile time dependency injection
-	ns := service.WithNameSpaceService()
+	ns := service.WithNameSpaceService(&eventRecorder)
 	rp := service.WithAccessControlRuleProvider()
-	acs := service.WithAccessControlService(rp)
+	acs := service.WithAccessControlService(rp, &eventRecorder)
 	js := service.WithJobService()
 	wscs := service.WithWorkerSliceConfigService()
-	ss := service.WithSecretService()
+	ss := service.WithSecretService(&eventRecorder)
 	wsgs := service.WithWorkerSliceGatewayService(js, wscs, ss)
-	c := service.WithClusterService(ns, acs, wsgs)
+	c := service.WithClusterService(ns, acs, wsgs, &eventRecorder)
 	wsi := service.WithWorkerServiceImportService()
-	se := service.WithServiceExportConfigService(wsi)
+	se := service.WithServiceExportConfigService(wsi, &eventRecorder)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs)
-	p := service.WithProjectService(ns, acs, c, sc, se)
-	sqcs := service.WithSliceQoSConfigService(wscs)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, &eventRecorder)
+	p := service.WithProjectService(ns, acs, c, sc, se, &eventRecorder)
+	sqcs := service.WithSliceQoSConfigService(wscs, &eventRecorder)
 	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
 }
 

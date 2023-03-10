@@ -43,7 +43,7 @@ type SliceConfigService struct {
 	si            IWorkerServiceImportService
 	se            IServiceExportConfigService
 	wsgrs         IWorkerSliceGatewayRecyclerService
-	eventRecorder events.EventRecorder
+	eventRecorder *events.EventRecorder
 }
 
 // ReconcileSliceConfig is a function to reconcile the sliceconfig
@@ -210,7 +210,7 @@ func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig 
 
 // loadEventRecorder is function to load the event recorder
 func (s *SliceConfigService) loadEventRecorder(ctx context.Context, project, cluster, slice, namespace string) {
-	s.eventRecorder = events.EventRecorder{
+	s.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),

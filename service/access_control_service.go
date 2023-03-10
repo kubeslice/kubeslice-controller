@@ -60,7 +60,7 @@ type activeServiceAccount struct {
 
 type AccessControlService struct {
 	ruleProvider  IAccessControlRuleProvider
-	eventRecorder events.EventRecorder
+	eventRecorder *events.EventRecorder
 }
 
 // ReconcileWorkerClusterRole reconciles the worker cluster role
@@ -487,11 +487,13 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 
 // loadEventRecorder is function to load the event recorder
 func (a *AccessControlService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	a.eventRecorder = events.EventRecorder{
+	a.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
+		Cluster:   util.ClusterController,
+		Slice:     util.NotApplicable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}

@@ -39,7 +39,7 @@ type ClusterService struct {
 	ns            INamespaceService
 	acs           IAccessControlService
 	sgws          IWorkerSliceGatewayService
-	eventRecorder events.EventRecorder
+	eventRecorder *events.EventRecorder
 }
 
 // ReconcileCluster is function to reconcile cluster
@@ -191,12 +191,13 @@ func (c *ClusterService) DeleteClusters(ctx context.Context, namespace string) (
 
 // loadEventRecorder is function to load the event recorder
 func (c *ClusterService) loadEventRecorder(ctx context.Context, project, cluster, namespace string) {
-	c.eventRecorder = events.EventRecorder{
+	c.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
 		Cluster:   cluster,
+		Slice:     util.NotApplicable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}
