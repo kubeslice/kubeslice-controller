@@ -37,7 +37,7 @@ type ProjectService struct {
 	c             IClusterService
 	sc            ISliceConfigService
 	se            IServiceExportConfigService
-	eventRecorder events.EventRecorder
+	eventRecorder *events.EventRecorder
 }
 
 // ReconcileProject is a function to reconcile the projects includes reconciliation of roles, clusters, project namespaces etc.
@@ -144,13 +144,13 @@ func (t *ProjectService) CleanUpProjectResources(ctx context.Context, namespace 
 
 // loadEventRecorder is function to load the event recorder
 func (t *ProjectService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	t.eventRecorder = events.EventRecorder{
+	t.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
 		Cluster:   util.ClusterController,
-		Slice:     util.NotAvailable,
+		Slice:     util.NotApplicable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}

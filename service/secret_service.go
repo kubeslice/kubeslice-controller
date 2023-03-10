@@ -32,7 +32,7 @@ type ISecretService interface {
 }
 
 type SecretService struct {
-	eventRecorder events.EventRecorder
+	eventRecorder *events.EventRecorder
 }
 
 // DeleteSecret is a function to delete the secret
@@ -72,13 +72,13 @@ func (s *SecretService) DeleteSecret(ctx context.Context, namespace string, secr
 
 // loadEventRecorder is function to load the event recorder
 func (s *SecretService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	s.eventRecorder = events.EventRecorder{
+	s.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
 		Cluster:   util.ClusterController,
-		Slice:     util.NotAvailable,
+		Slice:     util.NotApplicable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}

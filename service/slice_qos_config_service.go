@@ -37,7 +37,7 @@ type ISliceQoSConfigService interface {
 // SliceQoSConfigService implements different service interfaces
 type SliceQoSConfigService struct {
 	wsc           IWorkerSliceConfigService
-	eventRecorder events.EventRecorder
+	eventRecorder *events.EventRecorder
 }
 
 // ReconcileSliceQoSConfig is a function to reconcile the qos_profile
@@ -129,13 +129,13 @@ func (q *SliceQoSConfigService) updateWorkerSliceConfigs(ctx context.Context, na
 
 // loadEventRecorder is function to load the event recorder
 func (q *SliceQoSConfigService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	q.eventRecorder = events.EventRecorder{
+	q.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
 		Cluster:   util.ClusterController,
-		Slice:     util.NotAvailable,
+		Slice:     util.NotApplicable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}

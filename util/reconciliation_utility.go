@@ -277,7 +277,7 @@ func GetProjectName(namespace string) string {
 	return ""
 }
 
-func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runtime.Object, name string) {
+func RecordEvent(ctx context.Context, recorder *events.EventRecorder, object runtime.Object, name string) {
 	recorder.RecordEvent(ctx, &events.Event{
 		Object:            object,
 		ReportingInstance: InstanceController,

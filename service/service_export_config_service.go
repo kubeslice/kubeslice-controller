@@ -37,7 +37,7 @@ type IServiceExportConfigService interface {
 
 type ServiceExportConfigService struct {
 	ses           IWorkerServiceImportService
-	eventRecorder events.EventRecorder
+	eventRecorder *events.EventRecorder
 }
 
 // ReconcileServiceExportConfig is a function to reconcile the service export config
@@ -214,7 +214,7 @@ func (s *ServiceExportConfigService) getOwnerLabelsForServiceExport(serviceExpor
 
 // loadEventRecorder is function to load the event recorder
 func (s *ServiceExportConfigService) loadEventRecorder(ctx context.Context, project, cluster, slice, namespace string) {
-	s.eventRecorder = events.EventRecorder{
+	s.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),

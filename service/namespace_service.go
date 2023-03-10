@@ -35,7 +35,7 @@ type INamespaceService interface {
 }
 
 type NamespaceService struct {
-	eventRecorder events.EventRecorder
+	eventRecorder *events.EventRecorder
 }
 
 // ReconcileProjectNamespace is a function to reconcile project namespace
@@ -105,13 +105,13 @@ func (n *NamespaceService) getResourceLabel(namespace string, owner client.Objec
 
 // loadEventRecorder is function to load the event recorder
 func (n *NamespaceService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	n.eventRecorder = events.EventRecorder{
+	n.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
 		Cluster:   util.ClusterController,
-		Slice:     util.NotAvailable,
+		Slice:     util.NotApplicable,
 		Namespace: namespace,
 		Component: util.ComponentController,
 	}

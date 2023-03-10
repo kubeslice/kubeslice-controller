@@ -19,5 +19,5 @@ const (
 )
 
 const (
-	NotAvailable = "N/A"
+	NotApplicable = "NA"
 )
