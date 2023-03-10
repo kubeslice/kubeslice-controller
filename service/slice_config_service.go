@@ -127,7 +127,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	if len(serviceExports.Items) > 0 {
 		// iterate service export configs
 		for _, serviceExport := range serviceExports.Items {
-			err = s.si.CreateMinimalWorkerServiceImport(ctx, sliceConfig.Spec.Clusters, req.Namespace, s.getOwnerLabelsForServiceExport(&serviceExport), serviceExport.Spec.ServiceName, serviceExport.Spec.ServiceNamespace, serviceExport.Spec.SliceName)
+			err = s.si.CreateMinimalWorkerServiceImport(ctx, sliceConfig.Spec.Clusters, req.Namespace, s.getOwnerLabelsForServiceExport(&serviceExport), serviceExport.Spec.ServiceName, serviceExport.Spec.ServiceNamespace, serviceExport.Spec.SliceName, serviceExport.Spec.Aliases)
 			if err != nil {
 				return ctrl.Result{}, err
 			}

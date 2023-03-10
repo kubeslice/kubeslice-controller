@@ -37,6 +37,9 @@ type WorkerServiceImportSpec struct {
 	ServiceDiscoveryEndpoints []ServiceDiscoveryEndpoint `json:"serviceDiscoveryEndpoints,omitempty"`
 	// The ports for the given service.
 	ServiceDiscoveryPorts []ServiceDiscoveryPort `json:"serviceDiscoveryPorts,omitempty"`
+	// Alias names for the exported service. The service could be addressed by the alias names
+	// in addition to the slice.local name.
+	Aliases []string `json:"aliases,omitempty"`
 }
 
 type ServiceDiscoveryEndpoint struct {
