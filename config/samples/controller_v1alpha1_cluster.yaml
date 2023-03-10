@@ -3,7 +3,8 @@ kind: Cluster
 metadata:
   name: cluster-1
 spec:
-  nodeIP: 11.11.14.114
+  nodeIPs: 
+    - 11.11.14.114
   clusterProperty:
     telemetry:
       enabled: true
@@ -23,7 +24,8 @@ kind: Cluster
 metadata:
   name: cluster-2
 spec:
-  nodeIP: 11.11.12.11
+  nodeIPs: 
+    - 11.11.12.11
   clusterProperty:
     telemetry:
       enabled: true
@@ -43,7 +45,8 @@ kind: Cluster
 metadata:
   name: cluster-3
 spec:
-  nodeIP: 11.11.13.11
+  nodeIPs: 
+    - 11.11.13.11
   clusterProperty:
     telemetry:
       enabled: true
@@ -63,7 +66,8 @@ kind: Cluster
 metadata:
   name: cluster-4
 spec:
-  nodeIP: 11.11.14.11
+  nodeIPs: 
+    - 11.11.14.11
   clusterProperty:
     telemetry:
       enabled: true
@@ -83,7 +87,8 @@ kind: Cluster
 metadata:
   name: cluster-5
 spec:
-  nodeIP:  11.11.14.189
+  nodeIPs: 
+    - 11.11.14.189
   clusterProperty:
     telemetry:
       enabled: true
