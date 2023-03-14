@@ -72,11 +72,11 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, project, ProjectFinalizer)); shouldReturn {
 			//Register an event for project deletion fail
-			util.RecordEvent(ctx, t.eventRecorder, project, schema.EventProjectDeletionFailed)
+			util.RecordEvent(ctx, t.eventRecorder, project, nil, schema.EventProjectDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for project deletion
-		util.RecordEvent(ctx, t.eventRecorder, project, schema.EventProjectDeleted)
+		util.RecordEvent(ctx, t.eventRecorder, project, nil, schema.EventProjectDeleted)
 		return ctrl.Result{}, nil
 	}
 

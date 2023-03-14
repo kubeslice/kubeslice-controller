@@ -61,7 +61,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, nil
 	}
 	//Load Event Recorder with slice name and namespace
-	s.loadEventRecorder(ctx, util.GetProjectName(sliceConfig.Namespace), "", sliceConfig.Name, sliceConfig.Namespace)
+	s.loadEventRecorder(ctx, util.GetProjectName(sliceConfig.Namespace), sliceConfig.Name, sliceConfig.Namespace)
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		logger.Infof("Duplicate cluster name %v found in sliceConfig %v", value, req.NamespacedName)
 		return ctrl.Result{}, nil
@@ -80,11 +80,11 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceConfig, SliceConfigFinalizer)); shouldReturn {
 			//Register an event for slice config deletion fail
-			util.RecordEvent(ctx, s.eventRecorder, sliceConfig, schema.EventSliceConfigDeletionFailed)
+			util.RecordEvent(ctx, s.eventRecorder, sliceConfig, nil, schema.EventSliceConfigDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for slice config deletion
-		util.RecordEvent(ctx, s.eventRecorder, sliceConfig, schema.EventSliceConfigDeleted)
+		util.RecordEvent(ctx, s.eventRecorder, sliceConfig, nil, schema.EventSliceConfigDeleted)
 		return ctrl.Result{}, err
 	}
 
@@ -174,15 +174,15 @@ func (s *SliceConfigService) DeleteSliceConfigs(ctx context.Context, namespace s
 	}
 	for _, sliceConfig := range sliceConfigs.Items {
 		//Load Event Recorder with slice name and namespace
-		s.loadEventRecorder(ctx, util.GetProjectName(sliceConfig.Namespace), "", sliceConfig.Name, sliceConfig.Namespace)
+		s.loadEventRecorder(ctx, util.GetProjectName(sliceConfig.Namespace), sliceConfig.Name, sliceConfig.Namespace)
 		err = util.DeleteResource(ctx, &sliceConfig)
 		if err != nil {
 			//Register an event for slice config deletion fail
-			util.RecordEvent(ctx, s.eventRecorder, &sliceConfig, schema.EventSliceConfigDeletionFailed)
+			util.RecordEvent(ctx, s.eventRecorder, &sliceConfig, nil, schema.EventSliceConfigDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for slice config deletion
-		util.RecordEvent(ctx, s.eventRecorder, &sliceConfig, schema.EventSliceConfigDeleted)
+		util.RecordEvent(ctx, s.eventRecorder, &sliceConfig, nil, schema.EventSliceConfigDeleted)
 	}
 	return ctrl.Result{}, nil
 }
@@ -209,13 +209,13 @@ func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig 
 }
 
 // loadEventRecorder is function to load the event recorder
-func (s *SliceConfigService) loadEventRecorder(ctx context.Context, project, cluster, slice, namespace string) {
+func (s *SliceConfigService) loadEventRecorder(ctx context.Context, project, slice, namespace string) {
 	s.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
-		Cluster:   cluster,
+		Cluster:   util.ClusterController,
 		Slice:     slice,
 		Namespace: namespace,
 		Component: util.ComponentController,

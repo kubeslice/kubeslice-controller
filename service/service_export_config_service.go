@@ -56,7 +56,7 @@ func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Co
 		return ctrl.Result{}, nil
 	}
 	//Load Event Recorder with slice name and namespace
-	s.loadEventRecorder(ctx, util.GetProjectName(serviceExportConfig.Namespace), serviceExportConfig.Spec.SourceCluster, serviceExportConfig.Labels["original-slice-name"], serviceExportConfig.Namespace)
+	s.loadEventRecorder(ctx, util.GetProjectName(serviceExportConfig.Namespace), serviceExportConfig.Labels["original-slice-name"], serviceExportConfig.Namespace)
 	//Step 1: Finalizers
 	if serviceExportConfig.ObjectMeta.DeletionTimestamp.IsZero() {
 		logger.Debugf("Not deleting")
@@ -73,11 +73,11 @@ func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Co
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, serviceExportConfig, serviceExportConfigFinalizer)); shouldReturn {
 			//Register an event for service export config deletion failure
-			util.RecordEvent(ctx, s.eventRecorder, serviceExportConfig, schema.EventServiceExportConfigDeletionFailed)
+			util.RecordEvent(ctx, s.eventRecorder, serviceExportConfig, nil, schema.EventServiceExportConfigDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for service export config deletion
-		util.RecordEvent(ctx, s.eventRecorder, serviceExportConfig, schema.EventServiceExportConfigDeleted)
+		util.RecordEvent(ctx, s.eventRecorder, serviceExportConfig, nil, schema.EventServiceExportConfigDeleted)
 		return ctrl.Result{}, err
 	}
 	//Step 2: Get the slice based upon the sliceName and sliceNamespace
@@ -158,15 +158,15 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigs(ctx context.Cont
 	}
 	for _, serviceExport := range serviceExports.Items {
 		//Load Event Recorder with slice name and namespace
-		s.loadEventRecorder(ctx, util.GetProjectName(serviceExport.Namespace), serviceExport.Spec.SourceCluster, serviceExport.Labels["original-slice-name"], serviceExport.Namespace)
+		s.loadEventRecorder(ctx, util.GetProjectName(serviceExport.Namespace), serviceExport.Labels["original-slice-name"], serviceExport.Namespace)
 		err = util.DeleteResource(ctx, &serviceExport)
 		if err != nil {
 			//Register an event for service export config deletion
-			util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeletionFailed)
+			util.RecordEvent(ctx, s.eventRecorder, &serviceExport, nil, schema.EventServiceExportConfigDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for service export config deletion
-		util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeleted)
+		util.RecordEvent(ctx, s.eventRecorder, &serviceExport, nil, schema.EventServiceExportConfigDeleted)
 	}
 	return ctrl.Result{}, nil
 }
@@ -180,15 +180,15 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigByParticipatingSli
 	for _, serviceExport := range serviceExports {
 		if serviceExport.Labels["original-slice-name"] == sliceName {
 			//Load Event Recorder with slice name and namespace
-			s.loadEventRecorder(ctx, util.GetProjectName(serviceExport.Namespace), serviceExport.Spec.SourceCluster, serviceExport.Labels["original-slice-name"], serviceExport.Namespace)
+			s.loadEventRecorder(ctx, util.GetProjectName(serviceExport.Namespace), serviceExport.Labels["original-slice-name"], serviceExport.Namespace)
 			err = util.DeleteResource(ctx, &serviceExport)
 			if err != nil {
 				//Register an event for service export config deletion
-				util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeletionFailed)
+				util.RecordEvent(ctx, s.eventRecorder, &serviceExport, nil, schema.EventServiceExportConfigDeletionFailed)
 				return err
 			}
 			//Register an event for service export config deletion
-			util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeleted)
+			util.RecordEvent(ctx, s.eventRecorder, &serviceExport, nil, schema.EventServiceExportConfigDeleted)
 		}
 	}
 	return nil
@@ -213,13 +213,13 @@ func (s *ServiceExportConfigService) getOwnerLabelsForServiceExport(serviceExpor
 }
 
 // loadEventRecorder is function to load the event recorder
-func (s *ServiceExportConfigService) loadEventRecorder(ctx context.Context, project, cluster, slice, namespace string) {
+func (s *ServiceExportConfigService) loadEventRecorder(ctx context.Context, project, slice, namespace string) {
 	s.eventRecorder = &events.EventRecorder{
 		Client:    util.CtxClient(ctx),
 		Logger:    util.CtxLogger(ctx),
 		Scheme:    util.CtxScheme(ctx),
 		Project:   project,
-		Cluster:   cluster,
+		Cluster:   util.ClusterController,
 		Slice:     slice,
 		Namespace: namespace,
 		Component: util.ComponentController,

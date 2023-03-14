@@ -59,10 +59,10 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 		err := util.CreateResource(ctx, expectedNS)
 		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, n.eventRecorder, expectedNS, schema.EventNamespaceCreationFailed)
+			util.RecordEvent(ctx, n.eventRecorder, expectedNS, nil, schema.EventNamespaceCreationFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, n.eventRecorder, expectedNS, schema.EventNamespaceCreated)
+		util.RecordEvent(ctx, n.eventRecorder, expectedNS, nil, schema.EventNamespaceCreated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -90,10 +90,10 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		err := util.DeleteResource(ctx, nsToBeDeleted)
 		nsToBeDeleted.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, n.eventRecorder, nsToBeDeleted, schema.EventNamespaceDeletionFailed)
+			util.RecordEvent(ctx, n.eventRecorder, nsToBeDeleted, nil, schema.EventNamespaceDeletionFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, n.eventRecorder, nsToBeDeleted, schema.EventNamespaceDeleted)
+		util.RecordEvent(ctx, n.eventRecorder, nsToBeDeleted, nil, schema.EventNamespaceDeleted)
 	}
 	return ctrl.Result{}, nil
 }

@@ -61,11 +61,11 @@ func (s *SecretService) DeleteSecret(ctx context.Context, namespace string, secr
 		})
 		if err != nil {
 			//Register an event for secret deletion failure
-			util.RecordEvent(ctx, s.eventRecorder, nsResource, schema.EventSecretDeletionFailed)
+			util.RecordEvent(ctx, s.eventRecorder, nsResource, nil, schema.EventSecretDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for secret deletion
-		util.RecordEvent(ctx, s.eventRecorder, nsResource, schema.EventSecretDeleted)
+		util.RecordEvent(ctx, s.eventRecorder, nsResource, nil, schema.EventSecretDeleted)
 	}
 	return ctrl.Result{}, nil
 }

@@ -69,11 +69,11 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 		logger.Debug("starting delete for qos profile", req.NamespacedName)
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceQosConfig, SliceQoSConfigFinalizer)); shouldReturn {
 			//Register an event for slice qos config deletion failure
-			util.RecordEvent(ctx, q.eventRecorder, sliceQosConfig, schema.EventSliceQoSConfigDeletionFailed)
+			util.RecordEvent(ctx, q.eventRecorder, sliceQosConfig, nil, schema.EventSliceQoSConfigDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for slice qos config deletion
-		util.RecordEvent(ctx, q.eventRecorder, sliceQosConfig, schema.EventSliceQoSConfigDeleted)
+		util.RecordEvent(ctx, q.eventRecorder, sliceQosConfig, nil, schema.EventSliceQoSConfigDeleted)
 		return ctrl.Result{}, err
 	}
 
