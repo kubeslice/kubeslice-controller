@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/dailymotion/allure-go v0.7.0
 	github.com/jinzhu/copier v0.3.4
-	github.com/kubeslice/kubeslice-monitoring v0.0.8
+	github.com/kubeslice/kubeslice-monitoring v0.0.9
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/zap v1.24.0
 	k8s.io/api v0.23.0
