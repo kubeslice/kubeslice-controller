@@ -516,7 +516,7 @@ func setupWorkerSliceTest(name string, namespace string) (WorkerSliceConfigServi
 	clientMock := &utilMock.Client{}
 	workerSlice := &workerv1alpha1.WorkerSliceConfig{}
 
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceConfigController")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceConfigController", nil)
 	return WorkerSliceService, requestObj, clientMock, workerSlice, ctx
 }
 

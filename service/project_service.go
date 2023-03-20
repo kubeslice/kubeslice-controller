@@ -22,7 +22,6 @@ import (
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -32,12 +31,11 @@ type IProjectService interface {
 
 // ProjectService implements different service interfaces
 type ProjectService struct {
-	ns            INamespaceService
-	acs           IAccessControlService
-	c             IClusterService
-	sc            ISliceConfigService
-	se            IServiceExportConfigService
-	eventRecorder *events.EventRecorder
+	ns  INamespaceService
+	acs IAccessControlService
+	c   IClusterService
+	sc  ISliceConfigService
+	se  IServiceExportConfigService
 }
 
 // ReconcileProject is a function to reconcile the projects includes reconciliation of roles, clusters, project namespaces etc.
@@ -55,9 +53,9 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		logger.Infof("project %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 	//Load Event Recorder with project name and namespace
-	t.loadEventRecorder(ctx, project.Name, ControllerNamespace)
+	eventRecorder := util.CtxEventRecorder(ctx).WithProject(project.Name).WithNamespace(ControllerNamespace)
+	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 	//Finalizers
 	if project.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(project.GetFinalizers(), ProjectFinalizer) {
@@ -72,11 +70,11 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, project, ProjectFinalizer)); shouldReturn {
 			//Register an event for project deletion fail
-			util.RecordEvent(ctx, t.eventRecorder, project, schema.EventProjectDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, project, nil, events.EventProjectDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for project deletion
-		util.RecordEvent(ctx, t.eventRecorder, project, schema.EventProjectDeleted)
+		util.RecordEvent(ctx, eventRecorder, project, nil, events.EventProjectDeleted)
 		return ctrl.Result{}, nil
 	}
 
@@ -140,19 +138,4 @@ func (t *ProjectService) CleanUpProjectResources(ctx context.Context, namespace 
 		return result, reconErr
 	}
 	return ctrl.Result{}, nil
-}
-
-// loadEventRecorder is function to load the event recorder
-func (t *ProjectService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	t.eventRecorder = &events.EventRecorder{
-		Client:    util.CtxClient(ctx),
-		Logger:    util.CtxLogger(ctx),
-		Scheme:    util.CtxScheme(ctx),
-		Project:   project,
-		Cluster:   util.ClusterController,
-		Slice:     util.NotApplicable,
-		Namespace: namespace,
-		Component: util.ComponentController,
-	}
-	return
 }

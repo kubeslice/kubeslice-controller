@@ -43,7 +43,6 @@ var (
 	scheme        = runtime.NewScheme()
 	setupLog      = util.NewLogger().With("name", "setup")
 	controllerLog = util.NewLogger().With("name", "controllers")
-	eventRecorder = events.EventRecorder{}
 )
 
 func init() {
@@ -55,20 +54,20 @@ func init() {
 
 func main() {
 	// Compile time dependency injection
-	ns := service.WithNameSpaceService(&eventRecorder)
+	ns := service.WithNameSpaceService()
 	rp := service.WithAccessControlRuleProvider()
-	acs := service.WithAccessControlService(rp, &eventRecorder)
+	acs := service.WithAccessControlService(rp)
 	js := service.WithJobService()
 	wscs := service.WithWorkerSliceConfigService()
-	ss := service.WithSecretService(&eventRecorder)
+	ss := service.WithSecretService()
 	wsgs := service.WithWorkerSliceGatewayService(js, wscs, ss)
-	c := service.WithClusterService(ns, acs, wsgs, &eventRecorder)
+	c := service.WithClusterService(ns, acs, wsgs)
 	wsi := service.WithWorkerServiceImportService()
-	se := service.WithServiceExportConfigService(wsi, &eventRecorder)
+	se := service.WithServiceExportConfigService(wsi)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, &eventRecorder)
-	p := service.WithProjectService(ns, acs, c, sc, se, &eventRecorder)
-	sqcs := service.WithSliceQoSConfigService(wscs, &eventRecorder)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs)
+	p := service.WithProjectService(ns, acs, c, sc, se)
+	sqcs := service.WithSliceQoSConfigService(wscs)
 	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
 }
 
@@ -149,12 +148,19 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	eventRecorder := events.NewEventRecorder(mgr.GetClient(), mgr.GetScheme(), events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
 	// initialize controller with Project Kind
 	if err = (&controller.ProjectReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		Log:            controllerLog.With("name", "Project"),
 		ProjectService: services.ProjectService,
+		EventRecorder:  &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Project")
 		os.Exit(1)
@@ -165,6 +171,7 @@ func initialize(services *service.Services) {
 		Scheme:         mgr.GetScheme(),
 		Log:            controllerLog.With("name", "Cluster"),
 		ClusterService: services.ClusterService,
+		EventRecorder:  &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
@@ -175,6 +182,7 @@ func initialize(services *service.Services) {
 		Scheme:             mgr.GetScheme(),
 		Log:                controllerLog.With("name", "SliceConfig"),
 		SliceConfigService: services.SliceConfigService,
+		EventRecorder:      &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SliceConfig")
 		os.Exit(1)
@@ -185,6 +193,7 @@ func initialize(services *service.Services) {
 		Scheme:                     mgr.GetScheme(),
 		Log:                        controllerLog.With("name", "ServiceExportConfig"),
 		ServiceExportConfigService: services.ServiceExportConfigService,
+		EventRecorder:              &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceExportConfig")
 		os.Exit(1)
@@ -194,6 +203,7 @@ func initialize(services *service.Services) {
 		Scheme:                    mgr.GetScheme(),
 		Log:                       controllerLog.With("name", "WorkerSliceGateway"),
 		WorkerSliceGatewayService: services.WorkerSliceGatewayService,
+		EventRecorder:             &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkerSliceGateway")
 		os.Exit(1)
@@ -203,6 +213,7 @@ func initialize(services *service.Services) {
 		Scheme:             mgr.GetScheme(),
 		Log:                controllerLog.With("name", "WorkerSliceConfig"),
 		WorkerSliceService: services.WorkerSliceConfigService,
+		EventRecorder:      &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkerSliceConfig")
 		os.Exit(1)
@@ -212,6 +223,7 @@ func initialize(services *service.Services) {
 		Scheme:                     mgr.GetScheme(),
 		Log:                        controllerLog.With("name", "WorkerServiceImport"),
 		WorkerServiceImportService: services.WorkerServiceImportService,
+		EventRecorder:              &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkerServiceImport")
 		os.Exit(1)
@@ -221,6 +233,7 @@ func initialize(services *service.Services) {
 		Scheme:                mgr.GetScheme(),
 		Log:                   controllerLog.With("name", "SliceQoSConfig"),
 		SliceQoSConfigService: services.SliceQoSConfigService,
+		EventRecorder:         &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SliceQoSConfig")
 		os.Exit(1)

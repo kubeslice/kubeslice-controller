@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -1167,6 +1168,12 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 
 func prepareACSTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController")
+	eventRecorder := events.NewEventRecorder(client, scheme, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController", &eventRecorder)
 	return preparedCtx
 }

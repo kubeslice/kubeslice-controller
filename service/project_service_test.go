@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -74,6 +75,7 @@ func TestReconcileProject_Delete_Happypath(t *testing.T) {
 	sliceConfigServiceMock.On("DeleteSliceConfigs", ctx, projectNamespace, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	//delete finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := projectService.ReconcileProject(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
@@ -208,6 +210,12 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 
 func prepareProjectTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController")
+	eventRecorder := events.NewEventRecorder(client, scheme, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController", &eventRecorder)
 	return preparedCtx
 }

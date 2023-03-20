@@ -323,6 +323,6 @@ func setupServiceExportConfigWebhookValidationTest(name string, namespace string
 			Namespace: namespace,
 		},
 	}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "ServiceExportConfigWebhookValidationServiceTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "ServiceExportConfigWebhookValidationServiceTest", nil)
 	return clientMock, serviceExportConfig, ctx
 }

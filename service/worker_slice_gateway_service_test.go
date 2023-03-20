@@ -540,6 +540,6 @@ func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretS
 	}
 	clientMock := &utilMock.Client{}
 	workerSliceGateway := &workerv1alpha1.WorkerSliceGateway{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayTest", nil)
 	return secretServiceMock, workerSliceConfigMock, jobServiceMock, workerSliceGatewayMock, requestObj, clientMock, workerSliceGateway, ctx
 }
