@@ -148,6 +148,7 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	//setting up the event recorder
 	eventRecorder := events.NewEventRecorder(mgr.GetClient(), mgr.GetScheme(), events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
