@@ -147,9 +147,9 @@ jobs:
        server_port: 465
        username: ${{secrets.MAIL_USERNAME}}
        password: ${{secrets.MAIL_PASSWORD}}
-       cc: nishant.singh@aveshasystems.com
+       cc: rajendra@aveshasystems.com, eric@aveshasystems.com, abhisek@aveshasystems.com
        subject: Kubeslice-controller | end-to-end-test | ${{ steps.date.outputs.date }}
-       to: richie@aveshasystems.com
+       to: richie@aveshasystems.com, nishant.singh@aveshasystems.com
        from: no-reply@aveshasystems.com
        attachments: result-summary.txt
        body: Pipeline for the repo ${{github.repository}} is triggered by ${{github.actor}} from the branch ${{ steps.branch-name.outputs.current_branch }} !
