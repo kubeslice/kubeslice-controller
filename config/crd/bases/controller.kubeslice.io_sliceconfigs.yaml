@@ -181,17 +181,18 @@ spec:
                       description: Trigger action. Examples - CLUSTER_OFFBOARDING,
                         NAMESPCE_OFFBOARDING etc
                       type: string
-                    component:
-                      description: component on which action is triggered for
-                      type: string
-                    event:
-                      description: Event name (from monitoring framework schema)
-                      type: string
-                    identifiers:
-                      description: Identifier for effected components
+                    components:
+                      description: list of effected components on which action failed
                       items:
                         type: string
                       type: array
+                    event:
+                      description: Event name (from monitoring framework schema)
+                      type: string
+                    identifier:
+                      description: Identifier of the component for which the action
+                        was triggered
+                      type: string
                     isEventRaised:
                       default: false
                       description: Flag to determine if kubernetes event is already

@@ -111,10 +111,10 @@ type KubesliceEvent struct {
 	Type string `json:"type,omitempty"`
 	// Trigger action. Examples - CLUSTER_OFFBOARDING, NAMESPCE_OFFBOARDING etc
 	Action string `json:"action,omitempty"`
-	// component on which action is triggered for
-	Component string `json:"component,omitempty"`
-	// Identifier for effected components
-	Identifiers []string `json:"identifiers,omitempty"`
+	// list of effected components on which action failed
+	Components []string `json:"components,omitempty"`
+	// Identifier of the component for which the action was triggered
+	Identifier string `json:"identifier,omitempty"`
 	// Reason message for the event
 	Reason string `json:"reason,omitempty"`
 	// Event name (from monitoring framework schema)
