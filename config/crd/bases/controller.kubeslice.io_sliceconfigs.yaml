@@ -173,6 +173,38 @@ spec:
             type: object
           status:
             description: SliceConfigStatus defines the observed state of SliceConfig
+            properties:
+              kubeslicEvent:
+                items:
+                  properties:
+                    action:
+                      description: Trigger action. Examples - CLUSTER_OFFBOARDING
+                        | NAMESPCE_OFFBOARDING etc
+                      type: string
+                    component:
+                      description: component on which action is triggered for
+                      type: string
+                    event:
+                      description: Event name (from monitoring framework schema)
+                      type: string
+                    identifier:
+                      description: Identifier for effected components
+                      type: string
+                    reason:
+                      description: Reason message for the event
+                      type: string
+                    timestamp:
+                      description: Timestamp of the event
+                      format: date-time
+                      type: string
+                    type:
+                      description: Type of the event. Can be one of Error, Success
+                        or InProgress
+                      type: string
+                  required:
+                  - event
+                  type: object
+                type: array
             type: object
         type: object
     served: true
