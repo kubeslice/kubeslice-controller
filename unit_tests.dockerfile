@@ -1,4 +1,4 @@
-FROM golang:1.18 as builder
+FROM golang:1.18-alpine as builder
 COPY . /build
 WORKDIR /build/service
 ENV ALLURE_RESULTS_PATH=/build
