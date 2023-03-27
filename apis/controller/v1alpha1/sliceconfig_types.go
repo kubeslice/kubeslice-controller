@@ -125,7 +125,7 @@ type KubesliceEvent struct {
 
 // SliceConfigStatus defines the observed state of SliceConfig
 type SliceConfigStatus struct {
-	KubesliceEvents []KubesliceEvent `json:"kubeslicEvent,omitempty"`
+	KubesliceEvents []KubesliceEvent `json:"kubesliceEvents,omitempty"`
 }
 
 //+kubebuilder:object:root=true

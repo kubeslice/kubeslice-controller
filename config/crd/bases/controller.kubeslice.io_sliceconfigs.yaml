@@ -174,7 +174,7 @@ spec:
           status:
             description: SliceConfigStatus defines the observed state of SliceConfig
             properties:
-              kubeslicEvent:
+              kubesliceEvents:
                 items:
                   properties:
                     action:
