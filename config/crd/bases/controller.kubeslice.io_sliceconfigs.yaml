@@ -178,8 +178,8 @@ spec:
                 items:
                   properties:
                     action:
-                      description: Trigger action. Examples - CLUSTER_OFFBOARDING
-                        | NAMESPCE_OFFBOARDING etc
+                      description: Trigger action. Examples - CLUSTER_OFFBOARDING,
+                        NAMESPCE_OFFBOARDING etc
                       type: string
                     component:
                       description: component on which action is triggered for
@@ -187,9 +187,16 @@ spec:
                     event:
                       description: Event name (from monitoring framework schema)
                       type: string
-                    identifier:
+                    identifiers:
                       description: Identifier for effected components
-                      type: string
+                      items:
+                        type: string
+                      type: array
+                    isEventRaised:
+                      default: false
+                      description: Flag to determine if kubernetes event is already
+                        raised
+                      type: boolean
                     reason:
                       description: Reason message for the event
                       type: string
