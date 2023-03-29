@@ -112,12 +112,8 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 		if found {
 			_, err := s.sc.DeleteSecret(ctx, req.Namespace, workerSliceGateway.Name)
 			if err != nil {
-				//Register an event for gateway secret deletion failure
-				util.RecordEvent(ctx, eventRecorder, workerSliceGateway, nil, events.EventWorkerSliceGatewaySecretDeletionFailed)
 				return result, err
 			}
-			//Register an event for gateway secret deletion success
-			util.RecordEvent(ctx, eventRecorder, workerSliceGateway, nil, events.EventWorkerSliceGatewaySecretDeleted)
 		}
 		slice := &controllerv1alpha1.SliceConfig{}
 		found, err = util.GetResourceIfExist(ctx, client.ObjectKey{

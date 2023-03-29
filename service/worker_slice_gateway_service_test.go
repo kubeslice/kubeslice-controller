@@ -169,7 +169,6 @@ func testWorkerSliceGatewayReconciliationDelete(t *testing.T) {
 	secret := &corev1.Secret{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), secret).Return(nil).Once()
 	secretMock.On("DeleteSecret", ctx, requestObj.Namespace, WorkerSliceGateway.Name).Return(ctrl.Result{}, nil).Once()
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), sliceConfig).Return(notFoundError).Once()
@@ -224,7 +223,6 @@ func testWorkerSliceGatewayReconciliationDeleteForcefully(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	result, err := workerSliceGatewayService.ReconcileWorkerSliceGateways(ctx, requestObj)
 	expectedResult := ctrl.Result{}
