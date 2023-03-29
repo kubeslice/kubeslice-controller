@@ -19,6 +19,10 @@ jobs:
       with:
         ref: ${{ github.event.pull_request.head.sha }}
     
+    - name: Get branch name
+      id: branch-name
+      uses: tj-actions/branch-names@v6
+      
     - name: Set outputs
       id: vars
       run: echo "sha_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
