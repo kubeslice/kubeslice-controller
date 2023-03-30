@@ -65,14 +65,14 @@ var _ webhook.Validator = &ServiceExportConfig{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceExportConfig) ValidateCreate() error {
 	serviceexportlog.Info("validate create", "name", r.Name)
-	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation")
+	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation", nil)
 	return customCreateValidationServiceExport(serviceExportConfigCtx, r)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceExportConfig) ValidateUpdate(old runtime.Object) error {
 	serviceexportlog.Info("validate update", "name", r.Name)
-	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation")
+	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation", nil)
 	return customUpdateValidationServiceExport(serviceExportConfigCtx, r)
 }
 

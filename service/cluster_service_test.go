@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"testing"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -152,6 +154,7 @@ func testReconcileClusterDeletionClusterFail(t *testing.T) {
 	err := errors.New(" RemoveWorkerClusterServiceAccountAndRoleBindings internal error")
 	acsService.On("RemoveWorkerClusterServiceAccountAndRoleBindings", ctx, requestObj.Name, requestObj.Namespace, mock.AnythingOfType("*v1alpha1.Cluster")).Return(ctrl.Result{}, nil)
 	clientMock.On("Update", ctx, mock.Anything).Return(err).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := clusterService.ReconcileCluster(ctx, requestObj)
 	//	t.Error(result, err)
 	require.False(t, result.Requeue)
@@ -254,6 +257,7 @@ func testDeleteClusterDeleteFail(t *testing.T) {
 		arg.Items[0].GenerateName = "random"
 	})
 	clientMock.On("Delete", ctx, mock.Anything).Return(deleteerr)
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := clusterService.DeleteClusters(ctx, namespace)
 	require.NotNil(t, err)
 	require.False(t, result.Requeue)
@@ -262,8 +266,18 @@ func testDeleteClusterDeleteFail(t *testing.T) {
 
 func prepareTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ClusterTestController")
-	return preparedCtx
+	if scheme == nil {
+		scheme = runtime.NewScheme()
+	}
+	controllerv1alpha1.AddToScheme(scheme)
+	workerv1alpha1.AddToScheme(scheme)
+	eventRecorder := events.NewEventRecorder(client, scheme, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	return util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ClusterTestController", &eventRecorder)
 }
 
 func testClusterPass(t *testing.T) {

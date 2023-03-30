@@ -64,14 +64,14 @@ var _ webhook.Validator = &SliceConfig{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *SliceConfig) ValidateCreate() error {
 	sliceconfigurationlog.Info("validate create", "name", r.Name)
-	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation")
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation", nil)
 	return customSliceConfigCreateValidation(sliceConfigCtx, r)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *SliceConfig) ValidateUpdate(old runtime.Object) error {
 	sliceconfigurationlog.Info("validate update", "name", r.Name)
-	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation")
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation", nil)
 
 	return customSliceConfigUpdateValidation(sliceConfigCtx, r, old)
 }
@@ -79,7 +79,7 @@ func (r *SliceConfig) ValidateUpdate(old runtime.Object) error {
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *SliceConfig) ValidateDelete() error {
 	sliceconfigurationlog.Info("validate delete", "name", r.Name)
-	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation")
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), sliceConfigWebhookClient, nil, "SliceConfigValidation", nil)
 
 	return customSliceConfigDeleteValidation(sliceConfigCtx, r)
 }

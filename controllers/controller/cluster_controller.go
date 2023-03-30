@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -34,6 +35,7 @@ type ClusterReconciler struct {
 	Scheme         *runtime.Scheme
 	ClusterService service.IClusterService
 	Log            *zap.SugaredLogger
+	EventRecorder  *events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -45,6 +47,6 @@ func (c *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Reconcile is a function to reconcile the cluster , ClusterReconciler implements it
 func (c *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, c.Client, c.Scheme, "ClusterController")
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, c.Client, c.Scheme, "ClusterController", c.EventRecorder)
 	return c.ClusterService.ReconcileCluster(kubeSliceCtx, req)
 }

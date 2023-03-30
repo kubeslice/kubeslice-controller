@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
@@ -112,6 +113,12 @@ func setupSecretTest(name string, namespace string) (SecretService, *utilMock.Cl
 			Namespace: namespace,
 		},
 	}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SecretServiceTest")
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SecretServiceTest", &eventRecorder)
 	return secretService, clientMock, secret, ctx
 }

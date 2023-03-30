@@ -19,11 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/schema"
-
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,8 +34,7 @@ type IServiceExportConfigService interface {
 }
 
 type ServiceExportConfigService struct {
-	ses           IWorkerServiceImportService
-	eventRecorder *events.EventRecorder
+	ses IWorkerServiceImportService
 }
 
 // ReconcileServiceExportConfig is a function to reconcile the service export config
@@ -55,8 +52,12 @@ func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Co
 		logger.Infof("ServiceExportConfig %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	//Load Event Recorder with slice name and namespace
-	s.loadEventRecorder(ctx, util.GetProjectName(serviceExportConfig.Namespace), serviceExportConfig.Spec.SourceCluster, serviceExportConfig.Labels["original-slice-name"], serviceExportConfig.Namespace)
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(serviceExportConfig.Namespace)).
+		WithNamespace(serviceExportConfig.Namespace).
+		WithSlice(serviceExportConfig.Labels["original-slice-name"])
+
 	//Step 1: Finalizers
 	if serviceExportConfig.ObjectMeta.DeletionTimestamp.IsZero() {
 		logger.Debugf("Not deleting")
@@ -73,11 +74,11 @@ func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Co
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, serviceExportConfig, serviceExportConfigFinalizer)); shouldReturn {
 			//Register an event for service export config deletion failure
-			util.RecordEvent(ctx, s.eventRecorder, serviceExportConfig, schema.EventServiceExportConfigDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, serviceExportConfig, nil, events.EventServiceExportConfigDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for service export config deletion
-		util.RecordEvent(ctx, s.eventRecorder, serviceExportConfig, schema.EventServiceExportConfigDeleted)
+		util.RecordEvent(ctx, eventRecorder, serviceExportConfig, nil, events.EventServiceExportConfigDeleted)
 		return ctrl.Result{}, err
 	}
 	//Step 2: Get the slice based upon the sliceName and sliceNamespace
@@ -157,16 +158,19 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigs(ctx context.Cont
 		return ctrl.Result{}, err
 	}
 	for _, serviceExport := range serviceExports.Items {
-		//Load Event Recorder with slice name and namespace
-		s.loadEventRecorder(ctx, util.GetProjectName(serviceExport.Namespace), serviceExport.Spec.SourceCluster, serviceExport.Labels["original-slice-name"], serviceExport.Namespace)
+		//Load Event Recorder with project name, slice name and namespace
+		eventRecorder := util.CtxEventRecorder(ctx).
+			WithProject(util.GetProjectName(serviceExport.Namespace)).
+			WithNamespace(serviceExport.Namespace).
+			WithSlice(serviceExport.Labels["original-slice-name"])
 		err = util.DeleteResource(ctx, &serviceExport)
 		if err != nil {
 			//Register an event for service export config deletion
-			util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for service export config deletion
-		util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeleted)
+		util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeleted)
 	}
 	return ctrl.Result{}, nil
 }
@@ -179,16 +183,19 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigByParticipatingSli
 	}
 	for _, serviceExport := range serviceExports {
 		if serviceExport.Labels["original-slice-name"] == sliceName {
-			//Load Event Recorder with slice name and namespace
-			s.loadEventRecorder(ctx, util.GetProjectName(serviceExport.Namespace), serviceExport.Spec.SourceCluster, serviceExport.Labels["original-slice-name"], serviceExport.Namespace)
+			//Load Event Recorder with project name, slice name and namespace
+			eventRecorder := util.CtxEventRecorder(ctx).
+				WithProject(util.GetProjectName(serviceExport.Namespace)).
+				WithNamespace(serviceExport.Namespace).
+				WithSlice(serviceExport.Labels["original-slice-name"])
 			err = util.DeleteResource(ctx, &serviceExport)
 			if err != nil {
 				//Register an event for service export config deletion
-				util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeletionFailed)
+				util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeletionFailed)
 				return err
 			}
 			//Register an event for service export config deletion
-			util.RecordEvent(ctx, s.eventRecorder, &serviceExport, schema.EventServiceExportConfigDeleted)
+			util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeleted)
 		}
 	}
 	return nil
@@ -210,19 +217,4 @@ func (s *ServiceExportConfigService) getOwnerLabelsForServiceExport(serviceExpor
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
 	ownerLabels = util.GetOwnerLabel(completeResourceName)
 	return ownerLabels
-}
-
-// loadEventRecorder is function to load the event recorder
-func (s *ServiceExportConfigService) loadEventRecorder(ctx context.Context, project, cluster, slice, namespace string) {
-	s.eventRecorder = &events.EventRecorder{
-		Client:    util.CtxClient(ctx),
-		Logger:    util.CtxLogger(ctx),
-		Scheme:    util.CtxScheme(ctx),
-		Project:   project,
-		Cluster:   cluster,
-		Slice:     slice,
-		Namespace: namespace,
-		Component: util.ComponentController,
-	}
-	return
 }

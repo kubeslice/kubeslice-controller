@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -34,11 +35,12 @@ type ServiceExportConfigReconciler struct {
 	Scheme                     *runtime.Scheme
 	ServiceExportConfigService service.IServiceExportConfigService
 	Log                        *zap.SugaredLogger
+	EventRecorder              *events.EventRecorder
 }
 
 // Reconcile is a function to reconcile the ServiceExportConfig, ServiceExportConfigReconciler implements it
 func (r *ServiceExportConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "ServiceExportConfigController")
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "ServiceExportConfigController", r.EventRecorder)
 	return r.ServiceExportConfigService.ReconcileServiceExportConfig(kubeSliceCtx, req)
 }
 

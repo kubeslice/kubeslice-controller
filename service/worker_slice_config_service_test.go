@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -194,7 +196,9 @@ func testWorkerSliceReconciliationDeleteSuccessfully(t *testing.T) {
 			"worker-cluster": "cluster-1",
 		}
 	}).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), sliceConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
@@ -248,6 +252,7 @@ func testDeleteWorkerSliceConfigByLabelSuccess(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, workerSlice).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
 	err := WorkerSliceService.DeleteWorkerSliceConfigByLabel(ctx, label, requestObj.Namespace)
 	require.NoError(t, nil)
 	require.Nil(t, err)
@@ -308,7 +313,10 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 	}).Twice()
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(notFoundError).Twice()
-	clientMock.On("Create", ctx, mock.Anything).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
 	require.Equal(t, len(result), 2)
 	require.NoError(t, nil)
@@ -372,6 +380,7 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(notFoundError).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Create", ctx, mock.Anything).Return(err1).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
 	require.Error(t, err)
 	require.Equal(t, len(result), 2)
@@ -433,7 +442,7 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 	}).Twice()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(nil).Twice()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Twice()
-
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
 	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
 	require.Equal(t, len(result), 2)
 	require.NoError(t, nil)
@@ -496,6 +505,7 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
 	require.Error(t, err)
 	require.Equal(t, len(result), 2)
@@ -515,8 +525,16 @@ func setupWorkerSliceTest(name string, namespace string) (WorkerSliceConfigServi
 	}
 	clientMock := &utilMock.Client{}
 	workerSlice := &workerv1alpha1.WorkerSliceConfig{}
-
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceConfigController")
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	workerv1alpha1.AddToScheme(scheme)
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "WorkerSliceConfigController", &eventRecorder)
 	return WorkerSliceService, requestObj, clientMock, workerSlice, ctx
 }
 

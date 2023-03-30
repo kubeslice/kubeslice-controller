@@ -18,6 +18,8 @@ package service
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -193,6 +195,7 @@ func testWorkerSliceGatewayReconciliationDeleteForcefully(t *testing.T) {
 	secret := &corev1.Secret{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), secret).Return(nil).Once()
 	secretMock.On("DeleteSecret", ctx, requestObj.Namespace, WorkerSliceGateway.Name).Return(ctrl.Result{}, nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), sliceConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
@@ -289,6 +292,7 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
 	cluster := &controllerv1alpha1.Cluster{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Twice()
 	gateway := &workerv1alpha1.WorkerSliceGateway{}
@@ -365,14 +369,18 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
 	cluster := &controllerv1alpha1.Cluster{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Twice()
 	gateway := &workerv1alpha1.WorkerSliceGateway{}
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), gateway).Return(notFoundError).Once()
-	clientMock.On("Create", ctx, mock.Anything).Return(nil).Times(2)
+	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	jobMock.On("CreateJob", ctx, jobNamespace, JobImage, mock.Anything).Return(ctrl.Result{}, nil).Once()
-
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16")
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -436,6 +444,7 @@ func testDeleteWorkerSliceGatewaysByLabelExists(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
 	err := workerSliceGatewayService.DeleteWorkerSliceGatewaysByLabel(ctx, label, "namespace")
 	require.NoError(t, nil)
 	require.Nil(t, err)
@@ -539,7 +548,16 @@ func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretS
 		NamespacedName: namespacedName,
 	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	workerv1alpha1.AddToScheme(scheme)
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
 	workerSliceGateway := &workerv1alpha1.WorkerSliceGateway{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "WorkerSliceGatewayTest", &eventRecorder)
 	return secretServiceMock, workerSliceConfigMock, jobServiceMock, workerSliceGatewayMock, requestObj, clientMock, workerSliceGateway, ctx
 }

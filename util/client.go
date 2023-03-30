@@ -31,4 +31,5 @@ type Client interface {
 	Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error
 	Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error
 	Status() client.StatusWriter
+	DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error
 }
