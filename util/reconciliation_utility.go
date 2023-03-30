@@ -22,10 +22,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
-	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"strings"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+
+	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -284,7 +287,7 @@ func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runt
 		RelatedObject:     relatedObject,
 		ReportingInstance: InstanceController,
 		Name:              name,
-	})
+	}, ossEvents.EventsMap)
 	if err != nil {
 		logger.With(zap.Error(err)).Errorf("Failed to record event")
 	}

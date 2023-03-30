@@ -21,7 +21,7 @@ package events
 
 import "github.com/kubeslice/kubeslice-monitoring/pkg/events"
 
-var eventsMap = map[events.EventName]*events.EventSchema{
+var EventsMap = map[events.EventName]*events.EventSchema{
 	"LicenseSecretNotFound": {
 		Name:                "LicenseSecretNotFound",
 		Reason:              "LicenseNotFound",

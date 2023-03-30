@@ -333,6 +333,8 @@ github.com/kubeslice/kubeslice-monitoring v0.0.0-testing-modifications h1:OyDytE
 github.com/kubeslice/kubeslice-monitoring v0.0.0-testing-modifications/go.mod h1:g9LeBapz1stdifkPWIKh0Rw0/TYUsZetIHquWiiG4ps=
 github.com/kubeslice/kubeslice-monitoring v0.0.0-testing-v2 h1:LyQ+IpNFp9Blkzn6moPLkcNEzNVX/MXauVeOwocxYYQ=
 github.com/kubeslice/kubeslice-monitoring v0.0.0-testing-v2/go.mod h1:g9LeBapz1stdifkPWIKh0Rw0/TYUsZetIHquWiiG4ps=
+github.com/kubeslice/kubeslice-monitoring v0.0.0-testing-v3 h1:uuyMBNE4meyXfMliaVltZHvIniCI1LoKyUwGYCPhOKk=
+github.com/kubeslice/kubeslice-monitoring v0.0.0-testing-v3/go.mod h1:g9LeBapz1stdifkPWIKh0Rw0/TYUsZetIHquWiiG4ps=
 github.com/magiconair/properties v1.8.1/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/magiconair/properties v1.8.5/go.mod h1:y3VJvCyxH9uVvJTWEGAELF3aiYNyPKd5NZ3oSwXrF60=
 github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
