@@ -118,7 +118,7 @@ jobs:
         github_run_num: 'Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}'
         report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
         test_env: Kind
-        
+    
     - name: Create lockfile
       run: touch gh-pages/lockfile
 
@@ -132,21 +132,7 @@ jobs:
         '
       env:
         SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-        
-    - name: Create lockfile
-      run: touch gh-pages/lockfile
-
-    - name: Acquire lock
-      run: |
-        flock gh-pages/lockfile -c '
-          git -C gh-pages pull origin gh-pages
-          eval $(ssh-agent -s)
-          echo "${{ secrets.E2E_ALLURE_REPORTS_PRIVATE_KEY }}" | ssh-add -
-          git -C gh-pages push git@github.com:kubeslice/e2e-allure-reports.git gh-pages
-        '
-      env:
-        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-        
+          
     - name: Deploy report to Github Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
