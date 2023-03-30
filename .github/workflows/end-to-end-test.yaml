@@ -117,11 +117,11 @@ jobs:
           
     - name: Deploy report to Github Pages
       uses: peaceiris/actions-gh-pages@v3
-      env:
-        PUBLISH_BRANCH: gh-pages
-        PERSONAL_TOKEN: ${{ secrets.TOKEN }}
-        EXTERNAL_REPOSITORY: kubeslice/e2e-allure-reports
-        PUBLISH_DIR: allure-history
+      with:
+        publish_branch: gh-pages
+        deploy_key: ${{ secrets.E2E_ALLURE_REPORTS_PRIVATE_KEY }}
+        external_repository: kubeslice/e2e-allure-reports
+        publish_dir: allure-history
         keep_files: true
     
     - name: wait for report deploy on site ( you can check report here also )
