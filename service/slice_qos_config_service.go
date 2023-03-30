@@ -19,14 +19,15 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 type ISliceQoSConfigService interface {
@@ -68,11 +69,11 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 		logger.Debug("starting delete for qos profile", req.NamespacedName)
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceQosConfig, SliceQoSConfigFinalizer)); shouldReturn {
 			//Register an event for slice qos config deletion failure
-			util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, ossEvents.EventSliceQoSConfigDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for slice qos config deletion
-		util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeleted)
+		util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, ossEvents.EventSliceQoSConfigDeleted)
 		return ctrl.Result{}, err
 	}
 

@@ -64,6 +64,10 @@ generate-yamls: manifests kustomize ## Generates the yaml files
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default
 
+.PHONY: generate-events
+generate-events: 
+	go run hack/events/generate/generate.go
+	go fmt ./...
 
 ##@ Build
 

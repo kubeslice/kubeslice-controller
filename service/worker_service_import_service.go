@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"time"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -97,7 +98,7 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 			}
 			if exist && util.IsInSlice(slice.Spec.Clusters, workerServiceImport.Labels["worker-cluster"]) {
 				//Register an event for worker service import deleted forcefully
-				util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, events.EventWorkerServiceImportDeletedForcefully)
+				util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, ossEvents.EventWorkerServiceImportDeletedForcefully)
 				if serviceExport.Annotations == nil {
 					serviceExport.Annotations = make(map[string]string)
 				}
@@ -105,11 +106,11 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 				err = util.UpdateResource(ctx, serviceExport)
 				if err != nil {
 					//Register an event for worker service import recreation failure
-					util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, events.EventWorkerServiceImportRecreationFailed)
+					util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, ossEvents.EventWorkerServiceImportRecreationFailed)
 					return result, err
 				}
 				//Register an event for worker service import recreation success
-				util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, events.EventWorkerServiceImportRecreated)
+				util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, ossEvents.EventWorkerServiceImportRecreated)
 			}
 		}
 		return result, nil
@@ -185,7 +186,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 			err = util.CreateResource(ctx, &expectedWorkerServiceImport)
 			if err != nil {
 				//Register an event for worker service import create failure
-				util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, events.EventWorkerServiceImportCreationFailed)
+				util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, ossEvents.EventWorkerServiceImportCreationFailed)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker service import %s since it already exists, namespace - %s ",
 						expectedWorkerServiceImport.Name, namespace)
@@ -193,7 +194,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 				}
 			}
 			//Register an event for worker service import create success
-			util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, events.EventWorkerServiceImportCreated)
+			util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, ossEvents.EventWorkerServiceImportCreated)
 		} else {
 			existingWorkerServiceImport.UID = ""
 			if existingWorkerServiceImport.Annotations == nil {
@@ -203,7 +204,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 			err = util.UpdateResource(ctx, existingWorkerServiceImport)
 			if err != nil {
 				//Register an event for worker service import update failure
-				util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, events.EventWorkerServiceImportUpdateFailed)
+				util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, ossEvents.EventWorkerServiceImportUpdateFailed)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
 					logger.Debug("failed to create service import %s since it already exists, namespace - %s ",
 						existingWorkerServiceImport.Name, namespace)
@@ -211,7 +212,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 				}
 			}
 			//Register an event for worker service import update success
-			util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, events.EventWorkerServiceImportUpdated)
+			util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, ossEvents.EventWorkerServiceImportUpdated)
 		}
 	}
 	return nil
@@ -232,11 +233,11 @@ func (s *WorkerServiceImportService) DeleteWorkerServiceImportByLabel(ctx contex
 		err = util.DeleteResource(ctx, &serviceImport)
 		if err != nil {
 			//Register an event for worker service import delete failure
-			util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, events.EventWorkerServiceImportDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, ossEvents.EventWorkerServiceImportDeletionFailed)
 			return err
 		}
 		//Register an event for worker service import delete success
-		util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, events.EventWorkerServiceImportDeleted)
+		util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, ossEvents.EventWorkerServiceImportDeleted)
 	}
 	return nil
 }
@@ -273,11 +274,11 @@ func (s *WorkerServiceImportService) cleanUpWorkerServiceImportsForRemovedCluste
 			err = util.DeleteResource(ctx, &serviceImport)
 			if err != nil {
 				//Register an event for worker service import delete failure
-				util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, events.EventWorkerServiceImportDeletionFailed)
+				util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, ossEvents.EventWorkerServiceImportDeletionFailed)
 				return err
 			}
 			//Register an event for worker service import delete success
-			util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, events.EventWorkerServiceImportDeleted)
+			util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, ossEvents.EventWorkerServiceImportDeleted)
 		}
 	}
 	return nil

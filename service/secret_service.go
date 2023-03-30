@@ -18,8 +18,9 @@ package service
 
 import (
 	"context"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -59,11 +60,11 @@ func (s *SecretService) DeleteSecret(ctx context.Context, namespace string, secr
 		})
 		if err != nil {
 			//Register an event for secret deletion failure
-			util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, nsResource, nil, ossEvents.EventSecretDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for secret deletion
-		util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeleted)
+		util.RecordEvent(ctx, eventRecorder, nsResource, nil, ossEvents.EventSecretDeleted)
 	}
 	return ctrl.Result{}, nil
 }

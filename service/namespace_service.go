@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -56,10 +57,10 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 		err := util.CreateResource(ctx, expectedNS)
 		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreationFailed)
+			util.RecordEvent(ctx, eventRecorder, expectedNS, nil, ossEvents.EventNamespaceCreationFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreated)
+		util.RecordEvent(ctx, eventRecorder, expectedNS, nil, ossEvents.EventNamespaceCreated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -87,10 +88,10 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		err := util.DeleteResource(ctx, nsToBeDeleted)
 		nsToBeDeleted.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, ossEvents.EventNamespaceDeletionFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeleted)
+		util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, ossEvents.EventNamespaceDeleted)
 	}
 	return ctrl.Result{}, nil
 }

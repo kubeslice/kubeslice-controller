@@ -19,9 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,11 +75,11 @@ func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Co
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, serviceExportConfig, serviceExportConfigFinalizer)); shouldReturn {
 			//Register an event for service export config deletion failure
-			util.RecordEvent(ctx, eventRecorder, serviceExportConfig, nil, events.EventServiceExportConfigDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, serviceExportConfig, nil, ossEvents.EventServiceExportConfigDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for service export config deletion
-		util.RecordEvent(ctx, eventRecorder, serviceExportConfig, nil, events.EventServiceExportConfigDeleted)
+		util.RecordEvent(ctx, eventRecorder, serviceExportConfig, nil, ossEvents.EventServiceExportConfigDeleted)
 		return ctrl.Result{}, err
 	}
 	//Step 2: Get the slice based upon the sliceName and sliceNamespace
@@ -166,11 +167,11 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigs(ctx context.Cont
 		err = util.DeleteResource(ctx, &serviceExport)
 		if err != nil {
 			//Register an event for service export config deletion
-			util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, ossEvents.EventServiceExportConfigDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for service export config deletion
-		util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeleted)
+		util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, ossEvents.EventServiceExportConfigDeleted)
 	}
 	return ctrl.Result{}, nil
 }
@@ -191,11 +192,11 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigByParticipatingSli
 			err = util.DeleteResource(ctx, &serviceExport)
 			if err != nil {
 				//Register an event for service export config deletion
-				util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeletionFailed)
+				util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, ossEvents.EventServiceExportConfigDeletionFailed)
 				return err
 			}
 			//Register an event for service export config deletion
-			util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeleted)
+			util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, ossEvents.EventServiceExportConfigDeleted)
 		}
 	}
 	return nil

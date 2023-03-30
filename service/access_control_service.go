@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"strings"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 
 	"github.com/kubeslice/kubeslice-controller/util"
 	"go.uber.org/zap"
@@ -88,17 +89,17 @@ func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventWorkerClusterRoleCreationFailed)
+			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventWorkerClusterRoleCreationFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventWorkerClusterRoleCreated)
+		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventWorkerClusterRoleCreated)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventWorkerClusterRoleUpdateFailed)
+			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventWorkerClusterRoleUpdateFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventWorkerClusterRoleUpdated)
+		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventWorkerClusterRoleUpdated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -130,17 +131,17 @@ func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namesp
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadOnlyRoleCreationFailed)
+			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventReadOnlyRoleCreationFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadOnlyRoleCreated)
+		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventReadOnlyRoleCreated)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadOnlyRoleUpdateFailed)
+			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventReadOnlyRoleUpdateFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadOnlyRoleUpdated)
+		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventReadOnlyRoleUpdated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -172,17 +173,17 @@ func (a *AccessControlService) ReconcileReadWriteRole(ctx context.Context,
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadWriteRoleCreationFailed)
+			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventReadWriteRoleCreationFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadWriteRoleCreated)
+		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventReadWriteRoleCreated)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadWriteRoleUpdateFailed)
+			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventReadWriteRoleUpdateFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadWriteRoleUpdated)
+		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, ossEvents.EventReadWriteRoleUpdated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -287,10 +288,10 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			err = util.CreateResource(ctx, expectedServiceAccount)
 			if err != nil {
 				logger.With(zap.Error(err)).Errorf("Couldnt create serviceaccount")
-				util.RecordEvent(ctx, eventRecorder, expectedServiceAccount, nil, events.EventServiceAccountCreationFailed)
+				util.RecordEvent(ctx, eventRecorder, expectedServiceAccount, nil, ossEvents.EventServiceAccountCreationFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, expectedServiceAccount, nil, events.EventServiceAccountCreated)
+			util.RecordEvent(ctx, eventRecorder, expectedServiceAccount, nil, ossEvents.EventServiceAccountCreated)
 			// create secret for the service account
 			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -303,10 +304,10 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			err = util.CreateResource(ctx, &secret)
 			if err != nil {
 				logger.With(zap.Error(err)).Errorf("Couldnt create secret")
-				util.RecordEvent(ctx, eventRecorder, &secret, nil, events.EventServiceAccountSecretCreationFailed)
+				util.RecordEvent(ctx, eventRecorder, &secret, nil, ossEvents.EventServiceAccountSecretCreationFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, &secret, nil, events.EventServiceAccountSecretCreated)
+			util.RecordEvent(ctx, eventRecorder, &secret, nil, ossEvents.EventServiceAccountSecretCreated)
 		}
 	}
 	for _, name := range names {
@@ -346,17 +347,17 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 		if !foundRb {
 			err = util.CreateResource(ctx, expectedRoleBinding)
 			if err != nil {
-				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingCreationFailed)
+				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, ossEvents.EventDefaultRoleBindingCreationFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingCreated)
+			util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, ossEvents.EventDefaultRoleBindingCreated)
 		} else {
 			err = util.UpdateResource(ctx, expectedRoleBinding)
 			if err != nil {
-				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingUpdateFailed)
+				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, ossEvents.EventDefaultRoleBindingUpdateFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingUpdated)
+			util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, ossEvents.EventDefaultRoleBindingUpdated)
 		}
 	}
 	return ctrl.Result{}, nil
@@ -413,10 +414,10 @@ func (a *AccessControlService) cleanupObsoleteServiceAccountsAndRoleBindings(ctx
 		if !activeObj.active {
 			err = util.DeleteResource(ctx, &activeObj.object)
 			if err != nil {
-				util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, events.EventInactiveRoleBindingDeletionFailed)
+				util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, ossEvents.EventInactiveRoleBindingDeletionFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, events.EventInactiveRoleBindingDeleted)
+			util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, ossEvents.EventInactiveRoleBindingDeleted)
 		}
 	}
 
@@ -425,10 +426,10 @@ func (a *AccessControlService) cleanupObsoleteServiceAccountsAndRoleBindings(ctx
 		if !activeObj.active {
 			err = util.DeleteResource(ctx, &activeObj.object)
 			if err != nil {
-				util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, events.EventInactiveServiceAccountDeletionFailed)
+				util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, ossEvents.EventInactiveServiceAccountDeletionFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, events.EventInactiveServiceAccountDeleted)
+			util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, ossEvents.EventInactiveServiceAccountDeleted)
 		}
 	}
 	return ctrl.Result{}, err
@@ -462,10 +463,10 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 		for _, rb := range roleBindings.Items {
 			err = util.DeleteResource(ctx, &rb)
 			if err != nil {
-				util.RecordEvent(ctx, eventRecorder, &rb, nil, events.EventDefaultRoleBindingDeletionFailed)
+				util.RecordEvent(ctx, eventRecorder, &rb, nil, ossEvents.EventDefaultRoleBindingDeletionFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, &rb, nil, events.EventDefaultRoleBindingDeleted)
+			util.RecordEvent(ctx, eventRecorder, &rb, nil, ossEvents.EventDefaultRoleBindingDeleted)
 		}
 	}
 
@@ -474,10 +475,10 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 		for _, sa := range serviceAccounts.Items {
 			err = util.DeleteResource(ctx, &sa)
 			if err != nil {
-				util.RecordEvent(ctx, eventRecorder, &sa, nil, events.EventServiceAccountDeletionFailed)
+				util.RecordEvent(ctx, eventRecorder, &sa, nil, ossEvents.EventServiceAccountDeletionFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, &sa, nil, events.EventServiceAccountDeleted)
+			util.RecordEvent(ctx, eventRecorder, &sa, nil, ossEvents.EventServiceAccountDeleted)
 		}
 	}
 	return ctrl.Result{}, err

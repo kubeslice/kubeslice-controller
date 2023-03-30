@@ -19,9 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -70,11 +71,11 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, project, ProjectFinalizer)); shouldReturn {
 			//Register an event for project deletion fail
-			util.RecordEvent(ctx, eventRecorder, project, nil, events.EventProjectDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, project, nil, ossEvents.EventProjectDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for project deletion
-		util.RecordEvent(ctx, eventRecorder, project, nil, events.EventProjectDeleted)
+		util.RecordEvent(ctx, eventRecorder, project, nil, ossEvents.EventProjectDeleted)
 		return ctrl.Result{}, nil
 	}
 

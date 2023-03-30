@@ -19,9 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -80,11 +81,11 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceConfig, SliceConfigFinalizer)); shouldReturn {
 			//Register an event for slice config deletion fail
-			util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceConfigDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, ossEvents.EventSliceConfigDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for slice config deletion
-		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceConfigDeleted)
+		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, ossEvents.EventSliceConfigDeleted)
 		return ctrl.Result{}, err
 	}
 
@@ -181,11 +182,11 @@ func (s *SliceConfigService) DeleteSliceConfigs(ctx context.Context, namespace s
 		err = util.DeleteResource(ctx, &sliceConfig)
 		if err != nil {
 			//Register an event for slice config deletion fail
-			util.RecordEvent(ctx, eventRecorder, &sliceConfig, nil, events.EventSliceConfigDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, &sliceConfig, nil, ossEvents.EventSliceConfigDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for slice config deletion
-		util.RecordEvent(ctx, eventRecorder, &sliceConfig, nil, events.EventSliceConfigDeleted)
+		util.RecordEvent(ctx, eventRecorder, &sliceConfig, nil, ossEvents.EventSliceConfigDeleted)
 	}
 	return ctrl.Result{}, nil
 }
