@@ -148,8 +148,8 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 
 	//Load Event Recorder with project name, slice name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).
-		WithProject(util.GetProjectName(serviceNamespace)).
-		WithNamespace(serviceNamespace).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
 		WithSlice(sliceName)
 
 	for _, cluster := range clusters {
@@ -185,7 +185,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 			err = util.CreateResource(ctx, &expectedWorkerServiceImport)
 			if err != nil {
 				//Register an event for worker service import create failure
-				util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, events.EventWorkerServiceImportCreationFailed)
+				util.RecordEvent(ctx, eventRecorder, &expectedWorkerServiceImport, nil, events.EventWorkerServiceImportCreationFailed)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker service import %s since it already exists, namespace - %s ",
 						expectedWorkerServiceImport.Name, namespace)
@@ -193,7 +193,7 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 				}
 			}
 			//Register an event for worker service import create success
-			util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, events.EventWorkerServiceImportCreated)
+			util.RecordEvent(ctx, eventRecorder, &expectedWorkerServiceImport, nil, events.EventWorkerServiceImportCreated)
 		} else {
 			existingWorkerServiceImport.UID = ""
 			if existingWorkerServiceImport.Annotations == nil {
