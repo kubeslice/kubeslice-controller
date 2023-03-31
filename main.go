@@ -19,8 +19,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"os"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -149,7 +151,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	//setting up the event recorder
-	eventRecorder := events.NewEventRecorder(mgr.GetClient(), mgr.GetScheme(), events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(mgr.GetClient(), mgr.GetScheme(), ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,

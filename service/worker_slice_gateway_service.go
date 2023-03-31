@@ -19,10 +19,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/kubeslice/kubeslice-controller/events"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"

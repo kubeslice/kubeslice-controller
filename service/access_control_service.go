@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"strings"
+
+	"github.com/kubeslice/kubeslice-controller/events"
 
 	"github.com/kubeslice/kubeslice-controller/util"
 	"go.uber.org/zap"

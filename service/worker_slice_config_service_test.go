@@ -20,12 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"k8s.io/apimachinery/pkg/runtime"
-	"testing"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -528,7 +531,7 @@ func setupWorkerSliceTest(name string, namespace string) (WorkerSliceConfigServi
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	workerv1alpha1.AddToScheme(scheme)
-	eventRecorder := events.NewEventRecorder(clientMock, scheme, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,

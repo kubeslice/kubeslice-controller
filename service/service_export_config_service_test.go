@@ -19,12 +19,15 @@ package service
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"k8s.io/apimachinery/pkg/runtime"
-	"testing"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -463,7 +466,7 @@ func setupServiceExportTest(name string, namespace string) (*mocks.IWorkerServic
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	serviceExport := &controllerv1alpha1.ServiceExportConfig{}
-	eventRecorder := events.NewEventRecorder(clientMock, scheme, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,

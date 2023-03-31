@@ -15,6 +15,7 @@ COPY apis/ apis/
 COPY controllers/ controllers/
 COPY service/ service/
 COPY util/ util/
+COPY events/ events/
 COPY cleanup/ cleanup/
 
 # Build
