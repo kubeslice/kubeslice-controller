@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"testing"
 
@@ -271,7 +272,7 @@ func prepareTestContext(ctx context.Context, client util.Client,
 	}
 	controllerv1alpha1.AddToScheme(scheme)
 	workerv1alpha1.AddToScheme(scheme)
-	eventRecorder := events.NewEventRecorder(client, scheme, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(client, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,

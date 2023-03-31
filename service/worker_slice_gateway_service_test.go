@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"testing"
 
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
@@ -552,7 +553,7 @@ func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretS
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	workerv1alpha1.AddToScheme(scheme)
-	eventRecorder := events.NewEventRecorder(clientMock, scheme, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,

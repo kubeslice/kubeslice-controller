@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"testing"
 
@@ -210,7 +211,7 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 
 func prepareProjectTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	eventRecorder := events.NewEventRecorder(client, scheme, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(client, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,

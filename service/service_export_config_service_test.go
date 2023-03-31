@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"errors"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
@@ -463,7 +464,7 @@ func setupServiceExportTest(name string, namespace string) (*mocks.IWorkerServic
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	serviceExport := &controllerv1alpha1.ServiceExportConfig{}
-	eventRecorder := events.NewEventRecorder(clientMock, scheme, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,
