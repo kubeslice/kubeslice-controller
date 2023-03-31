@@ -19,9 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 

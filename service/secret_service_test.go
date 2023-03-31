@@ -19,10 +19,15 @@ package service
 import (
 	"context"
 	"errors"
+
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
-	"k8s.io/apimachinery/pkg/runtime"
+
 	"testing"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -113,7 +118,7 @@ func setupSecretTest(name string, namespace string) (SecretService, *utilMock.Cl
 			Namespace: namespace,
 		},
 	}
-	eventRecorder := events.NewEventRecorder(clientMock, scheme, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,

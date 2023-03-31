@@ -20,11 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"testing"
+
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -210,7 +212,7 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 
 func prepareProjectTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	eventRecorder := events.NewEventRecorder(client, scheme, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(client, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,

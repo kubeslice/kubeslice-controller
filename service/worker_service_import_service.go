@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"time"
+
+	"github.com/kubeslice/kubeslice-controller/events"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
