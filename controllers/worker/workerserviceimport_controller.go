@@ -18,6 +18,7 @@ package worker
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	"github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -35,11 +36,12 @@ type WorkerServiceImportReconciler struct {
 	Scheme                     *runtime.Scheme
 	WorkerServiceImportService service.IWorkerServiceImportService
 	Log                        *zap.SugaredLogger
+	EventRecorder              *events.EventRecorder
 }
 
 // Reconcile is a function to reconcile the workerServiceImport, WorkerServiceImportReconciler implements it
 func (r *WorkerServiceImportReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "WorkerServiceImportController")
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "WorkerServiceImportController", r.EventRecorder)
 	return r.WorkerServiceImportService.ReconcileWorkerServiceImport(kubeSliceCtx, req)
 }
 

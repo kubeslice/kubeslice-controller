@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -34,6 +35,7 @@ type ProjectReconciler struct {
 	Scheme         *runtime.Scheme
 	ProjectService service.IProjectService
 	Log            *zap.SugaredLogger
+	EventRecorder  *events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -45,6 +47,6 @@ func (t *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Reconcile is a function to reconcile the project, ProjectReconciler implements it
 func (t *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, t.Client, t.Scheme, "ProjectController")
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, t.Client, t.Scheme, "ProjectController", t.EventRecorder)
 	return t.ProjectService.ReconcileProject(kubeSliceCtx, req)
 }

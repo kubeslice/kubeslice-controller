@@ -20,14 +20,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
+
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"testing"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -135,6 +139,7 @@ func SliceQoSConfigDeleteTheObjectHappyCase(t *testing.T) {
 	}).Once()
 	//remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := sliceQosConfigService.ReconcileSliceQoSConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -208,6 +213,12 @@ func setupSliceQoSConfigTest(name string, namespace string) (*mocks.IWorkerSlice
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	sliceQosConfig := &controllerv1alpha1.SliceQoSConfig{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceQoSConfigServiceTest")
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceQoSConfigServiceTest", &eventRecorder)
 	return workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService
 }

@@ -75,6 +75,6 @@ func setupWorkerSliceGatewayWebhookValidationTest(name string, namespace string)
 			Namespace: namespace,
 		},
 	}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayWebhookValidationServiceTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayWebhookValidationServiceTest", nil)
 	return clientMock, workerSliceGateway, ctx
 }

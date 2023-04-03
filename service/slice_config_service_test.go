@@ -20,11 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
+
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -162,6 +166,7 @@ func SliceConfigDeleteTheObjectHappyCase(t *testing.T) {
 	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
 	//remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -400,6 +405,7 @@ func SliceConfigRemoveFinalizerErrorOnUpdate(t *testing.T) {
 	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -428,6 +434,7 @@ func SliceConfigRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
 	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -458,6 +465,7 @@ func SliceConfigDeleteHappyCase(t *testing.T) {
 	sliceConfig.Name = name
 	sliceConfig.Namespace = namespace
 	clientMock.On("Delete", ctx, sliceConfig).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := sliceConfigService.DeleteSliceConfigs(ctx, requestObj.Namespace)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -510,6 +518,7 @@ func SliceConfigDeleteErrorOnDelete(t *testing.T) {
 	sliceConfig.Namespace = namespace
 	err1 := errors.New("internal_error")
 	clientMock.On("Delete", ctx, sliceConfig).Return(err1).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err2 := sliceConfigService.DeleteSliceConfigs(ctx, requestObj.Namespace)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -629,6 +638,12 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceConfigServiceTest")
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceConfigServiceTest", &eventRecorder)
 	return workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, workerServiceImportMock, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj
 }

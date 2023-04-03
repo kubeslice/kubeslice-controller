@@ -18,9 +18,9 @@ package service
 
 import (
 	"context"
+
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/schema"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,7 +32,6 @@ type ISecretService interface {
 }
 
 type SecretService struct {
-	eventRecorder *events.EventRecorder
 }
 
 // DeleteSecret is a function to delete the secret
@@ -50,7 +49,7 @@ func (s *SecretService) DeleteSecret(ctx context.Context, namespace string, secr
 	}
 
 	//Load Event Recorder with project name and namespace
-	s.loadEventRecorder(ctx, util.GetProjectName(nsResource.Namespace), nsResource.Namespace)
+	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(nsResource.Namespace)).WithNamespace(nsResource.Namespace)
 
 	if found {
 		err = util.DeleteResource(ctx, &corev1.Secret{
@@ -61,26 +60,11 @@ func (s *SecretService) DeleteSecret(ctx context.Context, namespace string, secr
 		})
 		if err != nil {
 			//Register an event for secret deletion failure
-			util.RecordEvent(ctx, s.eventRecorder, nsResource, schema.EventSecretDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeletionFailed)
 			return ctrl.Result{}, err
 		}
 		//Register an event for secret deletion
-		util.RecordEvent(ctx, s.eventRecorder, nsResource, schema.EventSecretDeleted)
+		util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeleted)
 	}
 	return ctrl.Result{}, nil
-}
-
-// loadEventRecorder is function to load the event recorder
-func (s *SecretService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	s.eventRecorder = &events.EventRecorder{
-		Client:    util.CtxClient(ctx),
-		Logger:    util.CtxLogger(ctx),
-		Scheme:    util.CtxScheme(ctx),
-		Project:   project,
-		Cluster:   util.ClusterController,
-		Slice:     util.NotApplicable,
-		Namespace: namespace,
-		Component: util.ComponentController,
-	}
-	return
 }

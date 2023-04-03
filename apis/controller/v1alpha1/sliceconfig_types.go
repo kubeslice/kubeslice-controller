@@ -106,8 +106,29 @@ type SliceNamespaceSelection struct {
 	Clusters  []string `json:"clusters,omitempty"`
 }
 
+type KubesliceEvent struct {
+	// Type of the event. Can be one of Error, Success or InProgress
+	Type string `json:"type,omitempty"`
+	// Trigger action. Examples - CLUSTER_OFFBOARDING, NAMESPCE_OFFBOARDING etc
+	Action string `json:"action,omitempty"`
+	// list of effected components on which action failed
+	Components []string `json:"components,omitempty"`
+	// Identifier of the component for which the action was triggered
+	Identifier string `json:"identifier,omitempty"`
+	// Reason message for the event
+	Reason string `json:"reason,omitempty"`
+	// Event name (from monitoring framework schema)
+	Event string `json:"event"`
+	// Timestamp of the event
+	Timestamp metav1.Time `json:"timestamp,omitempty"`
+	// Flag to determine if kubernetes event is already raised
+	//+kubebuilder:default:=false
+	IsEventRaised bool `json:"isEventRaised,omitempty"`
+}
+
 // SliceConfigStatus defines the observed state of SliceConfig
 type SliceConfigStatus struct {
+	KubesliceEvents []KubesliceEvent `json:"kubesliceEvents,omitempty"`
 }
 
 //+kubebuilder:object:root=true

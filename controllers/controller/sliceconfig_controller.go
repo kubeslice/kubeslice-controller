@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -35,11 +36,12 @@ type SliceConfigReconciler struct {
 	Scheme             *runtime.Scheme
 	SliceConfigService service.ISliceConfigService
 	Log                *zap.SugaredLogger
+	EventRecorder      *events.EventRecorder
 }
 
 // Reconcile is a function to reconcile the slice config, SliceConfigReconciler implements it
 func (r *SliceConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "SliceConfigController")
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "SliceConfigController", r.EventRecorder)
 	return r.SliceConfigService.ReconcileSliceConfig(kubeSliceCtx, req)
 }
 

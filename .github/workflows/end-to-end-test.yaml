@@ -8,6 +8,10 @@ env:
   chartuser: ${{ secrets.DEV_CHARTS_USERNAME }}
   chartpassword: ${{ secrets.DEV_CHARTS_PASSWORD }}
   ENFORCE_CRITICAL_CHECK: ${{ secrets.ENFORCE_CRITICAL_CHECK }}
+  
+permissions:
+  contents: write
+  pages: write
 
 permissions:
   contents: write

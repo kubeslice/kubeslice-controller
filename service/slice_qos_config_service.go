@@ -19,15 +19,15 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/schema"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 type ISliceQoSConfigService interface {
@@ -36,8 +36,7 @@ type ISliceQoSConfigService interface {
 
 // SliceQoSConfigService implements different service interfaces
 type SliceQoSConfigService struct {
-	wsc           IWorkerSliceConfigService
-	eventRecorder *events.EventRecorder
+	wsc IWorkerSliceConfigService
 }
 
 // ReconcileSliceQoSConfig is a function to reconcile the qos_profile
@@ -56,8 +55,9 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 	}
 
 	//Load Event Recorder with project name and namespace
-	q.loadEventRecorder(ctx, util.GetProjectName(sliceQosConfig.Namespace), sliceQosConfig.Namespace)
-
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(sliceQosConfig.Namespace)).
+		WithNamespace(sliceQosConfig.Namespace)
 	//Step 1: Finalizers
 	if sliceQosConfig.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(sliceQosConfig.GetFinalizers(), SliceQoSConfigFinalizer) {
@@ -69,11 +69,11 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 		logger.Debug("starting delete for qos profile", req.NamespacedName)
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceQosConfig, SliceQoSConfigFinalizer)); shouldReturn {
 			//Register an event for slice qos config deletion failure
-			util.RecordEvent(ctx, q.eventRecorder, sliceQosConfig, schema.EventSliceQoSConfigDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeletionFailed)
 			return result, reconErr
 		}
 		//Register an event for slice qos config deletion
-		util.RecordEvent(ctx, q.eventRecorder, sliceQosConfig, schema.EventSliceQoSConfigDeleted)
+		util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeleted)
 		return ctrl.Result{}, err
 	}
 
@@ -125,19 +125,4 @@ func (q *SliceQoSConfigService) updateWorkerSliceConfigs(ctx context.Context, na
 		}
 	}
 	return nil
-}
-
-// loadEventRecorder is function to load the event recorder
-func (q *SliceQoSConfigService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	q.eventRecorder = &events.EventRecorder{
-		Client:    util.CtxClient(ctx),
-		Logger:    util.CtxLogger(ctx),
-		Scheme:    util.CtxScheme(ctx),
-		Project:   project,
-		Cluster:   util.ClusterController,
-		Slice:     util.NotApplicable,
-		Namespace: namespace,
-		Component: util.ComponentController,
-	}
-	return
 }

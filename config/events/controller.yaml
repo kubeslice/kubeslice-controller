@@ -1,120 +1,6 @@
 events:
-  - name: LicenseSecretNotFound
-    reason: LicenseNotFound
-    action: LicenseValidation
-    type: Warning
-    reportingController: controller
-    message: Secret with license config not found. Please ensure to create license secret if this is airgapped cluster.
-  - name: MachineFileNotFound
-    reason: MachineFileNotFound
-    action: FetchMachineFileFromSecret
-    type: Warning
-    reportingController: controller
-    message: Machine File not present in license secret. Please contact kubeslice support team.
-  - name: MachineFileInvalid
-    reason: MachineFileInvalid
-    action: VerifyMachineFile
-    type: Warning
-    reportingController: controller
-    message: Machine File is invalid in license secret. Please contact kubeslice support team.
-  - name: LicenseKeyInvalid
-    reason: LicenseKeyInvalid
-    action: DecryptMachineFile
-    type: Warning
-    reportingController: controller
-    message: License Key is invalid in license secret. Please contact kubeslice support team.
-  - name: LicenseExpired
-    reason: LicenseExpired
-    action: ValidateLicense
-    type: Warning
-    reportingController: controller
-    message: License Expired, please contact kubeslice support team to get it renewed!
-  - name: LicenseExpiredGracePeriodOn
-    reason: LicenseExpiredGracePeriodOn
-    action: ValidateLicense
-    type: Warning
-    reportingController: controller
-    message: License Expired, grace period is on, please contact kubeslice support team to get it renewed!
-  - name: MachineFingerPrintErr
-    reason: MachineFingerPrintErr
-    action: GetMachineFingerPrint
-    type: Warning
-    reportingController: kubeslice-controller
-    message: Unable to fetch MachineFingerPrint. Please look at the kubeslice-controller logs for more details.
-  - name: GotMachineFingerPrint
-    reason: GotMachineFingerPrint
-    action: GetMachineFingerPrint
-    type: Normal
-    reportingController: kubeslice-controller
-    message: Got MachineFingerPrint successfully
-  - name: ConfigMapErr
-    reason: ConfigMapErr
-    action: GetConfigMap
-    type: Warning
-    reportingController: kubeslice-controller
-    message: Unable to validate license keys from configmap. Please contact kubeslice support team
-  - name: GotConfigMap
-    reason: GotConfigMap
-    action: GetConfigMap
-    type: Normal
-    reportingController: kubeslice-controller
-    message: Got ConfigMap and kubeslice-license public keys successfully.
-  # license job
-  - name: LicenseProxyUnreachable
-    reason: LicenseProxyUnreachable
-    action: LicenseProxy
-    type: Warning
-    reportingController: kubeslice-controller
-    message: Failed to get response from license proxy for automatic license creation. Please contact Avesha to obtain licernse manually.
-  - name: LicenseDeployError
-    reason: LicenseDeployError
-    action: LicenseDeploy
-    type: Warning
-    reportingController: kubeslice-controller
-    message: Failed to deploy license secret.
-  - name: LicenseDeploySuccess
-    reason: LicenseDeploySuccess
-    action: LicenseDeploy
-    type: Normal
-    reportingController: kubeslice-controller
-    message: Successfully fetched license data & deployed license secret.
-  - name: ClusterMetadataCollectionFailed
-    reason: ClusterMetadataCollectionFailed
-    action: CollectClusterMetadata
-    type: Warning
-    reportingController: kubeslice-controller
-    message: Failed to collect cluster metadata for cluster creation.
-  - name: ClusterMetadataCollectionSuccess
-    reason: ClusterMetadataCollectionSuccess
-    action: CollectClusterMetadata
-    type: Normal
-    reportingController: kubeslice-controller
-    message: Successfully collected cluster metadata for license creation.
-  - name: LicenseDataFetchError
-    reason: LicenseDataFetchError
-    action: LicenseDataFetch
-    type: Warning
-    reportingController: kubeslice-controller
-    message: Failed to fetch license data from license proxy.
-  - name: LicenseDataFetchSuccess
-    reason: LicenseDataFetchSuccess
-    action: LicenseDataFetch
-    type: Normal
-    reportingController: kubeslice-controller
-    message: Successfully fetched license data from license proxy.
-  - name: LicenseSecretCreationFailed
-    reason: LicenseSecretCreationFailed
-    action: LicenseSecretCreation
-    type: Warning
-    reportingController: kubeslice-controller
-    message: Failed to create license secret.
-  - name: LicenseSecretCreationSuccess
-    reason: LicenseSecretCreationSuccess
-    action: LicenseSecretCreation
-    type: Normal
-    reportingController: kubeslice-controller
-    message: Successfully created license secret.
-    #Controller Objects
+    #Controller OSS Events
+    ## Project Events
   - name: ProjectDeleted
     reason: ProjectDeleted
     action: DeleteProject
@@ -379,3 +265,169 @@ events:
     type: Warning
     reportingController: controller
     message: Service account deletion failed.
+    ## Worker Service Import
+  - name: WorkerServiceImportDeletedForcefully
+    reason: WorkerServiceImportDeletedForcefully
+    action: DeleteWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import got deleted forcefully.
+  - name: WorkerServiceImportRecreationFailed
+    reason: WorkerServiceImportRecreationFailed
+    action: CreateWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import recreation failed after forceful deletion.
+  - name: WorkerServiceImportRecreated
+    reason: WorkerServiceImportRecreated
+    action: CreateWorkerServiceImport
+    type: Normal
+    reportingController: controller
+    message: Worker service import got recreated after forceful deletion.
+  - name: WorkerServiceImportCreationFailed
+    reason: WorkerServiceImportCreationFailed
+    action: CreateWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import creation failed.
+  - name: WorkerServiceImportCreated
+    reason: WorkerServiceImportCreated
+    action: CreateWorkerServiceImport
+    type: Normal
+    reportingController: controller
+    message: Worker service import got created.
+  - name: WorkerServiceImportUpdateFailed
+    reason: WorkerServiceImportUpdateFailed
+    action: UpdateWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import update failed.
+  - name: WorkerServiceImportUpdated
+    reason: WorkerServiceImportUpdated
+    action: UpdateWorkerServiceImport
+    type: Normal
+    reportingController: controller
+    message: Worker service import got updated.
+  - name: WorkerServiceImportDeleted
+    reason: WorkerServiceImportDeleted
+    action: DeleteWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import got deleted.
+  - name: WorkerServiceImportDeletionFailed
+    reason: WorkerServiceImportDeletionFailed
+    action: DeleteWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import deletion failed.
+    ## Worker Slice Config
+  - name: WorkerSliceConfigDeletedForcefully
+    reason: WorkerSliceConfigDeletedForcefully
+    action: DeleteWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config got deleted forcefully.
+  - name: WorkerSliceConfigRecreationFailed
+    reason: WorkerSliceConfigRecreationFailed
+    action: CreateWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config recreation failed after forceful deletion.
+  - name: WorkerSliceConfigRecreated
+    reason: WorkerSliceConfigRecreated
+    action: CreateWorkerSliceConfig
+    type: Normal
+    reportingController: controller
+    message: Worker slice config got recreated after forceful deletion.
+  - name: WorkerSliceConfigCreationFailed
+    reason: WorkerSliceConfigCreationFailed
+    action: CreateWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config creation failed.
+  - name: WorkerSliceConfigCreated
+    reason: WorkerSliceConfigCreated
+    action: CreateWorkerSliceConfig
+    type: Normal
+    reportingController: controller
+    message: Worker slice config got created.
+  - name: WorkerSliceConfigUpdateFailed
+    reason: WorkerSliceConfigUpdateFailed
+    action: UpdateWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config update failed.
+  - name: WorkerSliceConfigUpdated
+    reason: WorkerSliceConfigUpdated
+    action: UpdateWorkerSliceConfig
+    type: Normal
+    reportingController: controller
+    message: Worker slice config got updated.
+  - name: WorkerSliceConfigDeleted
+    reason: WorkerSliceConfigDeleted
+    action: DeleteWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config got deleted.
+  - name: WorkerSliceConfigDeletionFailed
+    reason: WorkerSliceConfigDeletionFailed
+    action: DeleteWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config deletion failed.
+    ## Worker Slice Gateway
+  - name: WorkerSliceGatewayDeletedForcefully
+    reason: WorkerSliceGatewayDeletedForcefully
+    action: DeleteWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway got deleted forcefully.
+  - name: WorkerSliceGatewayRecreationFailed
+    reason: WorkerSliceGatewayRecreationFailed
+    action: CreateWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway recreation failed after forceful deletion.
+  - name: WorkerSliceGatewayRecreated
+    reason: WorkerSliceGatewayRecreated
+    action: CreateWorkerSliceGateway
+    type: Normal
+    reportingController: controller
+    message: Worker slice gateway got recreated after forceful deletion.
+  - name: WorkerSliceGatewayDeletionFailed
+    reason: WorkerSliceGatewayDeletionFailed
+    action: DeleteWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway deletion failed.
+  - name: WorkerSliceGatewayDeleted
+    reason: WorkerSliceGatewayDeleted
+    action: DeleteWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway got deleted.
+  - name: WorkerSliceGatewayCreationFailed
+    reason: WorkerSliceGatewayCreationFailed
+    action: CreateWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway creation failed.
+  - name: WorkerSliceGatewayCreated
+    reason: WorkerSliceGatewayCreated
+    action: CreateWorkerSliceGateway
+    type: Normal
+    reportingController: controller
+    message: Worker slice gateway got created.
+  - name: SliceGatewayJobCreationFailed
+    reason: SliceGatewayJobCreationFailed
+    action: CreateSliceGatewayJob
+    type: Warning
+    reportingController: controller
+    message: Slice gateway job creation failed.
+  - name: SliceGatewayJobCreated
+    reason: SliceGatewayJobCreated
+    action: CreateSliceGatewayJob
+    type: Normal
+    reportingController: controller
+    message: Slice gateway job got created.
+    

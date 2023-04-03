@@ -19,11 +19,15 @@ package service
 import (
 	"context"
 	"errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
+
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -122,6 +126,7 @@ func ServiceExportDeleteTheObjectHappyCase(t *testing.T) {
 	workerServiceImportMock.On("LookupServiceExportForService", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	//remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -156,6 +161,7 @@ func ServiceExportRemoveFinalizerErrorOnUpdate(t *testing.T) {
 	workerServiceImportMock.On("LookupServiceExportForService", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err2 := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -185,6 +191,7 @@ func ServiceExportRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
 	//remove finalizer
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err2 := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -353,6 +360,7 @@ func ServiceExportDeleteByListSuccess(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := serviceExportConfigService.DeleteServiceExportConfigs(ctx, requestObj.Namespace)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -399,6 +407,7 @@ func ServiceExportDeleteByListFailedToDelete(t *testing.T) {
 	}).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Delete", ctx, mock.Anything).Return(err1).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := serviceExportConfigService.DeleteServiceExportConfigs(ctx, requestObj.Namespace)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, err1, err)
@@ -435,6 +444,7 @@ func ServiceExportDeleteServiceExportConfigByParticipatingSliceConfigFail(t *tes
 	}).Once()
 	deleteError := errors.New("delete failed")
 	clientMock.On("Delete", ctx, mock.Anything).Return(deleteError).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	err := serviceExportConfigService.DeleteServiceExportConfigByParticipatingSliceConfig(ctx, "random", requestObj.Namespace)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
@@ -456,6 +466,12 @@ func setupServiceExportTest(name string, namespace string) (*mocks.IWorkerServic
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	serviceExport := &controllerv1alpha1.ServiceExportConfig{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ServiceExportConfigServiceTest")
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ServiceExportConfigServiceTest", &eventRecorder)
 	return workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx
 }
