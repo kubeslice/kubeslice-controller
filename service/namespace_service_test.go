@@ -20,6 +20,9 @@ import (
 	"context"
 	"testing"
 
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -153,8 +156,13 @@ func TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist(t *testing.T) {
 
 }
 
-func prepareNamespaceTestContext(ctx context.Context, client util.Client,
-	scheme *runtime.Scheme) context.Context {
-	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "NamespaceTestController")
+func prepareNamespaceTestContext(ctx context.Context, client util.Client, scheme *runtime.Scheme) context.Context {
+	eventRecorder := events.NewEventRecorder(client, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "NamespaceTestController", &eventRecorder)
 	return preparedCtx
 }

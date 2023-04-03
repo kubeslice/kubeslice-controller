@@ -15,6 +15,7 @@ COPY apis/ apis/
 COPY controllers/ controllers/
 COPY service/ service/
 COPY util/ util/
+COPY events/ events/
 COPY cleanup/ cleanup/
 
 # Build
@@ -27,9 +28,6 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/cleanup/cleanup .
-# Copy config files for event monitoring
-COPY files files
-ENV EVENT_SCHEMA_PATH="/files/events"
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

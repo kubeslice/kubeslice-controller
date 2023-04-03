@@ -19,9 +19,8 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/schema"
 
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +34,6 @@ type INamespaceService interface {
 }
 
 type NamespaceService struct {
-	eventRecorder *events.EventRecorder
 }
 
 // ReconcileProjectNamespace is a function to reconcile project namespace
@@ -48,7 +46,7 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 		return ctrl.Result{}, err
 	}
 	//Load Event Recorder with project name and namespace
-	n.loadEventRecorder(ctx, util.GetProjectName(namespace), ControllerNamespace)
+	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(ControllerNamespace)
 	if !found {
 		expectedNS := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -59,10 +57,10 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 		err := util.CreateResource(ctx, expectedNS)
 		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, n.eventRecorder, expectedNS, schema.EventNamespaceCreationFailed)
+			util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreationFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, n.eventRecorder, expectedNS, schema.EventNamespaceCreated)
+		util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreated)
 	}
 	return ctrl.Result{}, nil
 }
@@ -74,7 +72,7 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		Name: namespace,
 	}, nsResource)
 	//Load Event Recorder with project name and namespace
-	n.loadEventRecorder(ctx, util.GetProjectName(namespace), ControllerNamespace)
+	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(ControllerNamespace)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -90,10 +88,10 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		err := util.DeleteResource(ctx, nsToBeDeleted)
 		nsToBeDeleted.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, n.eventRecorder, nsToBeDeleted, schema.EventNamespaceDeletionFailed)
+			util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeletionFailed)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, n.eventRecorder, nsToBeDeleted, schema.EventNamespaceDeleted)
+		util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeleted)
 	}
 	return ctrl.Result{}, nil
 }
@@ -105,19 +103,4 @@ func (n *NamespaceService) getResourceLabel(namespace string, owner client.Objec
 	}
 	label[util.LabelName] = fmt.Sprintf(util.LabelValue, owner.GetObjectKind().GroupVersionKind().Kind, namespace)
 	return label
-}
-
-// loadEventRecorder is function to load the event recorder
-func (n *NamespaceService) loadEventRecorder(ctx context.Context, project, namespace string) {
-	n.eventRecorder = &events.EventRecorder{
-		Client:    util.CtxClient(ctx),
-		Logger:    util.CtxLogger(ctx),
-		Scheme:    util.CtxScheme(ctx),
-		Project:   project,
-		Cluster:   util.ClusterController,
-		Slice:     util.NotApplicable,
-		Namespace: namespace,
-		Component: util.ComponentController,
-	}
-	return
 }

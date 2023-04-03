@@ -172,6 +172,6 @@ func setupSliceqosConfigWebhookValidationTest(name string, namespace string) (*u
 			Namespace: namespace,
 		},
 	}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceqosConfigWebhookValidationTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceqosConfigWebhookValidationTest", nil)
 	return clientMock, sliceQoSConfig, ctx
 }

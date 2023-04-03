@@ -277,10 +277,15 @@ func GetProjectName(namespace string) string {
 	return ""
 }
 
-func RecordEvent(ctx context.Context, recorder *events.EventRecorder, object runtime.Object, name string) {
-	recorder.RecordEvent(ctx, &events.Event{
+func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runtime.Object, relatedObject runtime.Object, name events.EventName) {
+	logger := CtxLogger(ctx)
+	err := recorder.RecordEvent(ctx, &events.Event{
 		Object:            object,
+		RelatedObject:     relatedObject,
 		ReportingInstance: InstanceController,
 		Name:              name,
 	})
+	if err != nil {
+		logger.With(zap.Error(err)).Errorf("Failed to record event")
+	}
 }

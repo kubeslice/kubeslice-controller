@@ -176,6 +176,6 @@ func setupWorkerSliceGatewayRecyclerTest(name string, namespace string) (WorkerS
 	}
 	clientMock := &utilMock.Client{}
 	workerSliceGatewayRecycler := &workerv1alpha1.WorkerSliceGwRecycler{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayRecyclerTest")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayRecyclerTest", nil)
 	return workerSliceGatewayRecyclerMock, requestObj, clientMock, workerSliceGatewayRecycler, ctx
 }

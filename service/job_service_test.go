@@ -49,7 +49,7 @@ func Test_CreateJob_CallsCreate(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	clientMock.On("Create", mock.Anything, mock.Anything).Return(nil).Once()
 	jobService := JobService{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "jobservicecontroller")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "jobservicecontroller", nil)
 
 	result, err := jobService.CreateJob(ctx, "", "", nil)
 	expectedResult := ctrl.Result{}
@@ -63,7 +63,7 @@ func Test_CreateJob_ReturnsError(t *testing.T) {
 	error := errors.New("testinternalerror")
 	clientMock.On("Create", mock.Anything, mock.Anything).Return(error).Once()
 	jobService := JobService{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "jobservicecontroller")
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "jobservicecontroller", nil)
 	result, err := jobService.CreateJob(ctx, "", "", nil)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err)

@@ -84,6 +84,7 @@ func testReconcileWorkerServiceImportGetWorkerServiceImportResourceFail(t *testi
 	clientMock.AssertExpectations(t)
 
 }
+
 func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
 	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
@@ -111,7 +112,9 @@ func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 	}).Once()
 
 	//remove
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	clientMock.On("List", ctx, serviceExportList, client.InNamespace(requestObj.Namespace), mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(1).(*controllerv1alpha1.ServiceExportConfigList)
@@ -134,7 +137,6 @@ func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 	require.False(t, result.Requeue)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-
 }
 
 func testReconcileWorkerServiceImportGetServiceExportListFail(t *testing.T) {
@@ -261,6 +263,7 @@ func testListWorkerServiceImportFail(t *testing.T) {
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func testDeleteWorkerServiceImportByLabelPass(t *testing.T) {
 	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
@@ -286,6 +289,7 @@ func testDeleteWorkerServiceImportByLabelPass(t *testing.T) {
 		}
 	})
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	err := WorkerServiceImportServiceStruct.DeleteWorkerServiceImportByLabel(ctx, labels, requestObj.Namespace)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -311,7 +315,7 @@ func testCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail(t *t
 	clientMock.AssertExpectations(t)
 }
 
-//pass
+// pass
 func testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
@@ -329,6 +333,7 @@ func testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail(t
 	updatetError := errors.New("existingWorkerServiceImport update failed")
 	clientMock.On("Get", ctx, mock.Anything, existingWorkerServiceImport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(updatetError).Once()
 	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
@@ -351,6 +356,7 @@ func testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail(t
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(getError).Once()
 	existserr := errors.New("IsAlreadyExists")
 	clientMock.On("Create", ctx, mock.Anything).Return(existserr).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
@@ -381,6 +387,7 @@ func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatch
 
 	deleteError := errors.New("existingWorkerServiceImport delete failed")
 	clientMock.On("Delete", ctx, mock.Anything).Return(deleteError).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)

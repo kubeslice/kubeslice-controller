@@ -65,7 +65,7 @@ func (r *WorkerSliceGateway) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *WorkerSliceGateway) ValidateUpdate(old runtime.Object) error {
 	workerslicegatewaylog.Info("validate update", "name", r.Name)
-	workerSliceGatewayCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), workerSliceGatewayWebhookClient, nil, "WorkerSliceGatewayValidation")
+	workerSliceGatewayCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), workerSliceGatewayWebhookClient, nil, "WorkerSliceGatewayValidation", nil)
 	return customWorkerSliceGatewayUpdateValidation(workerSliceGatewayCtx, r, old)
 }
 

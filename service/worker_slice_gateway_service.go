@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeslice/kubeslice-controller/events"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -80,6 +82,12 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 		return ctrl.Result{}, nil
 	}
 
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(req.Namespace)).
+		WithNamespace(req.Namespace).
+		WithSlice(workerSliceGateway.Labels["original-slice-name"])
+
 	//Step 1: Finalizers
 	if workerSliceGateway.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(workerSliceGateway.GetFinalizers(), WorkerSliceGatewayFinalizer) {
@@ -120,6 +128,8 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 			clusters := slice.Spec.Clusters
 			if util.IsInSlice(clusters, workerSliceGateway.Labels["worker-cluster"]) {
 				logger.Debug("SliceGateway deleted forcefully from slice, removing gateway pair and secret", req.NamespacedName)
+				//Register an event for worker slice gateway deleted forcefully
+				util.RecordEvent(ctx, eventRecorder, workerSliceGateway, slice, events.EventWorkerSliceGatewayDeletedForcefully)
 				completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(slice), slice.GetName())
 				labels := util.GetOwnerLabel(completeResourceName)
 				labels["worker-cluster"] = workerSliceGateway.Labels["remote-cluster"]
@@ -146,8 +156,12 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 				logger.Debug("Recreating sliceGateway", req.NamespacedName)
 				err = util.UpdateResource(ctx, slice)
 				if err != nil {
+					//Register an event for worker slice gateway recreation failure
+					util.RecordEvent(ctx, eventRecorder, workerSliceGateway, slice, events.EventWorkerSliceGatewayRecreationFailed)
 					return result, err
 				}
+				//Register an event for worker slice gateway recreation success
+				util.RecordEvent(ctx, eventRecorder, workerSliceGateway, slice, events.EventWorkerSliceGatewayRecreated)
 			}
 		}
 		return result, nil
@@ -211,11 +225,20 @@ func (s *WorkerSliceGatewayService) DeleteWorkerSliceGatewaysByLabel(ctx context
 	if err != nil {
 		return err
 	}
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(label["original-slice-name"])
 	for _, gateway := range gateways {
 		err = util.DeleteResource(ctx, &gateway)
 		if err != nil {
+			//Register an event for worker slice gateway deletion failure
+			util.RecordEvent(ctx, eventRecorder, &gateway, nil, events.EventWorkerSliceGatewayDeletionFailed)
 			return err
 		}
+		//Register an event for worker slice gateway deletion success
+		util.RecordEvent(ctx, eventRecorder, &gateway, nil, events.EventWorkerSliceGatewayDeleted)
 	}
 	return nil
 }
@@ -286,6 +309,12 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 		return err
 	}
 
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(ownerLabel["original-slice-name"])
+
 	clusterExistMap := make(map[string]bool, len(clusters))
 	for _, cluster := range clusters {
 		clusterExistMap[cluster] = true
@@ -298,8 +327,12 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 		if !clusterExistMap[clusterSource] || !clusterExistMap[clusterDestination] || gatewayExpectedNumber != gateway.Spec.GatewayNumber {
 			err = util.DeleteResource(ctx, &gateway)
 			if err != nil {
+				//Register an event for worker slice gateway deletion failure
+				util.RecordEvent(ctx, eventRecorder, &gateway, nil, events.EventWorkerSliceGatewayDeletionFailed)
 				return err
 			}
+			//Register an event for worker slice gateway deletion success
+			util.RecordEvent(ctx, eventRecorder, &gateway, nil, events.EventWorkerSliceGatewayDeleted)
 		}
 	}
 	return nil
@@ -357,17 +390,29 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 			return nil
 		}
 	}
-
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
 	serverGatewayObject := s.buildMinimumGateway(sourceCluster, destinationCluster, sliceName, namespace, label, serverGateway, gatewayNumber, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName, gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress, serverGatewayName)
 	err = util.CreateResource(ctx, serverGatewayObject)
 	if err != nil {
+		//Register an event for worker slice gateway creation failure
+		util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreationFailed)
 		return err
 	}
+	//Register an event for worker slice gateway creation success
+	util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
 	clientGatewayObject := s.buildMinimumGateway(destinationCluster, sourceCluster, sliceName, namespace, label, clientGateway, gatewayNumber, gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress, serverGatewayName, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName)
 	err = util.CreateResource(ctx, clientGatewayObject)
 	if err != nil {
+		//Register an event for worker slice gateway creation failure
+		util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreationFailed)
 		return err
 	}
+	//Register an event for worker slice gateway creation success
+	util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
 
 	err = s.generateCerts(ctx, sliceName, namespace, serverGatewayObject, clientGatewayObject, gatewayAddresses)
 	if err != nil {
@@ -453,6 +498,12 @@ func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName
 	gatewayAddresses WorkerSliceGatewayNetworkAddresses) error {
 	cpr := s.buildCertPairRequest(sliceName, serverGateway, clientGateway, gatewayAddresses)
 
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
 	environment := make(map[string]string, 5)
 	environment["NAMESPACE"] = namespace
 	environment["SERVER_SLICEGATEWAY_NAME"] = serverGateway.Name
@@ -462,8 +513,12 @@ func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName
 	util.CtxLogger(ctx).Info("jobNamespace", jobNamespace) //todo:remove
 	_, err := s.js.CreateJob(ctx, jobNamespace, JobImage, environment)
 	if err != nil {
+		//Register an event for gateway job creation failure
+		util.RecordEvent(ctx, eventRecorder, serverGateway, clientGateway, events.EventSliceGatewayJobCreationFailed)
 		return err
 	}
+	//Register an event for gateway job creation success
+	util.RecordEvent(ctx, eventRecorder, serverGateway, clientGateway, events.EventSliceGatewayJobCreated)
 	return nil
 }
 

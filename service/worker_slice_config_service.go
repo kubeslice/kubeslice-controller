@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubeslice/kubeslice-controller/events"
+
 	"go.uber.org/zap"
 
 	"github.com/jinzhu/copier"
@@ -61,6 +63,12 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 		return ctrl.Result{}, nil
 	}
 
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(req.Namespace)).
+		WithNamespace(req.Namespace).
+		WithSlice(workerSliceConfig.Labels["original-slice-name"])
+
 	// Step 2: add Finalizers to the resource
 	if workerSliceConfig.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(workerSliceConfig.GetFinalizers(), WorkerSliceConfigFinalizer) {
@@ -86,6 +94,8 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 			clusters := slice.Spec.Clusters
 			if util.IsInSlice(clusters, workerSliceConfig.Labels["worker-cluster"]) {
 				logger.Debug("workerSliceConfig deleted forcefully from slice", req.NamespacedName)
+				//Register an event for worker slice config deleted forcefully
+				util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigDeletedForcefully)
 				if slice.Annotations == nil {
 					slice.Annotations = make(map[string]string)
 				}
@@ -93,8 +103,12 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 				logger.Debug("Recreating workerSliceConfig", req.NamespacedName)
 				err = util.UpdateResource(ctx, slice)
 				if err != nil {
+					//Register an event for worker slice config recreation failure
+					util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigRecreationFailed)
 					return result, err
 				}
+				//Register an event for worker slice config recreation success
+				util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigRecreated)
 			}
 		}
 		return result, nil
@@ -207,6 +221,13 @@ outer:
 // More fields are added in reconciliation loop.
 func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string) (map[string]int, error) {
 	logger := util.CtxLogger(ctx)
+
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(name)
+
 	err := s.cleanUpSlices(ctx, label, namespace, clusters)
 	if err != nil {
 		return nil, err
@@ -250,12 +271,16 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			expectedSlice.Spec.SliceSubnet = sliceSubnet
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
+				//Register an event for worker slice config creation failure
+				util.RecordEvent(ctx, eventRecorder, &expectedSlice, nil, events.EventWorkerSliceConfigCreationFailed)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
 						expectedSlice.Name, namespace)
 					return clusterMap, err
 				}
 			}
+			//Register an event for worker slice config creation success
+			util.RecordEvent(ctx, eventRecorder, &expectedSlice, nil, events.EventWorkerSliceConfigCreated)
 		} else {
 			existingSlice.UID = ""
 			existingSlice.Spec.Octet = &ipamOctet
@@ -267,12 +292,16 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			existingSlice.Annotations["updatedTimestamp"] = time.Now().String()
 			err = util.UpdateResource(ctx, existingSlice)
 			if err != nil {
+				//Register an event for worker slice config update failure
+				util.RecordEvent(ctx, eventRecorder, existingSlice, nil, events.EventWorkerSliceConfigUpdateFailed)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
 						workerSliceConfigName, namespace)
 					return clusterMap, err
 				}
 			}
+			//Register an event for worker slice config update success
+			util.RecordEvent(ctx, eventRecorder, existingSlice, nil, events.EventWorkerSliceConfigUpdated)
 		}
 	}
 	return clusterMap, nil
@@ -284,11 +313,20 @@ func (s *WorkerSliceConfigService) DeleteWorkerSliceConfigByLabel(ctx context.Co
 	if err != nil {
 		return err
 	}
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(label["original-slice-name"])
 	for _, slice := range slices {
 		err = util.DeleteResource(ctx, &slice)
 		if err != nil {
+			//Register an event for worker slice config deletion failure
+			util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeletionFailed)
 			return err
 		}
+		//Register an event for worker slice config deletion success
+		util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeleted)
 	}
 	return nil
 }
@@ -346,13 +384,22 @@ func (s *WorkerSliceConfigService) cleanUpSlices(ctx context.Context, label map[
 	for _, cluster := range clusters {
 		clusterSet[cluster] = true
 	}
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(label["original-slice-name"])
 	for _, slice := range slices {
 		clusterName := slice.Labels["worker-cluster"]
 		if !clusterSet[clusterName] {
 			err = util.DeleteResource(ctx, &slice)
 			if err != nil {
+				//Register an event for worker slice config deletion failure
+				util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeletionFailed)
 				return err
 			}
+			//Register an event for worker slice config deletion success
+			util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeleted)
 		}
 	}
 	return nil
