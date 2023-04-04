@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -357,7 +358,10 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingUpdateFailed)
 				return ctrl.Result{}, err
 			}
-			util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingUpdated)
+			if !reflect.DeepEqual(expectedRoleBinding.RoleRef, actualRoleBinding.RoleRef) ||
+				!reflect.DeepEqual(expectedRoleBinding.Subjects, actualRoleBinding.Subjects) {
+				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingUpdated)
+			}
 		}
 	}
 	return ctrl.Result{}, nil
