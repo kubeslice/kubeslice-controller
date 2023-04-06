@@ -13,9 +13,6 @@ permissions:
   contents: write
   pages: write
 
-permissions:
-  contents: write
-  pages: write
 
 jobs:
   end-to-end:
@@ -174,7 +171,7 @@ jobs:
        username: ${{secrets.MAIL_USERNAME}}
        password: ${{secrets.MAIL_PASSWORD}}
        cc: rajendra@aveshasystems.com, eric@aveshasystems.com, abhisek@aveshasystems.com
-       subject: Kubeslice-controller | end-to-end-test | ${{ steps.date.outputs.date }}
+       subject: Kubeslice-controller | controller-end-to-end-test | ${{ steps.date.outputs.date }}
        to: richie@aveshasystems.com, nishant.singh@aveshasystems.com
        from: no-reply@aveshasystems.com
        attachments: result-summary.txt
