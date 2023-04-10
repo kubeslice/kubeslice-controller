@@ -132,7 +132,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// This logic it to set NodeIPs to nil, if an empty string is set in the first index.
+	// This logic is to set NodeIPs to nil, if an empty string is set in the first index.
 	if len(cluster.Spec.NodeIPs) > 0 && cluster.Spec.NodeIPs[0] == "" {
 		cluster.Spec.NodeIPs = nil
 		err = util.UpdateResource(ctx, cluster)
