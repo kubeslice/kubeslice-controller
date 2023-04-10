@@ -1,0 +1,2 @@
+resources:
+  - events_config_map.yaml

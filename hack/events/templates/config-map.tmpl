@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    name: event-schema
+  name: kubeslice-controller-event-schema-conf
+  namespace: kubeslice-controller
+data:
+  controller.yaml: |-
+    disabledEvents:{{ range . }}
+      - {{.Name}}{{ end }}

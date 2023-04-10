@@ -26,6 +26,14 @@ func main() {
 	f, err := os.Create("events/events_generated.go")
 	handleError(err)
 	t.Execute(f, events)
+
+	cmt, err := template.ParseFiles("hack/events/templates/config-map.tmpl")
+	handleError(err)
+
+	fcm, err := os.Create("config/events/events_config_map.yaml")
+	handleError(err)
+
+	cmt.Execute(fcm, events)
 }
 
 func handleError(err error) {
