@@ -108,6 +108,9 @@ type ClusterStatus struct {
 	ClusterHealth *ClusterHealth `json:"clusterHealth,omitempty"`
 	// NodeIPs of the gateway node of worker cluster
 	NodeIPs []string `json:"nodeIPs,omitempty"`
+	// RegistrationStatus shows the status of cluster registration
+	//+kubebuilder:validation:Enum:=Pending;InProgress;Failed;Registered;DeregisterInProgress;DeregisterFailed
+	RegistrationStatus string `json:"registrationStatus,omitempty"`
 }
 
 type ClusterHealth struct {

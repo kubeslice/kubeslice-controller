@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -70,23 +71,44 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	if cluster.ObjectMeta.DeletionTimestamp.IsZero() {
 		logger.Debugf("Not deleting")
 		if !util.ContainsString(cluster.GetFinalizers(), ClusterFinalizer) {
-			if shouldReturn, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, cluster, ClusterFinalizer)); shouldReturn {
+			if shouldRequeue, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, cluster, ClusterFinalizer)); shouldRequeue {
 				return result, reconErr
 			}
 		}
 	} else {
 		logger.Debug("starting delete for cluster", req.NamespacedName)
-		if shouldReturn, result, reconErr := util.IsReconciled(c.cleanUpClusterResources(ctx, req, cluster)); shouldReturn {
-			return result, reconErr
+		//  Check if ClusterDeregisterFinalizer is added by worker cluster.
+		if !util.ContainsString(cluster.GetFinalizers(), ClusterDeregisterFinalizer) {
+			if shouldRequeue, result, reconErr := util.IsReconciled(c.cleanUpClusterResources(ctx, req, cluster)); shouldRequeue {
+				return result, reconErr
+			}
+			if shouldRequeue, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterFinalizer)); shouldRequeue {
+				//Register an event for cluster deletion fail
+				util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
+				return result, reconErr
+			}
+			//Register an event for cluster deletion
+			util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
+			return ctrl.Result{}, err
+		} else {
+			// Wait until ClusterDeregisterFinalizer is removed by the worker cluster. If not removed even after 10 mins, remove it.
+			if cluster.ObjectMeta.DeletionTimestamp.Add(10 * time.Minute).Before(time.Now()) {
+				if shouldRequeue, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterDeregisterFinalizer)); shouldRequeue {
+					//Register an event for cluster deletion fail
+					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
+					return result, reconErr
+				}
+				// TODO: Register an event for worker-operator chart uninstallation timeout
+				logger.Info("Timed out waiting for worker-operator chart uninstallation")
+				// util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
+				return ctrl.Result{Requeue: true}, err
+			} else {
+				logger.Info("Waiting for worker-operator charts to uninstall")
+				// requeuing after ~10 mins
+				// TODO: Can somehow we verify if it is already requeued?
+				return ctrl.Result{RequeueAfter: 610 * time.Second}, nil
+			}
 		}
-		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterFinalizer)); shouldReturn {
-			//Register an event for cluster deletion fail
-			util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
-			return result, reconErr
-		}
-		//Register an event for cluster deletion
-		util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
-		return ctrl.Result{}, err
 	}
 	//Step 2: Get ServiceAccount
 	serviceAccount := &corev1.ServiceAccount{}
@@ -143,11 +165,22 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 	}
+
+	// Step 7: Set Registration status
+	if cluster.Status.RegistrationStatus == "" && len(cluster.Status.CniSubnet) > 0 {
+		cluster.Status.RegistrationStatus = "Registered"
+		err = util.UpdateStatus(ctx, cluster)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	//Step 6: NodeIP Reconciliation to WorkerSliceGateways
 	err = c.sgws.NodeIpReconciliationOfWorkerSliceGateways(ctx, cluster, req.Namespace)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
 	logger.Infof("cluster %v reconciled", req.NamespacedName)
 	return ctrl.Result{}, nil
 }
