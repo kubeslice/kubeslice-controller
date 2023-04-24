@@ -162,6 +162,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = new(ClusterHealth)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ClusterHealth2 != nil {
+		in, out := &in.ClusterHealth2, &out.ClusterHealth2
+		*out = new(ClusterHealth)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.NodeIPs != nil {
 		in, out := &in.NodeIPs, &out.NodeIPs
 		*out = make([]string, len(*in))

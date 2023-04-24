@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -91,6 +92,14 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
 			return ctrl.Result{}, err
 		} else {
+			// If ClusterDeregisterFinalizer is added by worker cluster, then wait for 10 mins for worker cluster to remove it.
+			// If not removed even after 10 mins, remove it.
+			// This is to handle the case where worker cluster is not reachable.
+			// For the condtion of Deregister success, the finalizer will be removed by the worker cluster after waiting for a few seconds.
+			// This is to ensure an event is registered for successful deregistration.
+			// For the condition of Deregister failure, the finalizer will be removed by the worker cluster after waiting for 10 mins.
+			// An event will also be registered for deregistration failure.
+
 			// Wait until ClusterDeregisterFinalizer is removed by the worker cluster. If not removed even after 10 mins, remove it.
 			if cluster.ObjectMeta.DeletionTimestamp.Add(10 * time.Minute).Before(time.Now()) {
 				if shouldRequeue, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterDeregisterFinalizer)); shouldRequeue {
@@ -98,15 +107,33 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
 					return result, reconErr
 				}
-				// TODO: Register an event for worker-operator chart uninstallation timeout
 				logger.Info("Timed out waiting for worker-operator chart uninstallation")
-				// util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
+				// Event for worker-operator chart uninstallation timeout [ClusterDeregisterTimeout]
+				util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregisterTimeout)
 				return ctrl.Result{Requeue: true}, err
 			} else {
-				logger.Info("Waiting for worker-operator charts to uninstall")
-				// requeuing after ~10 mins
-				// TODO: Can somehow we verify if it is already requeued?
-				return ctrl.Result{RequeueAfter: 610 * time.Second}, nil
+				if cluster.Status.RegistrationStatus == v1alpha1.RegistrationStatusDeregisterFailed {
+					logger.Info("Worker-operator charts failed to uninstall")
+					// Event for worker-operator chart uninstallation failure [ClusterDeregisterFailed]
+					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregisterFailed)
+					return ctrl.Result{}, nil
+				} else if cluster.Status.RegistrationStatus == v1alpha1.RegistrationStatusDeregistered {
+					logger.Info("Worker-operator charts uninstalled successfully")
+					// Event for worker-operator chart uninstallation success [ClusterDeregistered]
+					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregistered)
+					return ctrl.Result{}, nil
+				} else if cluster.Status.IsDeregisterInProgress {
+					logger.Info("Waiting for worker-operator charts to uninstall")
+					// setting IsDeregisterInProgress to true to avoid requeuing
+					cluster.Status.IsDeregisterInProgress = true
+					util.UpdateStatus(ctx, cluster)
+					// Event for worker-operator chart uninstallation in progress [ClusterDeregistrationInProgress]
+					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregistrationInProgress)
+					// requeuing after ~10 mins
+					return ctrl.Result{RequeueAfter: 610 * time.Second}, nil
+				} else {
+					return ctrl.Result{}, nil
+				}
 			}
 		}
 	}
@@ -161,15 +188,6 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		cluster.Spec.NodeIPs[0] = cluster.Spec.NodeIP
 
 		err = util.UpdateResource(ctx, cluster)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Step 7: Set Registration status
-	if cluster.Status.RegistrationStatus == "" && len(cluster.Status.CniSubnet) > 0 {
-		cluster.Status.RegistrationStatus = "Registered"
-		err = util.UpdateStatus(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

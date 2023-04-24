@@ -25,6 +25,30 @@ events:
     type: Warning
     reportingController: controller
     message: Cluster deletion failed.
+  - name: ClusterDeregistrationInProgress
+    reason: ClusterDeregistrationInProgress
+    action: DeregisterCluster
+    type: Normal
+    reportingController: controller
+    message: Cluster deregistration in progress.
+  - name: ClusterDeregistered
+    reason: ClusterDeregistered
+    action: DeregisterCluster
+    type: Normal
+    reportingController: controller
+    message: Cluster deregistered.
+  - name: ClusterDeregisterTimeout
+    reason: ClusterDeregisterTimeout
+    action: DeregisterCluster
+    type: Warning
+    reportingController: controller
+    message: Cluster deregister timeout.
+  - name: ClusterDeregisterFailed
+    reason: ClusterDeregisterFailed
+    action: DeregisterCluster
+    type: Warning
+    reportingController: controller
+    message: Cluster deregister failed.
   - name: SliceConfigDeleted
     reason: SliceConfigDeleted
     action: DeleteSliceConfig
@@ -430,4 +454,3 @@ events:
     type: Normal
     reportingController: controller
     message: Slice gateway job got created.
-    

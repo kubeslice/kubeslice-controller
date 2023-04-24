@@ -12,6 +12,10 @@ data:
       - ProjectDeletionFailed
       - ClusterDeleted
       - ClusterDeletionFailed
+      - ClusterDeregistrationInProgress
+      - ClusterDeregistered
+      - ClusterDeregisterTimeout
+      - ClusterDeregisterFailed
       - SliceConfigDeleted
       - SliceConfigDeletionFailed
       - ServiceExportConfigDeleted

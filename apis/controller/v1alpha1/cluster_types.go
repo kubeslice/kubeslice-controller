@@ -35,6 +35,18 @@ const (
 	ClusterHealthStatusWarning = "Warning"
 )
 
+type RegistrationStatus string
+
+const (
+	RegistrationStatusPending              = "Pending"
+	RegistrationStatusInProgress           = "InProgress"
+	RegistrationStatusFailed               = "Failed"
+	RegistrationStatusRegistered           = "Registered"
+	RegistrationStatusDeregisterInProgress = "DeregisterInProgress"
+	RegistrationStatusDeregisterFailed     = "DeregisterFailed"
+	RegistrationStatusDeregistered         = "Deregistered"
+)
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	//NodeIP is the IP address of the Node - deprecated field use Plural NodeIPs
@@ -105,12 +117,15 @@ type ClusterStatus struct {
 	// Namespaces present in cluster
 	Namespaces []NamespacesConfig `json:"namespaces,omitempty"`
 	// ClusterHealth shows the health of the worker cluster
-	ClusterHealth *ClusterHealth `json:"clusterHealth,omitempty"`
+	ClusterHealth  *ClusterHealth `json:"clusterHealth,omitempty"`
+	ClusterHealth2 *ClusterHealth `json:"clusterHealth2,omitempty"`
 	// NodeIPs of the gateway node of worker cluster
 	NodeIPs []string `json:"nodeIPs,omitempty"`
 	// RegistrationStatus shows the status of cluster registration
-	//+kubebuilder:validation:Enum:=Pending;InProgress;Failed;Registered;DeregisterInProgress;DeregisterFailed
-	RegistrationStatus string `json:"registrationStatus,omitempty"`
+	//+kubebuilder:validation:Enum:=Pending;InProgress;Failed;Registered;DeregisterInProgress;DeregisterFailed;Deregistered
+	RegistrationStatus RegistrationStatus `json:"registrationStatus,omitempty"`
+	// IsDeregisterInProgress is the flag to check if the cluster deregister is InProgress
+	IsDeregisterInProgress bool `json:"isDeregisterInProgress,omitempty"`
 }
 
 type ClusterHealth struct {
