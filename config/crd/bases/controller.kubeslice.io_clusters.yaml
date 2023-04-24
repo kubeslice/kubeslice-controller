@@ -144,40 +144,6 @@ spec:
                     format: date-time
                     type: string
                 type: object
-              clusterHealth2:
-                properties:
-                  clusterHealthStatus:
-                    description: ClusterHealthStatus shows the overall health status
-                      of the cluster
-                    enum:
-                    - Normal
-                    - Warning
-                    type: string
-                  componentStatuses:
-                    description: ComponentStatuses shows the health status of individual
-                      components in the cluster
-                    items:
-                      properties:
-                        component:
-                          description: Component name
-                          type: string
-                        componentHealthStatus:
-                          enum:
-                          - Normal
-                          - Warning
-                          - Error
-                          type: string
-                      required:
-                      - component
-                      - componentHealthStatus
-                      type: object
-                    type: array
-                  lastUpdated:
-                    description: LastUpdated is the timestamp when healthstatus was
-                      updated
-                    format: date-time
-                    type: string
-                type: object
               cniSubnet:
                 description: CniSubnet is the podip and service ip subnet of CNI
                 items:
