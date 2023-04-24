@@ -117,8 +117,7 @@ type ClusterStatus struct {
 	// Namespaces present in cluster
 	Namespaces []NamespacesConfig `json:"namespaces,omitempty"`
 	// ClusterHealth shows the health of the worker cluster
-	ClusterHealth  *ClusterHealth `json:"clusterHealth,omitempty"`
-	ClusterHealth2 *ClusterHealth `json:"clusterHealth2,omitempty"`
+	ClusterHealth *ClusterHealth `json:"clusterHealth,omitempty"`
 	// NodeIPs of the gateway node of worker cluster
 	NodeIPs []string `json:"nodeIPs,omitempty"`
 	// RegistrationStatus shows the status of cluster registration
