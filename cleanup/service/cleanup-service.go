@@ -209,7 +209,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 		if err != nil || len(clusters.Items) != 0 {
 			logger.Infof("%s %v clusters not deleted", util.Err, len(clusters.Items))
 		} else {
-			logger.Infof("%s All clusters deleted", util.Recycle, len(clusters.Items))
+			logger.Infof("%s All clusters deleted", util.Recycle)
 			break
 		}
 	}
