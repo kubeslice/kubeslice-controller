@@ -207,7 +207,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 		}
 		err = util.ListResources(ctx, clusters)
 		if err != nil || len(clusters.Items) != 0 {
-			logger.Errorf("%s %v clusters not deleted", util.Err, len(clusters.Items))
+			logger.Infof("%s %v clusters not deleted", util.Err, len(clusters.Items))
 		} else {
 			logger.Infof("%s All clusters deleted", util.Recycle, len(clusters.Items))
 			break
