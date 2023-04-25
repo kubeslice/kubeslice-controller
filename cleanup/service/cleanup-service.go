@@ -197,6 +197,19 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 			}
 		}
 
+		// Verify that clusters are deleted wait for ~ 11 minutes
+		logger.Infof("%s Verifying that all Clusters are deleted for Project %s", util.Find, project.GetName())
+		for i := 0; i < 21; i++ {
+			if i > 0 {
+				logger.Infof("%s Waiting %d seconds before retrying as clusters are still not deleted: %s", util.Wait, int(30*sleepDuration), err.Error())
+				time.Sleep(30 * sleepDuration)
+			}
+			err = util.ListResources(ctx, clusters, client.InNamespace(projectNamespace))
+			if len(clusters.Items) != 0 {
+				logger.Errorf("%s %v clusters not deleted", util.Err, len(clusters.Items))
+			}
+		}
+
 		// Delete the project
 		logger.Infof("%s  Deleting Project %s", util.Bin, project.GetName())
 		err = util.Retry(ctx, noOfRetries, sleepDuration, func() (err error) {
