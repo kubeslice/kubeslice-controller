@@ -38,6 +38,30 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Project deletion failed.",
 	},
+	"ClusterInstallationInProgress": {
+		Name:                "ClusterInstallationInProgress",
+		Reason:              "ClusterInstallationInProgress",
+		Action:              "AutoInstallation",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "Worker Operator installation in progress.",
+	},
+	"ClusterInstallationFailed": {
+		Name:                "ClusterInstallationFailed",
+		Reason:              "ClusterInstallationFailed",
+		Action:              "AutoInstallation",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Worker Operator installation failed.",
+	},
+	"ClusterInstallationPending": {
+		Name:                "ClusterInstallationPending",
+		Reason:              "ClusterInstallationPending",
+		Action:              "AutoInstallation",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Worker Operator verification failed. Pods might be in error state.",
+	},
 	"ClusterDeleted": {
 		Name:                "ClusterDeleted",
 		Reason:              "ClusterDeleted",
@@ -627,6 +651,9 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 var (
 	EventProjectDeleted                       events.EventName = "ProjectDeleted"
 	EventProjectDeletionFailed                events.EventName = "ProjectDeletionFailed"
+	EventClusterInstallationInProgress        events.EventName = "ClusterInstallationInProgress"
+	EventClusterInstallationFailed            events.EventName = "ClusterInstallationFailed"
+	EventClusterInstallationPending           events.EventName = "ClusterInstallationPending"
 	EventClusterDeleted                       events.EventName = "ClusterDeleted"
 	EventClusterDeletionFailed                events.EventName = "ClusterDeletionFailed"
 	EventClusterDeregistrationInProgress      events.EventName = "ClusterDeregistrationInProgress"

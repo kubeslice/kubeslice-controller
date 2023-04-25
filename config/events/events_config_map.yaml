@@ -10,6 +10,9 @@ data:
     disabledEvents:
       - ProjectDeleted
       - ProjectDeletionFailed
+      - ClusterInstallationInProgress
+      - ClusterInstallationFailed
+      - ClusterInstallationPending
       - ClusterDeleted
       - ClusterDeletionFailed
       - ClusterDeregistrationInProgress

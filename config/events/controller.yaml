@@ -13,6 +13,24 @@ events:
     type: Warning
     reportingController: controller
     message: Project deletion failed.
+  - name: ClusterInstallationInProgress
+    reason: ClusterInstallationInProgress
+    action: AutoInstallation
+    type: Normal
+    reportingController: controller
+    message: Worker Operator installation in progress.
+  - name: ClusterInstallationFailed
+    reason: ClusterInstallationFailed
+    action: AutoInstallation
+    type: Warning
+    reportingController: controller
+    message: Worker Operator installation failed.
+  - name: ClusterInstallationPending
+    reason: ClusterInstallationPending
+    action: AutoInstallation
+    type: Warning
+    reportingController: controller
+    message: Worker Operator verification failed. Pods might be in error state.
   - name: ClusterDeleted
     reason: ClusterDeleted
     action: DeleteCluster
