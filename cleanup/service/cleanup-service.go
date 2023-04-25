@@ -202,13 +202,14 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 	logger.Infof("%s Verifying that all Clusters are deleted for Projects", util.Find)
 	for i := 0; i < 21; i++ {
 		if i > 0 {
-			logger.Infof("%s Waiting %d seconds before retrying as clusters are still not deleted: %s", util.Wait, int(30*sleepDuration), err.Error())
+			logger.Infof("%s Waiting %d seconds before retrying as clusters are still not deleted", util.Wait, int((30 * sleepDuration).Seconds()))
 			time.Sleep(30 * sleepDuration)
 		}
 		err = util.ListResources(ctx, clusters)
-		if len(clusters.Items) != 0 {
+		if err != nil || len(clusters.Items) != 0 {
 			logger.Errorf("%s %v clusters not deleted", util.Err, len(clusters.Items))
 		} else {
+			logger.Infof("%s All clusters deleted", util.Recycle, len(clusters.Items))
 			break
 		}
 	}
