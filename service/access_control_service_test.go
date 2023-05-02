@@ -646,7 +646,8 @@ func ACS_removeServiceAccountsAndRoleBindingsByLabel_happypath(t *testing.T) {
 	}).Once()
 
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Times(4)
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := acsService.removeServiceAccountsAndRoleBindingsByLabel(ctx, namespace, clusterName, cluster)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
@@ -772,7 +773,8 @@ func ACS_RemoveWorkerClusterServiceAccountAndRoleBindings_Happypath(t *testing.T
 	}).Once()
 
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Times(4)
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := acsService.RemoveWorkerClusterServiceAccountAndRoleBindings(ctx, clusterNameString, namespace, cluster)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)

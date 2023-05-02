@@ -295,7 +295,8 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	cluster := &controllerv1alpha1.Cluster{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Twice()
 	gateway := &workerv1alpha1.WorkerSliceGateway{}
@@ -379,11 +380,11 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), gateway).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	jobMock.On("CreateJob", ctx, jobNamespace, JobImage, mock.Anything).Return(ctrl.Result{}, nil).Once()
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16")
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -447,7 +448,8 @@ func testDeleteWorkerSliceGatewaysByLabelExists(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	err := workerSliceGatewayService.DeleteWorkerSliceGatewaysByLabel(ctx, label, "namespace")
 	require.NoError(t, nil)
 	require.Nil(t, err)
