@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          volumeMounts:
+            - name: kubeslice-controller-event-schema-conf
+              mountPath: /events/event-schema/
+      volumes:
+        - name: kubeslice-controller-event-schema-conf
+          configMap:
+            name: kubeslice-controller-event-schema-conf
+            defaultMode: 420
