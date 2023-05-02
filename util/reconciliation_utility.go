@@ -277,6 +277,7 @@ func GetProjectName(namespace string) string {
 	return ""
 }
 
+// RecordEvent is a function to record the event
 func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runtime.Object, relatedObject runtime.Object, name events.EventName) {
 	logger := CtxLogger(ctx)
 	err := recorder.RecordEvent(ctx, &events.Event{
