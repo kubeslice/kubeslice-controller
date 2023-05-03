@@ -180,6 +180,16 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
+	// This logic is to set NodeIPs to nil, if an empty string is set in the first index.
+	if len(cluster.Spec.NodeIPs) > 0 && cluster.Spec.NodeIPs[0] == "" {
+		cluster.Spec.NodeIPs = nil
+		err = util.UpdateResource(ctx, cluster)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// this logic is for backward compatibility- check crds for more.
 	if len(cluster.Spec.NodeIPs) < 2 && len(cluster.Spec.NodeIP) != 0 {
 		if len(cluster.Spec.NodeIPs) == 0 {

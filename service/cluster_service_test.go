@@ -64,6 +64,7 @@ var ClusterTestbed = map[string]func(*testing.T){
 	"TestDeleteClusterDeleteFail":                                           testDeleteClusterDeleteFail,
 	"TestDeleteClusterDeletePass":                                           testDeleteClusterDeletePass,
 	"TestClusterPass":                                                       testClusterPass,
+	"TestClusterResetNodeIPsIfEmptyString":                                  testClusterResetNodeIPsIfEmptyString,
 	"TestReconcileClusterUpdateSecretFail":                                  testReconcileClusterUpdateSecretFail,
 	"TestReconcileClusterServiceAccountSecretNil":                           testReconcileClusterServiceAccountSecretNil,
 	"TestReconcileClusterDeletionRaisesEvent":                               testReconcileClusterDeletionRaisesEvent,
@@ -362,6 +363,82 @@ func testClusterPass(t *testing.T) {
 
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), mock.AnythingOfType("*v1alpha1.Cluster")).Return(nil).Once()
+	serviceAccount := &corev1.ServiceAccount{} //Secrets: nil, //secret= nil should return requeue true and requeuetime>0
+	clientMock.On("Get", ctx, mock.Anything, serviceAccount).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.ServiceAccount)
+		if arg.Secrets == nil {
+			arg.Secrets = make([]corev1.ObjectReference, 1)
+			arg.Secrets[0].Name = "random"
+		}
+	}).Once()
+	acsService.On("ReconcileWorkerClusterServiceAccountAndRoleBindings", ctx, requestObj.Name, requestObj.Namespace, mock.Anything).Return(ctrl.Result{}, nil)
+	clientMock.On("Get", ctx, serviceAccountSecretNamespacedName, secret).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Secret)
+		if arg.Data == nil {
+			arg.Data = make(map[string][]byte, 2)
+		}
+	})
+
+	clientMock.On("Status").Return(clientMock)
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
+	clientMock.On("Update", ctx, mock.Anything, mock.Anything).Return(nil)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
+	ssgService.On("NodeIpReconciliationOfWorkerSliceGateways", ctx, mock.Anything, requestObj.Namespace).Return(nil)
+	result, err := clusterService.ReconcileCluster(ctx, requestObj)
+	require.False(t, result.Requeue)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func testClusterResetNodeIPsIfEmptyString(t *testing.T) {
+	nsServiceMock := &mocks.INamespaceService{}
+	//var errList errorList
+	acsService := &mocks.IAccessControlService{}
+	ssgService := &mocks.IWorkerSliceGatewayService{}
+
+	clusterService := ClusterService{
+		ns:   nsServiceMock,
+		acs:  acsService,
+		sgws: ssgService,
+	}
+
+	clusterName := types.NamespacedName{
+		Namespace: "cisco",
+		Name:      "cluster-1",
+	}
+	requestObj := ctrl.Request{
+		clusterName,
+	}
+	clientMock := &utilmock.Client{}
+	cluster := &controllerv1alpha1.Cluster{}
+	//	}
+	nsResource := &corev1.Namespace{}
+
+	secret := &corev1.Secret{}
+	serviceAccountSecretNamespacedName := types.NamespacedName{
+		Namespace: requestObj.Namespace,
+		Name:      "random",
+	}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	clientMock.On("Get", ctx, requestObj.NamespacedName, cluster).Return(nil)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: requestObj.Namespace,
+	}, nsResource).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
+		arg.Name = "cisco"
+	})
+
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), mock.AnythingOfType("*v1alpha1.Cluster")).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = make([]string, 1)
+		arg.Spec.NodeIPs[0] = ""
+	}).Once()
 	serviceAccount := &corev1.ServiceAccount{} //Secrets: nil, //secret= nil should return requeue true and requeuetime>0
 	clientMock.On("Get", ctx, mock.Anything, serviceAccount).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*corev1.ServiceAccount)
