@@ -35,6 +35,18 @@ const (
 	ClusterHealthStatusWarning = "Warning"
 )
 
+type RegistrationStatus string
+
+const (
+	RegistrationStatusPending              = "Pending"
+	RegistrationStatusInProgress           = "InProgress"
+	RegistrationStatusFailed               = "Failed"
+	RegistrationStatusRegistered           = "Registered"
+	RegistrationStatusDeregisterInProgress = "DeregisterInProgress"
+	RegistrationStatusDeregisterFailed     = "DeregisterFailed"
+	RegistrationStatusDeregistered         = "Deregistered"
+)
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	//NodeIP is the IP address of the Node - deprecated field use Plural NodeIPs
@@ -108,6 +120,11 @@ type ClusterStatus struct {
 	ClusterHealth *ClusterHealth `json:"clusterHealth,omitempty"`
 	// NodeIPs of the gateway node of worker cluster
 	NodeIPs []string `json:"nodeIPs,omitempty"`
+	// RegistrationStatus shows the status of cluster registration
+	//+kubebuilder:validation:Enum:=Pending;InProgress;Failed;Registered;DeregisterInProgress;DeregisterFailed;Deregistered
+	RegistrationStatus RegistrationStatus `json:"registrationStatus,omitempty"`
+	// IsDeregisterInProgress is the flag to check if the cluster deregister is InProgress
+	IsDeregisterInProgress bool `json:"isDeregisterInProgress,omitempty"`
 }
 
 type ClusterHealth struct {

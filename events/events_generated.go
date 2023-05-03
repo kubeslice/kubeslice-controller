@@ -38,6 +38,30 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Project deletion failed.",
 	},
+	"ClusterInstallationInProgress": {
+		Name:                "ClusterInstallationInProgress",
+		Reason:              "ClusterInstallationInProgress",
+		Action:              "AutoInstallation",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "Worker Operator installation in progress.",
+	},
+	"ClusterInstallationFailed": {
+		Name:                "ClusterInstallationFailed",
+		Reason:              "ClusterInstallationFailed",
+		Action:              "AutoInstallation",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Worker Operator installation failed.",
+	},
+	"ClusterInstallationPending": {
+		Name:                "ClusterInstallationPending",
+		Reason:              "ClusterInstallationPending",
+		Action:              "AutoInstallation",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Worker Operator verification failed. Pods might be in error state.",
+	},
 	"ClusterDeleted": {
 		Name:                "ClusterDeleted",
 		Reason:              "ClusterDeleted",
@@ -53,6 +77,38 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Cluster deletion failed.",
+	},
+	"ClusterDeregistrationInProgress": {
+		Name:                "ClusterDeregistrationInProgress",
+		Reason:              "ClusterDeregistrationInProgress",
+		Action:              "DeregisterCluster",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "Cluster deregistration in progress.",
+	},
+	"ClusterDeregistered": {
+		Name:                "ClusterDeregistered",
+		Reason:              "ClusterDeregistered",
+		Action:              "DeregisterCluster",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "Cluster deregistered.",
+	},
+	"ClusterDeregisterTimeout": {
+		Name:                "ClusterDeregisterTimeout",
+		Reason:              "ClusterDeregisterTimeout",
+		Action:              "DeregisterCluster",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Cluster deregister timeout.",
+	},
+	"ClusterDeregisterFailed": {
+		Name:                "ClusterDeregisterFailed",
+		Reason:              "ClusterDeregisterFailed",
+		Action:              "DeregisterCluster",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Cluster deregister failed.",
 	},
 	"SliceConfigDeleted": {
 		Name:                "SliceConfigDeleted",
@@ -595,8 +651,15 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 var (
 	EventProjectDeleted                       events.EventName = "ProjectDeleted"
 	EventProjectDeletionFailed                events.EventName = "ProjectDeletionFailed"
+	EventClusterInstallationInProgress        events.EventName = "ClusterInstallationInProgress"
+	EventClusterInstallationFailed            events.EventName = "ClusterInstallationFailed"
+	EventClusterInstallationPending           events.EventName = "ClusterInstallationPending"
 	EventClusterDeleted                       events.EventName = "ClusterDeleted"
 	EventClusterDeletionFailed                events.EventName = "ClusterDeletionFailed"
+	EventClusterDeregistrationInProgress      events.EventName = "ClusterDeregistrationInProgress"
+	EventClusterDeregistered                  events.EventName = "ClusterDeregistered"
+	EventClusterDeregisterTimeout             events.EventName = "ClusterDeregisterTimeout"
+	EventClusterDeregisterFailed              events.EventName = "ClusterDeregisterFailed"
 	EventSliceConfigDeleted                   events.EventName = "SliceConfigDeleted"
 	EventSliceConfigDeletionFailed            events.EventName = "SliceConfigDeletionFailed"
 	EventServiceExportConfigDeleted           events.EventName = "ServiceExportConfigDeleted"

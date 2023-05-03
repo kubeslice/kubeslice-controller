@@ -108,6 +108,7 @@ const (
 const (
 	ProjectFinalizer             = "controller.kubeslice.io/project-finalizer"
 	ClusterFinalizer             = "controller.kubeslice.io/cluster-finalizer"
+	ClusterDeregisterFinalizer   = "worker.kubeslice.io/cluster-deregister-finalizer"
 	SliceConfigFinalizer         = "controller.kubeslice.io/slice-configuration-finalizer"
 	serviceExportConfigFinalizer = "controller.kubeslice.io/service-export-finalizer"
 	WorkerSliceConfigFinalizer   = "worker.kubeslice.io/worker-slice-configuration-finalizer"
