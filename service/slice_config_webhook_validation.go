@@ -22,8 +22,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -93,6 +95,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := preventMaxClusterCountUpdate(ctx, sliceConfig, old); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if err := validateRenewNowInSliceConfig(ctx, sliceConfig, old); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	return nil
 }
 
@@ -105,6 +110,43 @@ func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alp
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	return nil
+}
+
+func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, old runtime.Object) *field.Error {
+	oldSliceConfig := old.(*controllerv1alpha1.SliceConfig)
+	// nochange detected
+	if sliceConfig.Spec.RenewBefore == oldSliceConfig.Spec.RenewBefore || sliceConfig.Spec.RenewBefore.IsZero() {
+		return nil
+	}
+	// change detected
+	vpnKeyRotaion := controllerv1alpha1.VpnKeyRotation{}
+	exists, _ := util.GetResourceIfExist(ctx, types.NamespacedName{
+		Namespace: sliceConfig.Namespace,
+		Name:      sliceConfig.Name,
+	}, &vpnKeyRotaion)
+	if exists {
+		for gateway := range vpnKeyRotaion.Status.CurrentRotationState {
+			status, ok := vpnKeyRotaion.Status.CurrentRotationState[gateway]
+			if ok {
+				if status.Status != controllerv1alpha1.Complete {
+					return &field.Error{
+						Type:   field.ErrorTypeForbidden,
+						Field:  "Field: RenewBefore",
+						Detail: fmt.Sprintf("Certs Renewal status for %s gateway is not in Complete state", gateway),
+					}
+				}
+			}
+		}
+	}
+	// check if we are past and its a correct time
+	if time.Now().After(sliceConfig.Spec.RenewBefore) {
+		return nil
+	}
+	return &field.Error{
+		Type:   field.ErrorTypeForbidden,
+		Field:  "Field: RenewBefore",
+		Detail: "Renewal Time inappropriate for sliceconfig",
+	}
 }
 
 // checkNamespaceDeboardingStatus checks if the namespace is deboarding

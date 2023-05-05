@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -102,6 +104,10 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_ValidateQosProfileStandardQosProfileNameDoesNotExist":                                        ValidateQosProfileStandardQosProfileNameDoesNotExist,
 	"SliceConfigWebhookValidation_ValidateMaxCluster":                                                                          ValidateMaxCluster,
 	"SliceConfigWebhookValidation_ValidateMaxClusterForParticipatingCluster":                                                   ValidateMaxClusterForParticipatingCluster,
+	"TestValidateCertsRotationInterval_Postive":                                                                               TestValidateCertsRotationInterval_Postive,
+	"TestValidateCertsRotationInterval_Negative":                                                                               TestValidateCertsRotationInterval_Negative,
+	"TestValidateCertsRotationInterval_inProgressClusterStatus":                                                                TestValidateCertsRotationInterval_NegativeClusterStatus,
+	"TestValidateCertsRotationInterval_PositiveClusterStatus":                                                                 TestValidateCertsRotationInterval_PositiveClusterStatus,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1420,7 +1426,135 @@ func ValidateMaxClusterForParticipatingCluster(t *testing.T) {
 	require.Contains(t, err.Error(), "participating clusters cannot be greater than MaxClusterCount")
 	clientMock.AssertExpectations(t)
 }
+func TestValidateCertsRotationInterval_Postive(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.RenewBefore = time.Now()
+	expiry := metav1.Now().Add(30)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			CertificateCreationTime: metav1.Now(),
+			CertificateExpiryTime:   metav1.Time{expiry},
+		}
+	}).Once()
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+}
 
+func TestValidateCertsRotationInterval_Negative(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	// RenewBefore is 1 hour after, decline
+	sliceConfig.Spec.RenewBefore = time.Now().Add(time.Hour * 1)
+	expiry := metav1.Now().Add(30)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			CertificateCreationTime: metav1.Now(),
+			CertificateExpiryTime:   metav1.Time{expiry},
+		}
+	}).Once()
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.NotNil(t, err)
+}
+
+func TestValidateCertsRotationInterval_NegativeClusterStatus(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.RenewBefore = time.Now()
+	expiry := metav1.Now().Add(30)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			CertificateCreationTime: metav1.Now(),
+			CertificateExpiryTime:   metav1.Time{expiry},
+			ClusterGatewayMapping: map[string][]string{
+				"cluster-1": {"gateway-1"},
+				"cluster-2": {"gateway-2"},
+			},
+		}
+		arg.Status = controllerv1alpha1.VpnKeyRotationStatus{
+			CurrentRotationState: map[string]controllerv1alpha1.StatusOfKeyRotation{
+
+				"gateway-1": controllerv1alpha1.StatusOfKeyRotation{
+					Status:               controllerv1alpha1.Complete,
+					LastUpdatedTimestamp: metav1.Now(),
+				},
+				"gateway-2": controllerv1alpha1.StatusOfKeyRotation{
+					Status:               controllerv1alpha1.InProgress,
+					LastUpdatedTimestamp: metav1.Now(),
+				},
+			},
+		}
+	}).Once()
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.NotNil(t, err)
+	require.Equal(t, err.Type, field.ErrorTypeForbidden)
+}
+
+func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	sliceConfig.Spec.RenewBefore = time.Now()
+	expiry := metav1.Now().Add(30)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			CertificateCreationTime: metav1.Now(),
+			CertificateExpiryTime:   metav1.Time{expiry},
+			ClusterGatewayMapping: map[string][]string{
+				"cluster-1": {"gateway-1"},
+				"cluster-2": {"gateway-2"},
+			},
+		}
+		arg.Status = controllerv1alpha1.VpnKeyRotationStatus{
+			CurrentRotationState: map[string]controllerv1alpha1.StatusOfKeyRotation{
+
+				"gateway-1": controllerv1alpha1.StatusOfKeyRotation{
+					Status:               controllerv1alpha1.Complete,
+					LastUpdatedTimestamp: metav1.Now(),
+				},
+				"gateway-2": controllerv1alpha1.StatusOfKeyRotation{
+					Status:               controllerv1alpha1.Complete,
+					LastUpdatedTimestamp: metav1.Now(),
+				},
+			},
+		}
+	}).Once()
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+}
 func setupSliceConfigWebhookValidationTest(name string, namespace string) (*utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context) {
 	clientMock := &utilMock.Client{}
 	sliceConfig := &controllerv1alpha1.SliceConfig{
