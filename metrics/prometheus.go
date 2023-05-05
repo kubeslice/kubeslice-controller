@@ -24,7 +24,7 @@ var (
 )
 
 // StartMetricsCollector registers metrics to prometheus
-func StartMetricsCollector(metricCollectorPort string) {
+func StartMetricsCollector(metricCollectorPort string, shouldStart bool) {
 	metricCollectorPort = ":" + metricCollectorPort
 	//log.Info("Starting metric collector @ %s", metricCollectorPort)
 	rand.Seed(time.Now().Unix())
@@ -55,6 +55,10 @@ func StartMetricsCollector(metricCollectorPort string) {
 	)
 
 	prometheus.MustRegister(KubeSliceEventsCounter)
+
+	if !shouldStart {
+		return
+	}
 
 	http.Handle("/metrics", newHandlerWithHistogram(promhttp.Handler(), histogramVec))
 

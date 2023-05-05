@@ -163,7 +163,7 @@ func initialize(services *service.Services) {
 		Slice:     util.NotApplicable,
 	})
 	// setting up metrics collector
-	go metrics.StartMetricsCollector(service.MetricPort)
+	go metrics.StartMetricsCollector(service.MetricPort, true)
 	// initialize controller with Project Kind
 	if err = (&controller.ProjectReconciler{
 		Client:         mgr.GetClient(),
