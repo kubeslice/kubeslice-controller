@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/kubeslice/kubeslice-controller/metrics"
+	"time"
 
+	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -77,39 +79,118 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	if cluster.ObjectMeta.DeletionTimestamp.IsZero() {
 		logger.Debugf("Not deleting")
 		if !util.ContainsString(cluster.GetFinalizers(), ClusterFinalizer) {
-			if shouldReturn, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, cluster, ClusterFinalizer)); shouldReturn {
+			if shouldRequeue, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, cluster, ClusterFinalizer)); shouldRequeue {
 				return result, reconErr
 			}
 		}
 	} else {
 		logger.Debug("starting delete for cluster", req.NamespacedName)
-		if shouldReturn, result, reconErr := util.IsReconciled(c.cleanUpClusterResources(ctx, req, cluster)); shouldReturn {
-			return result, reconErr
-		}
-		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterFinalizer)); shouldReturn {
-			//Register an event for cluster deletion fail
-			util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
+		//  Check if ClusterDeregisterFinalizer is added by worker cluster.
+		if !util.ContainsString(cluster.GetFinalizers(), ClusterDeregisterFinalizer) {
+			if shouldRequeue, result, reconErr := util.IsReconciled(c.cleanUpClusterResources(ctx, req, cluster)); shouldRequeue {
+				return result, reconErr
+			}
+			if shouldRequeue, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterFinalizer)); shouldRequeue {
+				//Register an event for cluster deletion fail
+				util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
+				c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventClusterDeletionFailed),
+						"object_name": cluster.Name,
+						"object_kind": metricKindCluster,
+					},
+				)
+				return result, reconErr
+			}
+			//Register an event for cluster deletion
+			util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
 			c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 				map[string]string{
-					"action":      "deletion_failed",
-					"event":       string(events.EventClusterDeletionFailed),
+					"action":      "deleted",
+					"event":       string(events.EventClusterDeleted),
 					"object_name": cluster.Name,
 					"object_kind": metricKindCluster,
 				},
 			)
-			return result, reconErr
+			return ctrl.Result{}, err
+		} else {
+			// If ClusterDeregisterFinalizer is added by worker cluster, then wait for 10 mins for worker cluster to remove it.
+			// If not removed even after 10 mins, remove it.
+			// This is to handle the case where worker cluster is not reachable.
+			// For the condtion of Deregister success, the finalizer will be removed by the worker cluster after waiting for a few seconds.
+			// This is to ensure an event is registered for successful deregistration.
+			// For the condition of Deregister failure, the finalizer will be removed by the worker cluster after waiting for 10 mins.
+			// An event will also be registered for deregistration failure.
+
+			// Wait until ClusterDeregisterFinalizer is removed by the worker cluster. If not removed even after 10 mins, remove it.
+			if cluster.ObjectMeta.DeletionTimestamp.Add(10 * time.Minute).Before(time.Now()) {
+				if shouldRequeue, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterDeregisterFinalizer)); shouldRequeue {
+					//Register an event for cluster deletion fail
+					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
+					c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+						map[string]string{
+							"action":      "deletion_failed",
+							"event":       string(events.EventClusterDeletionFailed),
+							"object_name": cluster.Name,
+							"object_kind": metricKindCluster,
+						},
+					)
+					return result, reconErr
+				}
+				logger.Info("Timed out waiting for worker-operator chart uninstallation")
+				// Event for worker-operator chart uninstallation timeout [ClusterDeregisterTimeout]
+				util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregisterTimeout)
+				c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deregister_timeout",
+						"event":       string(events.EventClusterDeregisterTimeout),
+						"object_name": cluster.Name,
+						"object_kind": metricKindCluster,
+					},
+				)
+				return ctrl.Result{Requeue: true}, err
+			} else {
+				if cluster.Status.RegistrationStatus == v1alpha1.RegistrationStatusDeregisterFailed {
+					logger.Info("Worker-operator charts failed to uninstall")
+					// Event for worker-operator chart uninstallation failure [ClusterDeregisterFailed]
+					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregisterFailed)
+					c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+						map[string]string{
+							"action":      "deregister_failed",
+							"event":       string(events.EventClusterDeregisterFailed),
+							"object_name": cluster.Name,
+							"object_kind": metricKindCluster,
+						},
+					)
+					return ctrl.Result{}, nil
+				} else if cluster.Status.RegistrationStatus == v1alpha1.RegistrationStatusDeregistered {
+					logger.Info("Worker-operator charts uninstalled successfully")
+					// Event for worker-operator chart uninstallation success [ClusterDeregistered]
+					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregistered)
+					c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+						map[string]string{
+							"action":      "deregistered",
+							"event":       string(events.EventClusterDeregistered),
+							"object_name": cluster.Name,
+							"object_kind": metricKindCluster,
+						},
+					)
+					return ctrl.Result{}, nil
+				} else if !cluster.Status.IsDeregisterInProgress {
+					logger.Info("Waiting for worker-operator charts to uninstall")
+					// setting IsDeregisterInProgress to true to avoid requeuing
+					cluster.Status.IsDeregisterInProgress = true
+					util.UpdateStatus(ctx, cluster)
+					// Event for worker-operator chart uninstallation in progress [ClusterDeregistrationInProgress]
+					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregistrationInProgress)
+					// requeuing after ~10 mins
+					return ctrl.Result{RequeueAfter: 610 * time.Second}, nil
+				} else {
+					return ctrl.Result{}, nil
+				}
+			}
 		}
-		//Register an event for cluster deletion
-		util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
-		c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
-			map[string]string{
-				"action":      "deleted",
-				"event":       string(events.EventClusterDeleted),
-				"object_name": cluster.Name,
-				"object_kind": metricKindCluster,
-			},
-		)
-		return ctrl.Result{}, err
 	}
 	//Step 2: Get ServiceAccount
 	serviceAccount := &corev1.ServiceAccount{}
@@ -176,11 +257,13 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 	}
+
 	//Step 6: NodeIP Reconciliation to WorkerSliceGateways
 	err = c.sgws.NodeIpReconciliationOfWorkerSliceGateways(ctx, cluster, req.Namespace)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
 	logger.Infof("cluster %v reconciled", req.NamespacedName)
 	return ctrl.Result{}, nil
 }
