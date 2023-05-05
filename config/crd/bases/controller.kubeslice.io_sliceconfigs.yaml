@@ -143,6 +143,11 @@ spec:
                 - queueType
                 - tcType
                 type: object
+              rotationInterval:
+                default: 30
+                maximum: 90
+                minimum: 30
+                type: integer
               sliceGatewayProvider:
                 description: WorkerSliceGatewayProvider defines the configuration
                   for slicegateway
