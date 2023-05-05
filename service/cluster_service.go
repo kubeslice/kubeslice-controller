@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -39,6 +40,7 @@ type ClusterService struct {
 	ns   INamespaceService
 	acs  IAccessControlService
 	sgws IWorkerSliceGatewayService
+	mf   metrics.MetricRecorder
 }
 
 // ReconcileCluster is function to reconcile cluster
@@ -57,6 +59,11 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	}
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(cluster.Namespace)).WithNamespace(cluster.Namespace)
+
+	// Load metrics with project name and namespace
+	c.mf.WithProject(util.GetProjectName(cluster.Namespace)).
+		WithNamespace(cluster.Namespace)
+
 	// Step 0: check if cluster is in project namespace
 	nsResource := &corev1.Namespace{}
 	found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
@@ -82,10 +89,26 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterFinalizer)); shouldReturn {
 			//Register an event for cluster deletion fail
 			util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
+			c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventClusterDeletionFailed),
+					"object_name": cluster.Name,
+					"object_kind": metricKindCluster,
+				},
+			)
 			return result, reconErr
 		}
 		//Register an event for cluster deletion
 		util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
+		c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventClusterDeleted),
+				"object_name": cluster.Name,
+				"object_kind": metricKindCluster,
+			},
+		)
 		return ctrl.Result{}, err
 	}
 	//Step 2: Get ServiceAccount
@@ -187,13 +210,34 @@ func (c *ClusterService) DeleteClusters(ctx context.Context, namespace string) (
 		err = util.DeleteResource(ctx, &cluster)
 		//Load Event Recorder with project name and namespace
 		eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(cluster.Namespace)).WithNamespace(cluster.Namespace)
+
+		// Load metrics with project name and namespace
+		c.mf.WithProject(util.GetProjectName(cluster.Namespace)).
+			WithNamespace(cluster.Namespace)
+
 		if err != nil {
 			//Register an event for cluster deletion fail
 			util.RecordEvent(ctx, eventRecorder, &cluster, nil, events.EventClusterDeletionFailed)
+			c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventClusterDeletionFailed),
+					"object_name": cluster.Name,
+					"object_kind": metricKindCluster,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		//Register an event for cluster deletion
 		util.RecordEvent(ctx, eventRecorder, &cluster, nil, events.EventClusterDeleted)
+		c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventClusterDeleted),
+				"object_name": cluster.Name,
+				"object_kind": metricKindCluster,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }

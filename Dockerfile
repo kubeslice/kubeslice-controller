@@ -16,6 +16,7 @@ COPY controllers/ controllers/
 COPY service/ service/
 COPY util/ util/
 COPY events/ events/
+COPY metrics/ metrics/
 COPY cleanup/ cleanup/
 
 # Build

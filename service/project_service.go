@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -37,6 +38,7 @@ type ProjectService struct {
 	c   IClusterService
 	sc  ISliceConfigService
 	se  IServiceExportConfigService
+	mf  metrics.MetricRecorder
 }
 
 // ReconcileProject is a function to reconcile the projects includes reconciliation of roles, clusters, project namespaces etc.
@@ -56,6 +58,11 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 	}
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(project.Name).WithNamespace(ControllerNamespace)
+
+	// Load metrics with project name and namespace
+	t.mf.WithProject(project.Name).
+		WithNamespace(ControllerNamespace)
+
 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 	//Finalizers
 	if project.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -72,10 +79,26 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, project, ProjectFinalizer)); shouldReturn {
 			//Register an event for project deletion fail
 			util.RecordEvent(ctx, eventRecorder, project, nil, events.EventProjectDeletionFailed)
+			t.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventProjectDeletionFailed),
+					"object_name": project.Name,
+					"object_kind": metricKindProject,
+				},
+			)
 			return result, reconErr
 		}
 		//Register an event for project deletion
 		util.RecordEvent(ctx, eventRecorder, project, nil, events.EventProjectDeleted)
+		t.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventProjectDeleted),
+				"object_name": project.Name,
+				"object_kind": metricKindProject,
+			},
+		)
 		return ctrl.Result{}, nil
 	}
 

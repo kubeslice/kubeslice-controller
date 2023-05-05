@@ -50,6 +50,27 @@ const (
 	ResourceStatusSuffix          = "/status"
 )
 
+// metric kind
+const (
+	metricKindRole                = "role"
+	metricKindServiceAccount      = "service_account"
+	metricKindSecret              = "secret"
+	metricKindRoleBinding         = "role_binding"
+	metricKindCluster             = "cluster"
+	metricKindNamespace           = "namespace"
+	metricKindProject             = "project"
+	metricKindServiceExportConfig = "service_export_config"
+	metricKindSliceConfig         = "slice_config"
+	metricKindSliceQoSConfig      = "slice_qos_config"
+	metricKindWorkerServiceImport = "worker_service_import"
+	metricKindWorkerSliceConfig   = "worker_slice_config"
+	metricKindWorkerSliceGateway  = "worker_slice_gateway"
+)
+
+var (
+	MetricPort = "18080"
+)
+
 // Verbs
 const (
 	verbCreate = "create"

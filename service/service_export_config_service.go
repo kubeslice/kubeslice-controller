@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -36,6 +37,7 @@ type IServiceExportConfigService interface {
 
 type ServiceExportConfigService struct {
 	ses IWorkerServiceImportService
+	mf  metrics.MetricRecorder
 }
 
 // ReconcileServiceExportConfig is a function to reconcile the service export config
@@ -59,6 +61,11 @@ func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Co
 		WithNamespace(serviceExportConfig.Namespace).
 		WithSlice(serviceExportConfig.Labels["original-slice-name"])
 
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(serviceExportConfig.Namespace)).
+		WithNamespace(serviceExportConfig.Namespace).
+		WithSlice(serviceExportConfig.Labels["original-slice-name"])
+
 	//Step 1: Finalizers
 	if serviceExportConfig.ObjectMeta.DeletionTimestamp.IsZero() {
 		logger.Debugf("Not deleting")
@@ -76,10 +83,26 @@ func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Co
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, serviceExportConfig, serviceExportConfigFinalizer)); shouldReturn {
 			//Register an event for service export config deletion failure
 			util.RecordEvent(ctx, eventRecorder, serviceExportConfig, nil, events.EventServiceExportConfigDeletionFailed)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventServiceExportConfigDeletionFailed),
+					"object_name": serviceExportConfig.Name,
+					"object_kind": metricKindServiceExportConfig,
+				},
+			)
 			return result, reconErr
 		}
 		//Register an event for service export config deletion
 		util.RecordEvent(ctx, eventRecorder, serviceExportConfig, nil, events.EventServiceExportConfigDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventServiceExportConfigDeleted),
+				"object_name": serviceExportConfig.Name,
+				"object_kind": metricKindServiceExportConfig,
+			},
+		)
 		return ctrl.Result{}, err
 	}
 	//Step 2: Get the slice based upon the sliceName and sliceNamespace
@@ -164,14 +187,36 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigs(ctx context.Cont
 			WithProject(util.GetProjectName(serviceExport.Namespace)).
 			WithNamespace(serviceExport.Namespace).
 			WithSlice(serviceExport.Labels["original-slice-name"])
+
+		// Load metrics with project name and namespace
+		s.mf.WithProject(util.GetProjectName(serviceExport.Namespace)).
+			WithNamespace(serviceExport.Namespace).
+			WithSlice(serviceExport.Labels["original-slice-name"])
+
 		err = util.DeleteResource(ctx, &serviceExport)
 		if err != nil {
 			//Register an event for service export config deletion
 			util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeletionFailed)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventServiceExportConfigDeletionFailed),
+					"object_name": serviceExport.Name,
+					"object_kind": metricKindServiceExportConfig,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		//Register an event for service export config deletion
 		util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventServiceExportConfigDeleted),
+				"object_name": serviceExport.Name,
+				"object_kind": metricKindServiceExportConfig,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }
@@ -189,14 +234,36 @@ func (s *ServiceExportConfigService) DeleteServiceExportConfigByParticipatingSli
 				WithProject(util.GetProjectName(serviceExport.Namespace)).
 				WithNamespace(serviceExport.Namespace).
 				WithSlice(serviceExport.Labels["original-slice-name"])
+
+			// Load metrics with project name and namespace
+			s.mf.WithProject(util.GetProjectName(serviceExport.Namespace)).
+				WithNamespace(serviceExport.Namespace).
+				WithSlice(serviceExport.Labels["original-slice-name"])
+
 			err = util.DeleteResource(ctx, &serviceExport)
 			if err != nil {
 				//Register an event for service export config deletion
 				util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeletionFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventServiceExportConfigDeletionFailed),
+						"object_name": serviceExport.Name,
+						"object_kind": metricKindServiceExportConfig,
+					},
+				)
 				return err
 			}
 			//Register an event for service export config deletion
 			util.RecordEvent(ctx, eventRecorder, &serviceExport, nil, events.EventServiceExportConfigDeleted)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deleted",
+					"event":       string(events.EventServiceExportConfigDeleted),
+					"object_name": serviceExport.Name,
+					"object_kind": metricKindServiceExportConfig,
+				},
+			)
 		}
 	}
 	return nil

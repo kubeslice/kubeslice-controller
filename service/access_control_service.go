@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 	"reflect"
 	"strings"
 
@@ -61,6 +62,7 @@ type activeServiceAccount struct {
 
 type AccessControlService struct {
 	ruleProvider IAccessControlRuleProvider
+	mf           metrics.MetricRecorder
 }
 
 // ReconcileWorkerClusterRole reconciles the worker cluster role
@@ -87,20 +89,57 @@ func (a *AccessControlService) ReconcileWorkerClusterRole(ctx context.Context,
 	}
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(namespace)
+
+	// Load metrics with project name and namespace
+	a.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace)
+
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
 			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventWorkerClusterRoleCreationFailed)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "creation_failed",
+					"event":       string(events.EventWorkerClusterRoleCreationFailed),
+					"object_name": expectedRole.Name,
+					"object_kind": metricKindRole,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventWorkerClusterRoleCreated)
+		a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventWorkerClusterRoleCreated),
+				"object_name": expectedRole.Name,
+				"object_kind": metricKindRole,
+			},
+		)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
 			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventWorkerClusterRoleUpdateFailed)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "update_failed",
+					"event":       string(events.EventWorkerClusterRoleUpdateFailed),
+					"object_name": expectedRole.Name,
+					"object_kind": metricKindRole,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventWorkerClusterRoleUpdated)
+		a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "updated",
+				"event":       string(events.EventWorkerClusterRoleUpdated),
+				"object_name": expectedRole.Name,
+				"object_kind": metricKindRole,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }
@@ -129,20 +168,57 @@ func (a *AccessControlService) ReconcileReadOnlyRole(ctx context.Context, namesp
 	}
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(namespace)
+
+	// Load metrics with project name and namespace
+	a.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace)
+
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
 			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadOnlyRoleCreationFailed)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "creation_failed",
+					"event":       string(events.EventReadOnlyRoleCreationFailed),
+					"object_name": expectedRole.Name,
+					"object_kind": metricKindRole,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadOnlyRoleCreated)
+		a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventReadOnlyRoleCreated),
+				"object_name": expectedRole.Name,
+				"object_kind": metricKindRole,
+			},
+		)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
 			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadOnlyRoleUpdateFailed)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "update_failed",
+					"event":       string(events.EventReadOnlyRoleUpdateFailed),
+					"object_name": expectedRole.Name,
+					"object_kind": metricKindRole,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadOnlyRoleUpdated)
+		a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "updated",
+				"event":       string(events.EventReadOnlyRoleUpdated),
+				"object_name": expectedRole.Name,
+				"object_kind": metricKindRole,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }
@@ -171,20 +247,57 @@ func (a *AccessControlService) ReconcileReadWriteRole(ctx context.Context,
 	}
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(namespace)
+
+	// Load metrics with project name and namespace
+	a.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace)
+
 	if !found {
 		err = util.CreateResource(ctx, expectedRole)
 		if err != nil {
 			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadWriteRoleCreationFailed)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "creation_failed",
+					"event":       string(events.EventReadWriteRoleCreationFailed),
+					"object_name": expectedRole.Name,
+					"object_kind": metricKindRole,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadWriteRoleCreated)
+		a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventReadWriteRoleCreated),
+				"object_name": expectedRole.Name,
+				"object_kind": metricKindRole,
+			},
+		)
 	} else {
 		err = util.UpdateResource(ctx, expectedRole)
 		if err != nil {
 			util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadWriteRoleUpdateFailed)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "update_failed",
+					"event":       string(events.EventReadWriteRoleUpdateFailed),
+					"object_name": expectedRole.Name,
+					"object_kind": metricKindRole,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		util.RecordEvent(ctx, eventRecorder, expectedRole, nil, events.EventReadWriteRoleUpdated)
+		a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "updated",
+				"event":       string(events.EventReadWriteRoleUpdated),
+				"object_name": expectedRole.Name,
+				"object_kind": metricKindRole,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }
@@ -255,6 +368,11 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 	logger := util.CtxLogger(ctx)
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(namespace)
+
+	// Load metrics with project name and namespace
+	a.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace)
+
 	for _, name := range names {
 		// Create or update service account
 		serviceAccountNamespacedName := client.ObjectKey{
@@ -290,9 +408,25 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			if err != nil {
 				logger.With(zap.Error(err)).Errorf("Couldnt create serviceaccount")
 				util.RecordEvent(ctx, eventRecorder, expectedServiceAccount, nil, events.EventServiceAccountCreationFailed)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "creation_failed",
+						"event":       string(events.EventServiceAccountCreationFailed),
+						"object_name": expectedServiceAccount.Name,
+						"object_kind": metricKindServiceAccount,
+					},
+				)
 				return ctrl.Result{}, err
 			}
 			util.RecordEvent(ctx, eventRecorder, expectedServiceAccount, nil, events.EventServiceAccountCreated)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "created",
+					"event":       string(events.EventServiceAccountCreated),
+					"object_name": expectedServiceAccount.Name,
+					"object_kind": metricKindServiceAccount,
+				},
+			)
 			// create secret for the service account
 			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -306,9 +440,25 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			if err != nil {
 				logger.With(zap.Error(err)).Errorf("Couldnt create secret")
 				util.RecordEvent(ctx, eventRecorder, &secret, nil, events.EventServiceAccountSecretCreationFailed)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "creation_failed",
+						"event":       string(events.EventServiceAccountSecretCreationFailed),
+						"object_name": secret.Name,
+						"object_kind": metricKindSecret,
+					},
+				)
 				return ctrl.Result{}, err
 			}
 			util.RecordEvent(ctx, eventRecorder, &secret, nil, events.EventServiceAccountSecretCreated)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "created",
+					"event":       string(events.EventServiceAccountSecretCreated),
+					"object_name": secret.Name,
+					"object_kind": metricKindSecret,
+				},
+			)
 		}
 	}
 	for _, name := range names {
@@ -349,18 +499,50 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 			err = util.CreateResource(ctx, expectedRoleBinding)
 			if err != nil {
 				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingCreationFailed)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "creation_failed",
+						"event":       string(events.EventDefaultRoleBindingCreationFailed),
+						"object_name": expectedRoleBinding.Name,
+						"object_kind": metricKindRoleBinding,
+					},
+				)
 				return ctrl.Result{}, err
 			}
 			util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingCreated)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "created",
+					"event":       string(events.EventDefaultRoleBindingCreated),
+					"object_name": expectedRoleBinding.Name,
+					"object_kind": metricKindRoleBinding,
+				},
+			)
 		} else {
 			err = util.UpdateResource(ctx, expectedRoleBinding)
 			if err != nil {
 				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingUpdateFailed)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "update_failed",
+						"event":       string(events.EventDefaultRoleBindingUpdateFailed),
+						"object_name": expectedRoleBinding.Name,
+						"object_kind": metricKindRoleBinding,
+					},
+				)
 				return ctrl.Result{}, err
 			}
 			if !reflect.DeepEqual(expectedRoleBinding.RoleRef, actualRoleBinding.RoleRef) ||
 				!reflect.DeepEqual(expectedRoleBinding.Subjects, actualRoleBinding.Subjects) {
 				util.RecordEvent(ctx, eventRecorder, expectedRoleBinding, nil, events.EventDefaultRoleBindingUpdated)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "updated",
+						"event":       string(events.EventDefaultRoleBindingUpdated),
+						"object_name": expectedRoleBinding.Name,
+						"object_kind": metricKindRoleBinding,
+					},
+				)
 			}
 		}
 	}
@@ -413,15 +595,35 @@ func (a *AccessControlService) cleanupObsoleteServiceAccountsAndRoleBindings(ctx
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(namespace)
 
+	// Load metrics with project name and namespace
+	a.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace)
+
 	// Delete additional role bindings
 	for _, activeObj := range activeRoleBindings {
 		if !activeObj.active {
 			err = util.DeleteResource(ctx, &activeObj.object)
 			if err != nil {
 				util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, events.EventInactiveRoleBindingDeletionFailed)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventInactiveRoleBindingDeletionFailed),
+						"object_name": activeObj.object.Name,
+						"object_kind": metricKindRoleBinding,
+					},
+				)
 				return ctrl.Result{}, err
 			}
 			util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, events.EventInactiveRoleBindingDeleted)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deleted",
+					"event":       string(events.EventInactiveRoleBindingDeleted),
+					"object_name": activeObj.object.Name,
+					"object_kind": metricKindRoleBinding,
+				},
+			)
 		}
 	}
 
@@ -431,9 +633,25 @@ func (a *AccessControlService) cleanupObsoleteServiceAccountsAndRoleBindings(ctx
 			err = util.DeleteResource(ctx, &activeObj.object)
 			if err != nil {
 				util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, events.EventInactiveServiceAccountDeletionFailed)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventInactiveServiceAccountDeletionFailed),
+						"object_name": activeObj.object.Name,
+						"object_kind": metricKindServiceAccount,
+					},
+				)
 				return ctrl.Result{}, err
 			}
 			util.RecordEvent(ctx, eventRecorder, &activeObj.object, nil, events.EventInactiveServiceAccountDeleted)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deleted",
+					"event":       string(events.EventInactiveServiceAccountDeleted),
+					"object_name": activeObj.object.Name,
+					"object_kind": metricKindServiceAccount,
+				},
+			)
 		}
 	}
 	return ctrl.Result{}, err
@@ -462,15 +680,35 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(namespace)
 
+	// Load metrics with project name and namespace
+	a.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace)
+
 	// Delete role bindings
 	if len(roleBindings.Items) > 0 {
 		for _, rb := range roleBindings.Items {
 			err = util.DeleteResource(ctx, &rb)
 			if err != nil {
 				util.RecordEvent(ctx, eventRecorder, &rb, nil, events.EventDefaultRoleBindingDeletionFailed)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventDefaultRoleBindingDeletionFailed),
+						"object_name": rb.Name,
+						"object_kind": metricKindRoleBinding,
+					},
+				)
 				return ctrl.Result{}, err
 			}
 			util.RecordEvent(ctx, eventRecorder, &rb, nil, events.EventDefaultRoleBindingDeleted)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deleted",
+					"event":       string(events.EventDefaultRoleBindingDeleted),
+					"object_name": rb.Name,
+					"object_kind": metricKindRoleBinding,
+				},
+			)
 		}
 	}
 
@@ -480,9 +718,25 @@ func (a *AccessControlService) removeServiceAccountsAndRoleBindingsByLabel(ctx c
 			err = util.DeleteResource(ctx, &sa)
 			if err != nil {
 				util.RecordEvent(ctx, eventRecorder, &sa, nil, events.EventServiceAccountDeletionFailed)
+				a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventServiceAccountDeletionFailed),
+						"object_name": sa.Name,
+						"object_kind": metricKindServiceAccount,
+					},
+				)
 				return ctrl.Result{}, err
 			}
 			util.RecordEvent(ctx, eventRecorder, &sa, nil, events.EventServiceAccountDeleted)
+			a.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deleted",
+					"event":       string(events.EventServiceAccountDeleted),
+					"object_name": sa.Name,
+					"object_kind": metricKindServiceAccount,
+				},
+			)
 		}
 	}
 	return ctrl.Result{}, err

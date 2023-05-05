@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -34,6 +35,7 @@ type INamespaceService interface {
 }
 
 type NamespaceService struct {
+	mf metrics.MetricRecorder
 }
 
 // ReconcileProjectNamespace is a function to reconcile project namespace
@@ -47,6 +49,11 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 	}
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(ControllerNamespace)
+
+	// Load metrics with project name and namespace
+	n.mf.WithProject(util.GetProjectName(util.GetProjectName(namespace))).
+		WithNamespace(ControllerNamespace)
+
 	if !found {
 		expectedNS := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -58,9 +65,25 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
 			util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreationFailed)
+			n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "creation_failed",
+					"event":       string(events.EventNamespaceCreationFailed),
+					"object_name": expectedNS.Name,
+					"object_kind": metricKindNamespace,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreated)
+		n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventNamespaceCreated),
+				"object_name": expectedNS.Name,
+				"object_kind": metricKindNamespace,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }
@@ -73,6 +96,11 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 	}, nsResource)
 	//Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(ControllerNamespace)
+
+	// Load metrics with project name and namespace
+	n.mf.WithProject(util.GetProjectName(util.GetProjectName(namespace))).
+		WithNamespace(ControllerNamespace)
+
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -89,9 +117,25 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		nsToBeDeleted.Namespace = ControllerNamespace
 		if err != nil {
 			util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeletionFailed)
+			n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventNamespaceDeletionFailed),
+					"object_name": nsToBeDeleted.Name,
+					"object_kind": metricKindNamespace,
+				},
+			)
 			return ctrl.Result{}, err
 		}
 		util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeleted)
+		n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventNamespaceDeleted),
+				"object_name": nsToBeDeleted.Name,
+				"object_kind": metricKindNamespace,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }
