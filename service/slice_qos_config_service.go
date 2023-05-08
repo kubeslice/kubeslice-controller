@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"time"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -38,7 +37,7 @@ type ISliceQoSConfigService interface {
 // SliceQoSConfigService implements different service interfaces
 type SliceQoSConfigService struct {
 	wsc IWorkerSliceConfigService
-	mf  metrics.MetricRecorder
+	mf  util.MetricRecorder
 }
 
 // ReconcileSliceQoSConfig is a function to reconcile the qos_profile
@@ -76,25 +75,21 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 		logger.Debug("starting delete for qos profile", req.NamespacedName)
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceQosConfig, SliceQoSConfigFinalizer)); shouldReturn {
 			//Register an event for slice qos config deletion failure
-			util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeletionFailed)
-			q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
-				map[string]string{
-					"action":      "deletion_failed",
-					"event":       string(events.EventSliceQoSConfigDeletionFailed),
-					"object_name": sliceQosConfig.Name,
-					"object_kind": metricKindSliceQoSConfig,
+			util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeletionFailed,
+				&util.MetricRecorderOptions{
+					MetricRecorder: &q.mf,
+					ObjectName:     sliceQosConfig.Name,
+					ObjectKind:     metricKindSliceQoSConfig,
 				},
 			)
 			return result, reconErr
 		}
 		//Register an event for slice qos config deletion
-		util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeleted)
-		q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
-			map[string]string{
-				"action":      "deleted",
-				"event":       string(events.EventSliceQoSConfigDeleted),
-				"object_name": sliceQosConfig.Name,
-				"object_kind": metricKindSliceQoSConfig,
+		util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeleted,
+			&util.MetricRecorderOptions{
+				MetricRecorder: &q.mf,
+				ObjectName:     sliceQosConfig.Name,
+				ObjectKind:     metricKindSliceQoSConfig,
 			},
 		)
 		return ctrl.Result{}, err

@@ -24,7 +24,6 @@ import (
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -107,7 +106,7 @@ func initialize(services *service.Services) {
 	flag.StringVar(&jobImage, "ovpn-job-image", service.JobImage, "The image to use for the ovpn cert generator job")
 	flag.StringVar(&jobCredential, "ovpn-job-cred", service.JobCredential, "The credential to pull the ovpn job image")
 	flag.StringVar(&jobServiceAccount, "ovpn-job-sa", service.JobServiceAccount, "The service account to use for the ovpn job")
-	flag.StringVar(&prometheusServiceEndpoint, "prometheus-service-endpoint", metrics.PROMETHEUS_SERVICE_ENDPOINT, "PROMETHEUS SERVICE ENDPOINT")
+	flag.StringVar(&prometheusServiceEndpoint, "prometheus-service-endpoint", util.PROMETHEUS_SERVICE_ENDPOINT, "PROMETHEUS SERVICE ENDPOINT")
 
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -139,7 +138,7 @@ func initialize(services *service.Services) {
 	service.ServiceAccountWorkerCluster = rbacResourcePrefix + "worker-%s"
 	service.ServiceAccountReadOnlyUser = rbacResourcePrefix + "ro-%s"
 	service.ServiceAccountReadWriteUser = rbacResourcePrefix + "rw-%s"
-	metrics.PROMETHEUS_SERVICE_ENDPOINT = prometheusServiceEndpoint
+	util.PROMETHEUS_SERVICE_ENDPOINT = prometheusServiceEndpoint
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// initialize metrics
@@ -163,7 +162,7 @@ func initialize(services *service.Services) {
 		Slice:     util.NotApplicable,
 	})
 	// setting up metrics collector
-	go metrics.StartMetricsCollector(service.MetricPort, true)
+	go util.StartMetricsCollector(service.MetricPort, true)
 	// initialize controller with Project Kind
 	if err = (&controller.ProjectReconciler{
 		Client:         mgr.GetClient(),

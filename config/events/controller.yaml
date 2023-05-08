@@ -7,306 +7,357 @@ events:
     type: Warning
     reportingController: controller
     message: Project got deleted.
+    metricAction: deleted
   - name: ProjectDeletionFailed
     reason: ProjectDeletionFailed
     action: DeleteProject
     type: Warning
     reportingController: controller
     message: Project deletion failed.
+    metricAction: deletion_failed
   - name: ClusterInstallationInProgress
     reason: ClusterInstallationInProgress
     action: AutoInstallation
     type: Normal
     reportingController: controller
     message: Worker Operator installation in progress.
+    metricAction:
   - name: ClusterInstallationFailed
     reason: ClusterInstallationFailed
     action: AutoInstallation
     type: Warning
     reportingController: controller
     message: Worker Operator installation failed.
+    metricAction:
   - name: ClusterInstallationPending
     reason: ClusterInstallationPending
     action: AutoInstallation
     type: Warning
     reportingController: controller
     message: Worker Operator verification failed. Pods might be in error state.
+    metricAction:
   - name: ClusterDeleted
     reason: ClusterDeleted
     action: DeleteCluster
     type: Warning
     reportingController: controller
     message: Cluster got deleted.
+    metricAction: deleted
   - name: ClusterDeletionFailed
     reason: ClusterDeletionFailed
     action: DeleteCluster
     type: Warning
     reportingController: controller
     message: Cluster deletion failed.
+    metricAction: deletion_failed
   - name: ClusterDeregistrationInProgress
     reason: ClusterDeregistrationInProgress
     action: DeregisterCluster
     type: Normal
     reportingController: controller
     message: Cluster deregistration in progress.
+    metricAction:
   - name: ClusterDeregistered
     reason: ClusterDeregistered
     action: DeregisterCluster
     type: Normal
     reportingController: controller
     message: Cluster deregistered.
+    metricAction:
   - name: ClusterDeregisterTimeout
     reason: ClusterDeregisterTimeout
     action: DeregisterCluster
     type: Warning
     reportingController: controller
     message: Cluster deregister timeout.
+    metricAction:
   - name: ClusterDeregisterFailed
     reason: ClusterDeregisterFailed
     action: DeregisterCluster
     type: Warning
     reportingController: controller
     message: Cluster deregister failed.
+    metricAction:
   - name: SliceConfigDeleted
     reason: SliceConfigDeleted
     action: DeleteSliceConfig
     type: Warning
     reportingController: controller
     message: Slice config got deleted.
+    metricAction: deleted
   - name: SliceConfigDeletionFailed
     reason: SliceConfigDeletionFailed
     action: DeleteSliceConfig
     type: Warning
     reportingController: controller
     message: Slice config deletion failed.
+    metricAction: deletion_failed
   - name: ServiceExportConfigDeleted
     reason: ServiceExportConfigDeleted
     action: DeleteServiceExportConfig
     type: Warning
     reportingController: controller
     message: Service export config got deleted.
+    metricAction: deleted
   - name: ServiceExportConfigDeletionFailed
     reason: ServiceExportConfigDeletionFailed
     action: DeleteServiceExportConfig
     type: Warning
     reportingController: controller
     message: Service export config deletion failed.
+    metricAction: deletion_failed
   - name: SliceQoSConfigDeleted
     reason: SliceQoSConfigDeleted
     action: DeleteSliceQoSConfig
     type: Warning
     reportingController: controller
     message: Slice QoS config got deleted.
+    metricAction: deleted
   - name: SliceQoSConfigDeletionFailed
     reason: SliceQoSConfigDeletionFailed
     action: DeleteSliceQoSConfig
     type: Warning
     reportingController: controller
     message: Slice QoS config deletion failed.
+    metricAction: deletion_failed
   - name: SecretDeleted
     reason: SecretDeleted
     action: DeleteSecret
     type: Warning
     reportingController: controller
     message: Secret got deleted.
+    metricAction: deleted
   - name: SecretDeletionFailed
     reason: SecretDeletionFailed
     action: DeleteSecret
     type: Warning
     reportingController: controller
     message: Secret deletion failed.
+    metricAction: deletion_failed
   - name: NamespaceCreated
     reason: NamespaceCreated
     action: CreateNamespace
     type: Normal
     reportingController: controller
     message: Namespace got created.
+    metricAction: created
   - name: NamespaceCreationFailed
     reason: NamespaceCreationFailed
     action: CreateNamespace
     type: Warning
     reportingController: controller
     message: Namespace creation failed.
+    metricAction: creation_failed
   - name: NamespaceDeleted
     reason: NamespaceDeleted
     action: DeleteNamespace
     type: Warning
     reportingController: controller
     message: Namespace got deleted.
+    metricAction: deleted
   - name: NamespaceDeletionFailed
     reason: NamespaceDeletionFailed
     action: DeleteNamespace
     type: Warning
     reportingController: controller
     message: Namespace deletion failed.
+    metricAction: deletion_failed
   - name: WorkerClusterRoleCreated
     reason: WorkerClusterRoleCreated
     action: CreateWorkerClusterRole
     type: Normal
     reportingController: controller
     message: Worker cluster role got created.
+    metricAction: created
   - name: WorkerClusterRoleCreationFailed
     reason: WorkerClusterRoleCreationFailed
     action: CreateWorkerClusterRole
     type: Warning
     reportingController: controller
     message: Worker cluster role creation failed.
+    metricAction: creation_failed
   - name: WorkerClusterRoleUpdated
     reason: WorkerClusterRoleUpdated
     action: UpdateWorkerClusterRole
     type: Normal
     reportingController: controller
     message: Worker cluster role got updated.
+    metricAction: updated
   - name: WorkerClusterRoleUpdateFailed
     reason: WorkerClusterRoleUpdateFailed
     action: UpdateWorkerClusterRole
     type: Warning
     reportingController: controller
     message: Worker cluster role update failed.
+    metricAction: update_failed
   - name: ReadOnlyRoleCreated
     reason: ReadOnlyRoleCreated
     action: CreateReadOnlyRole
     type: Normal
     reportingController: controller
     message: Read only role got created.
+    metricAction: created
   - name: ReadOnlyRoleCreationFailed
     reason: ReadOnlyRoleCreationFailed
     action: CreateReadOnlyRole
     type: Warning
     reportingController: controller
     message: Read only role creation failed.
+    metricAction: creation_failed
   - name: ReadOnlyRoleUpdated
     reason: ReadOnlyRoleUpdated
     action: UpdateReadOnlyRole
     type: Normal
     reportingController: controller
     message: Read only role got updated.
+    metricAction: updated
   - name: ReadOnlyRoleUpdateFailed
     reason: ReadOnlyRoleUpdateFailed
     action: UpdateReadOnlyRole
     type: Warning
     reportingController: controller
     message: Read only role update failed.
+    metricAction: update_failed
   - name: ReadWriteRoleCreated
     reason: ReadWriteRoleCreated
     action: CreateReadWriteRole
     type: Normal
     reportingController: controller
     message: Read write role got created.
+    metricAction: created
   - name: ReadWriteRoleCreationFailed
     reason: ReadWriteRoleCreationFailed
     action: CreateReadWriteRole
     type: Warning
     reportingController: controller
     message: Read write role creation failed.
+    metricAction: creation_failed
   - name: ReadWriteRoleUpdated
     reason: ReadWriteRoleUpdated
     action: UpdateReadWriteRole
     type: Normal
     reportingController: controller
     message: Read write role got updated.
+    metricAction: updated
   - name: ReadWriteRoleUpdateFailed
     reason: ReadWriteRoleUpdateFailed
     action: UpdateReadWriteRole
     type: Warning
     reportingController: controller
     message: Read write role update failed.
+    metricAction: update_failed
   - name: ServiceAccountCreated
     reason: ServiceAccountCreated
     action: CreateServiceAccount
     type: Normal
     reportingController: controller
     message: Service account got created.
+    metricAction: created
   - name: ServiceAccountCreationFailed
     reason: ServiceAccountCreationFailed
     action: CreateServiceAccount
     type: Warning
     reportingController: controller
     message: Service account creation failed.
+    metricAction: creation_failed
   - name: ServiceAccountSecretCreated
     reason: ServiceAccountSecretCreated
     action: CreateServiceAccountSecret
     type: Normal
     reportingController: controller
     message: Service account secret got created.
+    metricAction: created
   - name: ServiceAccountSecretCreationFailed
     reason: ServiceAccountSecretCreationFailed
     action: CreateServiceAccountSecret
     type: Warning
     reportingController: controller
     message: Service account secret creation failed.
+    metricAction: creation_failed
   - name: DefaultRoleBindingCreated
     reason: DefaultRoleBindingCreated
     action: CreateDefaultRoleBinding
     type: Normal
     reportingController: controller
     message: Default role binding got created.
+    metricAction: created
   - name: DefaultRoleBindingCreationFailed
     reason: DefaultRoleBindingCreationFailed
     action: CreateDefaultRoleBinding
     type: Warning
     reportingController: controller
     message: Default role binding creation failed.
+    metricAction: creation_failed
   - name: DefaultRoleBindingUpdated
     reason: DefaultRoleBindingUpdated
     action: UpdateDefaultRoleBinding
     type: Normal
     reportingController: controller
     message: Default role binding got updated.
+    metricAction: updated
   - name: DefaultRoleBindingUpdateFailed
     reason: DefaultRoleBindingUpdateFailed
     action: UpdateDefaultRoleBinding
     type: Warning
     reportingController: controller
     message: Default role binding update failed.
+    metricAction: update_failed
   - name: DefaultRoleBindingDeleted
     reason: DefaultRoleBindingDeleted
     action: DeleteDefaultRoleBinding
     type: Warning
     reportingController: controller
     message: Default role binding got deleted.
+    metricAction: deleted
   - name: DefaultRoleBindingDeletionFailed
     reason: DefaultRoleBindingDeletionFailed
     action: DeleteDefaultRoleBinding
     type: Warning
     reportingController: controller
     message: Default role binding deletion failed.
+    metricAction: deletion_failed
   - name: InactiveRoleBindingDeleted
     reason: InactiveRoleBindingDeleted
     action: DeleteInactiveRoleBinding
     type: Warning
     reportingController: controller
     message: Inactive role binding got deleted.
+    metricAction: deleted
   - name: InactiveRoleBindingDeletionFailed
     reason: InactiveRoleBindingDeletionFailed
     action: DeleteInactiveRoleBinding
     type: Warning
     reportingController: controller
     message: Inactive role binding deletion failed.
+    metricAction: deletion_failed
   - name: InactiveServiceAccountDeleted
     reason: InactiveServiceAccountDeleted
     action: DeleteInactiveServiceAccount
     type: Warning
     reportingController: controller
     message: Inactive service account got deleted.
+    metricAction: deleted
   - name: InactiveServiceAccountDeletionFailed
     reason: InactiveServiceAccountDeletionFailed
     action: DeleteInactiveServiceAccount
     type: Warning
     reportingController: controller
     message: Inactive service account deletion failed.
+    metricAction: deletion_failed
   - name: ServiceAccountDeleted
     reason: ServiceAccountDeleted
     action: DeleteServiceAccount
     type: Warning
     reportingController: controller
     message: Service account got deleted.
+    metricAction: deleted
   - name: ServiceAccountDeletionFailed
     reason: ServiceAccountDeletionFailed
     action: DeleteServiceAccount
     type: Warning
     reportingController: controller
     message: Service account deletion failed.
+    metricAction: deletion_failed
     ## Worker Service Import
   - name: WorkerServiceImportDeletedForcefully
     reason: WorkerServiceImportDeletedForcefully
@@ -314,54 +365,63 @@ events:
     type: Warning
     reportingController: controller
     message: Worker service import got deleted forcefully.
+    metricAction: deleted_forcefully
   - name: WorkerServiceImportRecreationFailed
     reason: WorkerServiceImportRecreationFailed
     action: CreateWorkerServiceImport
     type: Warning
     reportingController: controller
     message: Worker service import recreation failed after forceful deletion.
+    metricAction: recreation_failed
   - name: WorkerServiceImportRecreated
     reason: WorkerServiceImportRecreated
     action: CreateWorkerServiceImport
     type: Normal
     reportingController: controller
     message: Worker service import got recreated after forceful deletion.
+    metricAction: recreated
   - name: WorkerServiceImportCreationFailed
     reason: WorkerServiceImportCreationFailed
     action: CreateWorkerServiceImport
     type: Warning
     reportingController: controller
     message: Worker service import creation failed.
+    metricAction: creation_failed
   - name: WorkerServiceImportCreated
     reason: WorkerServiceImportCreated
     action: CreateWorkerServiceImport
     type: Normal
     reportingController: controller
     message: Worker service import got created.
+    metricAction: created
   - name: WorkerServiceImportUpdateFailed
     reason: WorkerServiceImportUpdateFailed
     action: UpdateWorkerServiceImport
     type: Warning
     reportingController: controller
     message: Worker service import update failed.
+    metricAction: update_failed
   - name: WorkerServiceImportUpdated
     reason: WorkerServiceImportUpdated
     action: UpdateWorkerServiceImport
     type: Normal
     reportingController: controller
     message: Worker service import got updated.
+    metricAction: updated
   - name: WorkerServiceImportDeleted
     reason: WorkerServiceImportDeleted
     action: DeleteWorkerServiceImport
     type: Warning
     reportingController: controller
     message: Worker service import got deleted.
+    metricAction: deleted
   - name: WorkerServiceImportDeletionFailed
     reason: WorkerServiceImportDeletionFailed
     action: DeleteWorkerServiceImport
     type: Warning
     reportingController: controller
     message: Worker service import deletion failed.
+    metricAction: deletion_failed
     ## Worker Slice Config
   - name: WorkerSliceConfigDeletedForcefully
     reason: WorkerSliceConfigDeletedForcefully
@@ -369,54 +429,63 @@ events:
     type: Warning
     reportingController: controller
     message: Worker slice config got deleted forcefully.
+    metricAction: deleted_forcefully
   - name: WorkerSliceConfigRecreationFailed
     reason: WorkerSliceConfigRecreationFailed
     action: CreateWorkerSliceConfig
     type: Warning
     reportingController: controller
     message: Worker slice config recreation failed after forceful deletion.
+    metricAction: recreation_failed
   - name: WorkerSliceConfigRecreated
     reason: WorkerSliceConfigRecreated
     action: CreateWorkerSliceConfig
     type: Normal
     reportingController: controller
     message: Worker slice config got recreated after forceful deletion.
+    metricAction: recreated
   - name: WorkerSliceConfigCreationFailed
     reason: WorkerSliceConfigCreationFailed
     action: CreateWorkerSliceConfig
     type: Warning
     reportingController: controller
     message: Worker slice config creation failed.
+    metricAction: creation_failed
   - name: WorkerSliceConfigCreated
     reason: WorkerSliceConfigCreated
     action: CreateWorkerSliceConfig
     type: Normal
     reportingController: controller
     message: Worker slice config got created.
+    metricAction: created
   - name: WorkerSliceConfigUpdateFailed
     reason: WorkerSliceConfigUpdateFailed
     action: UpdateWorkerSliceConfig
     type: Warning
     reportingController: controller
     message: Worker slice config update failed.
+    metricAction: update_failed
   - name: WorkerSliceConfigUpdated
     reason: WorkerSliceConfigUpdated
     action: UpdateWorkerSliceConfig
     type: Normal
     reportingController: controller
     message: Worker slice config got updated.
+    metricAction: updated
   - name: WorkerSliceConfigDeleted
     reason: WorkerSliceConfigDeleted
     action: DeleteWorkerSliceConfig
     type: Warning
     reportingController: controller
     message: Worker slice config got deleted.
+    metricAction: deleted
   - name: WorkerSliceConfigDeletionFailed
     reason: WorkerSliceConfigDeletionFailed
     action: DeleteWorkerSliceConfig
     type: Warning
     reportingController: controller
     message: Worker slice config deletion failed.
+    metricAction: deletion_failed
     ## Worker Slice Gateway
   - name: WorkerSliceGatewayDeletedForcefully
     reason: WorkerSliceGatewayDeletedForcefully
@@ -424,51 +493,60 @@ events:
     type: Warning
     reportingController: controller
     message: Worker slice gateway got deleted forcefully.
+    metricAction: deleted_forcefully
   - name: WorkerSliceGatewayRecreationFailed
     reason: WorkerSliceGatewayRecreationFailed
     action: CreateWorkerSliceGateway
     type: Warning
     reportingController: controller
     message: Worker slice gateway recreation failed after forceful deletion.
+    metricAction: recreation_failed
   - name: WorkerSliceGatewayRecreated
     reason: WorkerSliceGatewayRecreated
     action: CreateWorkerSliceGateway
     type: Normal
     reportingController: controller
     message: Worker slice gateway got recreated after forceful deletion.
+    metricAction: recreated
   - name: WorkerSliceGatewayDeletionFailed
     reason: WorkerSliceGatewayDeletionFailed
     action: DeleteWorkerSliceGateway
     type: Warning
     reportingController: controller
     message: Worker slice gateway deletion failed.
+    metricAction: deletion_failed
   - name: WorkerSliceGatewayDeleted
     reason: WorkerSliceGatewayDeleted
     action: DeleteWorkerSliceGateway
     type: Warning
     reportingController: controller
     message: Worker slice gateway got deleted.
+    metricAction: deleted
   - name: WorkerSliceGatewayCreationFailed
     reason: WorkerSliceGatewayCreationFailed
     action: CreateWorkerSliceGateway
     type: Warning
     reportingController: controller
     message: Worker slice gateway creation failed.
+    metricAction: creation_failed
   - name: WorkerSliceGatewayCreated
     reason: WorkerSliceGatewayCreated
     action: CreateWorkerSliceGateway
     type: Normal
     reportingController: controller
     message: Worker slice gateway got created.
+    metricAction: created
   - name: SliceGatewayJobCreationFailed
     reason: SliceGatewayJobCreationFailed
     action: CreateSliceGatewayJob
     type: Warning
     reportingController: controller
     message: Slice gateway job creation failed.
+    metricAction: job_creation_failed
   - name: SliceGatewayJobCreated
     reason: SliceGatewayJobCreated
     action: CreateSliceGatewayJob
     type: Normal
     reportingController: controller
     message: Slice gateway job got created.
+    metricAction: job_created

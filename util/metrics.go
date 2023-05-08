@@ -16,10 +16,9 @@
  *  limitations under the License.
  */
 
-package metrics
+package util
 
 import (
-	"github.com/kubeslice/kubeslice-controller/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -77,16 +76,16 @@ func (mr *MetricRecorder) WithProject(project string) *MetricRecorder {
 // Adds slice labels to the list of labels provided
 // Returns the new set of labels and slice labels
 func (mr *MetricRecorder) getCurryLabels(labels map[string]string) prometheus.Labels {
-	sliceName := util.NotApplicable
+	sliceName := NotApplicable
 	if mr.Options.Slice != "" {
 		sliceName = mr.Options.Slice
 	}
 	pl := prometheus.Labels{
 		"slice_name":                 sliceName,
 		"slice_project":              mr.Options.Project,
-		"slice_cluster":              util.ClusterController,
+		"slice_cluster":              ClusterController,
 		"slice_namespace":            mr.Options.Namespace,
-		"slice_reporting_controller": util.InstanceController,
+		"slice_reporting_controller": InstanceController,
 	}
 
 	for k, v := range labels {

@@ -18,8 +18,6 @@ package service
 
 import (
 	"context"
-	"github.com/kubeslice/kubeslice-controller/metrics"
-
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +31,7 @@ type ISecretService interface {
 }
 
 type SecretService struct {
-	mf metrics.MetricRecorder
+	mf util.MetricRecorder
 }
 
 // DeleteSecret is a function to delete the secret
@@ -66,25 +64,21 @@ func (s *SecretService) DeleteSecret(ctx context.Context, namespace string, secr
 		})
 		if err != nil {
 			//Register an event for secret deletion failure
-			util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeletionFailed)
-			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
-				map[string]string{
-					"action":      "deletion_failed",
-					"event":       string(events.EventSecretDeletionFailed),
-					"object_name": nsResource.Name,
-					"object_kind": metricKindSecret,
+			util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeletionFailed,
+				&util.MetricRecorderOptions{
+					MetricRecorder: &s.mf,
+					ObjectName:     nsResource.Name,
+					ObjectKind:     metricKindSecret,
 				},
 			)
 			return ctrl.Result{}, err
 		}
 		//Register an event for secret deletion
-		util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeleted)
-		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
-			map[string]string{
-				"action":      "deleted",
-				"event":       string(events.EventSecretDeleted),
-				"object_name": nsResource.Name,
-				"object_kind": metricKindSecret,
+		util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeleted,
+			&util.MetricRecorderOptions{
+				MetricRecorder: &s.mf,
+				ObjectName:     nsResource.Name,
+				ObjectKind:     metricKindSecret,
 			},
 		)
 	}

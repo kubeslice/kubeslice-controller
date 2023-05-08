@@ -30,6 +30,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
   Type: events.EventType{{.Type}},
   ReportingController: "{{.ReportingController}}",
   Message: "{{.Message}}",
+  MetricAction: "{{.MetricAction}}",
 },
 {{ end }}
 }

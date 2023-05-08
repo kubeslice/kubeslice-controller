@@ -29,6 +29,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Project got deleted.",
+		MetricAction:        "deleted",
 	},
 	"ProjectDeletionFailed": {
 		Name:                "ProjectDeletionFailed",
@@ -37,6 +38,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Project deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"ClusterInstallationInProgress": {
 		Name:                "ClusterInstallationInProgress",
@@ -45,6 +47,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker Operator installation in progress.",
+		MetricAction:        "",
 	},
 	"ClusterInstallationFailed": {
 		Name:                "ClusterInstallationFailed",
@@ -53,6 +56,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker Operator installation failed.",
+		MetricAction:        "",
 	},
 	"ClusterInstallationPending": {
 		Name:                "ClusterInstallationPending",
@@ -61,6 +65,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker Operator verification failed. Pods might be in error state.",
+		MetricAction:        "",
 	},
 	"ClusterDeleted": {
 		Name:                "ClusterDeleted",
@@ -69,6 +74,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Cluster got deleted.",
+		MetricAction:        "deleted",
 	},
 	"ClusterDeletionFailed": {
 		Name:                "ClusterDeletionFailed",
@@ -77,6 +83,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Cluster deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"ClusterDeregistrationInProgress": {
 		Name:                "ClusterDeregistrationInProgress",
@@ -85,6 +92,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Cluster deregistration in progress.",
+		MetricAction:        "",
 	},
 	"ClusterDeregistered": {
 		Name:                "ClusterDeregistered",
@@ -93,6 +101,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Cluster deregistered.",
+		MetricAction:        "",
 	},
 	"ClusterDeregisterTimeout": {
 		Name:                "ClusterDeregisterTimeout",
@@ -101,6 +110,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Cluster deregister timeout.",
+		MetricAction:        "",
 	},
 	"ClusterDeregisterFailed": {
 		Name:                "ClusterDeregisterFailed",
@@ -109,6 +119,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Cluster deregister failed.",
+		MetricAction:        "",
 	},
 	"SliceConfigDeleted": {
 		Name:                "SliceConfigDeleted",
@@ -117,6 +128,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Slice config got deleted.",
+		MetricAction:        "deleted",
 	},
 	"SliceConfigDeletionFailed": {
 		Name:                "SliceConfigDeletionFailed",
@@ -125,6 +137,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Slice config deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"ServiceExportConfigDeleted": {
 		Name:                "ServiceExportConfigDeleted",
@@ -133,6 +146,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Service export config got deleted.",
+		MetricAction:        "deleted",
 	},
 	"ServiceExportConfigDeletionFailed": {
 		Name:                "ServiceExportConfigDeletionFailed",
@@ -141,6 +155,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Service export config deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"SliceQoSConfigDeleted": {
 		Name:                "SliceQoSConfigDeleted",
@@ -149,6 +164,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Slice QoS config got deleted.",
+		MetricAction:        "deleted",
 	},
 	"SliceQoSConfigDeletionFailed": {
 		Name:                "SliceQoSConfigDeletionFailed",
@@ -157,6 +173,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Slice QoS config deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"SecretDeleted": {
 		Name:                "SecretDeleted",
@@ -165,6 +182,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Secret got deleted.",
+		MetricAction:        "deleted",
 	},
 	"SecretDeletionFailed": {
 		Name:                "SecretDeletionFailed",
@@ -173,6 +191,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Secret deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"NamespaceCreated": {
 		Name:                "NamespaceCreated",
@@ -181,6 +200,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Namespace got created.",
+		MetricAction:        "created",
 	},
 	"NamespaceCreationFailed": {
 		Name:                "NamespaceCreationFailed",
@@ -189,6 +209,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Namespace creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"NamespaceDeleted": {
 		Name:                "NamespaceDeleted",
@@ -197,6 +218,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Namespace got deleted.",
+		MetricAction:        "deleted",
 	},
 	"NamespaceDeletionFailed": {
 		Name:                "NamespaceDeletionFailed",
@@ -205,6 +227,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Namespace deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"WorkerClusterRoleCreated": {
 		Name:                "WorkerClusterRoleCreated",
@@ -213,6 +236,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker cluster role got created.",
+		MetricAction:        "created",
 	},
 	"WorkerClusterRoleCreationFailed": {
 		Name:                "WorkerClusterRoleCreationFailed",
@@ -221,6 +245,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker cluster role creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"WorkerClusterRoleUpdated": {
 		Name:                "WorkerClusterRoleUpdated",
@@ -229,6 +254,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker cluster role got updated.",
+		MetricAction:        "updated",
 	},
 	"WorkerClusterRoleUpdateFailed": {
 		Name:                "WorkerClusterRoleUpdateFailed",
@@ -237,6 +263,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker cluster role update failed.",
+		MetricAction:        "update_failed",
 	},
 	"ReadOnlyRoleCreated": {
 		Name:                "ReadOnlyRoleCreated",
@@ -245,6 +272,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Read only role got created.",
+		MetricAction:        "created",
 	},
 	"ReadOnlyRoleCreationFailed": {
 		Name:                "ReadOnlyRoleCreationFailed",
@@ -253,6 +281,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Read only role creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"ReadOnlyRoleUpdated": {
 		Name:                "ReadOnlyRoleUpdated",
@@ -261,6 +290,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Read only role got updated.",
+		MetricAction:        "updated",
 	},
 	"ReadOnlyRoleUpdateFailed": {
 		Name:                "ReadOnlyRoleUpdateFailed",
@@ -269,6 +299,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Read only role update failed.",
+		MetricAction:        "update_failed",
 	},
 	"ReadWriteRoleCreated": {
 		Name:                "ReadWriteRoleCreated",
@@ -277,6 +308,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Read write role got created.",
+		MetricAction:        "created",
 	},
 	"ReadWriteRoleCreationFailed": {
 		Name:                "ReadWriteRoleCreationFailed",
@@ -285,6 +317,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Read write role creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"ReadWriteRoleUpdated": {
 		Name:                "ReadWriteRoleUpdated",
@@ -293,6 +326,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Read write role got updated.",
+		MetricAction:        "updated",
 	},
 	"ReadWriteRoleUpdateFailed": {
 		Name:                "ReadWriteRoleUpdateFailed",
@@ -301,6 +335,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Read write role update failed.",
+		MetricAction:        "update_failed",
 	},
 	"ServiceAccountCreated": {
 		Name:                "ServiceAccountCreated",
@@ -309,6 +344,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Service account got created.",
+		MetricAction:        "created",
 	},
 	"ServiceAccountCreationFailed": {
 		Name:                "ServiceAccountCreationFailed",
@@ -317,6 +353,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Service account creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"ServiceAccountSecretCreated": {
 		Name:                "ServiceAccountSecretCreated",
@@ -325,6 +362,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Service account secret got created.",
+		MetricAction:        "created",
 	},
 	"ServiceAccountSecretCreationFailed": {
 		Name:                "ServiceAccountSecretCreationFailed",
@@ -333,6 +371,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Service account secret creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"DefaultRoleBindingCreated": {
 		Name:                "DefaultRoleBindingCreated",
@@ -341,6 +380,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Default role binding got created.",
+		MetricAction:        "created",
 	},
 	"DefaultRoleBindingCreationFailed": {
 		Name:                "DefaultRoleBindingCreationFailed",
@@ -349,6 +389,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Default role binding creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"DefaultRoleBindingUpdated": {
 		Name:                "DefaultRoleBindingUpdated",
@@ -357,6 +398,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Default role binding got updated.",
+		MetricAction:        "updated",
 	},
 	"DefaultRoleBindingUpdateFailed": {
 		Name:                "DefaultRoleBindingUpdateFailed",
@@ -365,6 +407,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Default role binding update failed.",
+		MetricAction:        "update_failed",
 	},
 	"DefaultRoleBindingDeleted": {
 		Name:                "DefaultRoleBindingDeleted",
@@ -373,6 +416,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Default role binding got deleted.",
+		MetricAction:        "deleted",
 	},
 	"DefaultRoleBindingDeletionFailed": {
 		Name:                "DefaultRoleBindingDeletionFailed",
@@ -381,6 +425,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Default role binding deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"InactiveRoleBindingDeleted": {
 		Name:                "InactiveRoleBindingDeleted",
@@ -389,6 +434,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Inactive role binding got deleted.",
+		MetricAction:        "deleted",
 	},
 	"InactiveRoleBindingDeletionFailed": {
 		Name:                "InactiveRoleBindingDeletionFailed",
@@ -397,6 +443,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Inactive role binding deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"InactiveServiceAccountDeleted": {
 		Name:                "InactiveServiceAccountDeleted",
@@ -405,6 +452,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Inactive service account got deleted.",
+		MetricAction:        "deleted",
 	},
 	"InactiveServiceAccountDeletionFailed": {
 		Name:                "InactiveServiceAccountDeletionFailed",
@@ -413,6 +461,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Inactive service account deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"ServiceAccountDeleted": {
 		Name:                "ServiceAccountDeleted",
@@ -421,6 +470,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Service account got deleted.",
+		MetricAction:        "deleted",
 	},
 	"ServiceAccountDeletionFailed": {
 		Name:                "ServiceAccountDeletionFailed",
@@ -429,6 +479,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Service account deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"WorkerServiceImportDeletedForcefully": {
 		Name:                "WorkerServiceImportDeletedForcefully",
@@ -437,6 +488,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker service import got deleted forcefully.",
+		MetricAction:        "deleted_forcefully",
 	},
 	"WorkerServiceImportRecreationFailed": {
 		Name:                "WorkerServiceImportRecreationFailed",
@@ -445,6 +497,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker service import recreation failed after forceful deletion.",
+		MetricAction:        "recreation_failed",
 	},
 	"WorkerServiceImportRecreated": {
 		Name:                "WorkerServiceImportRecreated",
@@ -453,6 +506,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker service import got recreated after forceful deletion.",
+		MetricAction:        "recreated",
 	},
 	"WorkerServiceImportCreationFailed": {
 		Name:                "WorkerServiceImportCreationFailed",
@@ -461,6 +515,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker service import creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"WorkerServiceImportCreated": {
 		Name:                "WorkerServiceImportCreated",
@@ -469,6 +524,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker service import got created.",
+		MetricAction:        "created",
 	},
 	"WorkerServiceImportUpdateFailed": {
 		Name:                "WorkerServiceImportUpdateFailed",
@@ -477,6 +533,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker service import update failed.",
+		MetricAction:        "update_failed",
 	},
 	"WorkerServiceImportUpdated": {
 		Name:                "WorkerServiceImportUpdated",
@@ -485,6 +542,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker service import got updated.",
+		MetricAction:        "updated",
 	},
 	"WorkerServiceImportDeleted": {
 		Name:                "WorkerServiceImportDeleted",
@@ -493,6 +551,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker service import got deleted.",
+		MetricAction:        "deleted",
 	},
 	"WorkerServiceImportDeletionFailed": {
 		Name:                "WorkerServiceImportDeletionFailed",
@@ -501,6 +560,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker service import deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"WorkerSliceConfigDeletedForcefully": {
 		Name:                "WorkerSliceConfigDeletedForcefully",
@@ -509,6 +569,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice config got deleted forcefully.",
+		MetricAction:        "deleted_forcefully",
 	},
 	"WorkerSliceConfigRecreationFailed": {
 		Name:                "WorkerSliceConfigRecreationFailed",
@@ -517,6 +578,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice config recreation failed after forceful deletion.",
+		MetricAction:        "recreation_failed",
 	},
 	"WorkerSliceConfigRecreated": {
 		Name:                "WorkerSliceConfigRecreated",
@@ -525,6 +587,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker slice config got recreated after forceful deletion.",
+		MetricAction:        "recreated",
 	},
 	"WorkerSliceConfigCreationFailed": {
 		Name:                "WorkerSliceConfigCreationFailed",
@@ -533,6 +596,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice config creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"WorkerSliceConfigCreated": {
 		Name:                "WorkerSliceConfigCreated",
@@ -541,6 +605,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker slice config got created.",
+		MetricAction:        "created",
 	},
 	"WorkerSliceConfigUpdateFailed": {
 		Name:                "WorkerSliceConfigUpdateFailed",
@@ -549,6 +614,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice config update failed.",
+		MetricAction:        "update_failed",
 	},
 	"WorkerSliceConfigUpdated": {
 		Name:                "WorkerSliceConfigUpdated",
@@ -557,6 +623,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker slice config got updated.",
+		MetricAction:        "updated",
 	},
 	"WorkerSliceConfigDeleted": {
 		Name:                "WorkerSliceConfigDeleted",
@@ -565,6 +632,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice config got deleted.",
+		MetricAction:        "deleted",
 	},
 	"WorkerSliceConfigDeletionFailed": {
 		Name:                "WorkerSliceConfigDeletionFailed",
@@ -573,6 +641,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice config deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"WorkerSliceGatewayDeletedForcefully": {
 		Name:                "WorkerSliceGatewayDeletedForcefully",
@@ -581,6 +650,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice gateway got deleted forcefully.",
+		MetricAction:        "deleted_forcefully",
 	},
 	"WorkerSliceGatewayRecreationFailed": {
 		Name:                "WorkerSliceGatewayRecreationFailed",
@@ -589,6 +659,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice gateway recreation failed after forceful deletion.",
+		MetricAction:        "recreation_failed",
 	},
 	"WorkerSliceGatewayRecreated": {
 		Name:                "WorkerSliceGatewayRecreated",
@@ -597,6 +668,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker slice gateway got recreated after forceful deletion.",
+		MetricAction:        "recreated",
 	},
 	"WorkerSliceGatewayDeletionFailed": {
 		Name:                "WorkerSliceGatewayDeletionFailed",
@@ -605,6 +677,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice gateway deletion failed.",
+		MetricAction:        "deletion_failed",
 	},
 	"WorkerSliceGatewayDeleted": {
 		Name:                "WorkerSliceGatewayDeleted",
@@ -613,6 +686,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice gateway got deleted.",
+		MetricAction:        "deleted",
 	},
 	"WorkerSliceGatewayCreationFailed": {
 		Name:                "WorkerSliceGatewayCreationFailed",
@@ -621,6 +695,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Worker slice gateway creation failed.",
+		MetricAction:        "creation_failed",
 	},
 	"WorkerSliceGatewayCreated": {
 		Name:                "WorkerSliceGatewayCreated",
@@ -629,6 +704,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Worker slice gateway got created.",
+		MetricAction:        "created",
 	},
 	"SliceGatewayJobCreationFailed": {
 		Name:                "SliceGatewayJobCreationFailed",
@@ -637,6 +713,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeWarning,
 		ReportingController: "controller",
 		Message:             "Slice gateway job creation failed.",
+		MetricAction:        "job_creation_failed",
 	},
 	"SliceGatewayJobCreated": {
 		Name:                "SliceGatewayJobCreated",
@@ -645,6 +722,7 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		Type:                events.EventTypeNormal,
 		ReportingController: "controller",
 		Message:             "Slice gateway job got created.",
+		MetricAction:        "job_created",
 	},
 }
 
