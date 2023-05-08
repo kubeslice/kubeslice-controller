@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	mEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	corev1 "k8s.io/api/core/v1"
 	"reflect"
@@ -278,14 +277,8 @@ func GetProjectName(namespace string) string {
 	return ""
 }
 
-type MetricRecorderOptions struct {
-	MetricRecorder *MetricRecorder
-	ObjectName     string
-	ObjectKind     string
-}
-
 // RecordEvent is a function to record the event
-func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runtime.Object, relatedObject runtime.Object, name events.EventName, mOpts *MetricRecorderOptions) {
+func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runtime.Object, relatedObject runtime.Object, name events.EventName) {
 	logger := CtxLogger(ctx)
 	err := recorder.RecordEvent(ctx, &events.Event{
 		Object:            object,
@@ -295,18 +288,5 @@ func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runt
 	})
 	if err != nil {
 		logger.With(zap.Error(err)).Errorf("Failed to record event")
-	}
-
-	//Record metric
-	event, ok := mEvents.EventsMap[name]
-	if ok && event.MetricAction != "" && mOpts != nil {
-		mOpts.MetricRecorder.RecordCounterMetric(KubeSliceEventsCounter,
-			map[string]string{
-				"action":      event.MetricAction,
-				"event":       string(name),
-				"object_name": mOpts.ObjectName,
-				"object_kind": mOpts.ObjectKind,
-			},
-		)
 	}
 }

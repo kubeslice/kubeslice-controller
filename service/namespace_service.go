@@ -19,6 +19,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +35,7 @@ type INamespaceService interface {
 }
 
 type NamespaceService struct {
-	mf util.MetricRecorder
+	mf metrics.MetricRecorder
 }
 
 // ReconcileProjectNamespace is a function to reconcile project namespace
@@ -62,20 +64,24 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 		err := util.CreateResource(ctx, expectedNS)
 		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreationFailed,
-				&util.MetricRecorderOptions{
-					MetricRecorder: &n.mf,
-					ObjectName:     expectedNS.Name,
-					ObjectKind:     metricKindNamespace,
+			util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreationFailed)
+			n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "creation_failed",
+					"event":       string(events.EventNamespaceCreationFailed),
+					"object_name": expectedNS.Name,
+					"object_kind": metricKindNamespace,
 				},
 			)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreated,
-			&util.MetricRecorderOptions{
-				MetricRecorder: &n.mf,
-				ObjectName:     expectedNS.Name,
-				ObjectKind:     metricKindNamespace,
+		util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreated)
+		n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventNamespaceCreated),
+				"object_name": expectedNS.Name,
+				"object_kind": metricKindNamespace,
 			},
 		)
 	}
@@ -110,20 +116,24 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		err := util.DeleteResource(ctx, nsToBeDeleted)
 		nsToBeDeleted.Namespace = ControllerNamespace
 		if err != nil {
-			util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeletionFailed,
-				&util.MetricRecorderOptions{
-					MetricRecorder: &n.mf,
-					ObjectName:     nsToBeDeleted.Name,
-					ObjectKind:     metricKindNamespace,
+			util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeletionFailed)
+			n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventNamespaceDeletionFailed),
+					"object_name": nsToBeDeleted.Name,
+					"object_kind": metricKindNamespace,
 				},
 			)
 			return ctrl.Result{}, err
 		}
-		util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeleted,
-			&util.MetricRecorderOptions{
-				MetricRecorder: &n.mf,
-				ObjectName:     nsToBeDeleted.Name,
-				ObjectKind:     metricKindNamespace,
+		util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeleted)
+		n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventNamespaceDeleted),
+				"object_name": nsToBeDeleted.Name,
+				"object_kind": metricKindNamespace,
 			},
 		)
 	}

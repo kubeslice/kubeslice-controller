@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 	"time"
 
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -45,7 +46,7 @@ type IWorkerSliceConfigService interface {
 
 // WorkerSliceConfigService implements the IWorkerSliceConfigService interface
 type WorkerSliceConfigService struct {
-	mf util.MetricRecorder
+	mf metrics.MetricRecorder
 }
 
 // ReconcileWorkerSliceConfig is a function to reconcile the config of worker slice
@@ -101,11 +102,13 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 			if util.IsInSlice(clusters, workerSliceConfig.Labels["worker-cluster"]) {
 				logger.Debug("workerSliceConfig deleted forcefully from slice", req.NamespacedName)
 				//Register an event for worker slice config deleted forcefully
-				util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigDeletedForcefully,
-					&util.MetricRecorderOptions{
-						MetricRecorder: &s.mf,
-						ObjectName:     workerSliceConfig.Name,
-						ObjectKind:     metricKindWorkerSliceConfig,
+				util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigDeletedForcefully)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deleted_forcefully",
+						"event":       string(events.EventWorkerSliceConfigDeletedForcefully),
+						"object_name": workerSliceConfig.Name,
+						"object_kind": metricKindWorkerSliceConfig,
 					},
 				)
 				if slice.Annotations == nil {
@@ -116,21 +119,25 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 				err = util.UpdateResource(ctx, slice)
 				if err != nil {
 					//Register an event for worker slice config recreation failure
-					util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigRecreationFailed,
-						&util.MetricRecorderOptions{
-							MetricRecorder: &s.mf,
-							ObjectName:     workerSliceConfig.Name,
-							ObjectKind:     metricKindWorkerSliceConfig,
+					util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigRecreationFailed)
+					s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+						map[string]string{
+							"action":      "recreation_failed",
+							"event":       string(events.EventWorkerSliceConfigRecreationFailed),
+							"object_name": workerSliceConfig.Name,
+							"object_kind": metricKindWorkerSliceConfig,
 						},
 					)
 					return result, err
 				}
 				//Register an event for worker slice config recreation success
-				util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigRecreated,
-					&util.MetricRecorderOptions{
-						MetricRecorder: &s.mf,
-						ObjectName:     workerSliceConfig.Name,
-						ObjectKind:     metricKindWorkerSliceConfig,
+				util.RecordEvent(ctx, eventRecorder, workerSliceConfig, slice, events.EventWorkerSliceConfigRecreated)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "recreated",
+						"event":       string(events.EventWorkerSliceConfigRecreated),
+						"object_name": workerSliceConfig.Name,
+						"object_kind": metricKindWorkerSliceConfig,
 					},
 				)
 			}
@@ -301,11 +308,13 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
 				//Register an event for worker slice config creation failure
-				util.RecordEvent(ctx, eventRecorder, &expectedSlice, nil, events.EventWorkerSliceConfigCreationFailed,
-					&util.MetricRecorderOptions{
-						MetricRecorder: &s.mf,
-						ObjectName:     expectedSlice.Name,
-						ObjectKind:     metricKindWorkerSliceConfig,
+				util.RecordEvent(ctx, eventRecorder, &expectedSlice, nil, events.EventWorkerSliceConfigCreationFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "creation_failed",
+						"event":       string(events.EventWorkerSliceConfigCreationFailed),
+						"object_name": expectedSlice.Name,
+						"object_kind": metricKindWorkerSliceConfig,
 					},
 				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
@@ -315,11 +324,13 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 				}
 			}
 			//Register an event for worker slice config creation success
-			util.RecordEvent(ctx, eventRecorder, &expectedSlice, nil, events.EventWorkerSliceConfigCreated,
-				&util.MetricRecorderOptions{
-					MetricRecorder: &s.mf,
-					ObjectName:     expectedSlice.Name,
-					ObjectKind:     metricKindWorkerSliceConfig,
+			util.RecordEvent(ctx, eventRecorder, &expectedSlice, nil, events.EventWorkerSliceConfigCreated)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "created",
+					"event":       string(events.EventWorkerSliceConfigCreated),
+					"object_name": expectedSlice.Name,
+					"object_kind": metricKindWorkerSliceConfig,
 				},
 			)
 		} else {
@@ -334,11 +345,13 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			err = util.UpdateResource(ctx, existingSlice)
 			if err != nil {
 				//Register an event for worker slice config update failure
-				util.RecordEvent(ctx, eventRecorder, existingSlice, nil, events.EventWorkerSliceConfigUpdateFailed,
-					&util.MetricRecorderOptions{
-						MetricRecorder: &s.mf,
-						ObjectName:     existingSlice.Name,
-						ObjectKind:     metricKindWorkerSliceConfig,
+				util.RecordEvent(ctx, eventRecorder, existingSlice, nil, events.EventWorkerSliceConfigUpdateFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "update_failed",
+						"event":       string(events.EventWorkerSliceConfigUpdateFailed),
+						"object_name": existingSlice.Name,
+						"object_kind": metricKindWorkerSliceConfig,
 					},
 				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
@@ -348,11 +361,13 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 				}
 			}
 			//Register an event for worker slice config update success
-			util.RecordEvent(ctx, eventRecorder, existingSlice, nil, events.EventWorkerSliceConfigUpdated,
-				&util.MetricRecorderOptions{
-					MetricRecorder: &s.mf,
-					ObjectName:     existingSlice.Name,
-					ObjectKind:     metricKindWorkerSliceConfig,
+			util.RecordEvent(ctx, eventRecorder, existingSlice, nil, events.EventWorkerSliceConfigUpdated)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "updated",
+					"event":       string(events.EventWorkerSliceConfigUpdated),
+					"object_name": existingSlice.Name,
+					"object_kind": metricKindWorkerSliceConfig,
 				},
 			)
 		}
@@ -381,21 +396,25 @@ func (s *WorkerSliceConfigService) DeleteWorkerSliceConfigByLabel(ctx context.Co
 		err = util.DeleteResource(ctx, &slice)
 		if err != nil {
 			//Register an event for worker slice config deletion failure
-			util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeletionFailed,
-				&util.MetricRecorderOptions{
-					MetricRecorder: &s.mf,
-					ObjectName:     slice.Name,
-					ObjectKind:     metricKindWorkerSliceConfig,
+			util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeletionFailed)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventWorkerSliceConfigDeletionFailed),
+					"object_name": slice.Name,
+					"object_kind": metricKindWorkerSliceConfig,
 				},
 			)
 			return err
 		}
 		//Register an event for worker slice config deletion success
-		util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeleted,
-			&util.MetricRecorderOptions{
-				MetricRecorder: &s.mf,
-				ObjectName:     slice.Name,
-				ObjectKind:     metricKindWorkerSliceConfig,
+		util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventWorkerSliceConfigDeleted),
+				"object_name": slice.Name,
+				"object_kind": metricKindWorkerSliceConfig,
 			},
 		)
 	}
@@ -472,21 +491,25 @@ func (s *WorkerSliceConfigService) cleanUpSlices(ctx context.Context, label map[
 			err = util.DeleteResource(ctx, &slice)
 			if err != nil {
 				//Register an event for worker slice config deletion failure
-				util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeletionFailed,
-					&util.MetricRecorderOptions{
-						MetricRecorder: &s.mf,
-						ObjectName:     slice.Name,
-						ObjectKind:     metricKindWorkerSliceConfig,
+				util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeletionFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventWorkerSliceConfigDeletionFailed),
+						"object_name": slice.Name,
+						"object_kind": metricKindWorkerSliceConfig,
 					},
 				)
 				return err
 			}
 			//Register an event for worker slice config deletion success
-			util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeleted,
-				&util.MetricRecorderOptions{
-					MetricRecorder: &s.mf,
-					ObjectName:     slice.Name,
-					ObjectKind:     metricKindWorkerSliceConfig,
+			util.RecordEvent(ctx, eventRecorder, &slice, nil, events.EventWorkerSliceConfigDeleted)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deleted",
+					"event":       string(events.EventWorkerSliceConfigDeleted),
+					"object_name": slice.Name,
+					"object_kind": metricKindWorkerSliceConfig,
 				},
 			)
 		}

@@ -21,7 +21,3 @@ const (
 const (
 	NotApplicable = "NA"
 )
-
-var (
-	PROMETHEUS_SERVICE_ENDPOINT = "http://kubeslice-controller-prometheus-service:9090"
-)
