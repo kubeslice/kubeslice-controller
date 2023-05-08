@@ -18,6 +18,8 @@ package service
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
 	"testing"
 
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
@@ -57,7 +59,10 @@ var NamespaceTestbed = map[string]func(*testing.T){
 
 func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsReconciliationComplete_Happypath(t *testing.T) {
 	namespaceName := "cisco"
-	namespaceService := NamespaceService{}
+	mMock := &metricMock.IMetricRecorder{}
+	namespaceService := NamespaceService{
+		mf: mMock,
+	}
 	namespace := &corev1.Namespace{}
 	namespaceObject := client.ObjectKey{
 		Name: namespaceName,
@@ -67,6 +72,7 @@ func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsR
 	controllerv1alpha1.AddToScheme(scheme)
 	notFoundError := k8sError.NewNotFound(util.Resource("namespacetest"), "isnotFound")
 	ctx := prepareNamespaceTestContext(context.Background(), clientMock, scheme)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, namespaceObject, namespace).Return(notFoundError)
 
 	project := &controllerv1alpha1.Project{}
@@ -80,18 +86,22 @@ func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsR
 		},
 	}
 	clientMock.On("Create", ctx, projectToCreateWithLabel).Return(nil)
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := namespaceService.ReconcileProjectNamespace(ctx, namespaceName, project)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-
+	mMock.AssertExpectations(t)
 }
 
 func TestReconcileProjectNamespace_DoesNothingIfNamespaceExistAlready(t *testing.T) {
 	namespaceName := "cisco"
-	namespaceService := NamespaceService{}
+	mMock := &metricMock.IMetricRecorder{}
+	namespaceService := NamespaceService{
+		mf: mMock,
+	}
 
 	namespace := &corev1.Namespace{}
 	namespaceObject := client.ObjectKey{
@@ -101,6 +111,7 @@ func TestReconcileProjectNamespace_DoesNothingIfNamespaceExistAlready(t *testing
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareNamespaceTestContext(context.Background(), clientMock, scheme)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, namespaceObject, namespace).Return(nil)
 	project := &controllerv1alpha1.Project{}
 	project.ObjectMeta.Labels = map[string]string{"testLabel": "testValue"}
@@ -109,12 +120,15 @@ func TestReconcileProjectNamespace_DoesNothingIfNamespaceExistAlready(t *testing
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-
+	mMock.AssertExpectations(t)
 }
 
 func TestDeleteNamespace_DeletesObjectWithReconciliationComplete(t *testing.T) {
 	namespaceName := "cisco"
-	namespaceService := NamespaceService{}
+	mMock := &metricMock.IMetricRecorder{}
+	namespaceService := NamespaceService{
+		mf: mMock,
+	}
 
 	namespace := &corev1.Namespace{}
 	namespaceObject := client.ObjectKey{
@@ -124,19 +138,24 @@ func TestDeleteNamespace_DeletesObjectWithReconciliationComplete(t *testing.T) {
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareNamespaceTestContext(context.Background(), clientMock, scheme)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, namespaceObject, namespace).Return(nil)
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil)
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := namespaceService.DeleteNamespace(ctx, namespaceName)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-
+	mMock.AssertExpectations(t)
 }
 
 func TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist(t *testing.T) {
 	namespaceName := "cisco"
-	namespaceService := NamespaceService{}
+	mMock := &metricMock.IMetricRecorder{}
+	namespaceService := NamespaceService{
+		mf: mMock,
+	}
 
 	namespace := &corev1.Namespace{}
 	namespaceObject := client.ObjectKey{
@@ -147,13 +166,14 @@ func TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist(t *testing.T) {
 	controllerv1alpha1.AddToScheme(scheme)
 	notFoundError := k8sError.NewNotFound(util.Resource("namespacetest"), "isnotFound")
 	ctx := prepareNamespaceTestContext(context.Background(), clientMock, scheme)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, namespaceObject, namespace).Return(notFoundError)
 	result, err := namespaceService.DeleteNamespace(ctx, namespaceName)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-
+	mMock.AssertExpectations(t)
 }
 
 func prepareNamespaceTestContext(ctx context.Context, client util.Client, scheme *runtime.Scheme) context.Context {

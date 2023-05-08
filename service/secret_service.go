@@ -33,7 +33,7 @@ type ISecretService interface {
 }
 
 type SecretService struct {
-	mf metrics.MetricRecorder
+	mf metrics.IMetricRecorder
 }
 
 // DeleteSecret is a function to delete the secret

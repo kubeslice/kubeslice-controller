@@ -57,20 +57,21 @@ func init() {
 
 func main() {
 	// Compile time dependency injection
-	ns := service.WithNameSpaceService()
+	mr := service.WithMetricsRecorder()
+	ns := service.WithNameSpaceService(mr)
 	rp := service.WithAccessControlRuleProvider()
-	acs := service.WithAccessControlService(rp)
+	acs := service.WithAccessControlService(rp, mr)
 	js := service.WithJobService()
-	wscs := service.WithWorkerSliceConfigService()
-	ss := service.WithSecretService()
-	wsgs := service.WithWorkerSliceGatewayService(js, wscs, ss)
-	c := service.WithClusterService(ns, acs, wsgs)
-	wsi := service.WithWorkerServiceImportService()
-	se := service.WithServiceExportConfigService(wsi)
+	wscs := service.WithWorkerSliceConfigService(mr)
+	ss := service.WithSecretService(mr)
+	wsgs := service.WithWorkerSliceGatewayService(js, wscs, ss, mr)
+	c := service.WithClusterService(ns, acs, wsgs, mr)
+	wsi := service.WithWorkerServiceImportService(mr)
+	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs)
-	p := service.WithProjectService(ns, acs, c, sc, se)
-	sqcs := service.WithSliceQoSConfigService(wscs)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr)
+	p := service.WithProjectService(ns, acs, c, sc, se, mr)
+	sqcs := service.WithSliceQoSConfigService(wscs, mr)
 	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
 }
 

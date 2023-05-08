@@ -16,6 +16,8 @@
 
 package service
 
+import "github.com/kubeslice/kubeslice-controller/metrics"
+
 type Services struct {
 	ProjectService                    IProjectService
 	ClusterService                    IClusterService
@@ -60,6 +62,7 @@ func WithProjectService(
 	c IClusterService,
 	sc ISliceConfigService,
 	se IServiceExportConfigService,
+	mf metrics.IMetricRecorder,
 ) IProjectService {
 	return &ProjectService{
 		ns:  ns,
@@ -67,6 +70,7 @@ func WithProjectService(
 		c:   c,
 		sc:  sc,
 		se:  se,
+		mf:  mf,
 	}
 }
 
@@ -75,11 +79,13 @@ func WithClusterService(
 	ns INamespaceService,
 	acs IAccessControlService,
 	sgws IWorkerSliceGatewayService,
+	mf metrics.IMetricRecorder,
 ) IClusterService {
 	return &ClusterService{
 		ns:   ns,
 		acs:  acs,
 		sgws: sgws,
+		mf:   mf,
 	}
 }
 
@@ -92,6 +98,7 @@ func WithSliceConfigService(
 	si IWorkerServiceImportService,
 	se IServiceExportConfigService,
 	wsgrs IWorkerSliceGatewayRecyclerService,
+	mf metrics.IMetricRecorder,
 ) ISliceConfigService {
 	return &SliceConfigService{
 		ns:    ns,
@@ -101,31 +108,39 @@ func WithSliceConfigService(
 		si:    si,
 		se:    se,
 		wsgrs: wsgrs,
+		mf:    mf,
 	}
 }
 
 // bootstrapping service export config service
-func WithServiceExportConfigService(ses IWorkerServiceImportService) IServiceExportConfigService {
+func WithServiceExportConfigService(ses IWorkerServiceImportService,
+	mf metrics.IMetricRecorder) IServiceExportConfigService {
 	return &ServiceExportConfigService{
 		ses: ses,
+		mf:  mf,
 	}
 }
 
 // bootstrapping namespace service
-func WithNameSpaceService() INamespaceService {
-	return &NamespaceService{}
+func WithNameSpaceService(mf metrics.IMetricRecorder) INamespaceService {
+	return &NamespaceService{
+		mf: mf,
+	}
 }
 
 // bootstrapping accesscontrol service
-func WithAccessControlService(ruleProvider IAccessControlRuleProvider) IAccessControlService {
+func WithAccessControlService(ruleProvider IAccessControlRuleProvider, mf metrics.IMetricRecorder) IAccessControlService {
 	return &AccessControlService{
 		ruleProvider: ruleProvider,
+		mf:           mf,
 	}
 }
 
 // bootstrapping secret service
-func WithSecretService() ISecretService {
-	return &SecretService{}
+func WithSecretService(mf metrics.IMetricRecorder) ISecretService {
+	return &SecretService{
+		mf: mf,
+	}
 }
 
 // bootstrapping slice gateway service
@@ -133,11 +148,13 @@ func WithWorkerSliceGatewayService(
 	js IJobService,
 	sscs IWorkerSliceConfigService,
 	sc ISecretService,
+	mf metrics.IMetricRecorder,
 ) IWorkerSliceGatewayService {
 	return &WorkerSliceGatewayService{
 		js:   js,
 		sscs: sscs,
 		sc:   sc,
+		mf:   mf,
 	}
 }
 
@@ -156,18 +173,27 @@ func WithAccessControlRuleProvider() IAccessControlRuleProvider {
 }
 
 // bootstrapping worker slice config service
-func WithWorkerSliceConfigService() IWorkerSliceConfigService {
-	return &WorkerSliceConfigService{}
+func WithWorkerSliceConfigService(mf metrics.IMetricRecorder) IWorkerSliceConfigService {
+	return &WorkerSliceConfigService{
+		mf: mf,
+	}
 }
 
 // bootstrapping worker service import service
-func WithWorkerServiceImportService() IWorkerServiceImportService {
-	return &WorkerServiceImportService{}
+func WithWorkerServiceImportService(mf metrics.IMetricRecorder) IWorkerServiceImportService {
+	return &WorkerServiceImportService{
+		mf: mf,
+	}
 }
 
 // bootstrapping slice qos config service
-func WithSliceQoSConfigService(wsc IWorkerSliceConfigService) ISliceQoSConfigService {
+func WithSliceQoSConfigService(wsc IWorkerSliceConfigService, mf metrics.IMetricRecorder) ISliceQoSConfigService {
 	return &SliceQoSConfigService{
 		wsc: wsc,
+		mf:  mf,
 	}
+}
+
+func WithMetricsRecorder() metrics.IMetricRecorder {
+	return &metrics.MetricRecorder{}
 }

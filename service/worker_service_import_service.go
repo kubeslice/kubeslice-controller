@@ -47,7 +47,7 @@ type IWorkerServiceImportService interface {
 }
 
 type WorkerServiceImportService struct {
-	mf metrics.MetricRecorder
+	mf metrics.IMetricRecorder
 }
 
 // ReconcileWorkerServiceImport is a function to reconcile the service import for worker object

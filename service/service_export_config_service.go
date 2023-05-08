@@ -37,7 +37,7 @@ type IServiceExportConfigService interface {
 
 type ServiceExportConfigService struct {
 	ses IWorkerServiceImportService
-	mf  metrics.MetricRecorder
+	mf  metrics.IMetricRecorder
 }
 
 // ReconcileServiceExportConfig is a function to reconcile the service export config

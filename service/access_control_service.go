@@ -62,7 +62,7 @@ type activeServiceAccount struct {
 
 type AccessControlService struct {
 	ruleProvider IAccessControlRuleProvider
-	mf           metrics.MetricRecorder
+	mf           metrics.IMetricRecorder
 }
 
 // ReconcileWorkerClusterRole reconciles the worker cluster role

@@ -42,7 +42,7 @@ type ClusterService struct {
 	ns   INamespaceService
 	acs  IAccessControlService
 	sgws IWorkerSliceGatewayService
-	mf   metrics.MetricRecorder
+	mf   metrics.IMetricRecorder
 }
 
 // ReconcileCluster is function to reconcile cluster

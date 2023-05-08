@@ -55,7 +55,7 @@ type WorkerSliceGatewayService struct {
 	js   IJobService
 	sscs IWorkerSliceConfigService
 	sc   ISecretService
-	mf   metrics.MetricRecorder
+	mf   metrics.IMetricRecorder
 }
 
 // WorkerSliceGatewayNetworkAddresses is a schema for WorkerSlice gateway network parameters

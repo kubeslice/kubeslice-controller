@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
 	"testing"
 
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
@@ -63,8 +65,8 @@ func TestReconcileProject_Delete_Happypath(t *testing.T) {
 	projectName := "cisco"
 	namespace := "controller-manager"
 	time := k8sapimachinery.Now()
-	nsServiceMock, _, projectService, requestObj, clientMock, project, ctx, clusterServiceMock, sliceConfigServiceMock, serviceExportConfigServiceMock := setupProjectTest(projectName, namespace)
-
+	nsServiceMock, _, projectService, requestObj, clientMock, project, ctx, clusterServiceMock, sliceConfigServiceMock, serviceExportConfigServiceMock, mMock := setupProjectTest(projectName, namespace)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Project)
 		arg.ObjectMeta.DeletionTimestamp = &time
@@ -78,12 +80,14 @@ func TestReconcileProject_Delete_Happypath(t *testing.T) {
 	//delete finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := projectService.ReconcileProject(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 	nsServiceMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func TestReconcileProject_AddsREconciler_CreatesResourcesAndReturnsReconciliationComplete_Happypath(t *testing.T) {
@@ -92,7 +96,8 @@ func TestReconcileProject_AddsREconciler_CreatesResourcesAndReturnsReconciliatio
 	//time := k8sapimachinery.Now()
 	readOnlyServiceAccounts := []string{"sany-ro"}
 	readWriteServiceAccounts := []string{"imran-rw"}
-	nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, _, _, _ := setupProjectTest(projectName, namespace)
+	nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, _, _, _, mMock := setupProjectTest(projectName, namespace)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(nil).Once().Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Project)
 		arg.Spec.ServiceAccount.ReadOnly = readOnlyServiceAccounts
@@ -118,6 +123,7 @@ func TestReconcileProject_AddsREconciler_CreatesResourcesAndReturnsReconciliatio
 	clientMock.AssertExpectations(t)
 	nsServiceMock.AssertExpectations(t)
 	acsServicemOCK.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func TestReconcileProject_DoNotCallFinalizerIfItExists(t *testing.T) {
@@ -126,7 +132,8 @@ func TestReconcileProject_DoNotCallFinalizerIfItExists(t *testing.T) {
 	//time := k8sapimachinery.Now()
 	readOnlyServiceAccounts := []string{"sany-ro"}
 	readWriteServiceAccounts := []string{"imran-rw"}
-	nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, _, _, _ := setupProjectTest(projectName, namespace)
+	nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, _, _, _, mMock := setupProjectTest(projectName, namespace)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(nil).Once().Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Project)
 		controllerutil.AddFinalizer(arg, ProjectFinalizer)
@@ -150,12 +157,13 @@ func TestReconcileProject_DoNotCallFinalizerIfItExists(t *testing.T) {
 	clientMock.AssertExpectations(t)
 	nsServiceMock.AssertExpectations(t)
 	acsServicemOCK.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func TestReconcileProject_ReturnsReconciliationCompleteAndErrorWhenGetProjectNamespaceFailsWithErrorOtherThanNotFound(t *testing.T) {
 	projectName := "do-not-exist"
 	namespace := "controller-manager"
-	_, _, projectService, requestObj, clientMock, project, ctx, _, _, _ := setupProjectTest(projectName, namespace)
+	_, _, projectService, requestObj, clientMock, project, ctx, _, _, _, _ := setupProjectTest(projectName, namespace)
 	err1 := errors.New("testinternalerror")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(err1)
 	result, err := projectService.ReconcileProject(ctx, requestObj)
@@ -169,7 +177,7 @@ func TestReconcileProject_ReturnsReconciliationCompleteAndErrorWhenGetProjectNam
 func TestReconcileProject_ReturnsReconciliationCompleteAndNilErrorWhenGetProjectNamespaceIsNotFound(t *testing.T) {
 	projectName := "do-not-exist"
 	namespace := "controller-manager"
-	_, _, projectService, requestObj, clientMock, project, ctx, _, _, _ := setupProjectTest(projectName, namespace)
+	_, _, projectService, requestObj, clientMock, project, ctx, _, _, _, _ := setupProjectTest(projectName, namespace)
 	notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, project).Return(notFoundError).Once()
 	result, err := projectService.ReconcileProject(ctx, requestObj)
@@ -180,18 +188,20 @@ func TestReconcileProject_ReturnsReconciliationCompleteAndNilErrorWhenGetProject
 	clientMock.AssertExpectations(t)
 }
 
-func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, *mocks.IAccessControlService, ProjectService, ctrl.Request, *utilMock.Client, *controllerv1alpha1.Project, context.Context, *mocks.IClusterService, *mocks.ISliceConfigService, *mocks.IServiceExportConfigService) {
+func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, *mocks.IAccessControlService, ProjectService, ctrl.Request, *utilMock.Client, *controllerv1alpha1.Project, context.Context, *mocks.IClusterService, *mocks.ISliceConfigService, *mocks.IServiceExportConfigService, *metricMock.IMetricRecorder) {
 	nsServiceMock := &mocks.INamespaceService{}
 	acsServicemOCK := &mocks.IAccessControlService{}
 	clusterServiceMock := &mocks.IClusterService{}
 	sliceConfigServiceMock := &mocks.ISliceConfigService{}
 	serviceExportConfigServiceMock := &mocks.IServiceExportConfigService{}
+	mMock := &metricMock.IMetricRecorder{}
 	projectService := ProjectService{
 		ns:  nsServiceMock,
 		acs: acsServicemOCK,
 		c:   clusterServiceMock,
 		sc:  sliceConfigServiceMock,
 		se:  serviceExportConfigServiceMock,
+		mf:  mMock,
 	}
 
 	projectName := types.NamespacedName{
@@ -207,7 +217,7 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareProjectTestContext(context.Background(), clientMock, scheme)
-	return nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, clusterServiceMock, sliceConfigServiceMock, serviceExportConfigServiceMock
+	return nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, clusterServiceMock, sliceConfigServiceMock, serviceExportConfigServiceMock, mMock
 }
 
 func prepareProjectTestContext(ctx context.Context, client util.Client,

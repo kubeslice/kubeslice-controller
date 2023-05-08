@@ -38,7 +38,7 @@ type ISliceQoSConfigService interface {
 // SliceQoSConfigService implements different service interfaces
 type SliceQoSConfigService struct {
 	wsc IWorkerSliceConfigService
-	mf  metrics.MetricRecorder
+	mf  metrics.IMetricRecorder
 }
 
 // ReconcileSliceQoSConfig is a function to reconcile the qos_profile

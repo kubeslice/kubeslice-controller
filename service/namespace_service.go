@@ -35,7 +35,7 @@ type INamespaceService interface {
 }
 
 type NamespaceService struct {
-	mf metrics.MetricRecorder
+	mf metrics.IMetricRecorder
 }
 
 // ReconcileProjectNamespace is a function to reconcile project namespace

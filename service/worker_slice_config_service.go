@@ -46,7 +46,7 @@ type IWorkerSliceConfigService interface {
 
 // WorkerSliceConfigService implements the IWorkerSliceConfigService interface
 type WorkerSliceConfigService struct {
-	mf metrics.MetricRecorder
+	mf metrics.IMetricRecorder
 }
 
 // ReconcileWorkerSliceConfig is a function to reconcile the config of worker slice

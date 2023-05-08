@@ -19,6 +19,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
 	"testing"
 
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
@@ -125,21 +127,26 @@ func AccessControlService_ReconcileWorkerClusterRole_Create(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+		mf:           mMock,
+	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
-	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
-	acsService := AccessControlService{
-		ruleProvider: ruleProviderMock,
-	}
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	ruleProviderMock.On("WorkerClusterRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileWorkerClusterRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
@@ -199,20 +206,25 @@ func AccessControlService_ReconcileWorkerClusterRole_Update(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+		mf:           mMock,
+	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
-	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
-	acsService := AccessControlService{
-		ruleProvider: ruleProviderMock,
-	}
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	ruleProviderMock.On("WorkerClusterRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileWorkerClusterRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func AccessControlService_ReconcileReadOnlyRole_Create(t *testing.T) {
@@ -262,21 +274,26 @@ func AccessControlService_ReconcileReadOnlyRole_Create(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+		mf:           mMock,
+	}
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
-	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
-	acsService := AccessControlService{
-		ruleProvider: ruleProviderMock,
-	}
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	ruleProviderMock.On("ReadOnlyRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileReadOnlyRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func AccessControlService_ReconcileReadOnlyRole_Update(t *testing.T) {
@@ -326,20 +343,25 @@ func AccessControlService_ReconcileReadOnlyRole_Update(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+		mf:           mMock,
+	}
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
-	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
-	acsService := AccessControlService{
-		ruleProvider: ruleProviderMock,
-	}
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	ruleProviderMock.On("ReadOnlyRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileReadOnlyRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
@@ -389,21 +411,26 @@ func AccessControlService_ReconcileReadWriteRole_Create(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
+	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		ruleProvider: ruleProviderMock,
+		mf:           mMock,
+	}
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, namespacedName, actualRole).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRole).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
-	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
-	acsService := AccessControlService{
-		ruleProvider: ruleProviderMock,
-	}
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	ruleProviderMock.On("ReadWriteRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileReadWriteRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
@@ -453,25 +480,33 @@ func AccessControlServiceReconcileReadWriteRole_Update(t *testing.T) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
-	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
-	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
-	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	ruleProviderMock := &mocks.IAccessControlRuleProvider{}
+	mMock := &metricMock.IMetricRecorder{}
 	acsService := AccessControlService{
 		ruleProvider: ruleProviderMock,
+		mf:           mMock,
 	}
+	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	clientMock.On("Get", ctx, namespacedName, actualRole).Return(nil).Once()
+	clientMock.On("Update", ctx, expectedRole).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	ruleProviderMock.On("ReadWriteRoleRules").Return(expectedRole.Rules).Once()
 	result, err := acsService.ReconcileReadWriteRole(ctx, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 	clientMock := &utilMock.Client{}
-	acsService := AccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		mf: mMock,
+	}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
@@ -504,6 +539,7 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 		},
 		Type: "kubernetes.io/service-account-token",
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	notFoundError := k8sError.NewNotFound(util.Resource("acstest_readonly_role"), "isnotFound")
 	clientMock.On("Get", ctx, serviceAccountNamespacedName, actualServiceAccount).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedServiceAccount).Return(nil)
@@ -537,16 +573,21 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_Create(t *testing.T) {
 	clientMock.On("Get", ctx, roleBindingNamespacedName, actualRoleBinding).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRoleBinding).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Times(3)
 	result, err := acsService.createOrUpdateServiceAccountsAndRoleBindings(ctx, namespace, readonlynames, ServiceAccountWorkerCluster, RoleBindingWorkerCluster, AccessTypeClusterReadWrite, roleWorkerCluster, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_SA_exists_RoleBinding_exists_update(t *testing.T) {
 	clientMock := &utilMock.Client{}
-	acsService := AccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		mf: mMock,
+	}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
@@ -559,7 +600,7 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_SA_exists_RoleBinding_exis
 	}
 
 	actualServiceAccount := &corev1.ServiceAccount{}
-
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, serviceAccountNamespacedName, actualServiceAccount).Return(nil).Once()
 	roleBindingNamespacedName := client.ObjectKey{
 		Namespace: namespace,
@@ -592,16 +633,21 @@ func ACS_CreateOrUpdateServiceAccountsAndRoleBindings_SA_exists_RoleBinding_exis
 	clientMock.On("Get", ctx, roleBindingNamespacedName, actualRoleBinding).Return(nil).Once()
 	clientMock.On("Update", ctx, expectedRoleBinding).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := acsService.createOrUpdateServiceAccountsAndRoleBindings(ctx, namespace, readonlynames, ServiceAccountWorkerCluster, RoleBindingWorkerCluster, AccessTypeClusterReadWrite, roleWorkerCluster, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ACS_removeServiceAccountsAndRoleBindingsByLabel_happypath(t *testing.T) {
 	clientMock := &utilMock.Client{}
-	acsService := AccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		mf: mMock,
+	}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
@@ -609,6 +655,7 @@ func ACS_removeServiceAccountsAndRoleBindingsByLabel_happypath(t *testing.T) {
 	namespace := "cisco"
 	cluster := &controllerv1alpha1.Cluster{}
 	cluster.ObjectMeta.Labels = map[string]string{"ccc": "ggg"}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 
 	clientMock.On("List", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*rbacv1.RoleBindingList)
@@ -647,17 +694,23 @@ func ACS_removeServiceAccountsAndRoleBindingsByLabel_happypath(t *testing.T) {
 
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Times(4)
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 	result, err := acsService.removeServiceAccountsAndRoleBindingsByLabel(ctx, namespace, clusterName, cluster)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ACS_cleanupObsoleteServiceAccountsAndRoleBindings_happypath(t *testing.T) {
 	clientMock := &utilMock.Client{}
-	acsService := AccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		mf: mMock,
+	}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
@@ -700,6 +753,7 @@ func ACS_cleanupObsoleteServiceAccountsAndRoleBindings_happypath(t *testing.T) {
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("List", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*rbacv1.RoleBindingList)
 		arg.Items = []rbacv1.RoleBinding{
@@ -717,16 +771,21 @@ func ACS_cleanupObsoleteServiceAccountsAndRoleBindings_happypath(t *testing.T) {
 
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Times(2)
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 	result, err := acsService.cleanupObsoleteServiceAccountsAndRoleBindings(ctx, namespace, readonlynames, ServiceAccountReadOnlyUser, RoleBindingReadOnlyUser, accessType, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ACS_RemoveWorkerClusterServiceAccountAndRoleBindings_Happypath(t *testing.T) {
 	clientMock := &utilMock.Client{}
-	acsService := AccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		mf: mMock,
+	}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
@@ -737,6 +796,7 @@ func ACS_RemoveWorkerClusterServiceAccountAndRoleBindings_Happypath(t *testing.T
 	cluster := &controllerv1alpha1.Cluster{}
 	cluster.ObjectMeta.Labels = map[string]string{"ccc": "ggg"}
 
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("List", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*rbacv1.RoleBindingList)
 		arg.Items = []rbacv1.RoleBinding{{
@@ -774,17 +834,23 @@ func ACS_RemoveWorkerClusterServiceAccountAndRoleBindings_Happypath(t *testing.T
 
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Times(4)
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 	result, err := acsService.RemoveWorkerClusterServiceAccountAndRoleBindings(ctx, clusterNameString, namespace, cluster)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock := &utilMock.Client{}
-	acsService := AccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		mf: mMock,
+	}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
@@ -827,6 +893,7 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	clientMock.On("List", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*rbacv1.RoleBindingList)
 		arg.Items = []rbacv1.RoleBinding{
@@ -844,6 +911,7 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Times(2)
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 
 	serviceAccountNamespacedName := client.ObjectKey{
 		Namespace: namespace,
@@ -905,17 +973,22 @@ func ACS_ReconcileReadOnlyUserServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock.On("Get", ctx, roleBindingNamespacedName, actualRoleBinding).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRoleBinding).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Times(3)
 
 	result, err := acsService.ReconcileReadOnlyUserServiceAccountAndRoleBindings(ctx, namespace, readonlynames, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock := &utilMock.Client{}
-	acsService := AccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		mf: mMock,
+	}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
@@ -958,6 +1031,7 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	clientMock.On("List", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*rbacv1.RoleBindingList)
 		arg.Items = []rbacv1.RoleBinding{
@@ -975,6 +1049,7 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Times(2)
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 
 	serviceAccountNamespacedName := client.ObjectKey{
 		Namespace: namespace,
@@ -1036,17 +1111,22 @@ func ACS_ReconcileReadWriteUserServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock.On("Get", ctx, roleBindingNamespacedName, actualRoleBinding).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRoleBinding).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Times(3)
 
 	result, err := acsService.ReconcileReadWriteUserServiceAccountAndRoleBindings(ctx, namespace, readonlynames, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock := &utilMock.Client{}
-	acsService := AccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	acsService := AccessControlService{
+		mf: mMock,
+	}
 	scheme := runtime.NewScheme()
 	controllerv1alpha1.AddToScheme(scheme)
 	ctx := prepareACSTestContext(context.Background(), clientMock, scheme)
@@ -1097,6 +1177,7 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 		ImagePullSecrets:             nil,
 		AutomountServiceAccountToken: nil,
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	clientMock.On("List", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*rbacv1.RoleBindingList)
 		arg.Items = []rbacv1.RoleBinding{
@@ -1114,6 +1195,7 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Times(2)
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 
 	serviceAccountNamespacedName := client.ObjectKey{
 		Namespace: namespace,
@@ -1178,12 +1260,14 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 	clientMock.On("Get", ctx, roleBindingNamespacedName, actualRoleBinding).Return(notFoundError).Once()
 	clientMock.On("Create", ctx, expectedRoleBinding).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Times(3)
 
 	result, err := acsService.ReconcileWorkerClusterServiceAccountAndRoleBindings(ctx, name, namespace, project)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func prepareACSTestContext(ctx context.Context, client util.Client,

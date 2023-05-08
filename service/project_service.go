@@ -38,7 +38,7 @@ type ProjectService struct {
 	c   IClusterService
 	sc  ISliceConfigService
 	se  IServiceExportConfigService
-	mf  metrics.MetricRecorder
+	mf  metrics.IMetricRecorder
 }
 
 // ReconcileProject is a function to reconcile the projects includes reconciliation of roles, clusters, project namespaces etc.

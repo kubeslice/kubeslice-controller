@@ -43,7 +43,7 @@ type SliceConfigService struct {
 	si    IWorkerServiceImportService
 	se    IServiceExportConfigService
 	wsgrs IWorkerSliceGatewayRecyclerService
-	mf    metrics.MetricRecorder
+	mf    metrics.IMetricRecorder
 }
 
 // ReconcileSliceConfig is a function to reconcile the sliceconfig

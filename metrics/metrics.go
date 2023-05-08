@@ -19,6 +19,7 @@
 package metrics
 
 import (
+	"fmt"
 	"github.com/kubeslice/kubeslice-controller/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -56,6 +57,8 @@ func (mr *MetricRecorder) RecordGaugeMetric(metric *prometheus.GaugeVec, labels 
 }
 
 func (mr *MetricRecorder) RecordCounterMetric(metric *prometheus.CounterVec, labels map[string]string) {
+	fmt.Println(metric)
+	fmt.Println(labels)
 	metric.With(mr.getCurryLabels(labels)).Inc()
 }
 
