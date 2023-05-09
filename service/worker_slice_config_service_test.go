@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
 	"testing"
 
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
@@ -69,7 +71,8 @@ var WorkerSliceTestbed = map[string]func(*testing.T){
 func testWorkerSliceGetsCreatedAndReturnsReconciliationSuccess(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerSlice).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
 		arg.Spec.SliceSubnet = "10.23.45.14/24"
@@ -125,12 +128,13 @@ func testWorkerSliceGetsCreatedAndReturnsReconciliationSuccess(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testWorkerSliceReconciliationIfNotFound(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, _ := setupWorkerSliceTest(WorkerSliceName, namespace)
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerSlice).Return(notFoundError).Once()
 	result, err := WorkerSliceService.ReconcileWorkerSliceConfig(ctx, requestObj)
@@ -144,7 +148,8 @@ func testWorkerSliceReconciliationIfNotFound(t *testing.T) {
 func testWorkerSliceReconciliationIfSliceConfigNotFound(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerSlice).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
@@ -185,13 +190,15 @@ func testWorkerSliceReconciliationIfSliceConfigNotFound(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testWorkerSliceReconciliationDeleteSuccessfully(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
 	time := k8sapimachinery.Now()
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerSlice).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
 		arg.ObjectMeta.DeletionTimestamp = &time
@@ -200,8 +207,10 @@ func testWorkerSliceReconciliationDeleteSuccessfully(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), sliceConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
@@ -215,15 +224,17 @@ func testWorkerSliceReconciliationDeleteSuccessfully(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testDeleteWorkerSliceConfigByLabelSuccess(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
 	label := map[string]string{
 		"worker-cluster": "cluster-1",
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
@@ -256,20 +267,24 @@ func testDeleteWorkerSliceConfigByLabelSuccess(t *testing.T) {
 	}).Once()
 	clientMock.On("Delete", ctx, workerSlice).Return(nil).Twice()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	err := WorkerSliceService.DeleteWorkerSliceConfigByLabel(ctx, label, requestObj.Namespace)
 	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
 	label := map[string]string{
 		"worker-cluster": "cluster-1",
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
@@ -319,22 +334,26 @@ func testCreateWorkerSliceConfigNewClusterSuccess(t *testing.T) {
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(notFoundError).Twice()
 	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
 	require.Equal(t, len(result), 2)
 	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
 	label := map[string]string{
 		"worker-cluster": "cluster-1",
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
@@ -385,20 +404,23 @@ func testCreateWorkerSliceConfigNewClusterFails(t *testing.T) {
 	err1 := errors.New("internal_error")
 	clientMock.On("Create", ctx, mock.Anything).Return(err1).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
 	require.Error(t, err)
 	require.Equal(t, len(result), 2)
 	require.Equal(t, err, err1)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
 	label := map[string]string{
 		"worker-cluster": "cluster-1",
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
@@ -447,21 +469,25 @@ func testCreateWorkerSliceConfigUpdateClusterSuccess(t *testing.T) {
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), workerSlice).Return(nil).Twice()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Twice()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
 	require.Equal(t, len(result), 2)
 	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
 	label := map[string]string{
 		"worker-cluster": "cluster-1",
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSlices, client.MatchingLabels(label), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
@@ -511,42 +537,20 @@ func testCreateWorkerSliceConfigUpdateClusterFails(t *testing.T) {
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := WorkerSliceService.CreateMinimalWorkerSliceConfig(ctx, []string{"cluster-1", "cluster-2"}, requestObj.Namespace, label, "red", "198.23.54.47/16", "/20")
 	require.Error(t, err)
 	require.Equal(t, len(result), 2)
 	require.Equal(t, err, err1)
 	clientMock.AssertExpectations(t)
-}
-
-func setupWorkerSliceTest(name string, namespace string) (WorkerSliceConfigService, ctrl.Request, *utilMock.Client, *workerv1alpha1.WorkerSliceConfig, context.Context) {
-	WorkerSliceService := WorkerSliceConfigService{}
-	fmt.Println("WorkerSliceService", WorkerSliceService)
-	workerSliceName := types.NamespacedName{
-		Namespace: name,
-		Name:      namespace,
-	}
-	requestObj := ctrl.Request{
-		NamespacedName: workerSliceName,
-	}
-	clientMock := &utilMock.Client{}
-	workerSlice := &workerv1alpha1.WorkerSliceConfig{}
-	scheme := runtime.NewScheme()
-	controllerv1alpha1.AddToScheme(scheme)
-	workerv1alpha1.AddToScheme(scheme)
-	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
-		Version:   "v1alpha1",
-		Cluster:   util.ClusterController,
-		Component: util.ComponentController,
-		Slice:     util.NotApplicable,
-	})
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "WorkerSliceConfigController", &eventRecorder)
-	return WorkerSliceService, requestObj, clientMock, workerSlice, ctx
+	mMock.AssertExpectations(t)
 }
 
 func testCreateWorkerSliceConfigWithStandardQosProfile(t *testing.T) {
 	WorkerSliceName := "red-cluster-worker-slice"
 	namespace := "controller-manager-cisco"
-	WorkerSliceService, requestObj, clientMock, workerSlice, ctx := setupWorkerSliceTest(WorkerSliceName, namespace)
+	WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock := setupWorkerSliceTest(WorkerSliceName, namespace)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerSlice).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerSliceConfig)
 		arg.Spec.SliceSubnet = "10.23.45.14/24"
@@ -613,4 +617,33 @@ func testCreateWorkerSliceConfigWithStandardQosProfile(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
+}
+
+func setupWorkerSliceTest(name string, namespace string) (WorkerSliceConfigService, ctrl.Request, *utilMock.Client, *workerv1alpha1.WorkerSliceConfig, context.Context, *metricMock.IMetricRecorder) {
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerSliceService := WorkerSliceConfigService{
+		mf: mMock,
+	}
+	fmt.Println("WorkerSliceService", WorkerSliceService)
+	workerSliceName := types.NamespacedName{
+		Namespace: name,
+		Name:      namespace,
+	}
+	requestObj := ctrl.Request{
+		NamespacedName: workerSliceName,
+	}
+	clientMock := &utilMock.Client{}
+	workerSlice := &workerv1alpha1.WorkerSliceConfig{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	workerv1alpha1.AddToScheme(scheme)
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "WorkerSliceConfigController", &eventRecorder)
+	return WorkerSliceService, requestObj, clientMock, workerSlice, ctx, mMock
 }

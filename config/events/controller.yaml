@@ -13,6 +13,24 @@ events:
     type: Warning
     reportingController: controller
     message: Project deletion failed.
+  - name: ClusterInstallationInProgress
+    reason: ClusterInstallationInProgress
+    action: AutoInstallation
+    type: Normal
+    reportingController: controller
+    message: Worker Operator installation in progress.
+  - name: ClusterInstallationFailed
+    reason: ClusterInstallationFailed
+    action: AutoInstallation
+    type: Warning
+    reportingController: controller
+    message: Worker Operator installation failed.
+  - name: ClusterInstallationPending
+    reason: ClusterInstallationPending
+    action: AutoInstallation
+    type: Warning
+    reportingController: controller
+    message: Worker Operator verification failed. Pods might be in error state.
   - name: ClusterDeleted
     reason: ClusterDeleted
     action: DeleteCluster
@@ -25,6 +43,30 @@ events:
     type: Warning
     reportingController: controller
     message: Cluster deletion failed.
+  - name: ClusterDeregistrationInProgress
+    reason: ClusterDeregistrationInProgress
+    action: DeregisterCluster
+    type: Normal
+    reportingController: controller
+    message: Cluster deregistration in progress.
+  - name: ClusterDeregistered
+    reason: ClusterDeregistered
+    action: DeregisterCluster
+    type: Normal
+    reportingController: controller
+    message: Cluster deregistered.
+  - name: ClusterDeregisterTimeout
+    reason: ClusterDeregisterTimeout
+    action: DeregisterCluster
+    type: Warning
+    reportingController: controller
+    message: Cluster deregister timeout.
+  - name: ClusterDeregisterFailed
+    reason: ClusterDeregisterFailed
+    action: DeregisterCluster
+    type: Warning
+    reportingController: controller
+    message: Cluster deregister failed.
   - name: SliceConfigDeleted
     reason: SliceConfigDeleted
     action: DeleteSliceConfig
@@ -430,4 +472,3 @@ events:
     type: Normal
     reportingController: controller
     message: Slice gateway job got created.
-    
