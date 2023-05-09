@@ -93,12 +93,5 @@ func (mr *MetricRecorder) getCurryLabels(labels map[string]string) prometheus.La
 		pl[k] = v
 	}
 
-	/*for k, v := range pl {
-		// Remove labels if value is empty
-		if v == "" {
-			delete(pl, k)
-			continue
-		}
-	}*/
 	return pl
 }
