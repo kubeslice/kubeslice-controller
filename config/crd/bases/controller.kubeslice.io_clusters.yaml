@@ -149,6 +149,10 @@ spec:
                 items:
                   type: string
                 type: array
+              isDeregisterInProgress:
+                description: IsDeregisterInProgress is the flag to check if the cluster
+                  deregister is InProgress
+                type: boolean
               namespaces:
                 description: Namespaces present in cluster
                 items:
@@ -164,6 +168,17 @@ spec:
                 items:
                   type: string
                 type: array
+              registrationStatus:
+                description: RegistrationStatus shows the status of cluster registration
+                enum:
+                - Pending
+                - InProgress
+                - Failed
+                - Registered
+                - DeregisterInProgress
+                - DeregisterFailed
+                - Deregistered
+                type: string
               secretName:
                 description: SecretName is the name of the secret for the worker cluster.
                 type: string

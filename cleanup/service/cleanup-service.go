@@ -196,6 +196,24 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 				logger.Errorf("%s Error deleting Cluster %s. %s", util.Err, cluster.GetName(), err.Error())
 			}
 		}
+	}
+
+	// Verify that clusters are deleted wait for ~ 11 minutes
+	logger.Infof("%s Verifying that all Clusters are deleted for Projects", util.Find)
+	for i := 0; i < 21; i++ {
+		if i > 0 {
+			logger.Infof("%s Waiting %d seconds before retrying as clusters are still not deleted", util.Wait, int((30 * sleepDuration).Seconds()))
+			time.Sleep(30 * sleepDuration)
+		}
+		err = util.ListResources(ctx, clusters)
+		if err != nil || len(clusters.Items) != 0 {
+			logger.Infof("%s %v clusters not deleted", util.Err, len(clusters.Items))
+		} else {
+			logger.Infof("%s All clusters deleted", util.Recycle)
+			break
+		}
+	}
+	for _, project := range projects.Items {
 
 		// Delete the project
 		logger.Infof("%s  Deleting Project %s", util.Bin, project.GetName())
@@ -207,6 +225,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 			logger.Errorf("%s Error deleting Project %s. %s", util.Err, project.GetName(), err.Error())
 		}
 	}
+
 	if !hasErrors {
 		logger.Infof("%s Successfully cleaned up all Kubeslice resources.", util.Party)
 	} else {

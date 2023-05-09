@@ -19,6 +19,8 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
 	"testing"
 
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
@@ -74,7 +76,8 @@ var ServiceExportConfigTestBed = map[string]func(*testing.T){
 }
 
 func ServiceExportReconciliationCompleteHappyCase(t *testing.T) {
-	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Twice()
@@ -87,10 +90,11 @@ func ServiceExportReconciliationCompleteHappyCase(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerServiceImportMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportGetObjectErrorOtherThanNotFound(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, _ := setupServiceExportTest("service_export", "namespace")
 	err1 := errors.New("internal_error")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(err1).Once()
 	result, err2 := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
@@ -103,7 +107,7 @@ func ServiceExportGetObjectErrorOtherThanNotFound(t *testing.T) {
 }
 
 func ServiceExportGetObjectErrorNotFound(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, _ := setupServiceExportTest("service_export", "namespace")
 	notFoundError := k8sError.NewNotFound(util.Resource("ServiceExportConfigTest"), "isNotFound")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(notFoundError).Once()
 	result, err2 := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
@@ -116,8 +120,9 @@ func ServiceExportGetObjectErrorNotFound(t *testing.T) {
 }
 
 func ServiceExportDeleteTheObjectHappyCase(t *testing.T) {
-	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
 	time := k8sapimachinery.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.ServiceExportConfig)
 		arg.ObjectMeta.DeletionTimestamp = &time
@@ -127,6 +132,7 @@ func ServiceExportDeleteTheObjectHappyCase(t *testing.T) {
 	//remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -135,10 +141,12 @@ func ServiceExportDeleteTheObjectHappyCase(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerServiceImportMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportErrorOnUpdatingTheFinalizer(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
@@ -149,10 +157,13 @@ func ServiceExportErrorOnUpdatingTheFinalizer(t *testing.T) {
 	require.Equal(t, err1, err2)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
+
 func ServiceExportRemoveFinalizerErrorOnUpdate(t *testing.T) {
-	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
 	time := k8sapimachinery.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.ServiceExportConfig)
 		arg.ObjectMeta.DeletionTimestamp = &time
@@ -162,6 +173,7 @@ func ServiceExportRemoveFinalizerErrorOnUpdate(t *testing.T) {
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err2 := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -170,11 +182,13 @@ func ServiceExportRemoveFinalizerErrorOnUpdate(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerServiceImportMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
-	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
 	time := k8sapimachinery.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.ServiceExportConfig)
 		arg.ObjectMeta.DeletionTimestamp = &time
@@ -192,6 +206,7 @@ func ServiceExportRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err2 := serviceExportConfigService.ReconcileServiceExportConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -200,11 +215,13 @@ func ServiceExportRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerServiceImportMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportErrorOnDeleteWorkerServiceImportByLabel(t *testing.T) {
-	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
 	time := k8sapimachinery.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.ServiceExportConfig)
 		arg.ObjectMeta.DeletionTimestamp = &time
@@ -220,10 +237,12 @@ func ServiceExportErrorOnDeleteWorkerServiceImportByLabel(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerServiceImportMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportErrorOnGettingSliceConfigOtherThanNotFound(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
@@ -236,10 +255,12 @@ func ServiceExportErrorOnGettingSliceConfigOtherThanNotFound(t *testing.T) {
 	require.Equal(t, err1, err2)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportErrorNotFoundOnGettingSliceConfig(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
@@ -252,10 +273,12 @@ func ServiceExportErrorNotFoundOnGettingSliceConfig(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportErrorOnCreateWorkerServiceImport(t *testing.T) {
-	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Twice()
@@ -269,10 +292,12 @@ func ServiceExportErrorOnCreateWorkerServiceImport(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerServiceImportMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportUpdateHappyCase(t *testing.T) {
-	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.ServiceExportConfig)
 		if arg.Labels == nil {
@@ -293,10 +318,12 @@ func ServiceExportUpdateHappyCase(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerServiceImportMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportErrorOnUpdate(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.ServiceExportConfig)
 		if arg.Labels == nil {
@@ -316,10 +343,12 @@ func ServiceExportErrorOnUpdate(t *testing.T) {
 	require.Equal(t, err1, err2)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportLabelsNullOnUpdate(t *testing.T) {
-	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx := setupServiceExportTest("service_export", "namespace")
+	workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock := setupServiceExportTest("service_export", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, serviceExport).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.ServiceExportConfig)
 		arg.Spec.SliceName = "slice-2"
@@ -336,11 +365,13 @@ func ServiceExportLabelsNullOnUpdate(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerServiceImportMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportDeleteByListSuccess(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, _, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, _, ctx, mMock := setupServiceExportTest("service_export", "namespace")
 	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("List", ctx, serviceExports, client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*controllerv1alpha1.ServiceExportConfigList)
 		arg.Items = []controllerv1alpha1.ServiceExportConfig{
@@ -361,6 +392,7 @@ func ServiceExportDeleteByListSuccess(t *testing.T) {
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := serviceExportConfigService.DeleteServiceExportConfigs(ctx, requestObj.Namespace)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -368,10 +400,11 @@ func ServiceExportDeleteByListSuccess(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportDeleteByListFailToReturnList(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, _, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, _, ctx, _ := setupServiceExportTest("service_export", "namespace")
 	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
 	err1 := errors.New("internal_error")
 	clientMock.On("List", ctx, serviceExports, client.InNamespace(requestObj.Namespace)).Return(err1).Once()
@@ -385,8 +418,9 @@ func ServiceExportDeleteByListFailToReturnList(t *testing.T) {
 }
 
 func ServiceExportDeleteByListFailedToDelete(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, _, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, _, ctx, mMock := setupServiceExportTest("service_export", "namespace")
 	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("List", ctx, serviceExports, client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*controllerv1alpha1.ServiceExportConfigList)
 		arg.Items = []controllerv1alpha1.ServiceExportConfig{
@@ -408,6 +442,7 @@ func ServiceExportDeleteByListFailedToDelete(t *testing.T) {
 	err1 := errors.New("internal_error")
 	clientMock.On("Delete", ctx, mock.Anything).Return(err1).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := serviceExportConfigService.DeleteServiceExportConfigs(ctx, requestObj.Namespace)
 	expectedResult := ctrl.Result{}
 	require.Equal(t, err1, err)
@@ -415,10 +450,11 @@ func ServiceExportDeleteByListFailedToDelete(t *testing.T) {
 	require.Error(t, err1)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ServiceExportListServiceExportConfigsFail(t *testing.T) {
-	_, serviceExportConfigService, requestObj, clientMock, _, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, requestObj, clientMock, _, ctx, _ := setupServiceExportTest("service_export", "namespace")
 	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
 	listError := errors.New("list error")
 	clientMock.On("List", ctx, serviceExports, mock.Anything).Return(listError).Once()
@@ -429,8 +465,9 @@ func ServiceExportListServiceExportConfigsFail(t *testing.T) {
 }
 
 func ServiceExportDeleteServiceExportConfigByParticipatingSliceConfigFail(t *testing.T) {
-	_, serviceExportConfigService, _, clientMock, requestObj, ctx := setupServiceExportTest("service_export", "namespace")
+	_, serviceExportConfigService, _, clientMock, requestObj, ctx, mMock := setupServiceExportTest("service_export", "namespace")
 	serviceExports := &controllerv1alpha1.ServiceExportConfigList{}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("List", ctx, serviceExports, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*controllerv1alpha1.ServiceExportConfigList)
 		if arg.Items == nil {
@@ -445,15 +482,19 @@ func ServiceExportDeleteServiceExportConfigByParticipatingSliceConfigFail(t *tes
 	deleteError := errors.New("delete failed")
 	clientMock.On("Delete", ctx, mock.Anything).Return(deleteError).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	err := serviceExportConfigService.DeleteServiceExportConfigByParticipatingSliceConfig(ctx, "random", requestObj.Namespace)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
-func setupServiceExportTest(name string, namespace string) (*mocks.IWorkerServiceImportService, ServiceExportConfigService, ctrl.Request, *utilMock.Client, *controllerv1alpha1.ServiceExportConfig, context.Context) {
+func setupServiceExportTest(name string, namespace string) (*mocks.IWorkerServiceImportService, ServiceExportConfigService, ctrl.Request, *utilMock.Client, *controllerv1alpha1.ServiceExportConfig, context.Context, *metricMock.IMetricRecorder) {
 	workerServiceImportMock := &mocks.IWorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
 	serviceExportConfigService := ServiceExportConfigService{
 		ses: workerServiceImportMock,
+		mf:  mMock,
 	}
 	namespacedName := types.NamespacedName{
 		Name:      name,
@@ -473,5 +514,5 @@ func setupServiceExportTest(name string, namespace string) (*mocks.IWorkerServic
 		Slice:     util.NotApplicable,
 	})
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ServiceExportConfigServiceTest", &eventRecorder)
-	return workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx
+	return workerServiceImportMock, serviceExportConfigService, requestObj, clientMock, serviceExport, ctx, mMock
 }
