@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 	"reflect"
 	"strings"
 	"time"
@@ -54,6 +55,7 @@ type WorkerSliceGatewayService struct {
 	js   IJobService
 	sscs IWorkerSliceConfigService
 	sc   ISecretService
+	mf   metrics.IMetricRecorder
 }
 
 // WorkerSliceGatewayNetworkAddresses is a schema for WorkerSlice gateway network parameters
@@ -85,6 +87,11 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 	//Load Event Recorder with project name, slice name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).
 		WithProject(util.GetProjectName(req.Namespace)).
+		WithNamespace(req.Namespace).
+		WithSlice(workerSliceGateway.Labels["original-slice-name"])
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(req.Namespace)).
 		WithNamespace(req.Namespace).
 		WithSlice(workerSliceGateway.Labels["original-slice-name"])
 
@@ -130,6 +137,14 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 				logger.Debug("SliceGateway deleted forcefully from slice, removing gateway pair and secret", req.NamespacedName)
 				//Register an event for worker slice gateway deleted forcefully
 				util.RecordEvent(ctx, eventRecorder, workerSliceGateway, slice, events.EventWorkerSliceGatewayDeletedForcefully)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deleted_forcefully",
+						"event":       string(events.EventWorkerSliceGatewayDeletedForcefully),
+						"object_name": workerSliceGateway.Name,
+						"object_kind": metricKindWorkerSliceGateway,
+					},
+				)
 				completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(slice), slice.GetName())
 				labels := util.GetOwnerLabel(completeResourceName)
 				labels["worker-cluster"] = workerSliceGateway.Labels["remote-cluster"]
@@ -158,10 +173,26 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 				if err != nil {
 					//Register an event for worker slice gateway recreation failure
 					util.RecordEvent(ctx, eventRecorder, workerSliceGateway, slice, events.EventWorkerSliceGatewayRecreationFailed)
+					s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+						map[string]string{
+							"action":      "recreation_failed",
+							"event":       string(events.EventWorkerSliceGatewayRecreationFailed),
+							"object_name": workerSliceGateway.Name,
+							"object_kind": metricKindWorkerSliceGateway,
+						},
+					)
 					return result, err
 				}
 				//Register an event for worker slice gateway recreation success
 				util.RecordEvent(ctx, eventRecorder, workerSliceGateway, slice, events.EventWorkerSliceGatewayRecreated)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "recreated",
+						"event":       string(events.EventWorkerSliceGatewayRecreated),
+						"object_name": workerSliceGateway.Name,
+						"object_kind": metricKindWorkerSliceGateway,
+					},
+				)
 			}
 		}
 		return result, nil
@@ -230,15 +261,37 @@ func (s *WorkerSliceGatewayService) DeleteWorkerSliceGatewaysByLabel(ctx context
 		WithProject(util.GetProjectName(namespace)).
 		WithNamespace(namespace).
 		WithSlice(label["original-slice-name"])
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(label["original-slice-name"])
+
 	for _, gateway := range gateways {
 		err = util.DeleteResource(ctx, &gateway)
 		if err != nil {
 			//Register an event for worker slice gateway deletion failure
 			util.RecordEvent(ctx, eventRecorder, &gateway, nil, events.EventWorkerSliceGatewayDeletionFailed)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventWorkerSliceGatewayDeletionFailed),
+					"object_name": gateway.Name,
+					"object_kind": metricKindWorkerSliceGateway,
+				},
+			)
 			return err
 		}
 		//Register an event for worker slice gateway deletion success
 		util.RecordEvent(ctx, eventRecorder, &gateway, nil, events.EventWorkerSliceGatewayDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventWorkerSliceGatewayDeleted),
+				"object_name": gateway.Name,
+				"object_kind": metricKindWorkerSliceGateway,
+			},
+		)
 	}
 	return nil
 }
@@ -315,6 +368,11 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 		WithNamespace(namespace).
 		WithSlice(ownerLabel["original-slice-name"])
 
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(ownerLabel["original-slice-name"])
+
 	clusterExistMap := make(map[string]bool, len(clusters))
 	for _, cluster := range clusters {
 		clusterExistMap[cluster] = true
@@ -329,10 +387,26 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 			if err != nil {
 				//Register an event for worker slice gateway deletion failure
 				util.RecordEvent(ctx, eventRecorder, &gateway, nil, events.EventWorkerSliceGatewayDeletionFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventWorkerSliceGatewayDeletionFailed),
+						"object_name": gateway.Name,
+						"object_kind": metricKindWorkerSliceGateway,
+					},
+				)
 				return err
 			}
 			//Register an event for worker slice gateway deletion success
 			util.RecordEvent(ctx, eventRecorder, &gateway, nil, events.EventWorkerSliceGatewayDeleted)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deleted",
+					"event":       string(events.EventWorkerSliceGatewayDeleted),
+					"object_name": gateway.Name,
+					"object_kind": metricKindWorkerSliceGateway,
+				},
+			)
 		}
 	}
 	return nil
@@ -395,25 +469,62 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 		WithProject(util.GetProjectName(namespace)).
 		WithNamespace(namespace).
 		WithSlice(sliceName)
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
 	serverGatewayObject := s.buildMinimumGateway(sourceCluster, destinationCluster, sliceName, namespace, label, serverGateway, gatewayNumber, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName, gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress, serverGatewayName)
 	err = util.CreateResource(ctx, serverGatewayObject)
 	if err != nil {
 		//Register an event for worker slice gateway creation failure
 		util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreationFailed)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "creation_failed",
+				"event":       string(events.EventWorkerSliceGatewayCreationFailed),
+				"object_name": serverGatewayObject.Name,
+				"object_kind": metricKindWorkerSliceGateway,
+			},
+		)
 		return err
 	}
 	//Register an event for worker slice gateway creation success
 	util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
+	s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+		map[string]string{
+			"action":      "created",
+			"event":       string(events.EventWorkerSliceGatewayCreated),
+			"object_name": serverGatewayObject.Name,
+			"object_kind": metricKindWorkerSliceGateway,
+		},
+	)
 	clientGatewayObject := s.buildMinimumGateway(destinationCluster, sourceCluster, sliceName, namespace, label, clientGateway, gatewayNumber, gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress, serverGatewayName, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName)
 	err = util.CreateResource(ctx, clientGatewayObject)
 	if err != nil {
 		//Register an event for worker slice gateway creation failure
 		util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreationFailed)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "creation_failed",
+				"event":       string(events.EventWorkerSliceGatewayCreationFailed),
+				"object_name": clientGatewayObject.Name,
+				"object_kind": metricKindWorkerSliceGateway,
+			},
+		)
 		return err
 	}
 	//Register an event for worker slice gateway creation success
 	util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
-
+	s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+		map[string]string{
+			"action":      "created",
+			"event":       string(events.EventWorkerSliceGatewayCreated),
+			"object_name": clientGatewayObject.Name,
+			"object_kind": metricKindWorkerSliceGateway,
+		},
+	)
 	err = s.generateCerts(ctx, sliceName, namespace, serverGatewayObject, clientGatewayObject, gatewayAddresses)
 	if err != nil {
 		return err
@@ -504,6 +615,11 @@ func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName
 		WithNamespace(namespace).
 		WithSlice(sliceName)
 
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
 	environment := make(map[string]string, 5)
 	environment["NAMESPACE"] = namespace
 	environment["SERVER_SLICEGATEWAY_NAME"] = serverGateway.Name
@@ -515,10 +631,26 @@ func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName
 	if err != nil {
 		//Register an event for gateway job creation failure
 		util.RecordEvent(ctx, eventRecorder, serverGateway, clientGateway, events.EventSliceGatewayJobCreationFailed)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "job_creation_failed",
+				"event":       string(events.EventSliceGatewayJobCreationFailed),
+				"object_name": serverGateway.Name,
+				"object_kind": metricKindWorkerSliceGateway,
+			},
+		)
 		return err
 	}
 	//Register an event for gateway job creation success
 	util.RecordEvent(ctx, eventRecorder, serverGateway, clientGateway, events.EventSliceGatewayJobCreated)
+	s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+		map[string]string{
+			"action":      "job_created",
+			"event":       string(events.EventSliceGatewayJobCreated),
+			"object_name": serverGateway.Name,
+			"object_kind": metricKindWorkerSliceGateway,
+		},
+	)
 	return nil
 }
 

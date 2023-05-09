@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 	"time"
 
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -46,6 +47,7 @@ type IWorkerServiceImportService interface {
 }
 
 type WorkerServiceImportService struct {
+	mf metrics.IMetricRecorder
 }
 
 // ReconcileWorkerServiceImport is a function to reconcile the service import for worker object
@@ -67,6 +69,12 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 		WithProject(util.GetProjectName(req.Namespace)).
 		WithNamespace(req.Namespace).
 		WithSlice(workerServiceImport.Labels["original-slice-name"])
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(req.Namespace)).
+		WithNamespace(req.Namespace).
+		WithSlice(workerServiceImport.Labels["original-slice-name"])
+
 	//Step 1: Finalizers
 	if workerServiceImport.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(workerServiceImport.GetFinalizers(), WorkerServiceImportFinalizer) {
@@ -99,6 +107,14 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 			if exist && util.IsInSlice(slice.Spec.Clusters, workerServiceImport.Labels["worker-cluster"]) {
 				//Register an event for worker service import deleted forcefully
 				util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, events.EventWorkerServiceImportDeletedForcefully)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deleted_forcefully",
+						"event":       string(events.EventWorkerServiceImportDeletedForcefully),
+						"object_name": workerServiceImport.Name,
+						"object_kind": metricKindWorkerServiceImport,
+					},
+				)
 				if serviceExport.Annotations == nil {
 					serviceExport.Annotations = make(map[string]string)
 				}
@@ -107,10 +123,26 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 				if err != nil {
 					//Register an event for worker service import recreation failure
 					util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, events.EventWorkerServiceImportRecreationFailed)
+					s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+						map[string]string{
+							"action":      "recreation_failed",
+							"event":       string(events.EventWorkerServiceImportRecreationFailed),
+							"object_name": workerServiceImport.Name,
+							"object_kind": metricKindWorkerServiceImport,
+						},
+					)
 					return result, err
 				}
 				//Register an event for worker service import recreation success
 				util.RecordEvent(ctx, eventRecorder, workerServiceImport, serviceExport, events.EventWorkerServiceImportRecreated)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "recreated",
+						"event":       string(events.EventWorkerServiceImportRecreated),
+						"object_name": workerServiceImport.Name,
+						"object_kind": metricKindWorkerServiceImport,
+					},
+				)
 			}
 		}
 		return result, nil
@@ -153,6 +185,11 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 		WithNamespace(namespace).
 		WithSlice(sliceName)
 
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
 	for _, cluster := range clusters {
 		logger.Debugf("Cluster Object %s", cluster)
 		label["worker-cluster"] = cluster
@@ -187,6 +224,14 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 			if err != nil {
 				//Register an event for worker service import create failure
 				util.RecordEvent(ctx, eventRecorder, &expectedWorkerServiceImport, nil, events.EventWorkerServiceImportCreationFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "creation_failed",
+						"event":       string(events.EventWorkerServiceImportCreationFailed),
+						"object_name": expectedWorkerServiceImport.Name,
+						"object_kind": metricKindWorkerServiceImport,
+					},
+				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker service import %s since it already exists, namespace - %s ",
 						expectedWorkerServiceImport.Name, namespace)
@@ -195,6 +240,14 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 			}
 			//Register an event for worker service import create success
 			util.RecordEvent(ctx, eventRecorder, &expectedWorkerServiceImport, nil, events.EventWorkerServiceImportCreated)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "created",
+					"event":       string(events.EventWorkerServiceImportCreated),
+					"object_name": expectedWorkerServiceImport.Name,
+					"object_kind": metricKindWorkerServiceImport,
+				},
+			)
 		} else {
 			existingWorkerServiceImport.UID = ""
 			if existingWorkerServiceImport.Annotations == nil {
@@ -205,6 +258,14 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 			if err != nil {
 				//Register an event for worker service import update failure
 				util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, events.EventWorkerServiceImportUpdateFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "update_failed",
+						"event":       string(events.EventWorkerServiceImportUpdateFailed),
+						"object_name": existingWorkerServiceImport.Name,
+						"object_kind": metricKindWorkerServiceImport,
+					},
+				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
 					logger.Debug("failed to create service import %s since it already exists, namespace - %s ",
 						existingWorkerServiceImport.Name, namespace)
@@ -213,6 +274,14 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 			}
 			//Register an event for worker service import update success
 			util.RecordEvent(ctx, eventRecorder, existingWorkerServiceImport, nil, events.EventWorkerServiceImportUpdated)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "updated",
+					"event":       string(events.EventWorkerServiceImportUpdated),
+					"object_name": existingWorkerServiceImport.Name,
+					"object_kind": metricKindWorkerServiceImport,
+				},
+			)
 		}
 	}
 	return nil
@@ -229,15 +298,37 @@ func (s *WorkerServiceImportService) DeleteWorkerServiceImportByLabel(ctx contex
 		WithProject(util.GetProjectName(namespace)).
 		WithNamespace(namespace).
 		WithSlice(label["original-slice-name"])
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(label["original-slice-name"])
+
 	for _, serviceImport := range workerServiceImports {
 		err = util.DeleteResource(ctx, &serviceImport)
 		if err != nil {
 			//Register an event for worker service import delete failure
 			util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, events.EventWorkerServiceImportDeletionFailed)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventWorkerServiceImportDeletionFailed),
+					"object_name": serviceImport.Name,
+					"object_kind": metricKindWorkerServiceImport,
+				},
+			)
 			return err
 		}
 		//Register an event for worker service import delete success
 		util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, events.EventWorkerServiceImportDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventWorkerServiceImportDeleted),
+				"object_name": serviceImport.Name,
+				"object_kind": metricKindWorkerServiceImport,
+			},
+		)
 	}
 	return nil
 }
@@ -268,6 +359,12 @@ func (s *WorkerServiceImportService) cleanUpWorkerServiceImportsForRemovedCluste
 		WithProject(util.GetProjectName(namespace)).
 		WithNamespace(namespace).
 		WithSlice(label["original-slice-name"])
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(label["original-slice-name"])
+
 	for _, serviceImport := range serviceImports {
 		clusterName := serviceImport.Labels["worker-cluster"]
 		if !clusterSet[clusterName] {
@@ -275,10 +372,26 @@ func (s *WorkerServiceImportService) cleanUpWorkerServiceImportsForRemovedCluste
 			if err != nil {
 				//Register an event for worker service import delete failure
 				util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, events.EventWorkerServiceImportDeletionFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "deletion_failed",
+						"event":       string(events.EventWorkerServiceImportDeletionFailed),
+						"object_name": serviceImport.Name,
+						"object_kind": metricKindWorkerServiceImport,
+					},
+				)
 				return err
 			}
 			//Register an event for worker service import delete success
 			util.RecordEvent(ctx, eventRecorder, &serviceImport, nil, events.EventWorkerServiceImportDeleted)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deleted",
+					"event":       string(events.EventWorkerServiceImportDeleted),
+					"object_name": serviceImport.Name,
+					"object_kind": metricKindWorkerServiceImport,
+				},
+			)
 		}
 	}
 	return nil

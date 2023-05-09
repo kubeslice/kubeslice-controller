@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 	"time"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -37,6 +38,7 @@ type ISliceQoSConfigService interface {
 // SliceQoSConfigService implements different service interfaces
 type SliceQoSConfigService struct {
 	wsc IWorkerSliceConfigService
+	mf  metrics.IMetricRecorder
 }
 
 // ReconcileSliceQoSConfig is a function to reconcile the qos_profile
@@ -58,6 +60,11 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 	eventRecorder := util.CtxEventRecorder(ctx).
 		WithProject(util.GetProjectName(sliceQosConfig.Namespace)).
 		WithNamespace(sliceQosConfig.Namespace)
+
+	// Load metrics with project name and namespace
+	q.mf.WithProject(util.GetProjectName(sliceQosConfig.Namespace)).
+		WithNamespace(sliceQosConfig.Namespace)
+
 	//Step 1: Finalizers
 	if sliceQosConfig.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(sliceQosConfig.GetFinalizers(), SliceQoSConfigFinalizer) {
@@ -70,10 +77,26 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceQosConfig, SliceQoSConfigFinalizer)); shouldReturn {
 			//Register an event for slice qos config deletion failure
 			util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeletionFailed)
+			q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventSliceQoSConfigDeletionFailed),
+					"object_name": sliceQosConfig.Name,
+					"object_kind": metricKindSliceQoSConfig,
+				},
+			)
 			return result, reconErr
 		}
 		//Register an event for slice qos config deletion
 		util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeleted)
+		q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventSliceQoSConfigDeleted),
+				"object_name": sliceQosConfig.Name,
+				"object_kind": metricKindSliceQoSConfig,
+			},
+		)
 		return ctrl.Result{}, err
 	}
 
