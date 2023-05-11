@@ -20,9 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"testing"
 	"time"
+
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
@@ -724,6 +725,7 @@ func testReconcileClusterDeletionRequeueForDeregister(t *testing.T) {
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := clusterService.ReconcileCluster(ctx, requestObj)
 	require.NotNil(t, result.RequeueAfter)
 	require.True(t, result.RequeueAfter == 610*time.Second)
