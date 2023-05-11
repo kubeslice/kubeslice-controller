@@ -215,22 +215,6 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 	}
 	for _, project := range projects.Items {
 
-		// Delete all WorkerServiceImports (if Remaining)
-		logger.Infof("%s Fetching all WorkerServiceImports for Project %s", util.Find, project.GetName())
-		err = util.ListResources(ctx, workerServiceImports, client.InNamespace(projectNamespace))
-		if err != nil {
-			logger.Error("%s Error fetching WorkerServiceImports %s", util.Err, err.Error())
-		}
-		for _, cluster := range workerServiceImports.Items {
-			logger.Infof("%s  Deleting WorkerServiceImport %s", util.Bin, cluster.GetName())
-			err = util.Retry(ctx, noOfRetries, sleepDuration, func() (err error) {
-				return util.CleanupDeleteResource(ctx, &cluster)
-			})
-			if err != nil {
-				logger.Errorf("%s Error deleting workerServiceImport %s. %s", util.Err, cluster.GetName(), err.Error())
-			}
-		}
-
 		// Delete the project
 		logger.Infof("%s  Deleting Project %s", util.Bin, project.GetName())
 		err = util.Retry(ctx, noOfRetries, sleepDuration, func() (err error) {
