@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"time"
+
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -184,6 +185,14 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 					util.UpdateStatus(ctx, cluster)
 					// Event for worker-operator chart uninstallation in progress [ClusterDeregistrationInProgress]
 					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregistrationInProgress)
+					c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+						map[string]string{
+							"action":      "deregister_in_progress",
+							"event":       string(events.EventClusterDeregistrationInProgress),
+							"object_name": cluster.Name,
+							"object_kind": metricKindCluster,
+						},
+					)
 					// requeuing after ~10 mins
 					return ctrl.Result{RequeueAfter: 610 * time.Second}, nil
 				} else {
