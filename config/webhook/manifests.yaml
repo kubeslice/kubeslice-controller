@@ -211,6 +211,7 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - serviceexportconfigs
   sideEffects: None

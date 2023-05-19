@@ -54,6 +54,11 @@ func ValidateServiceExportConfigUpdate(ctx context.Context, serviceExportConfig 
 	return nil
 }
 
+// ValidateServiceExportConfigDelete is a function to validate the delete process of service export config
+func ValidateServiceExportConfigDelete(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
+	return nil
+}
+
 func validateServiceExportClusterAndSlice(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
 	cluster := &controllerv1alpha1.Cluster{}
 	clusterExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Spec.SourceCluster, Namespace: serviceExport.Namespace}, cluster)

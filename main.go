@@ -263,7 +263,7 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SliceConfig")
 			os.Exit(1)
 		}
-		if err = (&controllerv1alpha1.ServiceExportConfig{}).SetupWebhookWithManager(mgr, service.ValidateServiceExportConfigCreate, service.ValidateServiceExportConfigUpdate); err != nil {
+		if err = (&controllerv1alpha1.ServiceExportConfig{}).SetupWebhookWithManager(mgr, service.ValidateServiceExportConfigCreate, service.ValidateServiceExportConfigUpdate, service.ValidateServiceExportConfigDelete); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceExportConfig")
 			os.Exit(1)
 		}
