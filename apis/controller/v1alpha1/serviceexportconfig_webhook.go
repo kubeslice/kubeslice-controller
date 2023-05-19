@@ -48,7 +48,7 @@ func (r *ServiceExportConfig) SetupWebhookWithManager(mgr ctrl.Manager, validate
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-//+kubebuilder:webhook:path=/mutate-controller-kubeslice-io-v1alpha1-serviceexportconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=serviceexportconfigs,verbs=create;update;delete,versions=v1alpha1,name=mserviceexportconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-controller-kubeslice-io-v1alpha1-serviceexportconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=serviceexportconfigs,verbs=create;update,versions=v1alpha1,name=mserviceexportconfig.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &ServiceExportConfig{}
 
@@ -60,7 +60,7 @@ func (r *ServiceExportConfig) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-serviceexportconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=serviceexportconfigs,verbs=create;update,versions=v1alpha1,name=vserviceexportconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-serviceexportconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=serviceexportconfigs,verbs=create;update;delete,versions=v1alpha1,name=vserviceexportconfig.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ServiceExportConfig{}
 
