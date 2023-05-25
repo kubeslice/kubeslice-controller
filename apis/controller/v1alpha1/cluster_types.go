@@ -125,6 +125,16 @@ type ClusterStatus struct {
 	RegistrationStatus RegistrationStatus `json:"registrationStatus,omitempty"`
 	// IsDeregisterInProgress is the flag to check if the cluster deregister is InProgress
 	IsDeregisterInProgress bool `json:"isDeregisterInProgress,omitempty"`
+
+	// VCPURestriction is the restriction on the cluster disabling the creation of new pods
+	VCPURestriction *VCPURestriction `json:"vCPURestriction,omitempty"`
+}
+
+type VCPURestriction struct {
+	// EnforceRestrictions is the flag to check if the cluster is restricted
+	EnforceRestrictions bool `json:"enforceRestrictions,omitempty"`
+	// LastUpdatedTimestamp is the timestamp when the enforcement was updated
+	LastUpdatedTimestamp metav1.Time `json:"lastUpdatedTimestamp,omitempty"`
 }
 
 type ClusterHealth struct {

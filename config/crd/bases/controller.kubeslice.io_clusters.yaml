@@ -182,6 +182,20 @@ spec:
               secretName:
                 description: SecretName is the name of the secret for the worker cluster.
                 type: string
+              vCPURestriction:
+                description: VCPURestriction is the restriction on the cluster disabling
+                  the creation of new pods
+                properties:
+                  enforceRestrictions:
+                    description: EnforceRestrictions is the flag to check if the cluster
+                      is restricted
+                    type: boolean
+                  lastUpdatedTimestamp:
+                    description: LastUpdatedTimestamp is the timestamp when the enforcement
+                      was updated
+                    format: date-time
+                    type: string
+                type: object
             type: object
         type: object
     served: true
