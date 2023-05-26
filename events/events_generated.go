@@ -142,6 +142,14 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Service export config deletion failed.",
 	},
+	"DefaultSliceQoSConfigCreated": {
+		Name:                "DefaultSliceQoSConfigCreated",
+		Reason:              "DefaultSliceQoSConfigCreated",
+		Action:              "CreateSliceQoSConfig",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "Default Slice QoS config created.",
+	},
 	"SliceQoSConfigDeleted": {
 		Name:                "SliceQoSConfigDeleted",
 		Reason:              "SliceQoSConfigDeleted",
@@ -664,6 +672,7 @@ var (
 	EventSliceConfigDeletionFailed            events.EventName = "SliceConfigDeletionFailed"
 	EventServiceExportConfigDeleted           events.EventName = "ServiceExportConfigDeleted"
 	EventServiceExportConfigDeletionFailed    events.EventName = "ServiceExportConfigDeletionFailed"
+	EventDefaultSliceQoSConfigCreated         events.EventName = "DefaultSliceQoSConfigCreated"
 	EventSliceQoSConfigDeleted                events.EventName = "SliceQoSConfigDeleted"
 	EventSliceQoSConfigDeletionFailed         events.EventName = "SliceQoSConfigDeletionFailed"
 	EventSecretDeleted                        events.EventName = "SecretDeleted"

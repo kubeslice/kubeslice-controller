@@ -21,3 +21,7 @@ const (
 const (
 	NotApplicable = "NA"
 )
+
+const (
+	DefaultSliceQOSConfigName = "default"
+)
