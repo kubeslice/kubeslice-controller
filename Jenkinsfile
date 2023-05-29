@@ -6,6 +6,7 @@ dockerImagePipeline(
   // add docker imaveshasystemsage path for jenkins pipeline
   service: 'kubeslice-controller',
   testsDockerfile: "unit_tests.dockerfile",
+  
 )
 
 
