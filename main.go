@@ -70,8 +70,8 @@ func main() {
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
 	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr)
-	p := service.WithProjectService(ns, acs, c, sc, se, mr)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
+	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
 	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
 }
 
