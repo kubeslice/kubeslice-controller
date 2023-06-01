@@ -62,6 +62,7 @@ func WithProjectService(
 	c IClusterService,
 	sc ISliceConfigService,
 	se IServiceExportConfigService,
+	q ISliceQoSConfigService,
 	mf metrics.IMetricRecorder,
 ) IProjectService {
 	return &ProjectService{
@@ -70,6 +71,7 @@ func WithProjectService(
 		c:   c,
 		sc:  sc,
 		se:  se,
+		q:   q,
 		mf:  mf,
 	}
 }

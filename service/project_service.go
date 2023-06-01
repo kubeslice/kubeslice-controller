@@ -19,7 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+
 	"github.com/kubeslice/kubeslice-controller/metrics"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -38,6 +41,7 @@ type ProjectService struct {
 	c   IClusterService
 	sc  ISliceConfigService
 	se  IServiceExportConfigService
+	q   ISliceQoSConfigService
 	mf  metrics.IMetricRecorder
 }
 
@@ -144,6 +148,50 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
+	// Step 7: Create default SliceQOSConfig (10 gbps ceiling, 1 gbps guaranteed)
+	defaultSliceQOSConfig := &controllerv1alpha1.SliceQoSConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      util.DefaultSliceQOSConfigName,
+			Namespace: projectNamespace,
+		},
+		Spec: controllerv1alpha1.SliceQoSConfigSpec{
+			QueueType:               "HTB",
+			Priority:                0,
+			TcType:                  "BANDWIDTH_CONTROL",
+			BandwidthCeilingKbps:    10000000,
+			BandwidthGuaranteedKbps: 1000000,
+			DscpClass:               "AF11",
+		},
+	}
+	// check if default SliceQOSConfig exists
+	found, err = util.GetResourceIfExist(
+		ctx,
+		types.NamespacedName{
+			Name:      util.DefaultSliceQOSConfigName,
+			Namespace: projectNamespace,
+		},
+		defaultSliceQOSConfig)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !found {
+		err = util.CreateResource(ctx, defaultSliceQOSConfig)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		eventRecorder.WithNamespace(projectNamespace)
+		logger.Infof("default SliceQOSConfig %s created", util.DefaultSliceQOSConfigName)
+		util.RecordEvent(ctx, eventRecorder, defaultSliceQOSConfig, nil, events.EventDefaultSliceQoSConfigCreated)
+		t.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventDefaultSliceQoSConfigCreated),
+				"object_name": defaultSliceQOSConfig.Name,
+				"object_kind": metricKindSliceQoSConfig,
+			},
+		)
+	}
+
 	logger.Infof("project %s reconciled", req.Name)
 	return ctrl.Result{}, nil
 }
@@ -156,6 +204,9 @@ func (t *ProjectService) CleanUpProjectResources(ctx context.Context, namespace 
 		return result, reconErr
 	}
 	if shouldReturn, result, reconErr := util.IsReconciled(t.c.DeleteClusters(ctx, namespace)); shouldReturn {
+		return result, reconErr
+	}
+	if shouldReturn, result, reconErr := util.IsReconciled(t.q.DeleteSliceQoSConfig(ctx, namespace)); shouldReturn {
 		return result, reconErr
 	}
 	if shouldReturn, result, reconErr := util.IsReconciled(t.ns.DeleteNamespace(ctx, namespace)); shouldReturn {
