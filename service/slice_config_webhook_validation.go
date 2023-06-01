@@ -43,7 +43,7 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateSliceSubnet(sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	if err := validateClusters(ctx, sliceConfig); err != nil {
+	if err := validateClustersOnCreate(ctx, sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateQosProfile(ctx, sliceConfig); err != nil {
@@ -72,7 +72,7 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := preventUpdate(ctx, sliceConfig, old); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	if err := validateClusters(ctx, sliceConfig); err != nil {
+	if err := validateClustersOnUpdate(ctx, sliceConfig, old); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateQosProfile(ctx, sliceConfig); err != nil {
@@ -173,18 +173,65 @@ func validateIfServiceExportConfigExists(ctx context.Context, sliceConfig *contr
 }
 
 // validateClusters is function to validate the cluster specification
-func validateClusters(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+func validateClustersOnCreate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		return field.Duplicate(field.NewPath("Spec").Child("Clusters"), strings.Join(value, ", "))
 	}
-	for _, clusterName := range sliceConfig.Spec.Clusters {
+	for i, clusterName := range sliceConfig.Spec.Clusters {
+		cluster := controllerv1alpha1.Cluster{}
+		exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
+		if !exist {
+			return field.Invalid(field.NewPath("Spec").Child("Clusters").Index(i), clusterName, "cluster is not registered")
+		}
+		if cluster.Status.RegistrationStatus != controllerv1alpha1.RegistrationStatusRegistered {
+			return field.Invalid(field.NewPath("Spec").Child("Clusters").Index(i), clusterName, "cluster registration is not completed. Possible cause: Slice Operator installation is pending on the cluster.")
+		}
+		if cluster.Status.ClusterHealth != nil && cluster.Status.ClusterHealth.ClusterHealthStatus != controllerv1alpha1.ClusterHealthStatusNormal {
+			return field.Invalid(field.NewPath("Spec").Child("Clusters").Index(i), clusterName, "cluster health is not normal")
+		}
+		if len(cluster.Spec.NodeIPs) == 0 && len(cluster.Status.NodeIPs) == 0 {
+			return field.NotFound(field.NewPath("Status").Child("NodeIPs"), "in cluster "+clusterName+". Autodetected node IPs are not available. Possible cause: Slice Operator installation is pending on the cluster.")
+		}
+		if len(cluster.Status.CniSubnet) == 0 {
+			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
+		}
+		for _, cniSubnet := range cluster.Status.CniSubnet {
+			if util.OverlapIP(cniSubnet, sliceConfig.Spec.SliceSubnet) {
+				return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
+			}
+		}
+	}
+	return nil
+}
+
+// validateClustersOnUpdate is function to validate the cluster specification
+func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, old runtime.Object) *field.Error {
+	oldSc := old.(*controllerv1alpha1.SliceConfig)
+	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
+		return field.Duplicate(field.NewPath("Spec").Child("Clusters"), strings.Join(value, ", "))
+	}
+	newlyAddedClusters := util.DifferenceOfArray(sliceConfig.Spec.Clusters, oldSc.Spec.Clusters)
+	for _, clusterName := range newlyAddedClusters {
 		cluster := controllerv1alpha1.Cluster{}
 		exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
 		if !exist {
 			return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster is not registered")
 		}
+		if cluster.Status.RegistrationStatus != controllerv1alpha1.RegistrationStatusRegistered {
+			return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster registration is not completed. Possible cause: Slice Operator installation is pending on the cluster.")
+		}
+		if cluster.Status.ClusterHealth.ClusterHealthStatus != controllerv1alpha1.ClusterHealthStatusNormal {
+			return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster health is not normal")
+		}
+	}
+	for i, clusterName := range sliceConfig.Spec.Clusters {
+		cluster := controllerv1alpha1.Cluster{}
+		exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
+		if !exist {
+			return field.Invalid(field.NewPath("Spec").Child("Clusters").Index(i), clusterName, "cluster is not registered")
+		}
 		if len(cluster.Spec.NodeIPs) == 0 && len(cluster.Status.NodeIPs) == 0 {
-			return field.Required(field.NewPath("Spec").Child("Clusters").Child("NodeIPs"), "for cluster "+clusterName)
+			return field.NotFound(field.NewPath("Status").Child("NodeIPs"), "in cluster "+clusterName+". Autodetected node IPs are not available. Possible cause: Slice Operator installation is pending on the cluster.")
 		}
 		if len(cluster.Status.CniSubnet) == 0 {
 			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")

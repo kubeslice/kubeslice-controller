@@ -23,6 +23,7 @@ data:
       - SliceConfigDeletionFailed
       - ServiceExportConfigDeleted
       - ServiceExportConfigDeletionFailed
+      - DefaultSliceQoSConfigCreated
       - SliceQoSConfigDeleted
       - SliceQoSConfigDeletionFailed
       - SecretDeleted
