@@ -209,3 +209,19 @@ func Retry(ctx context.Context, backoffLimit int, sleep time.Duration, f func() 
 	elapsed := time.Since(start)
 	return fmt.Errorf("retry failed after %d attempts (took %d seconds), last error: %s", backoffLimit, int(elapsed.Seconds()), err)
 }
+
+// Set Difference: A - B
+func DifferenceOfArray(a, b []string) (diff []string) {
+	m := make(map[string]bool)
+
+	for _, item := range b {
+		m[item] = true
+	}
+
+	for _, item := range a {
+		if _, ok := m[item]; !ok {
+			diff = append(diff, item)
+		}
+	}
+	return diff
+}

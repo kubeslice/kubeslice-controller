@@ -55,6 +55,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigSubnetHasLastTwoOctetsOtherThanZero":                                CreateValidateSliceConfigSubnetHasLastTwoOctetsOtherThanZero,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithDuplicateClusters":                                              CreateValidateSliceConfigWithDuplicateClusters,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithClusterDoesNotExist":                                            CreateValidateSliceConfigWithClusterDoesNotExist,
+	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithParticipatingClusterRegistrationInProgress":                     CreateValidateSliceConfigWithParticipatingClusterRegistrationInProgress,
+	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithParticipatingClusterHealthNotNormal":                            CreateValidateSliceConfigWithParticipatingClusterHealthNotNormal,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster":                             CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster":                           CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster,
 	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster":      CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipatingCluster,
@@ -71,6 +73,9 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingSliceIpamType":                                              UpdateValidateSliceConfigUpdatingSliceIpamType,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithDuplicateClusters":                                              UpdateValidateSliceConfigWithDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithClusterDoesNotExist":                                            UpdateValidateSliceConfigWithClusterDoesNotExist,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNewClustersDoesNotExist":                                        UpdateValidateSliceConfigWithNewClustersDoesNotExist,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNewClusterUnhealthy":                                            UpdateValidateSliceConfigWithNewClusterUnhealthy,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNewClusterRegistrationPending":                                  UpdateValidateSliceConfigWithNewClusterRegistrationPending,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingCluster":             UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess":                                         UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsInStatusIsSuccess":                                       UpdateValidateSliceConfigWithNodeIPsInStatusIsSuccess,
@@ -252,11 +257,73 @@ func CreateValidateSliceConfigWithClusterDoesNotExist(t *testing.T) {
 	}, &controllerv1alpha1.Cluster{}).Return(notFoundError).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "Spec.Clusters[0]: Invalid value:")
 	require.Contains(t, err.Error(), sliceConfig.Spec.Clusters[0])
 	clientMock.AssertExpectations(t)
 }
 
+func CreateValidateSliceConfigWithParticipatingClusterRegistrationInProgress(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	}).Once()
+	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusInProgress
+	}).Once()
+	err := ValidateSliceConfigCreate(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.Clusters[0]: Invalid value: \"cluster-1\": cluster registration is not completed.")
+	clientMock.AssertExpectations(t)
+}
+
+func CreateValidateSliceConfigWithParticipatingClusterHealthNotNormal(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	}).Once()
+	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusWarning,
+		}
+	}).Once()
+	err := ValidateSliceConfigCreate(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.Clusters[0]: Invalid value: \"cluster-1\": cluster health is not normal")
+	clientMock.AssertExpectations(t)
+}
 func CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
@@ -279,10 +346,15 @@ func CreateValidateSliceConfigWithNodeIPsEmptyInParticipatingCluster(t *testing.
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters.NodeIPs: Required value:")
+	require.Contains(t, err.Error(), "Status.NodeIPs: Not found:")
 	clientMock.AssertExpectations(t)
 }
 
@@ -308,6 +380,10 @@ func CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster(t *testin
 	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 		arg.Status.CniSubnet = []string{}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
@@ -340,6 +416,10 @@ func CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipa
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
@@ -432,6 +512,10 @@ func CreateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "SomeType",
@@ -506,6 +590,10 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[1],
@@ -514,6 +602,10 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "SomeType",
@@ -570,6 +662,10 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[1],
@@ -578,6 +674,10 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[0],
@@ -690,9 +790,88 @@ func UpdateValidateSliceConfigWithClusterDoesNotExist(t *testing.T) {
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	t.Log(err.Error())
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "Spec.Clusters[0]: Invalid value:")
 	require.Contains(t, err.Error(), "cluster is not registered")
 	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[0])
+	clientMock.AssertExpectations(t)
+}
+
+func UpdateValidateSliceConfigWithNewClustersDoesNotExist(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	oldSliceConfig := newSliceConfig.DeepCopy()
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2", "cluster-3"}
+	notFoundError := k8sError.NewNotFound(util.Resource("SliceConfigWebhookValidationTest"), "isNotFound")
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[2],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(notFoundError).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
+	t.Log(err.Error())
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "cluster is not registered")
+	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[2])
+	clientMock.AssertExpectations(t)
+}
+
+func UpdateValidateSliceConfigWithNewClusterRegistrationPending(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clusterCniSubnet := "10.10.1.1/16"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	oldSliceConfig := newSliceConfig.DeepCopy()
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2", "cluster-3"}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[2],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{}
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusInProgress
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
+	t.Log(err.Error())
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "cluster registration is not completed")
+	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[2])
+	clientMock.AssertExpectations(t)
+}
+
+func UpdateValidateSliceConfigWithNewClusterUnhealthy(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clusterCniSubnet := "10.10.1.1/16"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	oldSliceConfig := newSliceConfig.DeepCopy()
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2", "cluster-3"}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[2],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{}
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusWarning,
+		}
+	}).Once()
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
+	t.Log(err.Error())
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
+	require.Contains(t, err.Error(), "cluster health is not normal")
+	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[2])
 	clientMock.AssertExpectations(t)
 }
 
@@ -709,10 +888,14 @@ func UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingClu
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Spec.Clusters.NodeIPs: Required value:")
+	require.Contains(t, err.Error(), "Status.NodeIPs: Not found")
 	clientMock.AssertExpectations(t)
 }
 func UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess(t *testing.T) {
@@ -734,6 +917,7 @@ func UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"11.11.14.114"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.Nil(t, err)
@@ -1257,6 +1441,10 @@ func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[1],
@@ -1265,6 +1453,10 @@ func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
