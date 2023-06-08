@@ -55,9 +55,9 @@ spec:
                   name and value is array of gateways present on that cluster. This
                   is used to avoid unnecessary reconciliation in worker-operator.
                 type: object
+              rotationInterval:
+                type: integer
               sliceName:
-                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-                  Important: Run "make" to regenerate code after modifying this file'
                 type: string
             type: object
           status:
@@ -75,10 +75,10 @@ spec:
                   - lastUpdatedTimestamp
                   - status
                   type: object
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file This is map of gateway name to the current rotation state'
+                description: This is map of gateway name to the current rotation state
                 type: object
+              rotationCount:
+                type: integer
               statusHistory:
                 description: This is circular array of last n number of rotation status.
                 items:
