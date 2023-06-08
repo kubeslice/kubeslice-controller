@@ -139,7 +139,7 @@ func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv
 		}
 	}
 	// check if we are past and its a correct time
-	if time.Now().After(sliceConfig.Spec.RenewBefore) {
+	if time.Now().After(sliceConfig.Spec.RenewBefore.Time) {
 		return nil
 	}
 	return &field.Error{
