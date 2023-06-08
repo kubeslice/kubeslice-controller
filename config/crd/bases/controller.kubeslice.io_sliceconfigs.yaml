@@ -143,6 +143,9 @@ spec:
                 - queueType
                 - tcType
                 type: object
+              renewBefore:
+                description: RenewBefore is used for renew now!
+                type: object
               rotationInterval:
                 default: 30
                 maximum: 90
