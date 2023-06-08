@@ -33,6 +33,7 @@ type VpnKeyRotationSpec struct {
 	CertificateCreationTime metav1.Time `json:"certificateCreationTime,omitempty"`
 	// CertificateExpiryTime is a time when certificate for all the gateway pairs will expire
 	CertificateExpiryTime metav1.Time `json:"certificateExpiryTime,omitempty"`
+	RotationInterval      int
 }
 
 // VpnKeyRotationStatus defines the observed state of VpnKeyRotation
@@ -41,6 +42,12 @@ type VpnKeyRotationStatus struct {
 	CurrentRotationState map[string]StatusOfKeyRotation `json:"currentRotationState,omitempty"`
 	// This is circular array of last n number of rotation status.
 	StatusHistory []map[string]StatusOfKeyRotation `json:"statusHistory,omitempty"`
+	RotationCount int
+}
+
+type StatusOfKeyRotation struct {
+	Status               string      `json:"status"`
+	LastUpdatedTimestamp metav1.Time `json:"lastUpdatedTimestamp"`
 }
 
 //+kubebuilder:object:root=true
@@ -66,11 +73,6 @@ type VpnKeyRotationList struct {
 
 func init() {
 	SchemeBuilder.Register(&VpnKeyRotation{}, &VpnKeyRotationList{})
-}
-
-type StatusOfKeyRotation struct {
-	Status               string      `json:"status"`
-	LastUpdatedTimestamp metav1.Time `json:"lastUpdatedTimestamp"`
 }
 
 const (
