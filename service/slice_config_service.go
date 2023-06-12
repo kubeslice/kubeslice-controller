@@ -44,6 +44,7 @@ type SliceConfigService struct {
 	se    IServiceExportConfigService
 	wsgrs IWorkerSliceGatewayRecyclerService
 	mf    metrics.IMetricRecorder
+	vpn   IVpnKeyRotationService
 }
 
 // ReconcileSliceConfig is a function to reconcile the sliceconfig
@@ -143,7 +144,9 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
 
-	// Step 5: Create ServiceImport Objects
+	// Step 5: Create VPNKeyRotation CR
+
+	// Step 6: Create ServiceImport Objects
 	serviceExports := &v1alpha1.ServiceExportConfigList{}
 	_, err = s.getServiceExportBySliceName(ctx, req.Namespace, sliceConfig.Name, serviceExports)
 	if err != nil {
