@@ -209,5 +209,5 @@ type reconcileVpnKeyRotationTestCase struct {
 }
 
 func Test_ReconcileVpnKeyRotation(t *testing.T) {
-	
+
 }

@@ -69,11 +69,11 @@ func main() {
 	wsi := service.WithWorkerServiceImportService(mr)
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
-	vpn := service.VpnKeyRotationService{}
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, &vpn)
+	vpn := service.WithVpnKeyRotationService()
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, vpn)
 	p := service.WithProjectService(ns, acs, c, sc, se)
 	sqcs := service.WithSliceQoSConfigService(wscs)
-	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
+	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn))
 }
 
 func initialize(services *service.Services) {
@@ -248,6 +248,16 @@ func initialize(services *service.Services) {
 		EventRecorder:         &eventRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SliceQoSConfig")
+		os.Exit(1)
+	}
+	if err = (&controller.VpnKeyRotationReconciler{
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		Log:                   controllerLog.With("name", "VpnKeyRotationConfig"),
+		VpnKeyRotationService: services.VpnKeyRotationService,
+		EventRecorder:         &eventRecorder,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VpnKeyRotationConfig")
 		os.Exit(1)
 	}
 

@@ -28,6 +28,7 @@ type Services struct {
 	WorkerServiceImportService        IWorkerServiceImportService
 	SliceQoSConfigService             ISliceQoSConfigService
 	WorkerSliceGatewayRecyclerService IWorkerSliceGatewayRecyclerService
+	VpnKeyRotationService             IVpnKeyRotationService
 }
 
 // bootstrapping Services
@@ -41,6 +42,7 @@ func WithServices(
 	wsis IWorkerServiceImportService,
 	sqcs ISliceQoSConfigService,
 	wsgrs IWorkerSliceGatewayRecyclerService,
+	vpn IVpnKeyRotationService,
 ) *Services {
 	return &Services{
 		ProjectService:                    ps,
@@ -52,6 +54,7 @@ func WithServices(
 		WorkerServiceImportService:        wsis,
 		SliceQoSConfigService:             sqcs,
 		WorkerSliceGatewayRecyclerService: wsgrs,
+		VpnKeyRotationService:             vpn,
 	}
 }
 
@@ -200,4 +203,9 @@ func WithSliceQoSConfigService(wsc IWorkerSliceConfigService, mf metrics.IMetric
 
 func WithMetricsRecorder() metrics.IMetricRecorder {
 	return &metrics.MetricRecorder{}
+}
+
+// bootstrapping Vpn Key Rotation service
+func WithVpnKeyRotationService() IVpnKeyRotationService {
+	return &VpnKeyRotationService{}
 }
