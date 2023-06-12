@@ -70,8 +70,8 @@ func main() {
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
 	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr)
-	p := service.WithProjectService(ns, acs, c, sc, se, mr)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
+	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
 	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
 }
 
@@ -263,7 +263,7 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SliceConfig")
 			os.Exit(1)
 		}
-		if err = (&controllerv1alpha1.ServiceExportConfig{}).SetupWebhookWithManager(mgr, service.ValidateServiceExportConfigCreate, service.ValidateServiceExportConfigUpdate); err != nil {
+		if err = (&controllerv1alpha1.ServiceExportConfig{}).SetupWebhookWithManager(mgr, service.ValidateServiceExportConfigCreate, service.ValidateServiceExportConfigUpdate, service.ValidateServiceExportConfigDelete); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceExportConfig")
 			os.Exit(1)
 		}
