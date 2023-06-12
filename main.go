@@ -67,7 +67,8 @@ func main() {
 	wsi := service.WithWorkerServiceImportService()
 	se := service.WithServiceExportConfigService(wsi)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs)
+	vpn := service.VpnKeyRotationService{}
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, &vpn)
 	p := service.WithProjectService(ns, acs, c, sc, se)
 	sqcs := service.WithSliceQoSConfigService(wscs)
 	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
