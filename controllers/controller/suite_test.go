@@ -17,10 +17,15 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"path/filepath"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
 
-	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 
 	"github.com/kubeslice/kubeslice-controller/service"
@@ -30,7 +35,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/client-go/kubernetes/scheme"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -48,6 +53,8 @@ var testEnv *envtest.Environment
 var svc *service.Services
 var controllerLog = util.NewLogger().With("name", "controllers")
 var eventRecorder events.EventRecorder
+var ctx context.Context
+var cancel context.CancelFunc
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -70,12 +77,18 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = v1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(controllerv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(workerv1alpha1.AddToScheme(scheme))
+
+	ctx, cancel = context.WithCancel(context.TODO())
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	//+kubebuilder:scaffold:scheme
+
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
@@ -92,22 +105,54 @@ var _ = BeforeSuite(func() {
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
 	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr)
-	p := service.WithProjectService(ns, acs, c, sc, se, mr)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
+	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
 	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs)
 
+	service.ProjectNamespacePrefix = util.AppendHyphenAndPercentageSToString("kubeslice")
+
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme,
+	})
+	Expect(err).ToNot(HaveOccurred())
+
 	//setting up the event recorder
-	eventRecorder = events.NewEventRecorder(k8sClient, k8sClient.Scheme(), ossEvents.EventsMap, events.EventRecorderOptions{
+	eventRecorder = events.NewEventRecorder(k8sClient, k8sManager.GetScheme(), ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,
 		Slice:     util.NotApplicable,
 	})
 
+	err = (&ClusterReconciler{
+		Client:         k8sClient,
+		Scheme:         k8sManager.GetScheme(),
+		Log:            controllerLog.With("name", "Cluster"),
+		EventRecorder:  &eventRecorder,
+		ClusterService: svc.ClusterService,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&ProjectReconciler{
+		Client:         k8sClient,
+		Scheme:         k8sManager.GetScheme(),
+		Log:            controllerLog.With("name", "Project"),
+		EventRecorder:  &eventRecorder,
+		ProjectService: svc.ProjectService,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	go func() {
+		defer GinkgoRecover()
+		err = k8sManager.Start(ctx)
+		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
+	}()
+
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
+	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
