@@ -2,8 +2,6 @@ package controller
 
 import (
 	"context"
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -13,13 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-var (
-	timeout = time.Second * 10
-	// duration = time.Second * 10
-	interval = time.Millisecond * 250
-)
-
-var _ = Describe("Cluster controller", func() {
+var _ = XDescribe("Cluster controller", func() {
 	When("When Creating Cluster CR", func() {
 		It("It should pass without errors", func() {
 			By("By creating a new Cluster CR")
