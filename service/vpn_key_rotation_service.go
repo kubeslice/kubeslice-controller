@@ -18,11 +18,15 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"time"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,7 +39,10 @@ type IVpnKeyRotationService interface {
 	ReconcileVpnKeyRotation(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 }
 
-type VpnKeyRotationService struct{}
+type VpnKeyRotationService struct {
+	wsgs IWorkerSliceGatewayService
+	wscs IWorkerSliceConfigService
+}
 
 // CreateMinimalVpnKeyRotationConfig creates minimal VPNKeyRotationCR if not found
 func (v *VpnKeyRotationService) CreateMinimalVpnKeyRotationConfig(ctx context.Context, sliceName, namespace string, r int) error {
@@ -102,37 +109,163 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		logger.Infof("Vpn Key Rotation Config %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
+	// get slice config
+	s, err := v.getSliceConfig(ctx, req.Name, req.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	// Step 1: Build map of clusterName: gateways
 	var clusterGatewayMapping = make(map[string][]string, 0)
-	workerSliceGatewaysList := workerv1alpha1.WorkerSliceGatewayList{}
-	for _, cluster := range vpnKeyRotationConfig.Spec.Clusters {
+	workerSliceGatewaysList := &workerv1alpha1.WorkerSliceGatewayList{}
+	for _, cluster := range s.Spec.Clusters {
 		// list workerslicegateways
 		o := map[string]string{
-			"worker-cluster": cluster,
+			"worker-cluster":      cluster,
+			"original-slice-name": s.Name,
 		}
-		listOpts := []client.ListOption{
-			client.MatchingLabels(
-				o,
-			),
-		}
-		if err := util.ListResources(ctx, &workerSliceGatewaysList, listOpts...); err != nil {
+		workerSliceGatewaysList, err = v.listWorkerSliceGateways(ctx, o)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 		vl := v.fetchGatewayNames(workerSliceGatewaysList)
 		clusterGatewayMapping[cluster] = vl
 	}
-	if !reflect.DeepEqual(vpnKeyRotationConfig.Spec.ClusterGatewayMapping, clusterGatewayMapping) {
-		vpnKeyRotationConfig.Spec.ClusterGatewayMapping = clusterGatewayMapping
-		if err := util.UpdateResource(ctx, vpnKeyRotationConfig); err != nil {
+
+	copyVpnConfig := vpnKeyRotationConfig.DeepCopy()
+
+	if !reflect.DeepEqual(copyVpnConfig.Spec.ClusterGatewayMapping, clusterGatewayMapping) {
+		copyVpnConfig.Spec.ClusterGatewayMapping = clusterGatewayMapping
+		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+	// Step 2: TODO Update Certificate Creation TimeStamp and Expiry Timestamp if
+	// a. The Creation TS and Expiry TS is empty
+	// b. The Current TS is pass the expiry TS
+	//TODO(): confirm if this is the right approach?
+	if !v.verifyAllJobsAreCompleted(ctx, vpnKeyRotationConfig.Spec.SliceName) {
+		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+	}
+
+	if metav1.Now().After(vpnKeyRotationConfig.Spec.CertificateExpiryTime.Time) {
+		now := metav1.Now()
+		// Check if it's the first time creation
+		if copyVpnConfig.Spec.CertificateCreationTime.IsZero() && copyVpnConfig.Spec.CertificateExpiryTime.IsZero() {
+			copyVpnConfig.Spec.CertificateCreationTime = now
+		} else {
+			if err := v.triggerJobsForCertCreation(ctx, vpnKeyRotationConfig, s); err != nil {
+				return ctrl.Result{}, err
+			}
+			copyVpnConfig.Spec.CertificateCreationTime = metav1.Now()
+		}
+		copyVpnConfig.Spec.CertificateExpiryTime = metav1.NewTime(now.AddDate(0, 0, vpnKeyRotationConfig.Spec.RotationInterval).Add(-1 * time.Hour))
+		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
-	// Step 2: TODO Update Certificate Creation TimeStamp and Expiry Timestamp
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: time.Duration(vpnKeyRotationConfig.Spec.RotationInterval-int(time.Hour)) * 24 * time.Hour}, nil
+}
+func (v *VpnKeyRotationService) triggerJobsForCertCreation(ctx context.Context, vpnKeyRotationConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) error {
+	o := map[string]string{
+		"original-slice-name": vpnKeyRotationConfig.Spec.SliceName,
+	}
+	workerSliceGatewaysList, err := v.listWorkerSliceGateways(ctx, o)
+	if err != nil {
+		return err
+	}
+	// fire certificate creation jobs for each gateway pair
+	for _, gateway := range workerSliceGatewaysList.Items {
+		if gateway.Spec.GatewayHostType == "Server" {
+			cl, err := v.listClientPairGateway(workerSliceGatewaysList, gateway.Spec.RemoteGatewayConfig.GatewayName)
+			if err != nil {
+				return err
+			}
+			// construct clustermap
+			clusterCidr := util.FindCIDRByMaxClusters(s.Spec.MaxClusters)
+			completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(s), s.GetName())
+			ownershipLabel := util.GetOwnerLabel(completeResourceName)
+			workerSliceConfigs, err := v.wscs.ListWorkerSliceConfigs(ctx, ownershipLabel, s.Namespace)
+			if err != nil {
+				return err
+			}
+			clusterMap := v.wscs.ComputeClusterMap(s.Spec.Clusters, workerSliceConfigs)
+			// contruct gw address
+			gatewayAddresses := v.wsgs.BuildNetworkAddresses(s.Spec.SliceSubnet, gateway.Spec.LocalGatewayConfig.ClusterName, gateway.Spec.RemoteGatewayConfig.ClusterName, clusterMap, clusterCidr)
+			// call GenerateCerts()
+			if err := v.wsgs.GenerateCerts(ctx, s.Name, s.Namespace, &gateway, cl, gatewayAddresses); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (v *VpnKeyRotationService) listWorkerSliceGateways(ctx context.Context, labels map[string]string) (*workerv1alpha1.WorkerSliceGatewayList, error) {
+	workerSliceGatewaysList := workerv1alpha1.WorkerSliceGatewayList{}
+	// list workerslicegateways
+	listOpts := []client.ListOption{
+		client.MatchingLabels(
+			labels,
+		),
+	}
+	if err := util.ListResources(ctx, &workerSliceGatewaysList, listOpts...); err != nil {
+		return nil, err
+	}
+	return &workerSliceGatewaysList, nil
+}
+
+// getSliceConfig
+func (v *VpnKeyRotationService) getSliceConfig(ctx context.Context, name, namespace string) (*controllerv1alpha1.SliceConfig, error) {
+	s := controllerv1alpha1.SliceConfig{}
+	found, err := util.GetResourceIfExist(ctx, types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}, &s)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("sliceonfig %s not found", name)
+	}
+	return &s, nil
+}
+
+func (v *VpnKeyRotationService) listClientPairGateway(wl *workerv1alpha1.WorkerSliceGatewayList, clientGatewayName string) (*workerv1alpha1.WorkerSliceGateway, error) {
+	for _, gateway := range wl.Items {
+		if gateway.Name == clientGatewayName {
+			return &gateway, nil
+		}
+	}
+	return nil, fmt.Errorf("cannot find gateway %s", clientGatewayName)
+}
+
+// verifyAllJobsAreCompleted checks if all the jobs are in complete state
+func (v *VpnKeyRotationService) verifyAllJobsAreCompleted(ctx context.Context, sliceName string) bool {
+	jobs := batchv1.JobList{}
+	o := map[string]string{
+		"SLICE_NAME": sliceName,
+	}
+	listOpts := []client.ListOption{
+		client.MatchingLabels(
+			o,
+		),
+	}
+	if err := util.ListResources(ctx, &jobs, listOpts...); err != nil {
+		return false
+	}
+	for _, job := range jobs.Items {
+		for _, condition := range job.Status.Conditions {
+			if !(condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // fetchGatewayNames fetches gateway names from the list of workerv1alpha1.WorkerSliceGatewayList
-func (v *VpnKeyRotationService) fetchGatewayNames(gl workerv1alpha1.WorkerSliceGatewayList) []string {
+func (v *VpnKeyRotationService) fetchGatewayNames(gl *workerv1alpha1.WorkerSliceGatewayList) []string {
 	var gatewayNames []string
 	for _, g := range gl.Items {
 		gatewayNames = append(gatewayNames, g.Name)

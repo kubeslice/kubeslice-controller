@@ -146,7 +146,8 @@ spec:
                 type: object
               renewBefore:
                 description: RenewBefore is used for renew now!
-                type: object
+                format: date-time
+                type: string
               rotationInterval:
                 default: 30
                 maximum: 90
