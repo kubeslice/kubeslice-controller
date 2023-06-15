@@ -206,6 +206,9 @@ func WithMetricsRecorder() metrics.IMetricRecorder {
 }
 
 // bootstrapping Vpn Key Rotation service
-func WithVpnKeyRotationService() IVpnKeyRotationService {
-	return &VpnKeyRotationService{}
+func WithVpnKeyRotationService(w IWorkerSliceGatewayService, ws IWorkerSliceConfigService) IVpnKeyRotationService {
+	return &VpnKeyRotationService{
+		wsgs: w,
+		wscs: ws,
+	}
 }

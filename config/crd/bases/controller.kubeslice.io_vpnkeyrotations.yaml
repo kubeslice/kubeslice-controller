@@ -46,6 +46,12 @@ spec:
                   all the gateway pairs will expire
                 format: date-time
                 type: string
+              clusters:
+                description: clusters contains the list of clusters attached to this
+                  slice
+                items:
+                  type: string
+                type: array
               gateways:
                 additionalProperties:
                   items:
