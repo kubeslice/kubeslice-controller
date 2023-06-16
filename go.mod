@@ -16,6 +16,7 @@ require (
 )
 
 require (
+	bou.ke/monkey v1.0.2
 	cloud.google.com/go v0.81.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18 // indirect
