@@ -115,22 +115,10 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		return ctrl.Result{}, err
 	}
 	// Step 1: Build map of clusterName: gateways
-	var clusterGatewayMapping = make(map[string][]string, 0)
-	workerSliceGatewaysList := &workerv1alpha1.WorkerSliceGatewayList{}
-	for _, cluster := range s.Spec.Clusters {
-		// list workerslicegateways
-		o := map[string]string{
-			"worker-cluster":      cluster,
-			"original-slice-name": s.Name,
-		}
-		workerSliceGatewaysList, err = v.listWorkerSliceGateways(ctx, o)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		vl := v.fetchGatewayNames(workerSliceGatewaysList)
-		clusterGatewayMapping[cluster] = vl
+	clusterGatewayMapping, err := v.constructClusterGatewayMapping(ctx, s)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
-
 	copyVpnConfig := vpnKeyRotationConfig.DeepCopy()
 
 	if !reflect.DeepEqual(copyVpnConfig.Spec.ClusterGatewayMapping, clusterGatewayMapping) {
@@ -148,24 +136,51 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
 
-	if metav1.Now().After(vpnKeyRotationConfig.Spec.CertificateExpiryTime.Time) {
-		now := metav1.Now()
+	copyVpnConfig, err = v.reconcileVpnKeyRotationConfig(ctx, copyVpnConfig, s)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: time.Duration(copyVpnConfig.Spec.RotationInterval-int(time.Hour)) * 24 * time.Hour}, nil
+}
+
+func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Context, copyVpnConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) (*controllerv1alpha1.VpnKeyRotation, error) {
+	now := metav1.Now()
+	if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
 		// Check if it's the first time creation
 		if copyVpnConfig.Spec.CertificateCreationTime.IsZero() && copyVpnConfig.Spec.CertificateExpiryTime.IsZero() {
 			copyVpnConfig.Spec.CertificateCreationTime = now
 		} else {
-			if err := v.triggerJobsForCertCreation(ctx, vpnKeyRotationConfig, s); err != nil {
-				return ctrl.Result{}, err
+			if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
+				return nil, err
 			}
-			copyVpnConfig.Spec.CertificateCreationTime = metav1.Now()
+			copyVpnConfig.Spec.CertificateCreationTime = now
 		}
-		copyVpnConfig.Spec.CertificateExpiryTime = metav1.NewTime(now.AddDate(0, 0, vpnKeyRotationConfig.Spec.RotationInterval).Add(-1 * time.Hour))
+		copyVpnConfig.Spec.CertificateExpiryTime = metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
-			return ctrl.Result{}, err
+			return nil, err
 		}
 	}
-	return ctrl.Result{RequeueAfter: time.Duration(vpnKeyRotationConfig.Spec.RotationInterval-int(time.Hour)) * 24 * time.Hour}, nil
+	return copyVpnConfig, nil
 }
+
+func (v *VpnKeyRotationService) constructClusterGatewayMapping(ctx context.Context, s *controllerv1alpha1.SliceConfig) (map[string][]string, error) {
+	var clusterGatewayMapping = make(map[string][]string, 0)
+	for _, cluster := range s.Spec.Clusters {
+		// list workerslicegateways
+		o := map[string]string{
+			"worker-cluster":      cluster,
+			"original-slice-name": s.Name,
+		}
+		workerSliceGatewaysList, err := v.listWorkerSliceGateways(ctx, o)
+		if err != nil {
+			return nil, err
+		}
+		vl := v.fetchGatewayNames(workerSliceGatewaysList)
+		clusterGatewayMapping[cluster] = vl
+	}
+	return clusterGatewayMapping, nil
+}
+
 func (v *VpnKeyRotationService) triggerJobsForCertCreation(ctx context.Context, vpnKeyRotationConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) error {
 	o := map[string]string{
 		"original-slice-name": vpnKeyRotationConfig.Spec.SliceName,
