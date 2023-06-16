@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -29,6 +30,8 @@ import (
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -429,6 +432,7 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 	patch := monkey.Patch(metav1.Now, func() metav1.Time {
 		return metav1.NewTime(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC))
 	})
+
 	defer patch.Unpatch()
 
 	gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
@@ -437,4 +441,164 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 	require.False(t, gotResp.Spec.CertificateCreationTime.IsZero())
 	require.False(t, gotResp.Spec.CertificateExpiryTime.IsZero())
 	clientMock.AssertExpectations(t)
+}
+
+type listClientPairGatewayTesCase struct {
+	name         string
+	arg1         *workerv1alpha1.WorkerSliceGatewayList
+	arg2         string
+	expectedResp *workerv1alpha1.WorkerSliceGateway
+	expectedErr  error
+}
+
+func Test_listClientPairGateway(t *testing.T) {
+	testCases := []listClientPairGatewayTesCase{
+		{
+			name: "it should return correct workerslicegw",
+			arg1: &workerv1alpha1.WorkerSliceGatewayList{
+				Items: []workerv1alpha1.WorkerSliceGateway{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-slice-worker-1-worker-2",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-slice-worker-2-worker-1",
+						},
+					},
+				},
+			},
+			arg2: "test-slice-worker-1-worker-2",
+			expectedResp: &workerv1alpha1.WorkerSliceGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice-worker-1-worker-2",
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "it should return error",
+			arg1: &workerv1alpha1.WorkerSliceGatewayList{
+				Items: []workerv1alpha1.WorkerSliceGateway{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-slice-worker-1-worker-2",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-slice-worker-2-worker-1",
+						},
+					},
+				},
+			},
+			arg2:         "test-slice-worker-1-worker-3",
+			expectedResp: nil,
+			expectedErr:  fmt.Errorf("cannot find gateway %s", "test-slice-worker-1-worker-3"),
+		},
+	}
+	for _, tc := range testCases {
+		runlistClientPairGatewayTestCase(t, tc)
+	}
+}
+
+func runlistClientPairGatewayTestCase(t *testing.T, tc listClientPairGatewayTesCase) {
+	_, _, vpn := setupTestCase()
+
+	gotResp, gotErr := vpn.listClientPairGateway(tc.arg1, tc.arg2)
+	require.Equal(t, gotErr, tc.expectedErr)
+	require.Equal(t, gotResp, tc.expectedResp)
+}
+
+type verifyAllJobsAreCompletedTestCase struct {
+	name                         string
+	arg1                         string
+	expectedResp                 bool
+	completionType               corev1.ConditionStatus
+	listArg1, listArg2, listArg3 interface{}
+	listRet1                     interface{}
+}
+
+func Test_verifyAllJobsAreCompleted(t *testing.T) {
+	testCases := []verifyAllJobsAreCompletedTestCase{
+		{
+			name:           "should return true if all jobs are in completed",
+			arg1:           "test-slice",
+			expectedResp:   true,
+			listArg1:       mock.Anything,
+			listArg2:       mock.Anything,
+			listArg3:       mock.Anything,
+			listRet1:       nil,
+			completionType: corev1.ConditionTrue,
+		},
+		{
+			name:           "should return false if all jobs are not in complete state",
+			arg1:           "test-slice",
+			expectedResp:   false,
+			listArg1:       mock.Anything,
+			listArg2:       mock.Anything,
+			listArg3:       mock.Anything,
+			listRet1:       nil,
+			completionType: corev1.ConditionFalse,
+		},
+		{
+			name:         "should return false if listing job fails",
+			arg1:         "test-slice",
+			expectedResp: false,
+			listArg1:     mock.Anything,
+			listArg2:     mock.Anything,
+			listArg3:     mock.Anything,
+			listRet1:     fmt.Errorf("cannot list jobs"),
+		},
+	}
+	for _, tc := range testCases {
+		runVerifyAllJobsAreCompleted(t, tc)
+	}
+}
+
+func runVerifyAllJobsAreCompleted(t *testing.T, tc verifyAllJobsAreCompletedTestCase) {
+	ctx, clientMock, vpn := setupTestCase()
+
+	clientMock.
+		On("List", tc.listArg1, tc.listArg2, tc.listArg3).
+		Return(tc.listRet1).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items,
+			batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "job-1",
+					Labels: map[string]string{
+						"SLICE_NAME": "test-slice",
+					},
+				},
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobComplete,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			},
+			batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "job-2",
+					Labels: map[string]string{
+						"SLICE_NAME": "test-slice",
+					},
+				},
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobComplete,
+							Status: tc.completionType,
+						},
+					},
+				},
+			})
+	}).Once()
+
+	gotResp := vpn.verifyAllJobsAreCompleted(ctx, tc.arg1)
+	require.Equal(t, gotResp, tc.expectedResp)
 }
