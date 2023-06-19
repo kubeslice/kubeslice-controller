@@ -26,6 +26,7 @@ import (
 	"bou.ke/monkey"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
@@ -35,6 +36,8 @@ import (
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type createMinimalVpnKeyRotationConfigTestCase struct {
@@ -48,10 +51,15 @@ type createMinimalVpnKeyRotationConfigTestCase struct {
 	createRet1                interface{}
 }
 
-func setupTestCase() (context.Context, *utilMock.Client, VpnKeyRotationService) {
+func setupTestCase() (context.Context, *utilMock.Client, VpnKeyRotationService, *mocks.IWorkerSliceGatewayService, *mocks.IWorkerSliceConfigService) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
-	return util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ClusterTestController", nil), clientMock, VpnKeyRotationService{}
+	wg := &mocks.IWorkerSliceGatewayService{}
+	ws := &mocks.IWorkerSliceConfigService{}
+	return util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ClusterTestController", nil), clientMock, VpnKeyRotationService{
+		wsgs: wg,
+		wscs: ws,
+	}, wg, ws
 }
 
 func Test_CreateMinimalVpnKeyRotationConfig(t *testing.T) {
@@ -90,7 +98,7 @@ func Test_CreateMinimalVpnKeyRotationConfig(t *testing.T) {
 }
 
 func runCreateMinimalVpnKeyRotationConfigTestCase(t *testing.T, tc createMinimalVpnKeyRotationConfigTestCase) {
-	ctx, clientMock, vpn := setupTestCase()
+	ctx, clientMock, vpn, _, _ := setupTestCase()
 	clientMock.
 		On("Get", tc.getArg1, tc.getArg2, tc.getArg3).
 		Return(tc.getRet1).Once()
@@ -178,7 +186,7 @@ func Test_ReconcileClusters(t *testing.T) {
 }
 
 func runReconcileClustersTestCase(t *testing.T, tc reconcileClustersTestCase) {
-	ctx, clientMock, vpn := setupTestCase()
+	ctx, clientMock, vpn, _, _ := setupTestCase()
 
 	clientMock.
 		On("Get", tc.getArg1, tc.getArg2, tc.getArg3).
@@ -259,7 +267,7 @@ func Test_ConstructClusterGatewayMapping(t *testing.T) {
 }
 
 func runClusterGatewayMappingTestCase(t *testing.T, tc constructClusterGatewayMappingTestCase) {
-	ctx, clientMock, vpn := setupTestCase()
+	ctx, clientMock, vpn, _, _ := setupTestCase()
 
 	if tc.expectedErr != nil {
 		clientMock.
@@ -350,7 +358,7 @@ func Test_getSliceConfig(t *testing.T) {
 }
 
 func runGetSliceConfigTestCase(t *testing.T, tc getSliceConfigTestCase) {
-	ctx, clientMock, vpn := setupTestCase()
+	ctx, clientMock, vpn, _, _ := setupTestCase()
 
 	clientMock.
 		On("Get", tc.getArg1, tc.getArg2, tc.getArg3).
@@ -375,12 +383,17 @@ type reconcileVpnKeyRotationConfigTestCase struct {
 	expectedResp                       *controllerv1alpha1.VpnKeyRotation
 	updateArg1, updateArg2, updateArg3 interface{}
 	updateRet1                         interface{}
+	now                                metav1.Time
 }
 
 func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
+	ts := metav1.NewTime(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC))
+	expiryTs := metav1.NewTime(ts.AddDate(0, 0, 30).Add(-1 * time.Hour))
+	newTs := metav1.NewTime(time.Date(2021, 07, 16, 20, 34, 58, 651387237, time.UTC))
+	newExpiryTs := metav1.NewTime(newTs.AddDate(0, 0, 30).Add(-1 * time.Hour))
 	testCases := []reconcileVpnKeyRotationConfigTestCase{
 		{
-			name: "should update CertCreation TS and Expiry TS",
+			name: "should update CertCreation TS and Expiry TS when it is nil",
 			arg1: &controllerv1alpha1.VpnKeyRotation{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-slice",
@@ -408,39 +421,140 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 					SliceName:               "test-slice",
 					Clusters:                []string{"worker-1", "worker-2"},
 					RotationInterval:        30,
-					CertificateCreationTime: metav1.NewTime(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC)),
+					CertificateCreationTime: &ts,
+					CertificateExpiryTime:   &expiryTs,
 				},
 			},
 			updateArg1: mock.Anything,
 			updateArg2: mock.Anything,
 			updateArg3: mock.Anything,
 			updateRet1: nil,
+			now:        ts,
+		},
+		{
+			name: "should update CertCreation TS and Expiry TS and fire new jobs",
+			arg1: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName:               "test-slice",
+					Clusters:                []string{"worker-1", "worker-2"},
+					RotationInterval:        30,
+					CertificateCreationTime: &ts,
+					CertificateExpiryTime:   &expiryTs,
+				},
+			},
+			arg2: &controllerv1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+			},
+			expectedErr: nil,
+			expectedResp: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName:               "test-slice",
+					Clusters:                []string{"worker-1", "worker-2"},
+					RotationInterval:        30,
+					CertificateCreationTime: &newTs,
+					CertificateExpiryTime:   &newExpiryTs,
+				},
+			},
+			updateArg1: mock.Anything,
+			updateArg2: mock.Anything,
+			updateArg3: mock.Anything,
+			updateRet1: nil,
+			now:        newTs,
 		},
 	}
 	for _, tc := range testCases {
 		runReconcileVpnKeyRotationConfig(t, &tc)
 	}
 }
-
 func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationConfigTestCase) {
-	ctx, clientMock, vpn := setupTestCase()
+	ctx, clientMock, vpn, wg, ws := setupTestCase()
+
+	// Mocking metav1.Now() with a fixed time value
+	patch := monkey.Patch(metav1.Now, func() metav1.Time {
+		return tc.now
+	})
+	defer patch.Unpatch()
+	// NOTE: Monkey pathcing sometimes requires the inlining to be disabled
+	// use go test -gcflags=-l
+
+	// setup Expectations
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
+		w.Items = append(w.Items,
+			workerv1alpha1.WorkerSliceGateway{
+				Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+					GatewayHostType: "Server",
+					RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+						GatewayName: "test-slice-worker-2-worker-1",
+					},
+				},
+			},
+			workerv1alpha1.WorkerSliceGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice-worker-2-worker-1",
+				},
+				Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+					GatewayHostType: "Client",
+					RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+						GatewayName: "test-slice-worker-1-worker-2",
+					},
+				},
+			})
+	}).Times(2)
+
+	workerSliceConfigs := workerv1alpha1.WorkerSliceConfigList{
+		Items: []workerv1alpha1.WorkerSliceConfig{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice-config-1",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice-config-2",
+				},
+			},
+		},
+	}
+
+	ws.On("ListWorkerSliceConfigs", mock.Anything, mock.Anything, mock.Anything).Return(workerSliceConfigs.Items, nil).Once()
+
+	clusterMap := map[string]int{
+		"cluster-1": 1,
+		"cluster-2": 2,
+	}
+
+	ws.On("ComputeClusterMap", mock.Anything, mock.Anything).Return(clusterMap).Once()
+
+	gwAddress := util.WorkerSliceGatewayNetworkAddresses{}
+
+	wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
+
+	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	clientMock.
 		On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
 
-	// Mocking metav1.Now() with a fixed time value
-	patch := monkey.Patch(metav1.Now, func() metav1.Time {
-		return metav1.NewTime(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC))
-	})
-
-	defer patch.Unpatch()
-
 	gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
 	require.Equal(t, gotErr, tc.expectedErr)
 
+	require.Equal(t, tc.expectedResp, gotResp)
+
 	require.False(t, gotResp.Spec.CertificateCreationTime.IsZero())
 	require.False(t, gotResp.Spec.CertificateExpiryTime.IsZero())
-	clientMock.AssertExpectations(t)
 }
 
 type listClientPairGatewayTesCase struct {
@@ -504,7 +618,7 @@ func Test_listClientPairGateway(t *testing.T) {
 }
 
 func runlistClientPairGatewayTestCase(t *testing.T, tc listClientPairGatewayTesCase) {
-	_, _, vpn := setupTestCase()
+	_, _, vpn, _, _ := setupTestCase()
 
 	gotResp, gotErr := vpn.listClientPairGateway(tc.arg1, tc.arg2)
 	require.Equal(t, gotErr, tc.expectedErr)
@@ -558,7 +672,7 @@ func Test_verifyAllJobsAreCompleted(t *testing.T) {
 }
 
 func runVerifyAllJobsAreCompleted(t *testing.T, tc verifyAllJobsAreCompletedTestCase) {
-	ctx, clientMock, vpn := setupTestCase()
+	ctx, clientMock, vpn, _, _ := setupTestCase()
 
 	clientMock.
 		On("List", tc.listArg1, tc.listArg2, tc.listArg3).
@@ -601,4 +715,482 @@ func runVerifyAllJobsAreCompleted(t *testing.T, tc verifyAllJobsAreCompletedTest
 
 	gotResp := vpn.verifyAllJobsAreCompleted(ctx, tc.arg1)
 	require.Equal(t, gotResp, tc.expectedResp)
+}
+
+type triggerJobsForCertCreationTestCase struct {
+	name                                                                               string
+	arg1                                                                               *controllerv1alpha1.VpnKeyRotation
+	arg2                                                                               *controllerv1alpha1.SliceConfig
+	expectedResp                                                                       error
+	listArg1, listArg2, listArg3                                                       interface{}
+	listRet1                                                                           interface{}
+	listWorkerSliceConfigsArg1, listWorkerSliceConfigsArg2, listWorkerSliceConfigsArg3 interface{}
+	listWorkerSliceConfigsRet1                                                         interface{}
+	workerSliceGateways                                                                []workerv1alpha1.WorkerSliceGateway
+	generateCertsRet1                                                                  interface{}
+}
+
+func Test_triggerJobsForCertCreation(t *testing.T) {
+	testCases := []triggerJobsForCertCreationTestCase{
+		{
+			name: "should return error in case listing workerslicegateways failed",
+			arg1: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName: "test-slice",
+				},
+			},
+			arg2:         &controllerv1alpha1.SliceConfig{},
+			expectedResp: fmt.Errorf("Error listing workerslicegateways"),
+			listArg1:     mock.Anything,
+			listArg2:     mock.Anything,
+			listArg3:     mock.Anything,
+			listRet1:     fmt.Errorf("Error listing workerslicegateways"),
+		},
+		{
+			name: "should return error in case client workerslicegateway is not present",
+			arg1: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName: "test-slice",
+				},
+			},
+			arg2:         &controllerv1alpha1.SliceConfig{},
+			expectedResp: fmt.Errorf("cannot find gateway %s", "test-slice-worker2-worker-1"),
+			listArg1:     mock.Anything,
+			listArg2:     mock.Anything,
+			listArg3:     mock.Anything,
+			listRet1:     nil,
+			workerSliceGateways: []workerv1alpha1.WorkerSliceGateway{
+				{
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Server",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker2-worker-1",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "should return error in case listing workersliceconfigs failed",
+			arg1: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName: "test-slice",
+				},
+			},
+			arg2: &controllerv1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice",
+				},
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					MaxClusters: 3,
+				},
+			},
+			expectedResp:               fmt.Errorf("error listing workersliceconfigs"),
+			listArg1:                   mock.Anything,
+			listArg2:                   mock.Anything,
+			listArg3:                   mock.Anything,
+			listRet1:                   nil,
+			listWorkerSliceConfigsArg1: mock.Anything,
+			listWorkerSliceConfigsArg2: mock.Anything,
+			listWorkerSliceConfigsArg3: mock.Anything,
+			listWorkerSliceConfigsRet1: fmt.Errorf("error listing workersliceconfigs"),
+			workerSliceGateways: []workerv1alpha1.WorkerSliceGateway{
+				{
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Server",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-2-worker-1",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-2-worker-1",
+					},
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Client",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-1-worker-2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "should return error in case generating certs failed",
+			arg1: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName: "test-slice",
+				},
+			},
+			arg2: &controllerv1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice",
+				},
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					MaxClusters: 3,
+				},
+			},
+			expectedResp:               fmt.Errorf("error generating Certs"),
+			listArg1:                   mock.Anything,
+			listArg2:                   mock.Anything,
+			listArg3:                   mock.Anything,
+			listRet1:                   nil,
+			listWorkerSliceConfigsArg1: mock.Anything,
+			listWorkerSliceConfigsArg2: mock.Anything,
+			listWorkerSliceConfigsArg3: mock.Anything,
+			listWorkerSliceConfigsRet1: nil,
+			workerSliceGateways: []workerv1alpha1.WorkerSliceGateway{
+				{
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Server",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-2-worker-1",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-2-worker-1",
+					},
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Client",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-1-worker-2",
+						},
+					},
+				},
+			},
+			generateCertsRet1: fmt.Errorf("error generating Certs"),
+		},
+		{
+			name: "should return error in case generating certs failed",
+			arg1: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName: "test-slice",
+				},
+			},
+			arg2: &controllerv1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice",
+				},
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					MaxClusters: 3,
+				},
+			},
+			expectedResp:               nil,
+			listArg1:                   mock.Anything,
+			listArg2:                   mock.Anything,
+			listArg3:                   mock.Anything,
+			listRet1:                   nil,
+			listWorkerSliceConfigsArg1: mock.Anything,
+			listWorkerSliceConfigsArg2: mock.Anything,
+			listWorkerSliceConfigsArg3: mock.Anything,
+			listWorkerSliceConfigsRet1: nil,
+			workerSliceGateways: []workerv1alpha1.WorkerSliceGateway{
+				{
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Server",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-2-worker-1",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-2-worker-1",
+					},
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Client",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-1-worker-2",
+						},
+					},
+				},
+			},
+			generateCertsRet1: nil,
+		},
+	}
+	for _, tc := range testCases {
+		runTriggerJobsForCertCreation(t, tc)
+	}
+}
+
+func runTriggerJobsForCertCreation(t *testing.T, tc triggerJobsForCertCreationTestCase) {
+	ctx, clientMock, vpn, wg, ws := setupTestCase()
+
+	clientMock.
+		On("List", tc.listArg1, tc.listArg2, tc.listArg3).
+		Return(tc.listRet1).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
+		w.Items = tc.workerSliceGateways
+	}).Once()
+
+	workerSliceConfigs := workerv1alpha1.WorkerSliceConfigList{
+		Items: []workerv1alpha1.WorkerSliceConfig{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker-slice-config-1",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker-slice-config-2",
+				},
+			},
+		},
+	}
+
+	ws.On("ListWorkerSliceConfigs", tc.listWorkerSliceConfigsArg1, tc.listWorkerSliceConfigsArg2, tc.listWorkerSliceConfigsArg3).Return(workerSliceConfigs.Items, tc.listWorkerSliceConfigsRet1).Once()
+
+	clusterMap := map[string]int{
+		"cluster-1": 1,
+		"cluster-2": 2,
+	}
+
+	ws.On("ComputeClusterMap", tc.listWorkerSliceConfigsArg1, tc.listWorkerSliceConfigsArg2).Return(clusterMap).Once()
+
+	gwAddress := util.WorkerSliceGatewayNetworkAddresses{}
+
+	wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
+
+	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.generateCertsRet1).Once()
+
+	gotResp := vpn.triggerJobsForCertCreation(ctx, tc.arg1, tc.arg2)
+	require.Equal(t, gotResp, tc.expectedResp)
+
+	clientMock.AssertExpectations(t)
+}
+
+type reconcileVpnKeyRotationTestCase struct {
+	name                      string
+	request                   ctrl.Request
+	expectedResponse          ctrl.Result
+	expectedError             error
+	getArg1, getArg2, getArg3 interface{}
+	getRet1                   interface{}
+	getRet2                   interface{}
+	completionType            corev1.ConditionStatus
+	clusterGatewayMapping     map[string][]string
+}
+
+func Test_reconcileVpnKeyRotation(t *testing.T) {
+	testCases := []reconcileVpnKeyRotationTestCase{
+		{
+			name: "should return error in case vpnkeyrotation config not found",
+			request: ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: "test-ns",
+				Name:      "test-slice",
+			}},
+			expectedResponse: ctrl.Result{},
+			expectedError:    fmt.Errorf("vpnkeyrotation config not found"),
+			getArg1:          mock.Anything,
+			getArg2:          mock.Anything,
+			getArg3:          mock.Anything,
+			getRet1:          fmt.Errorf("vpnkeyrotation config not found"),
+		},
+		{
+			name: "should return error in case slice config not found",
+			request: ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: "test-ns",
+				Name:      "test-slice",
+			}},
+			expectedResponse: ctrl.Result{},
+			expectedError:    fmt.Errorf("slice config not found"),
+			getArg1:          mock.Anything,
+			getArg2:          mock.Anything,
+			getArg3:          mock.Anything,
+			getRet1:          nil,
+			getRet2:          fmt.Errorf("slice config not found"),
+		},
+		{
+			name: "should successfully requeue after building clusterGatewayMapping",
+			request: ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: "test-ns",
+				Name:      "test-slice",
+			}},
+			expectedResponse: ctrl.Result{Requeue: true},
+			expectedError:    nil,
+			getArg1:          mock.Anything,
+			getArg2:          mock.Anything,
+			getArg3:          mock.Anything,
+			getRet1:          nil,
+			getRet2:          nil,
+		},
+		{
+			name: "should wait and requeue till all the jobs are in comlpletion state",
+			request: ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: "test-ns",
+				Name:      "test-slice",
+			}},
+			expectedResponse: ctrl.Result{RequeueAfter: 1 * time.Minute},
+			expectedError:    nil,
+			getArg1:          mock.Anything,
+			getArg2:          mock.Anything,
+			getArg3:          mock.Anything,
+			getRet1:          nil,
+			getRet2:          nil,
+			completionType:   corev1.ConditionFalse,
+			clusterGatewayMapping: map[string][]string{
+				"worker-1": {"test-slice-worker-1-worker-2"},
+				"worker-2": {"test-slice-worker-2-worker-1"},
+			},
+		},
+		{
+			name: "should successfully requeue before 1 hour of expiry",
+			request: ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: "test-ns",
+				Name:      "test-slice",
+			}},
+			expectedResponse: ctrl.Result{RequeueAfter: (time.Duration(30) * 24 * time.Hour) - (time.Hour)},
+			expectedError:    nil,
+			getArg1:          mock.Anything,
+			getArg2:          mock.Anything,
+			getArg3:          mock.Anything,
+			getRet1:          nil,
+			getRet2:          nil,
+			completionType:   corev1.ConditionTrue,
+			clusterGatewayMapping: map[string][]string{
+				"worker-1": {"test-slice-worker-1-worker-2"},
+				"worker-2": {"test-slice-worker-2-worker-1"},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		runReconcileVpnKeyRotation(t, tc)
+	}
+}
+
+func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase) {
+	ctx, clientMock, vpn, _, _ := setupTestCase()
+
+	clientMock.
+		On("Get", tc.getArg1, tc.getArg2, tc.getArg3).
+		Return(tc.getRet1).Run(func(args mock.Arguments) {
+		v := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		v.ObjectMeta = metav1.ObjectMeta{
+			Name:      "test-slice",
+			Namespace: "test-namespace",
+		}
+		v.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			Clusters:              []string{"worker-1", "worker-2"},
+			RotationInterval:      30,
+			SliceName:             "test-slice",
+			ClusterGatewayMapping: tc.clusterGatewayMapping,
+		}
+	}).Once()
+
+	clientMock.
+		On("Get", tc.getArg1, tc.getArg2, tc.getArg3).
+		Return(tc.getRet2).Run(func(args mock.Arguments) {
+		s := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		s.ObjectMeta = metav1.ObjectMeta{
+			Name:      "test-slice",
+			Namespace: "test-ns",
+		}
+		s.Spec = controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"worker-1", "worker-2"},
+		}
+	}).Once()
+
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
+		w.Items = append(w.Items, workerv1alpha1.WorkerSliceGateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-slice-worker-1-worker-2",
+				Labels: map[string]string{
+					"worker-cluster":      "worker-1",
+					"original-slice-name": "test-slice",
+				},
+			},
+		})
+	}).Once()
+
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
+		w.Items = append(w.Items, workerv1alpha1.WorkerSliceGateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-slice-worker-2-worker-1",
+				Labels: map[string]string{
+					"worker-cluster":      "worker-2",
+					"original-slice-name": "test-slice",
+				},
+			},
+		})
+	}).Once()
+
+	clientMock.
+		On("Update", mock.Anything, mock.Anything).Return(nil).Once()
+
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items,
+			batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice-worker-1-worker-2",
+					Labels: map[string]string{
+						"SLICE_NAME": "test-slice",
+					},
+				},
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobComplete,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			},
+			batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-slice-worker-2-worker-1",
+					Labels: map[string]string{
+						"SLICE_NAME": "test-slice",
+					},
+				},
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobComplete,
+							Status: tc.completionType,
+						},
+					},
+				},
+			})
+	}).Once()
+
+	clientMock.
+		On("Update", mock.Anything, mock.Anything).Return(nil).Once()
+
+	gotResp, gotErr := vpn.ReconcileVpnKeyRotation(ctx, tc.request)
+
+	require.Equal(t, tc.expectedError, gotErr)
+	require.Equal(t, tc.expectedResponse, gotResp)
+
 }
