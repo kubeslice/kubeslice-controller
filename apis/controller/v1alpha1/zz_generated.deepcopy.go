@@ -940,8 +940,14 @@ func (in *VpnKeyRotationSpec) DeepCopyInto(out *VpnKeyRotationSpec) {
 			(*out)[key] = outVal
 		}
 	}
-	in.CertificateCreationTime.DeepCopyInto(&out.CertificateCreationTime)
-	in.CertificateExpiryTime.DeepCopyInto(&out.CertificateExpiryTime)
+	if in.CertificateCreationTime != nil {
+		in, out := &in.CertificateCreationTime, &out.CertificateCreationTime
+		*out = (*in).DeepCopy()
+	}
+	if in.CertificateExpiryTime != nil {
+		in, out := &in.CertificateExpiryTime, &out.CertificateExpiryTime
+		*out = (*in).DeepCopy()
+	}
 	if in.Clusters != nil {
 		in, out := &in.Clusters, &out.Clusters
 		*out = make([]string, len(*in))

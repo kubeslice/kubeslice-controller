@@ -161,7 +161,7 @@ generate-mocks: ## Generate mocks for the controller-runtime.
 
 .PHONY: unit-test
 unit-test: ## Run local unit tests.
-	go test ./service --coverprofile=coverage.out
+	go test -gcflags=-l ./service --coverprofile=coverage.out
 	mkdir -p coverage-report
 	go tool cover -html=coverage.out -o coverage-report/report.html
 

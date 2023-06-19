@@ -30,10 +30,10 @@ type VpnKeyRotationSpec struct {
 	// This is used to avoid unnecessary reconciliation in worker-operator.
 	ClusterGatewayMapping map[string][]string `json:"gateways,omitempty"`
 	// CertificateCreationTime is a time when certificate for all the gateway pairs is created/updated
-	CertificateCreationTime metav1.Time `json:"certificateCreationTime,omitempty"`
+	CertificateCreationTime *metav1.Time `json:"certificateCreationTime,omitempty"`
 	// CertificateExpiryTime is a time when certificate for all the gateway pairs will expire
-	CertificateExpiryTime metav1.Time `json:"certificateExpiryTime,omitempty"`
-	RotationInterval      int         `json:"rotationInterval,omitempty"`
+	CertificateExpiryTime *metav1.Time `json:"certificateExpiryTime,omitempty"`
+	RotationInterval      int          `json:"rotationInterval,omitempty"`
 	// clusters contains the list of clusters attached to this slice
 	Clusters []string `json:"clusters,omitempty"`
 }

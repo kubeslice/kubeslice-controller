@@ -140,26 +140,34 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{RequeueAfter: time.Duration(copyVpnConfig.Spec.RotationInterval-int(time.Hour)) * 24 * time.Hour}, nil
+	return ctrl.Result{RequeueAfter: (time.Duration(copyVpnConfig.Spec.RotationInterval) * 24 * time.Hour) - (time.Hour)}, nil
 }
 
 func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Context, copyVpnConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) (*controllerv1alpha1.VpnKeyRotation, error) {
 	now := metav1.Now()
-	if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
-		// Check if it's the first time creation
-		if copyVpnConfig.Spec.CertificateCreationTime.IsZero() && copyVpnConfig.Spec.CertificateExpiryTime.IsZero() {
-			copyVpnConfig.Spec.CertificateCreationTime = now
-		} else {
-			if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
-				return nil, err
-			}
-			copyVpnConfig.Spec.CertificateCreationTime = now
-		}
-		copyVpnConfig.Spec.CertificateExpiryTime = metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
+
+	// Check if it's the first time creation
+	if copyVpnConfig.Spec.CertificateCreationTime.IsZero() && copyVpnConfig.Spec.CertificateExpiryTime.IsZero() {
+		copyVpnConfig.Spec.CertificateCreationTime = &now
+		expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
+		copyVpnConfig.Spec.CertificateExpiryTime = &expiryTS
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
 			return nil, err
 		}
+	} else {
+		if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
+			if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
+				return nil, err
+			}
+			copyVpnConfig.Spec.CertificateCreationTime = &now
+			expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
+			copyVpnConfig.Spec.CertificateExpiryTime = &expiryTS
+			if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
+				return nil, err
+			}
+		}
 	}
+
 	return copyVpnConfig, nil
 }
 
@@ -241,7 +249,7 @@ func (v *VpnKeyRotationService) getSliceConfig(ctx context.Context, name, namesp
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("sliceonfig %s not found", name)
+		return nil, fmt.Errorf("sliceconfig %s not found", name)
 	}
 	return &s, nil
 }

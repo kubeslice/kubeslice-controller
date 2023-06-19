@@ -1432,6 +1432,7 @@ func TestValidateCertsRotationInterval_Postive(t *testing.T) {
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	sliceConfig.Spec.RenewBefore = metav1.Now()
 	expiry := metav1.Now().Add(30)
+	now := metav1.Now()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		arg.ObjectMeta = metav1.ObjectMeta{
@@ -1440,8 +1441,8 @@ func TestValidateCertsRotationInterval_Postive(t *testing.T) {
 		}
 		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
 			SliceName:               name,
-			CertificateCreationTime: metav1.Now(),
-			CertificateExpiryTime:   metav1.Time{Time: expiry},
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{Time: expiry},
 		}
 	}).Once()
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
@@ -1456,6 +1457,7 @@ func TestValidateCertsRotationInterval_Negative(t *testing.T) {
 	// RenewBefore is 1 hour after, decline
 	sliceConfig.Spec.RenewBefore = metav1.Time{Time: metav1.Now().Add(time.Hour * 1)}
 	expiry := metav1.Now().Add(30)
+	now := metav1.Now()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		arg.ObjectMeta = metav1.ObjectMeta{
@@ -1464,8 +1466,8 @@ func TestValidateCertsRotationInterval_Negative(t *testing.T) {
 		}
 		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
 			SliceName:               name,
-			CertificateCreationTime: metav1.Now(),
-			CertificateExpiryTime:   metav1.Time{Time: expiry},
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{Time: expiry},
 		}
 	}).Once()
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
@@ -1480,6 +1482,7 @@ func TestValidateCertsRotationInterval_NegativeClusterStatus(t *testing.T) {
 
 	sliceConfig.Spec.RenewBefore = metav1.Now()
 	expiry := metav1.Now().Add(30)
+	now := metav1.Now()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		arg.ObjectMeta = metav1.ObjectMeta{
@@ -1488,8 +1491,8 @@ func TestValidateCertsRotationInterval_NegativeClusterStatus(t *testing.T) {
 		}
 		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
 			SliceName:               name,
-			CertificateCreationTime: metav1.Now(),
-			CertificateExpiryTime:   metav1.Time{Time: expiry},
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{Time: expiry},
 			ClusterGatewayMapping: map[string][]string{
 				"cluster-1": {"gateway-1"},
 				"cluster-2": {"gateway-2"},
@@ -1522,6 +1525,7 @@ func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
 
 	sliceConfig.Spec.RenewBefore = metav1.Now()
 	expiry := metav1.Now().Add(30)
+	now := metav1.Now()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		arg.ObjectMeta = metav1.ObjectMeta{
@@ -1530,8 +1534,8 @@ func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
 		}
 		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
 			SliceName:               name,
-			CertificateCreationTime: metav1.Now(),
-			CertificateExpiryTime:   metav1.Time{expiry},
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{expiry},
 			ClusterGatewayMapping: map[string][]string{
 				"cluster-1": {"gateway-1"},
 				"cluster-2": {"gateway-2"},
