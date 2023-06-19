@@ -145,6 +145,6 @@ func (n *NamespaceService) getResourceLabel(namespace string, owner client.Objec
 	for key, value := range util.LabelsKubeSliceController {
 		label[key] = value
 	}
-	label[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	label[util.LabelName] = fmt.Sprintf(util.LabelValue, owner.GetObjectKind().GroupVersionKind().Kind, namespace)
 	return label
 }
