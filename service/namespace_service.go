@@ -51,7 +51,7 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(ControllerNamespace)
 
 	// Load metrics with project name and namespace
-	n.mf.WithProject(util.GetProjectName(util.GetProjectName(namespace))).
+	n.mf.WithProject(util.GetProjectName(namespace)).
 		WithNamespace(ControllerNamespace)
 
 	if !found {
@@ -145,6 +145,10 @@ func (n *NamespaceService) getResourceLabel(namespace string, owner client.Objec
 	for key, value := range util.LabelsKubeSliceController {
 		label[key] = value
 	}
-	label[util.LabelName] = fmt.Sprintf(util.LabelValue, owner.GetObjectKind().GroupVersionKind().Kind, namespace)
+	kind := owner.GetObjectKind().GroupVersionKind().Kind
+	if kind == "" {
+		kind = "Project"
+	}
+	label[util.LabelName] = fmt.Sprintf(util.LabelValue, kind, namespace)
 	return label
 }
