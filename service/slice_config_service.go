@@ -145,8 +145,16 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
 
 	// Step 5: Create VPNKeyRotation CR
+	// TODO(rahul): handle change in rotation interval
+	if err := s.vpn.CreateMinimalVpnKeyRotationConfig(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.RotationInterval); err != nil {
+		return ctrl.Result{}, err
+	}
+	// Step 6: update cluster info into vpnkeyrotation Cconfig
+	if _, err := s.vpn.ReconcileClusters(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.Clusters); err != nil {
+		return ctrl.Result{}, err
+	}
 
-	// Step 6: Create ServiceImport Objects
+	// Step 7: Create ServiceImport Objects
 	serviceExports := &v1alpha1.ServiceExportConfigList{}
 	_, err = s.getServiceExportBySliceName(ctx, req.Namespace, sliceConfig.Name, serviceExports)
 	if err != nil {
