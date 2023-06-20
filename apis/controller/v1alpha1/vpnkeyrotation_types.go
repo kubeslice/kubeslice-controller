@@ -41,7 +41,7 @@ type VpnKeyRotationStatus struct {
 	// This is map of gateway name to the current rotation state
 	CurrentRotationState map[string]StatusOfKeyRotation `json:"currentRotationState,omitempty"`
 	// This is circular array of last n number of rotation status.
-	StatusHistory []map[string][]StatusOfKeyRotation `json:"statusHistory,omitempty"`
+	StatusHistory map[string][]StatusOfKeyRotation `json:"statusHistory,omitempty"`
 	RotationCount int                              `json:"rotationCount,omitempty"`
 }
 
