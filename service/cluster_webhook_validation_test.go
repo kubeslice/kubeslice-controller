@@ -19,9 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
-	"testing"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -45,13 +46,16 @@ func TestClusterWebhookSuite(t *testing.T) {
 }
 
 var ClusterWebHookValidationTestbed = map[string]func(*testing.T){
-	"TestValidateClusterCreateFail":                         testValidateClusterCreateOtherThanProjectNamespace,
-	"TestValidateClusterUpdateFailNetworkInterfaceNotEmpty": testValidateClusterUpdateFailNetworkInterfaceNotEmpty,
-	"TestValidateClusterDeleteFail":                         testValidateClusterDeleteFail,
-	"TestValidateClusterGeolocationFailOnCreate":            testValidateClusterGeolocationFailOnCreate,
-	"TestValidateClusterGeolocationFailOnUpdate":            testValidateClusterGeolocationFailOnUpdate,
-	"TestValidateClusterGeolocationPassOnCreate":            testValidateClusterGeolocationPassOnCreate,
-	"TestValidateClusterGeolocationPassOnUpdate":            testValidateClusterGeolocationPassOnUpdate,
+	"TestValidateClusterCreateFail":              testValidateClusterCreateOtherThanProjectNamespace,
+	"TestValidateClusterDeleteFail":              testValidateClusterDeleteFail,
+	"TestValidateClusterGeolocationFailOnCreate": testValidateClusterGeolocationFailOnCreate,
+	"TestValidateClusterNodeIPsFailOnCreate":     testValidateClusterNodeIPsFailOnCreate,
+	"TestValidateClusterGeolocationFailOnUpdate": testValidateClusterGeolocationFailOnUpdate,
+	"TestValidateClusterNodeIPsFailOnUpdate":     testValidateClusterNodeIPsFailOnUpdate,
+	"TestValidateClusterGeolocationPassOnCreate": testValidateClusterGeolocationPassOnCreate,
+	"TestValidateNodeIPsPassOnCreate":            testValidateNodeIPsPassOnCreate,
+	"TestValidateClusterGeolocationPassOnUpdate": testValidateClusterGeolocationPassOnUpdate,
+	"TestValidateNodeIPsPassOnUpdate":            testValidateNodeIPsPassOnUpdate,
 }
 
 func testValidateClusterCreateOtherThanProjectNamespace(t *testing.T) {
@@ -66,25 +70,6 @@ func testValidateClusterCreateOtherThanProjectNamespace(t *testing.T) {
 	ans := ValidateClusterCreate(ctx, cluster)
 	require.NotNil(t, ans)
 	require.Contains(t, ans.Error(), "cluster must be applied on project namespace")
-	clientMock.AssertExpectations(t)
-}
-
-func testValidateClusterUpdateFailNetworkInterfaceNotEmpty(t *testing.T) {
-	clientMock := &utilmock.Client{}
-	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	cluster1 := &controllerv1alpha1.Cluster{
-		Spec: controllerv1alpha1.ClusterSpec{
-			NetworkInterface: "random1",
-		},
-	}
-	cluster2 := &controllerv1alpha1.Cluster{
-		Spec: controllerv1alpha1.ClusterSpec{
-			NetworkInterface: "random2",
-		},
-	}
-	err := ValidateClusterUpdate(ctx, cluster1, runtime.Object(cluster2))
-	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "network interface can't be changed")
 	clientMock.AssertExpectations(t)
 }
 
@@ -136,6 +121,75 @@ func testValidateClusterGeolocationFailOnUpdate(t *testing.T) {
 	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Latitude and longitude are not valid")
+	clientMock.AssertExpectations(t)
+}
+
+func testValidateClusterNodeIPsFailOnCreate(t *testing.T) {
+	cluster := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{
+			NodeIPs: []string{"Invalid IP"},
+		},
+	}
+	actualNamespace := corev1.Namespace{}
+
+	clientMock := &utilmock.Client{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Namespace: cluster.Name,
+		Name:      cluster.Namespace,
+	}, &actualNamespace).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		arg.Labels = map[string]string{util.LabelName: fmt.Sprintf(util.LabelValue, "Project", cluster.Namespace)}
+	}).Once()
+	err := ValidateClusterCreate(ctx, cluster)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)")
+	clientMock.AssertExpectations(t)
+}
+func testValidateClusterNodeIPsFailOnUpdate(t *testing.T) {
+	cluster := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{
+			NodeIPs: []string{"Invalid IP"},
+		},
+	}
+	clientMock := &utilmock.Client{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)")
+	clientMock.AssertExpectations(t)
+}
+
+func testValidateNodeIPsPassOnCreate(t *testing.T) {
+	cluster := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{
+			NodeIPs: []string{"11.11.11.11"},
+		},
+	}
+	actualNamespace := corev1.Namespace{}
+	clientMock := &utilmock.Client{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: cluster.Namespace,
+	}, &actualNamespace).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		arg.Labels = map[string]string{util.LabelName: fmt.Sprintf(util.LabelValue, "Project", cluster.Namespace)}
+	}).Once()
+	err := ValidateClusterCreate(ctx, cluster)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func testValidateNodeIPsPassOnUpdate(t *testing.T) {
+	cluster := &controllerv1alpha1.Cluster{
+		Spec: controllerv1alpha1.ClusterSpec{
+			NodeIPs: []string{"11.11.11.11"},
+		},
+	}
+	clientMock := &utilmock.Client{}
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
+	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
 

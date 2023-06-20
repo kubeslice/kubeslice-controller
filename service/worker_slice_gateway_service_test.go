@@ -18,10 +18,17 @@ package service
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
 	"testing"
+
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -61,7 +68,8 @@ var WorkerSliceGatewayTestbed = map[string]func(*testing.T){
 }
 
 func testWorkerSliceGatewayReconciliationSuccess(t *testing.T) {
-	_, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	_, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx, mMock := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, WorkerSliceGateway).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerSliceGateway)
 		arg.Spec.SliceName = "slice_gateway"
@@ -103,10 +111,12 @@ func testWorkerSliceGatewayReconciliationSuccess(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testWorkerSliceGatewayReconciliationIfSliceConfigNotFound(t *testing.T) {
-	_, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	_, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx, mMock := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, WorkerSliceGateway).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerSliceGateway)
 		arg.Spec.SliceName = "slice_gateway"
@@ -142,10 +152,11 @@ func testWorkerSliceGatewayReconciliationIfSliceConfigNotFound(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testWorkerSliceGatewayReconciliationIfGatewayNotFound(t *testing.T) {
-	_, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	_, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx, _ := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, WorkerSliceGateway).Return(notFoundError).Once()
 	result, err := workerSliceGatewayService.ReconcileWorkerSliceGateways(ctx, requestObj)
@@ -157,8 +168,9 @@ func testWorkerSliceGatewayReconciliationIfGatewayNotFound(t *testing.T) {
 }
 
 func testWorkerSliceGatewayReconciliationDelete(t *testing.T) {
-	secretMock, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	secretMock, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx, mMock := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
 	time := k8sapimachinery.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, WorkerSliceGateway).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerSliceGateway)
 		arg.ObjectMeta.DeletionTimestamp = &time
@@ -176,11 +188,13 @@ func testWorkerSliceGatewayReconciliationDelete(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testWorkerSliceGatewayReconciliationDeleteForcefully(t *testing.T) {
-	secretMock, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	secretMock, _, _, workerSliceGatewayService, requestObj, clientMock, WorkerSliceGateway, ctx, mMock := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
 	time := k8sapimachinery.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, WorkerSliceGateway).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerSliceGateway)
 		arg.ObjectMeta.DeletionTimestamp = &time
@@ -193,6 +207,8 @@ func testWorkerSliceGatewayReconciliationDeleteForcefully(t *testing.T) {
 	secret := &corev1.Secret{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), secret).Return(nil).Once()
 	secretMock.On("DeleteSecret", ctx, requestObj.Namespace, WorkerSliceGateway.Name).Return(ctrl.Result{}, nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), sliceConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
@@ -227,10 +243,11 @@ func testWorkerSliceGatewayReconciliationDeleteForcefully(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
-	_, _, _, workerSliceGatewayService, requestObj, clientMock, _, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	_, _, _, workerSliceGatewayService, requestObj, clientMock, _, ctx, mMock := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
 	label := map[string]string{
 		"worker-cluster": "cluster-1",
 		"remote-cluster": "cluster-2",
@@ -240,6 +257,7 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 		"cluster-1": 1,
 		"cluster-2": 2,
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	pairWorkerSliceGateway := &workerv1alpha1.WorkerSliceGatewayList{}
 	clientMock.On("List", ctx, pairWorkerSliceGateway, mock.Anything, client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
@@ -289,6 +307,10 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	cluster := &controllerv1alpha1.Cluster{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Twice()
 	gateway := &workerv1alpha1.WorkerSliceGateway{}
@@ -303,10 +325,11 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
-	_, _, jobMock, workerSliceGatewayService, requestObj, clientMock, _, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	_, _, jobMock, workerSliceGatewayService, requestObj, clientMock, _, ctx, mMock := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
 	label := map[string]string{
 		"worker-cluster": "cluster-1",
 		"remote-cluster": "cluster-2",
@@ -316,6 +339,7 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 		"cluster-1": 1,
 		"cluster-2": 2,
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Times(3)
 	pairWorkerSliceGateway := &workerv1alpha1.WorkerSliceGatewayList{}
 	clientMock.On("List", ctx, pairWorkerSliceGateway, mock.Anything, client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
@@ -365,28 +389,38 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Twice()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Twice()
 	cluster := &controllerv1alpha1.Cluster{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Twice()
 	gateway := &workerv1alpha1.WorkerSliceGateway{}
 	notFoundError := k8sError.NewNotFound(schema.GroupResource{Group: "", Resource: "WorkerSliceTest"}, "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), gateway).Return(notFoundError).Once()
-	clientMock.On("Create", ctx, mock.Anything).Return(nil).Times(2)
+	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
+	clientMock.On("Create", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	jobMock.On("CreateJob", ctx, jobNamespace, JobImage, mock.Anything).Return(ctrl.Result{}, nil).Once()
-
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16")
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testDeleteWorkerSliceGatewaysByLabelExists(t *testing.T) {
-	_, _, _, workerSliceGatewayService, requestObj, clientMock, _, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	_, _, _, workerSliceGatewayService, requestObj, clientMock, _, ctx, mMock := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
 	label := map[string]string{
 		"worker-cluster": "cluster-1",
 		"remote-cluster": "cluster-2",
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	pairWorkerSliceGateway := &workerv1alpha1.WorkerSliceGatewayList{}
 	clientMock.On("List", ctx, pairWorkerSliceGateway, mock.Anything, client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
@@ -436,14 +470,19 @@ func testDeleteWorkerSliceGatewaysByLabelExists(t *testing.T) {
 		}
 	}).Once()
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Twice()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	err := workerSliceGatewayService.DeleteWorkerSliceGatewaysByLabel(ctx, label, "namespace")
 	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
-	_, _, _, workerSliceGatewayService, requestObj, clientMock, _, ctx := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	_, _, _, workerSliceGatewayService, requestObj, clientMock, _, ctx, _ := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
 	pairWorkerSliceGateway := &workerv1alpha1.WorkerSliceGatewayList{}
 	clientMock.On("List", ctx, pairWorkerSliceGateway, mock.Anything, client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
@@ -522,14 +561,16 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 	clientMock.AssertExpectations(t)
 }
 
-func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretService, *mocks.IWorkerSliceConfigService, *mocks.IJobService, WorkerSliceGatewayService, ctrl.Request, *utilMock.Client, *workerv1alpha1.WorkerSliceGateway, context.Context) {
+func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretService, *mocks.IWorkerSliceConfigService, *mocks.IJobService, WorkerSliceGatewayService, ctrl.Request, *utilMock.Client, *workerv1alpha1.WorkerSliceGateway, context.Context, *metricMock.IMetricRecorder) {
 	secretServiceMock := &mocks.ISecretService{}
 	workerSliceConfigMock := &mocks.IWorkerSliceConfigService{}
 	jobServiceMock := &mocks.IJobService{}
+	mMock := &metricMock.IMetricRecorder{}
 	workerSliceGatewayMock := WorkerSliceGatewayService{
 		js:   jobServiceMock,
 		sscs: workerSliceConfigMock,
 		sc:   secretServiceMock,
+		mf:   mMock,
 	}
 	namespacedName := types.NamespacedName{
 		Name:      name,
@@ -539,7 +580,16 @@ func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretS
 		NamespacedName: namespacedName,
 	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	workerv1alpha1.AddToScheme(scheme)
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
 	workerSliceGateway := &workerv1alpha1.WorkerSliceGateway{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "WorkerSliceGatewayTest")
-	return secretServiceMock, workerSliceConfigMock, jobServiceMock, workerSliceGatewayMock, requestObj, clientMock, workerSliceGateway, ctx
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "WorkerSliceGatewayTest", &eventRecorder)
+	return secretServiceMock, workerSliceConfigMock, jobServiceMock, workerSliceGatewayMock, requestObj, clientMock, workerSliceGateway, ctx, mMock
 }

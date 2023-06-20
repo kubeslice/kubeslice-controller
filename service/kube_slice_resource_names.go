@@ -29,6 +29,11 @@ const (
 	apiGroupKubeSliceWorker      = "worker.kubeslice.io"
 )
 
+// ControllerNamespace Controller Namespace
+const (
+	ControllerNamespace = "kubeslice-controller"
+)
+
 // Resources
 const (
 	resourceProjects              = "projects"
@@ -43,6 +48,27 @@ const (
 	resourceSecrets               = "secrets"
 	resourceEvents                = "events"
 	ResourceStatusSuffix          = "/status"
+)
+
+// metric kind
+const (
+	metricKindRole                = "role"
+	metricKindServiceAccount      = "service_account"
+	metricKindSecret              = "secret"
+	metricKindRoleBinding         = "role_binding"
+	metricKindCluster             = "cluster"
+	metricKindNamespace           = "namespace"
+	metricKindProject             = "project"
+	metricKindServiceExportConfig = "service_export_config"
+	metricKindSliceConfig         = "slice_config"
+	metricKindSliceQoSConfig      = "slice_qos_config"
+	metricKindWorkerServiceImport = "worker_service_import"
+	metricKindWorkerSliceConfig   = "worker_slice_config"
+	metricKindWorkerSliceGateway  = "worker_slice_gateway"
+)
+
+var (
+	MetricPort = "18080"
 )
 
 // Verbs
@@ -103,6 +129,7 @@ const (
 const (
 	ProjectFinalizer             = "controller.kubeslice.io/project-finalizer"
 	ClusterFinalizer             = "controller.kubeslice.io/cluster-finalizer"
+	ClusterDeregisterFinalizer   = "worker.kubeslice.io/cluster-deregister-finalizer"
 	SliceConfigFinalizer         = "controller.kubeslice.io/slice-configuration-finalizer"
 	serviceExportConfigFinalizer = "controller.kubeslice.io/service-export-finalizer"
 	WorkerSliceConfigFinalizer   = "worker.kubeslice.io/worker-slice-configuration-finalizer"
@@ -141,7 +168,7 @@ const (
 	KubesliceWorkerDeleteRequeueTime = 3
 )
 
-//StandardQoSProfileLabel name
+// StandardQoSProfileLabel name
 const (
 	StandardQoSProfileLabel = "standard-qos-profile"
 )
@@ -182,7 +209,7 @@ var (
 			Resources: []string{resourceCluster},
 		},
 		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch,verbCreate,verbDelete},
+			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch, verbCreate, verbDelete},
 			APIGroups: []string{apiGroupKubeSliceWorker},
 			Resources: []string{resourceWorkerSliceGwRecycler},
 		},
@@ -239,7 +266,7 @@ var (
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
 			APIGroups: []string{""},
-			Resources: []string{resourceSecrets},
+			Resources: []string{resourceSecrets, resourceEvents},
 		},
 	}
 )
@@ -269,7 +296,7 @@ var (
 		{
 			Verbs:     []string{verbGet, verbList, verbWatch},
 			APIGroups: []string{""},
-			Resources: []string{resourceSecrets},
+			Resources: []string{resourceSecrets, resourceEvents},
 		},
 	}
 )

@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"strings"
@@ -265,4 +266,27 @@ func EncodeToBase64(v interface{}) (string, error) {
 // CheckForProjectNamespace is a function to check namespace is in decided format
 func CheckForProjectNamespace(namespace *corev1.Namespace) bool {
 	return namespace.Labels[LabelName] == fmt.Sprintf(LabelValue, "Project", namespace.Name)
+}
+
+// GetProjectName is function to get the project name from the namespace
+func GetProjectName(namespace string) string {
+	d := strings.Split(namespace, NamespacePrefix)
+	if len(d) > 1 {
+		return d[1]
+	}
+	return ""
+}
+
+// RecordEvent is a function to record the event
+func RecordEvent(ctx context.Context, recorder events.EventRecorder, object runtime.Object, relatedObject runtime.Object, name events.EventName) {
+	logger := CtxLogger(ctx)
+	err := recorder.RecordEvent(ctx, &events.Event{
+		Object:            object,
+		RelatedObject:     relatedObject,
+		ReportingInstance: InstanceController,
+		Name:              name,
+	})
+	if err != nil {
+		logger.With(zap.Error(err)).Errorf("Failed to record event")
+	}
 }

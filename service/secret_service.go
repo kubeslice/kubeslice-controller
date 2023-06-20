@@ -18,7 +18,9 @@ package service
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +33,11 @@ type ISecretService interface {
 }
 
 type SecretService struct {
+	mf metrics.IMetricRecorder
 }
 
 // DeleteSecret is a function to delete the secret
-func (s SecretService) DeleteSecret(ctx context.Context, namespace string, secretName string) (ctrl.Result, error) {
+func (s *SecretService) DeleteSecret(ctx context.Context, namespace string, secretName string) (ctrl.Result, error) {
 	nsResource := &corev1.Secret{}
 	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
 		Name:      secretName,
@@ -46,6 +49,14 @@ func (s SecretService) DeleteSecret(ctx context.Context, namespace string, secre
 	if !found {
 		return ctrl.Result{}, nil
 	}
+
+	//Load Event Recorder with project name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(nsResource.Namespace)).WithNamespace(nsResource.Namespace)
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(nsResource.Namespace)).
+		WithNamespace(nsResource.Namespace)
+
 	if found {
 		err = util.DeleteResource(ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -54,8 +65,28 @@ func (s SecretService) DeleteSecret(ctx context.Context, namespace string, secre
 			},
 		})
 		if err != nil {
+			//Register an event for secret deletion failure
+			util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeletionFailed)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventSecretDeletionFailed),
+					"object_name": nsResource.Name,
+					"object_kind": metricKindSecret,
+				},
+			)
 			return ctrl.Result{}, err
 		}
+		//Register an event for secret deletion
+		util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventSecretDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventSecretDeleted),
+				"object_name": nsResource.Name,
+				"object_kind": metricKindSecret,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }

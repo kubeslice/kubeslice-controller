@@ -19,7 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +35,7 @@ type INamespaceService interface {
 }
 
 type NamespaceService struct {
+	mf metrics.IMetricRecorder
 }
 
 // ReconcileProjectNamespace is a function to reconcile project namespace
@@ -44,16 +47,43 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	//Load Event Recorder with project name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(ControllerNamespace)
+
+	// Load metrics with project name and namespace
+	n.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(ControllerNamespace)
+
 	if !found {
-		err := util.CreateResource(ctx, &corev1.Namespace{
+		expectedNS := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   namespace,
 				Labels: n.getResourceLabel(namespace, owner),
 			},
-		})
+		}
+		err := util.CreateResource(ctx, expectedNS)
+		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
+			util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreationFailed)
+			n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "creation_failed",
+					"event":       string(events.EventNamespaceCreationFailed),
+					"object_name": expectedNS.Name,
+					"object_kind": metricKindNamespace,
+				},
+			)
 			return ctrl.Result{}, err
 		}
+		util.RecordEvent(ctx, eventRecorder, expectedNS, nil, events.EventNamespaceCreated)
+		n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventNamespaceCreated),
+				"object_name": expectedNS.Name,
+				"object_kind": metricKindNamespace,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }
@@ -64,6 +94,13 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
 		Name: namespace,
 	}, nsResource)
+	//Load Event Recorder with project name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(ControllerNamespace)
+
+	// Load metrics with project name and namespace
+	n.mf.WithProject(util.GetProjectName(util.GetProjectName(namespace))).
+		WithNamespace(ControllerNamespace)
+
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -71,14 +108,34 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 		return ctrl.Result{}, err
 	}
 	if found {
-		err := util.DeleteResource(ctx, &corev1.Namespace{
+		nsToBeDeleted := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
 			},
-		})
+		}
+		err := util.DeleteResource(ctx, nsToBeDeleted)
+		nsToBeDeleted.Namespace = ControllerNamespace
 		if err != nil {
+			util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeletionFailed)
+			n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventNamespaceDeletionFailed),
+					"object_name": nsToBeDeleted.Name,
+					"object_kind": metricKindNamespace,
+				},
+			)
 			return ctrl.Result{}, err
 		}
+		util.RecordEvent(ctx, eventRecorder, nsToBeDeleted, nil, events.EventNamespaceDeleted)
+		n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventNamespaceDeleted),
+				"object_name": nsToBeDeleted.Name,
+				"object_kind": metricKindNamespace,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }
@@ -88,6 +145,10 @@ func (n *NamespaceService) getResourceLabel(namespace string, owner client.Objec
 	for key, value := range util.LabelsKubeSliceController {
 		label[key] = value
 	}
-	label[util.LabelName] = fmt.Sprintf(util.LabelValue, owner.GetObjectKind().GroupVersionKind().Kind, namespace)
+	kind := owner.GetObjectKind().GroupVersionKind().Kind
+	if kind == "" {
+		kind = "Project"
+	}
+	label[util.LabelName] = fmt.Sprintf(util.LabelValue, kind, namespace)
 	return label
 }

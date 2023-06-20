@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
   name: serviceexportconfigs.controller.kubeslice.io
 spec:
@@ -37,6 +36,12 @@ spec:
           spec:
             description: ServiceExportConfigSpec defines the desired state of ServiceExportConfig
             properties:
+              aliases:
+                description: Alias names for the exported service. The service could
+                  be addressed by the alias names in addition to the slice.local name.
+                items:
+                  type: string
+                type: array
               serviceDiscoveryEndpoints:
                 description: the service discovery endpoint array
                 items:
@@ -99,9 +104,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

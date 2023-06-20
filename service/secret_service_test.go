@@ -19,7 +19,17 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
+
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+
 	"testing"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -51,19 +61,22 @@ var SecretTestBed = map[string]func(*testing.T){
 }
 
 func SecretDeleteHappyCase(t *testing.T) {
-	secretService, clientMock, secret, ctx := setupSecretTest("secret", "namespace")
+	secretService, clientMock, secret, ctx, mMock := setupSecretTest("secret", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), &corev1.Secret{}).Return(nil).Once()
 	clientMock.On("Delete", ctx, secret).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := secretService.DeleteSecret(ctx, secret.Namespace, secret.Name)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func SecretGetErrorOtherThanNotFound(t *testing.T) {
-	secretService, clientMock, secret, ctx := setupSecretTest("secret", "namespace")
+	secretService, clientMock, secret, ctx, _ := setupSecretTest("secret", "namespace")
 	err1 := errors.New("internal_error")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), &corev1.Secret{}).Return(err1).Once()
 	result, err2 := secretService.DeleteSecret(ctx, secret.Namespace, secret.Name)
@@ -75,7 +88,7 @@ func SecretGetErrorOtherThanNotFound(t *testing.T) {
 }
 
 func SecretGetErrorNotFound(t *testing.T) {
-	secretService, clientMock, secret, ctx := setupSecretTest("secret", "namespace")
+	secretService, clientMock, secret, ctx, _ := setupSecretTest("secret", "namespace")
 	notFoundError := k8sError.NewNotFound(util.Resource("SecretTest"), "isNotFound")
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), &corev1.Secret{}).Return(notFoundError).Once()
 	result, err := secretService.DeleteSecret(ctx, secret.Namespace, secret.Name)
@@ -87,27 +100,41 @@ func SecretGetErrorNotFound(t *testing.T) {
 }
 
 func SecretFoundButErrorOnDelete(t *testing.T) {
-	secretService, clientMock, secret, ctx := setupSecretTest("secret", "namespace")
+	secretService, clientMock, secret, ctx, mMock := setupSecretTest("secret", "namespace")
 	err1 := errors.New("internal_error")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), &corev1.Secret{}).Return(nil).Once()
 	clientMock.On("Delete", ctx, secret).Return(err1).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err2 := secretService.DeleteSecret(ctx, secret.Namespace, secret.Name)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
 	require.Equal(t, expectedResult, result)
 	require.Equal(t, err1, err2)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
-func setupSecretTest(name string, namespace string) (SecretService, *utilMock.Client, *corev1.Secret, context.Context) {
-	secretService := SecretService{}
+func setupSecretTest(name string, namespace string) (SecretService, *utilMock.Client, *corev1.Secret, context.Context, *metricMock.IMetricRecorder) {
+	mMock := &metricMock.IMetricRecorder{}
+	secretService := SecretService{
+		mf: mMock,
+	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 	}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SecretServiceTest")
-	return secretService, clientMock, secret, ctx
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SecretServiceTest", &eventRecorder)
+	return secretService, clientMock, secret, ctx, mMock
 }

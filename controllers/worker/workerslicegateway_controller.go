@@ -18,6 +18,7 @@ package worker
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	"github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -35,11 +36,12 @@ type WorkerSliceGatewayReconciler struct {
 	Scheme                    *runtime.Scheme
 	WorkerSliceGatewayService service.IWorkerSliceGatewayService
 	Log                       *zap.SugaredLogger
+	EventRecorder             *events.EventRecorder
 }
 
 // Reconcile is a function, WorkerSliceGatewayReconciler implements it
 func (r *WorkerSliceGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "WorkerSliceGatewayController")
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "WorkerSliceGatewayController", r.EventRecorder)
 	return r.WorkerSliceGatewayService.ReconcileWorkerSliceGateways(kubeSliceCtx, req)
 }
 

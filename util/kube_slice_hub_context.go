@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,8 +34,9 @@ type kubeSliceControllerContextKey struct {
 // kubeSliceControllerRequestContext is a schema for request context
 type kubeSliceControllerRequestContext struct {
 	Client
-	Scheme *runtime.Scheme
-	Log    *zap.SugaredLogger
+	Scheme        *runtime.Scheme
+	Log           *zap.SugaredLogger
+	eventRecorder *events.EventRecorder
 }
 
 // kubeSliceControllerContext is instance of kubeSliceControllerContextKey
@@ -42,7 +44,7 @@ var kubeSliceControllerContext = &kubeSliceControllerContextKey{}
 
 // PrepareKubeSliceControllersRequestContext is a function to create the context for kube slice
 func PrepareKubeSliceControllersRequestContext(ctx context.Context, client Client,
-	scheme *runtime.Scheme, controllerName string) context.Context {
+	scheme *runtime.Scheme, controllerName string, er *events.EventRecorder) context.Context {
 	uuid := k8sUuid.NewUUID()[:8]
 
 	var log *zap.SugaredLogger
@@ -57,9 +59,10 @@ func PrepareKubeSliceControllersRequestContext(ctx context.Context, client Clien
 	}
 
 	ctxVal := &kubeSliceControllerRequestContext{
-		Client: client,
-		Scheme: scheme,
-		Log:    log,
+		Client:        client,
+		Scheme:        scheme,
+		Log:           log,
+		eventRecorder: er,
 	}
 	newCtx := context.WithValue(ctx, kubeSliceControllerContext, ctxVal)
 	return newCtx
@@ -77,4 +80,20 @@ func GetKubeSliceControllerRequestContext(ctx context.Context) *kubeSliceControl
 func CtxLogger(ctx context.Context) *zap.SugaredLogger {
 	logg := GetKubeSliceControllerRequestContext(ctx).Log
 	return logg
+}
+
+// CtxClient is a function to get the Client
+func CtxClient(ctx context.Context) Client {
+	return GetKubeSliceControllerRequestContext(ctx).Client
+}
+
+// CtxScheme is a function to get the Scheme
+func CtxScheme(ctx context.Context) *runtime.Scheme {
+	return GetKubeSliceControllerRequestContext(ctx).Scheme
+}
+
+// CtxEventRecorder is a function to get the EventRecorder
+func CtxEventRecorder(ctx context.Context) events.EventRecorder {
+	recorder := GetKubeSliceControllerRequestContext(ctx).eventRecorder
+	return *recorder
 }

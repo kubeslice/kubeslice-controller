@@ -19,8 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,6 +43,7 @@ type SliceConfigService struct {
 	si    IWorkerServiceImportService
 	se    IServiceExportConfigService
 	wsgrs IWorkerSliceGatewayRecyclerService
+	mf    metrics.IMetricRecorder
 }
 
 // ReconcileSliceConfig is a function to reconcile the sliceconfig
@@ -57,6 +60,17 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(sliceConfig.Namespace)).
+		WithNamespace(sliceConfig.Namespace).
+		WithSlice(sliceConfig.Name)
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(sliceConfig.Namespace)).
+		WithNamespace(sliceConfig.Namespace).
+		WithSlice(sliceConfig.Name)
+
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		logger.Infof("Duplicate cluster name %v found in sliceConfig %v", value, req.NamespacedName)
 		return ctrl.Result{}, nil
@@ -74,8 +88,28 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 			return result, reconErr
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceConfig, SliceConfigFinalizer)); shouldReturn {
+			//Register an event for slice config deletion fail
+			util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceConfigDeletionFailed)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventSliceConfigDeletionFailed),
+					"object_name": sliceConfig.Name,
+					"object_kind": metricKindSliceConfig,
+				},
+			)
 			return result, reconErr
 		}
+		//Register an event for slice config deletion
+		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceConfigDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventSliceConfigDeleted),
+				"object_name": sliceConfig.Name,
+				"object_kind": metricKindSliceConfig,
+			},
+		)
 		return ctrl.Result{}, err
 	}
 
@@ -118,7 +152,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	if len(serviceExports.Items) > 0 {
 		// iterate service export configs
 		for _, serviceExport := range serviceExports.Items {
-			err = s.si.CreateMinimalWorkerServiceImport(ctx, sliceConfig.Spec.Clusters, req.Namespace, s.getOwnerLabelsForServiceExport(&serviceExport), serviceExport.Spec.ServiceName, serviceExport.Spec.ServiceNamespace, serviceExport.Spec.SliceName)
+			err = s.si.CreateMinimalWorkerServiceImport(ctx, sliceConfig.Spec.Clusters, req.Namespace, s.getOwnerLabelsForServiceExport(&serviceExport), serviceExport.Spec.ServiceName, serviceExport.Spec.ServiceNamespace, serviceExport.Spec.SliceName, serviceExport.Spec.Aliases)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -164,10 +198,41 @@ func (s *SliceConfigService) DeleteSliceConfigs(ctx context.Context, namespace s
 		return ctrl.Result{}, err
 	}
 	for _, sliceConfig := range sliceConfigs.Items {
+		//Load Event Recorder with project name, slice name and namespace
+		eventRecorder := util.CtxEventRecorder(ctx).
+			WithProject(util.GetProjectName(sliceConfig.Namespace)).
+			WithNamespace(sliceConfig.Namespace).
+			WithSlice(sliceConfig.Name)
+
+		// Load metrics with project name and namespace
+		s.mf.WithProject(util.GetProjectName(sliceConfig.Namespace)).
+			WithNamespace(sliceConfig.Namespace).
+			WithSlice(sliceConfig.Name)
+
 		err = util.DeleteResource(ctx, &sliceConfig)
 		if err != nil {
+			//Register an event for slice config deletion fail
+			util.RecordEvent(ctx, eventRecorder, &sliceConfig, nil, events.EventSliceConfigDeletionFailed)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventSliceConfigDeletionFailed),
+					"object_name": sliceConfig.Name,
+					"object_kind": metricKindSliceConfig,
+				},
+			)
 			return ctrl.Result{}, err
 		}
+		//Register an event for slice config deletion
+		util.RecordEvent(ctx, eventRecorder, &sliceConfig, nil, events.EventSliceConfigDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventSliceConfigDeleted),
+				"object_name": sliceConfig.Name,
+				"object_kind": metricKindSliceConfig,
+			},
+		)
 	}
 	return ctrl.Result{}, nil
 }

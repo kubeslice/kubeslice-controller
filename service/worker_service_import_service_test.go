@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
 	"testing"
 
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -82,10 +84,13 @@ func testReconcileWorkerServiceImportGetWorkerServiceImportResourceFail(t *testi
 	require.False(t, result.Requeue)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-
 }
+
 func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
@@ -100,6 +105,7 @@ func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 
 	timeStamp := kubemachine.Now()
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerServiceImport).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*workerv1alpha1.WorkerServiceImport)
 		arg.ObjectMeta.DeletionTimestamp = &timeStamp
@@ -111,7 +117,11 @@ func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 	}).Once()
 
 	//remove
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	clientMock.On("List", ctx, serviceExportList, client.InNamespace(requestObj.Namespace), mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(1).(*controllerv1alpha1.ServiceExportConfigList)
@@ -134,11 +144,14 @@ func testReconcileWorkerServiceDeleteTheobjectHappyCase(t *testing.T) {
 	require.False(t, result.Requeue)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
-
+	mMock.AssertExpectations(t)
 }
 
 func testReconcileWorkerServiceImportGetServiceExportListFail(t *testing.T) {
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
@@ -156,6 +169,7 @@ func testReconcileWorkerServiceImportGetServiceExportListFail(t *testing.T) {
 	}
 
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerServiceImport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
@@ -165,11 +179,15 @@ func testReconcileWorkerServiceImportGetServiceExportListFail(t *testing.T) {
 	require.True(t, result.Requeue)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testReconcileWorkerServiceImportGetServiceExportListEmpty(t *testing.T) {
 	//var errList errorList
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
@@ -185,6 +203,7 @@ func testReconcileWorkerServiceImportGetServiceExportListEmpty(t *testing.T) {
 		"service-namespace":   workerServiceImport.Spec.ServiceNamespace,
 		"original-slice-name": workerServiceImport.Spec.SliceName,
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	//	serviceImport := workerv1alpha1.WorkerServiceImport{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerServiceImport).Return(nil).Once()
@@ -196,9 +215,14 @@ func testReconcileWorkerServiceImportGetServiceExportListEmpty(t *testing.T) {
 	require.False(t, result.Requeue) //serviceExportList.Items = empty
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
+
 func testReconcileWorkerServiceImportHappyPath(t *testing.T) {
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceName := types.NamespacedName{
 		Namespace: "cisco",
@@ -216,6 +240,7 @@ func testReconcileWorkerServiceImportHappyPath(t *testing.T) {
 	}
 
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, workerServiceImport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
@@ -232,6 +257,7 @@ func testReconcileWorkerServiceImportHappyPath(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testListWorkerServiceImportFail(t *testing.T) {
@@ -261,9 +287,13 @@ func testListWorkerServiceImportFail(t *testing.T) {
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
+
 func testDeleteWorkerServiceImportByLabelPass(t *testing.T) {
 	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 	clientMock := &utilmock.Client{}
 	labels := map[string]string{
 		"service-name":        "random_service-name",
@@ -277,6 +307,7 @@ func testDeleteWorkerServiceImportByLabelPass(t *testing.T) {
 	requestObj := ctrl.Request{
 		workerServiceName,
 	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("List", ctx, workerServiceImports, client.MatchingLabels(labels), client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerServiceImportList)
@@ -286,14 +317,20 @@ func testDeleteWorkerServiceImportByLabelPass(t *testing.T) {
 		}
 	})
 	clientMock.On("Delete", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	err := WorkerServiceImportServiceStruct.DeleteWorkerServiceImportByLabel(ctx, labels, requestObj.Namespace)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail(t *testing.T) {
 	clientMock := &utilmock.Client{}
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 	existingWorkerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	serviceName := "mysql"
@@ -302,19 +339,24 @@ func testCreateMinimalWorkerServiceImportGetexistingWorkerServiceImportFail(t *t
 	clusters := []string{"cluster1", "cluster2"}
 	namespace := "cisco"
 	label := make(map[string]string)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	clientMock.On("List", ctx, workerServiceImports, mock.Anything, mock.Anything).Return(nil).Once()
 	getError := errors.New("existingWorkerServiceImport not found")
 	clientMock.On("Get", ctx, mock.Anything, existingWorkerServiceImport).Return(getError).Once()
-	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
-//pass
+// pass
 func testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail(t *testing.T) {
 	clientMock := &utilmock.Client{}
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 
 	existingWorkerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
@@ -325,19 +367,26 @@ func testCreateMinimalWorkerServiceImportUpdateexistingWorkerServiceImportFail(t
 	namespace := "cisco"
 	label := make(map[string]string)
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	clientMock.On("List", ctx, workerServiceImports, mock.Anything, mock.Anything).Return(nil).Once()
 	updatetError := errors.New("existingWorkerServiceImport update failed")
 	clientMock.On("Get", ctx, mock.Anything, existingWorkerServiceImport).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(updatetError).Once()
-	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail(t *testing.T) {
 	clientMock := &utilmock.Client{}
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	serviceName := "mysql"
 	serviceNamespace := "alpha"
@@ -346,19 +395,26 @@ func testCreateMinimalWorkerServiceImportCreateexistingWorkerServiceImportFail(t
 	namespace := "cisco"
 	label := make(map[string]string)
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Twice()
 	clientMock.On("List", ctx, workerServiceImports, mock.Anything, mock.Anything).Return(nil).Once()
 	getError := kubeerrors.NewNotFound(util.Resource("WorkerServiceImportTest"), "existingWorkerServiceImport not found")
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(getError).Once()
 	existserr := errors.New("IsAlreadyExists")
 	clientMock.On("Create", ctx, mock.Anything).Return(existserr).Once()
-	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatchWithLabel(t *testing.T) {
 	clientMock := &utilmock.Client{}
-	WorkerServiceImportServiceStruct := WorkerServiceImportService{}
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
 	workerServiceImports := &workerv1alpha1.WorkerServiceImportList{}
 	serviceName := "mysql"
 	serviceNamespace := "alpha"
@@ -367,6 +423,7 @@ func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatch
 	namespace := "cisco"
 	label := make(map[string]string)
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("List", ctx, workerServiceImports, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*workerv1alpha1.WorkerServiceImportList)
 		if arg.Items == nil {
@@ -381,9 +438,12 @@ func CreateMinimalWorkerServiceImportCreateErrorOnCleanUpWhereClusterDoesntMatch
 
 	deleteError := errors.New("existingWorkerServiceImport delete failed")
 	clientMock.On("Delete", ctx, mock.Anything).Return(deleteError).Once()
-	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName)
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
+	err := WorkerServiceImportServiceStruct.CreateMinimalWorkerServiceImport(ctx, clusters, namespace, label, serviceName, serviceNamespace, sliceName, nil)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func ForceReconciliationHappyCase(t *testing.T) {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +36,7 @@ type SliceQoSConfigReconciler struct {
 	Scheme                *runtime.Scheme
 	SliceQoSConfigService service.ISliceQoSConfigService
 	Log                   *zap.SugaredLogger
+	EventRecorder         *events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -46,6 +48,6 @@ func (r *SliceQoSConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Reconcile is a function to reconcile the qos_profile, SliceQoSConfigReconciler implements it
 func (r *SliceQoSConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "SliceQoSConfigController")
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "SliceQoSConfigController", r.EventRecorder)
 	return r.SliceQoSConfigService.ReconcileSliceQoSConfig(kubeSliceCtx, req)
 }

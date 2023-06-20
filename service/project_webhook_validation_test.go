@@ -319,6 +319,6 @@ func Test_ValidateProjectDelete_FailsIfSliceConfigExists(t *testing.T) {
 
 func prepareProjectWebhookTestContext(ctx context.Context, client util.Client,
 	scheme *runtime.Scheme) context.Context {
-	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectWebhookTestController")
+	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectWebhookTestController", nil)
 	return preparedCtx
 }

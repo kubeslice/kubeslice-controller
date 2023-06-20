@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -26,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -38,16 +40,19 @@ func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) e
 	if err := validateGeolocation(c); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
+	if errs := validateNodeIPs(c); len(errs) != 0 {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, errs)
+	}
 	return nil
 }
 
 // ValidateClusterUpdate is a function to validate to the update of specification of cluster
 func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) error {
-	if err := validateClusterSpec(ctx, c, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
-	}
 	if err := validateGeolocation(c); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
+	}
+	if errs := validateNodeIPs(c); len(errs) != 0 {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, errs)
 	}
 	return nil
 }
@@ -66,15 +71,6 @@ func validateAppliedInProjectNamespace(ctx context.Context, c *controllerv1alpha
 	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Namespace}, namespace)
 	if !exist || !util.CheckForProjectNamespace(namespace) {
 		return field.Invalid(field.NewPath("metadata").Child("namespace"), c.Namespace, "cluster must be applied on project namespace")
-	}
-	return nil
-}
-
-// validateClusterSpec is a function to validate the specification of cluster
-func validateClusterSpec(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) *field.Error {
-	cluster := old.(*controllerv1alpha1.Cluster)
-	if cluster.Spec.NetworkInterface != "" && cluster.Spec.NetworkInterface != c.Spec.NetworkInterface {
-		return field.Invalid(field.NewPath("spec").Child("networkInterface"), c.Spec.NetworkInterface, "network interface can't be changed")
 	}
 	return nil
 }
@@ -101,4 +97,19 @@ func validateGeolocation(c *controllerv1alpha1.Cluster) *field.Error {
 		return field.Invalid(field.NewPath("spec").Child("clusterProperty.geoLocation"), util.ArrayToString([]string{latitude, longitude}), "Latitude and longitude are not valid")
 	}
 	return nil
+}
+
+func validateNodeIPs(c *controllerv1alpha1.Cluster) field.ErrorList {
+	if len(c.Spec.NodeIPs) == 0 {
+		return nil
+	}
+	var errors field.ErrorList
+	var isValid []string
+	for _, ip := range c.Spec.NodeIPs {
+		isValid = validation.IsValidIP(ip)
+		if isValid != nil {
+			errors = append(errors, field.Invalid(field.NewPath("spec").Child("nodeIPs"), ip, isValid[0]))
+		}
+	}
+	return errors
 }

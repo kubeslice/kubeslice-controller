@@ -19,22 +19,28 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/kubeslice/kubeslice-controller/metrics"
+
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 type ISliceQoSConfigService interface {
 	ReconcileSliceQoSConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
+	DeleteSliceQoSConfig(ctx context.Context, namespace string) (ctrl.Result, error)
 }
 
 // SliceQoSConfigService implements different service interfaces
 type SliceQoSConfigService struct {
 	wsc IWorkerSliceConfigService
+	mf  metrics.IMetricRecorder
 }
 
 // ReconcileSliceQoSConfig is a function to reconcile the qos_profile
@@ -51,6 +57,16 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 		logger.Infof("QoS Profile %v not found, returning from  reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
+
+	//Load Event Recorder with project name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(sliceQosConfig.Namespace)).
+		WithNamespace(sliceQosConfig.Namespace)
+
+	// Load metrics with project name and namespace
+	q.mf.WithProject(util.GetProjectName(sliceQosConfig.Namespace)).
+		WithNamespace(sliceQosConfig.Namespace)
+
 	//Step 1: Finalizers
 	if sliceQosConfig.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(sliceQosConfig.GetFinalizers(), SliceQoSConfigFinalizer) {
@@ -61,8 +77,28 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 	} else {
 		logger.Debug("starting delete for qos profile", req.NamespacedName)
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceQosConfig, SliceQoSConfigFinalizer)); shouldReturn {
+			//Register an event for slice qos config deletion failure
+			util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeletionFailed)
+			q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventSliceQoSConfigDeletionFailed),
+					"object_name": sliceQosConfig.Name,
+					"object_kind": metricKindSliceQoSConfig,
+				},
+			)
 			return result, reconErr
 		}
+		//Register an event for slice qos config deletion
+		util.RecordEvent(ctx, eventRecorder, sliceQosConfig, nil, events.EventSliceQoSConfigDeleted)
+		q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventSliceQoSConfigDeleted),
+				"object_name": sliceQosConfig.Name,
+				"object_kind": metricKindSliceQoSConfig,
+			},
+		)
 		return ctrl.Result{}, err
 	}
 
@@ -114,4 +150,48 @@ func (q *SliceQoSConfigService) updateWorkerSliceConfigs(ctx context.Context, na
 		}
 	}
 	return nil
+}
+
+// DeleteSliceQoSConfig is a function to delete the slice qos config
+func (q *SliceQoSConfigService) DeleteSliceQoSConfig(ctx context.Context, namespace string) (ctrl.Result, error) {
+	sliceQoSConfigs := &v1alpha1.SliceQoSConfigList{}
+	err := util.ListResources(ctx, sliceQoSConfigs, client.InNamespace(namespace))
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	for _, sliceQoSConfig := range sliceQoSConfigs.Items {
+		//Load Event Recorder with project name, slice name and namespace
+		eventRecorder := util.CtxEventRecorder(ctx).
+			WithProject(util.GetProjectName(sliceQoSConfig.Namespace)).
+			WithNamespace(sliceQoSConfig.Namespace)
+		// Load metrics with project name and namespace
+		q.mf.WithProject(util.GetProjectName(sliceQoSConfig.Namespace)).
+			WithNamespace(sliceQoSConfig.Namespace)
+
+		err = util.DeleteResource(ctx, &sliceQoSConfig)
+		if err != nil {
+			//Register an event for slice config deletion fail
+			util.RecordEvent(ctx, eventRecorder, &sliceQoSConfig, nil, events.EventSliceQoSConfigDeletionFailed)
+			q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "deletion_failed",
+					"event":       string(events.EventSliceConfigDeletionFailed),
+					"object_name": sliceQoSConfig.Name,
+					"object_kind": metricKindSliceQoSConfig,
+				},
+			)
+			return ctrl.Result{}, err
+		}
+		//Register an event for slice config deletion
+		util.RecordEvent(ctx, eventRecorder, &sliceQoSConfig, nil, events.EventSliceQoSConfigDeleted)
+		q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventSliceConfigDeleted),
+				"object_name": sliceQoSConfig.Name,
+				"object_kind": metricKindSliceQoSConfig,
+			},
+		)
+	}
+	return ctrl.Result{}, nil
 }

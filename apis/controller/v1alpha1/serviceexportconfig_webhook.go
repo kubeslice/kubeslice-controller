@@ -33,12 +33,14 @@ type customValidationServiceExport func(ctx context.Context, serviceExportConfig
 
 var customCreateValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) error = nil
 var customUpdateValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) error = nil
+var customDeleteValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) error = nil
 var serviceExportConfigWebhookClient client.Client
 
-func (r *ServiceExportConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customValidationServiceExport, updateUpdate customValidationServiceExport) error {
+func (r *ServiceExportConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customValidationServiceExport, validateUpdate customValidationServiceExport, validateDelete customValidationServiceExport) error {
 	serviceExportConfigWebhookClient = mgr.GetClient()
 	customCreateValidationServiceExport = validateCreate
-	customUpdateValidationServiceExport = updateUpdate
+	customUpdateValidationServiceExport = validateUpdate
+	customDeleteValidationServiceExport = validateDelete
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -58,28 +60,27 @@ func (r *ServiceExportConfig) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-serviceexportconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=serviceexportconfigs,verbs=create;update,versions=v1alpha1,name=vserviceexportconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-serviceexportconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=serviceexportconfigs,verbs=create;update;delete,versions=v1alpha1,name=vserviceexportconfig.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ServiceExportConfig{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceExportConfig) ValidateCreate() error {
 	serviceexportlog.Info("validate create", "name", r.Name)
-	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation")
+	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation", nil)
 	return customCreateValidationServiceExport(serviceExportConfigCtx, r)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceExportConfig) ValidateUpdate(old runtime.Object) error {
 	serviceexportlog.Info("validate update", "name", r.Name)
-	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation")
+	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation", nil)
 	return customUpdateValidationServiceExport(serviceExportConfigCtx, r)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceExportConfig) ValidateDelete() error {
 	serviceexportlog.Info("validate delete", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object deletion.
-	return nil
+	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation", nil)
+	return customDeleteValidationServiceExport(serviceExportConfigCtx, r)
 }

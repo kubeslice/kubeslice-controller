@@ -20,13 +20,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
+	"testing"
+
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -58,7 +65,8 @@ var SliceQoSConfigTestbed = map[string]func(*testing.T){
 }
 
 func SliceQoSConfigReconciliationCompleteHappyCase(t *testing.T) {
-	workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService, mMock := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceQosConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
@@ -97,10 +105,11 @@ func SliceQoSConfigReconciliationCompleteHappyCase(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerSliceConfigMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func SliceQoSConfigGetObjectErrorOtherThanNotFound(t *testing.T) {
-	_, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	_, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService, _ := setupSliceQoSConfigTest("qos_profile_1", "namespace")
 	err1 := errors.New("internal_error")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceQosConfig).Return(err1).Once()
 	result, err2 := sliceQosConfigService.ReconcileSliceQoSConfig(ctx, requestObj)
@@ -113,7 +122,7 @@ func SliceQoSConfigGetObjectErrorOtherThanNotFound(t *testing.T) {
 }
 
 func SliceQoSConfigGetObjectErrorNotFound(t *testing.T) {
-	_, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	_, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService, _ := setupSliceQoSConfigTest("qos_profile_1", "namespace")
 	notFoundError := k8sError.NewNotFound(util.Resource("SliceQoSConfigTest"), "isNotFound")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceQosConfig).Return(notFoundError).Once()
 	result, err2 := sliceQosConfigService.ReconcileSliceQoSConfig(ctx, requestObj)
@@ -126,14 +135,17 @@ func SliceQoSConfigGetObjectErrorNotFound(t *testing.T) {
 }
 
 func SliceQoSConfigDeleteTheObjectHappyCase(t *testing.T) {
-	workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService, mMock := setupSliceQoSConfigTest("qos_profile_1", "namespace")
 	time := metav1.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceQosConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceQoSConfig)
 		arg.ObjectMeta.DeletionTimestamp = &time
 	}).Once()
 	//remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := sliceQosConfigService.ReconcileSliceQoSConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -142,10 +154,12 @@ func SliceQoSConfigDeleteTheObjectHappyCase(t *testing.T) {
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerSliceConfigMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func SliceQoSConfigObjectNamespaceNotFound(t *testing.T) {
-	_, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	_, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService, mMock := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceQosConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
@@ -166,10 +180,12 @@ func SliceQoSConfigObjectNamespaceNotFound(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
 func SliceQoSConfigObjectNotInProjectNamespace(t *testing.T) {
-	_, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	_, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService, mMock := setupSliceQoSConfigTest("qos_profile_1", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceQosConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
@@ -189,12 +205,15 @@ func SliceQoSConfigObjectNotInProjectNamespace(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
 }
 
-func setupSliceQoSConfigTest(name string, namespace string) (*mocks.IWorkerSliceConfigService, ctrl.Request, *utilMock.Client, *controllerv1alpha1.SliceQoSConfig, context.Context, SliceQoSConfigService) {
+func setupSliceQoSConfigTest(name string, namespace string) (*mocks.IWorkerSliceConfigService, ctrl.Request, *utilMock.Client, *controllerv1alpha1.SliceQoSConfig, context.Context, SliceQoSConfigService, *metricMock.IMetricRecorder) {
 	workerSliceConfigMock := &mocks.IWorkerSliceConfigService{}
+	mMock := &metricMock.IMetricRecorder{}
 	sliceQosConfigService := SliceQoSConfigService{
 		wsc: workerSliceConfigMock,
+		mf:  mMock,
 	}
 	namespacedName := types.NamespacedName{
 		Name:      name,
@@ -204,7 +223,15 @@ func setupSliceQoSConfigTest(name string, namespace string) (*mocks.IWorkerSlice
 		NamespacedName: namespacedName,
 	}
 	clientMock := &utilMock.Client{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
 	sliceQosConfig := &controllerv1alpha1.SliceQoSConfig{}
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceQoSConfigServiceTest")
-	return workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceQoSConfigServiceTest", &eventRecorder)
+	return workerSliceConfigMock, requestObj, clientMock, sliceQosConfig, ctx, sliceQosConfigService, mMock
 }

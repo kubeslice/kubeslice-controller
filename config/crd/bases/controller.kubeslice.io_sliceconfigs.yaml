@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
   name: sliceconfigs.controller.kubeslice.io
 spec:
@@ -173,15 +172,49 @@ spec:
             type: object
           status:
             description: SliceConfigStatus defines the observed state of SliceConfig
+            properties:
+              kubesliceEvents:
+                items:
+                  properties:
+                    action:
+                      description: Trigger action. Examples - CLUSTER_OFFBOARDING,
+                        NAMESPCE_OFFBOARDING etc
+                      type: string
+                    components:
+                      description: list of effected components on which action failed
+                      items:
+                        type: string
+                      type: array
+                    event:
+                      description: Event name (from monitoring framework schema)
+                      type: string
+                    identifier:
+                      description: Identifier of the component for which the action
+                        was triggered
+                      type: string
+                    isEventRaised:
+                      default: false
+                      description: Flag to determine if kubernetes event is already
+                        raised
+                      type: boolean
+                    reason:
+                      description: Reason message for the event
+                      type: string
+                    timestamp:
+                      description: Timestamp of the event
+                      format: date-time
+                      type: string
+                    type:
+                      description: Type of the event. Can be one of Error, Success
+                        or InProgress
+                      type: string
+                  required:
+                  - event
+                  type: object
+                type: array
             type: object
         type: object
     served: true
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

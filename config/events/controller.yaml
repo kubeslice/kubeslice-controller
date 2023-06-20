@@ -1,0 +1,480 @@
+events:
+    #Controller OSS Events
+    ## Project Events
+  - name: ProjectDeleted
+    reason: ProjectDeleted
+    action: DeleteProject
+    type: Warning
+    reportingController: controller
+    message: Project got deleted.
+  - name: ProjectDeletionFailed
+    reason: ProjectDeletionFailed
+    action: DeleteProject
+    type: Warning
+    reportingController: controller
+    message: Project deletion failed.
+  - name: ClusterInstallationInProgress
+    reason: ClusterInstallationInProgress
+    action: AutoInstallation
+    type: Normal
+    reportingController: controller
+    message: Worker Operator installation in progress.
+  - name: ClusterInstallationFailed
+    reason: ClusterInstallationFailed
+    action: AutoInstallation
+    type: Warning
+    reportingController: controller
+    message: Worker Operator installation failed.
+  - name: ClusterInstallationPending
+    reason: ClusterInstallationPending
+    action: AutoInstallation
+    type: Warning
+    reportingController: controller
+    message: Worker Operator verification failed. Pods might be in error state.
+  - name: ClusterDeleted
+    reason: ClusterDeleted
+    action: DeleteCluster
+    type: Warning
+    reportingController: controller
+    message: Cluster got deleted.
+  - name: ClusterDeletionFailed
+    reason: ClusterDeletionFailed
+    action: DeleteCluster
+    type: Warning
+    reportingController: controller
+    message: Cluster deletion failed.
+  - name: ClusterDeregistrationInProgress
+    reason: ClusterDeregistrationInProgress
+    action: DeregisterCluster
+    type: Normal
+    reportingController: controller
+    message: Cluster deregistration in progress.
+  - name: ClusterDeregistered
+    reason: ClusterDeregistered
+    action: DeregisterCluster
+    type: Normal
+    reportingController: controller
+    message: Cluster deregistered.
+  - name: ClusterDeregisterTimeout
+    reason: ClusterDeregisterTimeout
+    action: DeregisterCluster
+    type: Warning
+    reportingController: controller
+    message: Cluster deregister timeout.
+  - name: ClusterDeregisterFailed
+    reason: ClusterDeregisterFailed
+    action: DeregisterCluster
+    type: Warning
+    reportingController: controller
+    message: Cluster deregister failed.
+  - name: SliceConfigDeleted
+    reason: SliceConfigDeleted
+    action: DeleteSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Slice config got deleted.
+  - name: SliceConfigDeletionFailed
+    reason: SliceConfigDeletionFailed
+    action: DeleteSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Slice config deletion failed.
+  - name: ServiceExportConfigDeleted
+    reason: ServiceExportConfigDeleted
+    action: DeleteServiceExportConfig
+    type: Warning
+    reportingController: controller
+    message: Service export config got deleted.
+  - name: ServiceExportConfigDeletionFailed
+    reason: ServiceExportConfigDeletionFailed
+    action: DeleteServiceExportConfig
+    type: Warning
+    reportingController: controller
+    message: Service export config deletion failed.
+  - name: DefaultSliceQoSConfigCreated
+    reason: DefaultSliceQoSConfigCreated
+    action: CreateSliceQoSConfig
+    type: Normal
+    reportingController: controller
+    message: Default Slice QoS config created.
+  - name: SliceQoSConfigDeleted
+    reason: SliceQoSConfigDeleted
+    action: DeleteSliceQoSConfig
+    type: Warning
+    reportingController: controller
+    message: Slice QoS config got deleted.
+  - name: SliceQoSConfigDeletionFailed
+    reason: SliceQoSConfigDeletionFailed
+    action: DeleteSliceQoSConfig
+    type: Warning
+    reportingController: controller
+    message: Slice QoS config deletion failed.
+  - name: SecretDeleted
+    reason: SecretDeleted
+    action: DeleteSecret
+    type: Warning
+    reportingController: controller
+    message: Secret got deleted.
+  - name: SecretDeletionFailed
+    reason: SecretDeletionFailed
+    action: DeleteSecret
+    type: Warning
+    reportingController: controller
+    message: Secret deletion failed.
+  - name: NamespaceCreated
+    reason: NamespaceCreated
+    action: CreateNamespace
+    type: Normal
+    reportingController: controller
+    message: Namespace got created.
+  - name: NamespaceCreationFailed
+    reason: NamespaceCreationFailed
+    action: CreateNamespace
+    type: Warning
+    reportingController: controller
+    message: Namespace creation failed.
+  - name: NamespaceDeleted
+    reason: NamespaceDeleted
+    action: DeleteNamespace
+    type: Warning
+    reportingController: controller
+    message: Namespace got deleted.
+  - name: NamespaceDeletionFailed
+    reason: NamespaceDeletionFailed
+    action: DeleteNamespace
+    type: Warning
+    reportingController: controller
+    message: Namespace deletion failed.
+  - name: WorkerClusterRoleCreated
+    reason: WorkerClusterRoleCreated
+    action: CreateWorkerClusterRole
+    type: Normal
+    reportingController: controller
+    message: Worker cluster role got created.
+  - name: WorkerClusterRoleCreationFailed
+    reason: WorkerClusterRoleCreationFailed
+    action: CreateWorkerClusterRole
+    type: Warning
+    reportingController: controller
+    message: Worker cluster role creation failed.
+  - name: WorkerClusterRoleUpdated
+    reason: WorkerClusterRoleUpdated
+    action: UpdateWorkerClusterRole
+    type: Normal
+    reportingController: controller
+    message: Worker cluster role got updated.
+  - name: WorkerClusterRoleUpdateFailed
+    reason: WorkerClusterRoleUpdateFailed
+    action: UpdateWorkerClusterRole
+    type: Warning
+    reportingController: controller
+    message: Worker cluster role update failed.
+  - name: ReadOnlyRoleCreated
+    reason: ReadOnlyRoleCreated
+    action: CreateReadOnlyRole
+    type: Normal
+    reportingController: controller
+    message: Read only role got created.
+  - name: ReadOnlyRoleCreationFailed
+    reason: ReadOnlyRoleCreationFailed
+    action: CreateReadOnlyRole
+    type: Warning
+    reportingController: controller
+    message: Read only role creation failed.
+  - name: ReadOnlyRoleUpdated
+    reason: ReadOnlyRoleUpdated
+    action: UpdateReadOnlyRole
+    type: Normal
+    reportingController: controller
+    message: Read only role got updated.
+  - name: ReadOnlyRoleUpdateFailed
+    reason: ReadOnlyRoleUpdateFailed
+    action: UpdateReadOnlyRole
+    type: Warning
+    reportingController: controller
+    message: Read only role update failed.
+  - name: ReadWriteRoleCreated
+    reason: ReadWriteRoleCreated
+    action: CreateReadWriteRole
+    type: Normal
+    reportingController: controller
+    message: Read write role got created.
+  - name: ReadWriteRoleCreationFailed
+    reason: ReadWriteRoleCreationFailed
+    action: CreateReadWriteRole
+    type: Warning
+    reportingController: controller
+    message: Read write role creation failed.
+  - name: ReadWriteRoleUpdated
+    reason: ReadWriteRoleUpdated
+    action: UpdateReadWriteRole
+    type: Normal
+    reportingController: controller
+    message: Read write role got updated.
+  - name: ReadWriteRoleUpdateFailed
+    reason: ReadWriteRoleUpdateFailed
+    action: UpdateReadWriteRole
+    type: Warning
+    reportingController: controller
+    message: Read write role update failed.
+  - name: ServiceAccountCreated
+    reason: ServiceAccountCreated
+    action: CreateServiceAccount
+    type: Normal
+    reportingController: controller
+    message: Service account got created.
+  - name: ServiceAccountCreationFailed
+    reason: ServiceAccountCreationFailed
+    action: CreateServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Service account creation failed.
+  - name: ServiceAccountSecretCreated
+    reason: ServiceAccountSecretCreated
+    action: CreateServiceAccountSecret
+    type: Normal
+    reportingController: controller
+    message: Service account secret got created.
+  - name: ServiceAccountSecretCreationFailed
+    reason: ServiceAccountSecretCreationFailed
+    action: CreateServiceAccountSecret
+    type: Warning
+    reportingController: controller
+    message: Service account secret creation failed.
+  - name: DefaultRoleBindingCreated
+    reason: DefaultRoleBindingCreated
+    action: CreateDefaultRoleBinding
+    type: Normal
+    reportingController: controller
+    message: Default role binding got created.
+  - name: DefaultRoleBindingCreationFailed
+    reason: DefaultRoleBindingCreationFailed
+    action: CreateDefaultRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Default role binding creation failed.
+  - name: DefaultRoleBindingUpdated
+    reason: DefaultRoleBindingUpdated
+    action: UpdateDefaultRoleBinding
+    type: Normal
+    reportingController: controller
+    message: Default role binding got updated.
+  - name: DefaultRoleBindingUpdateFailed
+    reason: DefaultRoleBindingUpdateFailed
+    action: UpdateDefaultRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Default role binding update failed.
+  - name: DefaultRoleBindingDeleted
+    reason: DefaultRoleBindingDeleted
+    action: DeleteDefaultRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Default role binding got deleted.
+  - name: DefaultRoleBindingDeletionFailed
+    reason: DefaultRoleBindingDeletionFailed
+    action: DeleteDefaultRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Default role binding deletion failed.
+  - name: InactiveRoleBindingDeleted
+    reason: InactiveRoleBindingDeleted
+    action: DeleteInactiveRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Inactive role binding got deleted.
+  - name: InactiveRoleBindingDeletionFailed
+    reason: InactiveRoleBindingDeletionFailed
+    action: DeleteInactiveRoleBinding
+    type: Warning
+    reportingController: controller
+    message: Inactive role binding deletion failed.
+  - name: InactiveServiceAccountDeleted
+    reason: InactiveServiceAccountDeleted
+    action: DeleteInactiveServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Inactive service account got deleted.
+  - name: InactiveServiceAccountDeletionFailed
+    reason: InactiveServiceAccountDeletionFailed
+    action: DeleteInactiveServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Inactive service account deletion failed.
+  - name: ServiceAccountDeleted
+    reason: ServiceAccountDeleted
+    action: DeleteServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Service account got deleted.
+  - name: ServiceAccountDeletionFailed
+    reason: ServiceAccountDeletionFailed
+    action: DeleteServiceAccount
+    type: Warning
+    reportingController: controller
+    message: Service account deletion failed.
+    ## Worker Service Import
+  - name: WorkerServiceImportDeletedForcefully
+    reason: WorkerServiceImportDeletedForcefully
+    action: DeleteWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import got deleted forcefully.
+  - name: WorkerServiceImportRecreationFailed
+    reason: WorkerServiceImportRecreationFailed
+    action: CreateWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import recreation failed after forceful deletion.
+  - name: WorkerServiceImportRecreated
+    reason: WorkerServiceImportRecreated
+    action: CreateWorkerServiceImport
+    type: Normal
+    reportingController: controller
+    message: Worker service import got recreated after forceful deletion.
+  - name: WorkerServiceImportCreationFailed
+    reason: WorkerServiceImportCreationFailed
+    action: CreateWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import creation failed.
+  - name: WorkerServiceImportCreated
+    reason: WorkerServiceImportCreated
+    action: CreateWorkerServiceImport
+    type: Normal
+    reportingController: controller
+    message: Worker service import got created.
+  - name: WorkerServiceImportUpdateFailed
+    reason: WorkerServiceImportUpdateFailed
+    action: UpdateWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import update failed.
+  - name: WorkerServiceImportUpdated
+    reason: WorkerServiceImportUpdated
+    action: UpdateWorkerServiceImport
+    type: Normal
+    reportingController: controller
+    message: Worker service import got updated.
+  - name: WorkerServiceImportDeleted
+    reason: WorkerServiceImportDeleted
+    action: DeleteWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import got deleted.
+  - name: WorkerServiceImportDeletionFailed
+    reason: WorkerServiceImportDeletionFailed
+    action: DeleteWorkerServiceImport
+    type: Warning
+    reportingController: controller
+    message: Worker service import deletion failed.
+    ## Worker Slice Config
+  - name: WorkerSliceConfigDeletedForcefully
+    reason: WorkerSliceConfigDeletedForcefully
+    action: DeleteWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config got deleted forcefully.
+  - name: WorkerSliceConfigRecreationFailed
+    reason: WorkerSliceConfigRecreationFailed
+    action: CreateWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config recreation failed after forceful deletion.
+  - name: WorkerSliceConfigRecreated
+    reason: WorkerSliceConfigRecreated
+    action: CreateWorkerSliceConfig
+    type: Normal
+    reportingController: controller
+    message: Worker slice config got recreated after forceful deletion.
+  - name: WorkerSliceConfigCreationFailed
+    reason: WorkerSliceConfigCreationFailed
+    action: CreateWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config creation failed.
+  - name: WorkerSliceConfigCreated
+    reason: WorkerSliceConfigCreated
+    action: CreateWorkerSliceConfig
+    type: Normal
+    reportingController: controller
+    message: Worker slice config got created.
+  - name: WorkerSliceConfigUpdateFailed
+    reason: WorkerSliceConfigUpdateFailed
+    action: UpdateWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config update failed.
+  - name: WorkerSliceConfigUpdated
+    reason: WorkerSliceConfigUpdated
+    action: UpdateWorkerSliceConfig
+    type: Normal
+    reportingController: controller
+    message: Worker slice config got updated.
+  - name: WorkerSliceConfigDeleted
+    reason: WorkerSliceConfigDeleted
+    action: DeleteWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config got deleted.
+  - name: WorkerSliceConfigDeletionFailed
+    reason: WorkerSliceConfigDeletionFailed
+    action: DeleteWorkerSliceConfig
+    type: Warning
+    reportingController: controller
+    message: Worker slice config deletion failed.
+    ## Worker Slice Gateway
+  - name: WorkerSliceGatewayDeletedForcefully
+    reason: WorkerSliceGatewayDeletedForcefully
+    action: DeleteWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway got deleted forcefully.
+  - name: WorkerSliceGatewayRecreationFailed
+    reason: WorkerSliceGatewayRecreationFailed
+    action: CreateWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway recreation failed after forceful deletion.
+  - name: WorkerSliceGatewayRecreated
+    reason: WorkerSliceGatewayRecreated
+    action: CreateWorkerSliceGateway
+    type: Normal
+    reportingController: controller
+    message: Worker slice gateway got recreated after forceful deletion.
+  - name: WorkerSliceGatewayDeletionFailed
+    reason: WorkerSliceGatewayDeletionFailed
+    action: DeleteWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway deletion failed.
+  - name: WorkerSliceGatewayDeleted
+    reason: WorkerSliceGatewayDeleted
+    action: DeleteWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway got deleted.
+  - name: WorkerSliceGatewayCreationFailed
+    reason: WorkerSliceGatewayCreationFailed
+    action: CreateWorkerSliceGateway
+    type: Warning
+    reportingController: controller
+    message: Worker slice gateway creation failed.
+  - name: WorkerSliceGatewayCreated
+    reason: WorkerSliceGatewayCreated
+    action: CreateWorkerSliceGateway
+    type: Normal
+    reportingController: controller
+    message: Worker slice gateway got created.
+  - name: SliceGatewayJobCreationFailed
+    reason: SliceGatewayJobCreationFailed
+    action: CreateSliceGatewayJob
+    type: Warning
+    reportingController: controller
+    message: Slice gateway job creation failed.
+  - name: SliceGatewayJobCreated
+    reason: SliceGatewayJobCreated
+    action: CreateSliceGatewayJob
+    type: Normal
+    reportingController: controller
+    message: Slice gateway job got created.

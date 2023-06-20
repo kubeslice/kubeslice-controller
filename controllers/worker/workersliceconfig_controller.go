@@ -18,6 +18,7 @@ package worker
 
 import (
 	"context"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	"github.com/kubeslice/kubeslice-controller/service"
@@ -36,6 +37,7 @@ type WorkerSliceConfigReconciler struct {
 	Scheme             *runtime.Scheme
 	WorkerSliceService service.IWorkerSliceConfigService
 	Log                *zap.SugaredLogger
+	EventRecorder      *events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -47,6 +49,6 @@ func (c *WorkerSliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Reconcile is a function to reconcilation of WorkerSliceconfig, WorkerSliceConfigReconciler implements it
 func (c *WorkerSliceConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, c.Client, c.Scheme, "WorkerSliceConfigController")
+	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, c.Client, c.Scheme, "WorkerSliceConfigController", c.EventRecorder)
 	return c.WorkerSliceService.ReconcileWorkerSliceConfig(kubeSliceCtx, req)
 }

@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.17 as builder
+FROM golang:1.18 as builder
 MAINTAINER "Avesha Systems"
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -15,6 +15,8 @@ COPY apis/ apis/
 COPY controllers/ controllers/
 COPY service/ service/
 COPY util/ util/
+COPY events/ events/
+COPY metrics/ metrics/
 COPY cleanup/ cleanup/
 
 # Build
