@@ -83,16 +83,18 @@ spec:
                 description: This is circular array of last n number of rotation status.
                 items:
                   additionalProperties:
-                    properties:
-                      lastUpdatedTimestamp:
-                        format: date-time
-                        type: string
-                      status:
-                        type: string
-                    required:
-                    - lastUpdatedTimestamp
-                    - status
-                    type: object
+                    items:
+                      properties:
+                        lastUpdatedTimestamp:
+                          format: date-time
+                          type: string
+                        status:
+                          type: string
+                      required:
+                      - lastUpdatedTimestamp
+                      - status
+                      type: object
+                    type: array
                   type: object
                 type: array
             type: object

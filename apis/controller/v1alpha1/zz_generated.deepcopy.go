@@ -966,13 +966,23 @@ func (in *VpnKeyRotationStatus) DeepCopyInto(out *VpnKeyRotationStatus) {
 	}
 	if in.StatusHistory != nil {
 		in, out := &in.StatusHistory, &out.StatusHistory
-		*out = make([]map[string]StatusOfKeyRotation, len(*in))
+		*out = make([]map[string][]StatusOfKeyRotation, len(*in))
 		for i := range *in {
 			if (*in)[i] != nil {
 				in, out := &(*in)[i], &(*out)[i]
-				*out = make(map[string]StatusOfKeyRotation, len(*in))
+				*out = make(map[string][]StatusOfKeyRotation, len(*in))
 				for key, val := range *in {
-					(*out)[key] = *val.DeepCopy()
+					var outVal []StatusOfKeyRotation
+					if val == nil {
+						(*out)[key] = nil
+					} else {
+						in, out := &val, &outVal
+						*out = make([]StatusOfKeyRotation, len(*in))
+						for i := range *in {
+							(*in)[i].DeepCopyInto(&(*out)[i])
+						}
+					}
+					(*out)[key] = outVal
 				}
 			}
 		}
