@@ -91,6 +91,12 @@ events:
     type: Warning
     reportingController: controller
     message: Service export config deletion failed.
+  - name: DefaultSliceQoSConfigCreated
+    reason: DefaultSliceQoSConfigCreated
+    action: CreateSliceQoSConfig
+    type: Normal
+    reportingController: controller
+    message: Default Slice QoS config created.
   - name: SliceQoSConfigDeleted
     reason: SliceQoSConfigDeleted
     action: DeleteSliceQoSConfig
