@@ -1619,7 +1619,7 @@ func ValidateMaxClusterForParticipatingCluster(t *testing.T) {
 	clientMock.AssertExpectations(t)
 }
 func TestValidateCertsRotationInterval_Postive(t *testing.T) {
-	now :=  metav1.Now()
+	now := metav1.Now()
 	name := "slice_config"
 	namespace := "randomNamespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -1717,7 +1717,7 @@ func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
 	now := metav1.Now()
 	sliceConfig.Spec.RenewBefore = &now
 	expiry := metav1.Now().Add(30)
-	
+
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		arg.ObjectMeta = metav1.ObjectMeta{

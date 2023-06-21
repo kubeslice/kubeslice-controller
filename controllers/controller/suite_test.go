@@ -119,10 +119,10 @@ var _ = BeforeSuite(func() {
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
 	vpn := service.WithVpnKeyRotationService(wsgs, wscs)
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr,vpn)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr, vpn)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
 	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
-	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs,vpn)
+	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn)
 
 	service.ProjectNamespacePrefix = util.AppendHyphenAndPercentageSToString("kubeslice")
 	rbacResourcePrefix := util.AppendHyphenToString("kubeslice-rbac")
@@ -173,7 +173,6 @@ var _ = BeforeSuite(func() {
 		ClusterService: svc.ClusterService,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
-
 
 	err = (&VpnKeyRotationReconciler{
 		Client:                k8sClient,
