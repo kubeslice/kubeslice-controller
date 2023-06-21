@@ -212,3 +212,11 @@ func WithVpnKeyRotationService(w IWorkerSliceGatewayService, ws IWorkerSliceConf
 		wscs: ws,
 	}
 }
+
+// bootstrapping Vpn Key Rotation service
+func WithVpnKeyRotationService(w IWorkerSliceGatewayService, ws IWorkerSliceConfigService) IVpnKeyRotationService {
+	return &VpnKeyRotationService{
+		wsgs: w,
+		wscs: ws,
+	}
+}
