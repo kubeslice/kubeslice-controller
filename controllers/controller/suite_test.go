@@ -174,6 +174,16 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+
+	err = (&VpnKeyRotationReconciler{
+		Client:                k8sClient,
+		Scheme:                k8sManager.GetScheme(),
+		Log:                   controllerLog.With("name", "VpnKeyRotationConfig"),
+		VpnKeyRotationService: svc.VpnKeyRotationService,
+		EventRecorder:         &eventRecorder,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)

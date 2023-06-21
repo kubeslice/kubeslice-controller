@@ -1619,12 +1619,12 @@ func ValidateMaxClusterForParticipatingCluster(t *testing.T) {
 	clientMock.AssertExpectations(t)
 }
 func TestValidateCertsRotationInterval_Postive(t *testing.T) {
+	now :=  metav1.Now()
 	name := "slice_config"
 	namespace := "randomNamespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-	sliceConfig.Spec.RenewBefore = metav1.Now()
+	sliceConfig.Spec.RenewBefore = &now
 	expiry := metav1.Now().Add(30)
-	now := metav1.Now()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		arg.ObjectMeta = metav1.ObjectMeta{
@@ -1647,7 +1647,8 @@ func TestValidateCertsRotationInterval_Negative(t *testing.T) {
 	namespace := "randomNamespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	// RenewBefore is 1 hour after, decline
-	sliceConfig.Spec.RenewBefore = metav1.Time{Time: metav1.Now().Add(time.Hour * 1)}
+	renewBefore := metav1.Time{Time: metav1.Now().Add(time.Hour * 1)}
+	sliceConfig.Spec.RenewBefore = &renewBefore
 	expiry := metav1.Now().Add(30)
 	now := metav1.Now()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -1671,10 +1672,9 @@ func TestValidateCertsRotationInterval_NegativeClusterStatus(t *testing.T) {
 	name := "slice_config"
 	namespace := "randomNamespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-
-	sliceConfig.Spec.RenewBefore = metav1.Now()
-	expiry := metav1.Now().Add(30)
 	now := metav1.Now()
+	sliceConfig.Spec.RenewBefore = &now
+	expiry := metav1.Now().Add(30)
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		arg.ObjectMeta = metav1.ObjectMeta{
@@ -1714,10 +1714,10 @@ func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
 	name := "slice_config"
 	namespace := "randomNamespace"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
-
-	sliceConfig.Spec.RenewBefore = metav1.Now()
-	expiry := metav1.Now().Add(30)
 	now := metav1.Now()
+	sliceConfig.Spec.RenewBefore = &now
+	expiry := metav1.Now().Add(30)
+	
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		arg.ObjectMeta = metav1.ObjectMeta{
