@@ -144,8 +144,8 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 }
 
 func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Context, copyVpnConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) (*controllerv1alpha1.VpnKeyRotation, error) {
+	logger := util.CtxLogger(ctx)
 	now := metav1.Now()
-
 	// Check if it's the first time creation
 	if copyVpnConfig.Spec.CertificateCreationTime.IsZero() && copyVpnConfig.Spec.CertificateExpiryTime.IsZero() {
 		copyVpnConfig.Spec.CertificateCreationTime = &now
@@ -157,6 +157,7 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 	} else {
 		if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
 			if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
+				logger.Error("error creating new certs", err)
 				return nil, err
 			}
 			copyVpnConfig.Spec.CertificateCreationTime = &now
