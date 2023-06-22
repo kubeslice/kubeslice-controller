@@ -1,3 +1,4 @@
+
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
@@ -145,6 +146,7 @@ webhooks:
     resources:
     - workerslicegateways
   sideEffects: None
+
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -256,6 +258,27 @@ webhooks:
     - DELETE
     resources:
     - sliceqosconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-controller-kubeslice-io-v1alpha1-vpnkeyrotation
+  failurePolicy: Fail
+  name: vvpnkeyrotation.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - vpnkeyrotations
   sideEffects: None
 - admissionReviewVersions:
   - v1

@@ -21,17 +21,18 @@ import (
 	"fmt"
 	"os"
 
-	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 
-	"github.com/kubeslice/kubeslice-controller/metrics"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -39,6 +40,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/controllers/worker"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -49,7 +51,7 @@ var (
 )
 
 func init() {
-	c
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(controllerv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workerv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
@@ -292,6 +294,10 @@ func initialize(services *service.Services) {
 		}
 	}
 
+	if err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(mgr, service.ValidateVpnKeyRotationCreate); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "VpnKeyRotation")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
