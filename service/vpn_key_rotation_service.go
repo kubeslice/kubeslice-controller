@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type IVpnKeyRotationService interface {
@@ -113,6 +114,12 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	s, err := v.getSliceConfig(ctx, req.Name, req.Namespace)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+	if vpnKeyRotationConfig.GetOwnerReferences() == nil {
+		if err := controllerutil.SetControllerReference(s, vpnKeyRotationConfig, util.GetKubeSliceControllerRequestContext(ctx).Scheme); err != nil {
+			logger.Error(err, "Failed to set SliceConfig as owner of vpnKeyRotationConfig")
+			return ctrl.Result{}, err
+		}
 	}
 	// Step 1: Build map of clusterName: gateways
 	clusterGatewayMapping, err := v.constructClusterGatewayMapping(ctx, s)

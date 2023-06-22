@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -54,6 +55,7 @@ type createMinimalVpnKeyRotationConfigTestCase struct {
 func setupTestCase() (context.Context, *utilMock.Client, VpnKeyRotationService, *mocks.IWorkerSliceGatewayService, *mocks.IWorkerSliceConfigService) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
+	utilruntime.Must(controllerv1alpha1.AddToScheme(scheme))
 	wg := &mocks.IWorkerSliceGatewayService{}
 	ws := &mocks.IWorkerSliceConfigService{}
 	return util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ClusterTestController", nil), clientMock, VpnKeyRotationService{
@@ -1090,7 +1092,7 @@ func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase
 		v := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
 		v.ObjectMeta = metav1.ObjectMeta{
 			Name:      "test-slice",
-			Namespace: "test-namespace",
+			Namespace: "test-ns",
 		}
 		v.Spec = controllerv1alpha1.VpnKeyRotationSpec{
 			Clusters:              []string{"worker-1", "worker-2"},

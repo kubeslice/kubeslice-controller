@@ -1637,6 +1637,8 @@ func TestValidateCertsRotationInterval_Postive(t *testing.T) {
 			CertificateExpiryTime:   &metav1.Time{Time: expiry},
 		}
 	}).Once()
+
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
 	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
 	require.Nil(t, err)
@@ -1747,6 +1749,7 @@ func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
 			},
 		}
 	}).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
 	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
 	require.Nil(t, err)

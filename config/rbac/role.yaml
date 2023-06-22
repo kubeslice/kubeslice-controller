@@ -1,3 +1,4 @@
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -75,6 +76,7 @@ rules:
   - serviceexportconfigs
   - sliceconfigs
   - sliceqosconfigs
+  - vpnkeyrotations
   verbs:
   - create
   - delete
