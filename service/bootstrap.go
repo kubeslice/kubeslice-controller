@@ -212,7 +212,3 @@ func WithVpnKeyRotationService(w IWorkerSliceGatewayService, ws IWorkerSliceConf
 		wscs: ws,
 	}
 }
-
-func WithMetricsRecorder() metrics.IMetricRecorder {
-	return &metrics.MetricRecorder{}
-}
