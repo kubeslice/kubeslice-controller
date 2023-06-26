@@ -111,4 +111,15 @@ resources:
   kind: WorkerSliceGwRecycler
   path: github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeslice.io
+  group: controller
+  kind: VpnKeyRotation
+  path: github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1
+  version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 version: "3"

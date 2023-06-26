@@ -139,14 +139,24 @@ func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv
 		}
 	}
 	// check if we are past and its a correct time
-	if time.Now().After(sliceConfig.Spec.RenewBefore.Time) {
-		return nil
+	if !time.Now().After(sliceConfig.Spec.RenewBefore.Time) {
+		return &field.Error{
+			Type:   field.ErrorTypeForbidden,
+			Field:  "Field: RenewBefore",
+			Detail: "Renewal Time inappropriate for sliceconfig",
+		}
 	}
-	return &field.Error{
-		Type:   field.ErrorTypeForbidden,
-		Field:  "Field: RenewBefore",
-		Detail: "Renewal Time inappropriate for sliceconfig",
+
+	vpnKeyRotaion.Spec.CertificateExpiryTime = sliceConfig.Spec.RenewBefore
+	err := util.UpdateResource(ctx, &vpnKeyRotaion)
+	if err != nil {
+		return &field.Error{
+			Type:   field.ErrorTypeForbidden,
+			Field:  "Field: RenewBefore",
+			Detail: "Failed to Update Renewal Time, Please try again!",
+		}
 	}
+	return nil
 }
 
 // checkNamespaceDeboardingStatus checks if the namespace is deboarding

@@ -28,6 +28,16 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type WorkerSliceGatewayNetworkAddresses struct {
+	ServerNetwork    string
+	ClientNetwork    string
+	ServerSubnet     string
+	ClientSubnet     string
+	ServerVpnNetwork string
+	ServerVpnAddress string
+	ClientVpnAddress string
+}
+
 // AppendHyphenToString is a function add hyphen at the end of string
 func AppendHyphenToString(stringToAppend string) string {
 	if strings.HasSuffix(stringToAppend, "-") {

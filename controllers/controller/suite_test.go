@@ -18,15 +18,16 @@ package controller
 
 import (
 	"context"
+	"path/filepath"
+	"testing"
+	"time"
+
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/metrics"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"testing"
-	"time"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
@@ -118,10 +119,11 @@ var _ = BeforeSuite(func() {
 	wsi := service.WithWorkerServiceImportService(mr)
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr)
+	vpn := service.WithVpnKeyRotationService(wsgs, wscs)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr, vpn)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
 	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
-	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs)
+	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn)
 
 	service.ProjectNamespacePrefix = util.AppendHyphenAndPercentageSToString("kubeslice")
 	rbacResourcePrefix := util.AppendHyphenToString("kubeslice-rbac")
@@ -170,6 +172,15 @@ var _ = BeforeSuite(func() {
 		Log:            controllerLog.With("name", "Cluster"),
 		EventRecorder:  &eventRecorder,
 		ClusterService: svc.ClusterService,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&VpnKeyRotationReconciler{
+		Client:                k8sClient,
+		Scheme:                k8sManager.GetScheme(),
+		Log:                   controllerLog.With("name", "VpnKeyRotationConfig"),
+		VpnKeyRotationService: svc.VpnKeyRotationService,
+		EventRecorder:         &eventRecorder,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
