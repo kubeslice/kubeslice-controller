@@ -119,14 +119,14 @@ func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv
 		return nil
 	}
 	// change detected
-	vpnKeyRotaion := controllerv1alpha1.VpnKeyRotation{}
+	vpnKeyRotation := controllerv1alpha1.VpnKeyRotation{}
 	exists, _ := util.GetResourceIfExist(ctx, types.NamespacedName{
 		Namespace: sliceConfig.Namespace,
 		Name:      sliceConfig.Name,
-	}, &vpnKeyRotaion)
+	}, &vpnKeyRotation)
 	if exists {
-		for gateway := range vpnKeyRotaion.Status.CurrentRotationState {
-			status, ok := vpnKeyRotaion.Status.CurrentRotationState[gateway]
+		for gateway := range vpnKeyRotation.Status.CurrentRotationState {
+			status, ok := vpnKeyRotation.Status.CurrentRotationState[gateway]
 			if ok {
 				if status.Status != controllerv1alpha1.Complete {
 					return &field.Error{
@@ -147,8 +147,8 @@ func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv
 		}
 	}
 
-	vpnKeyRotaion.Spec.CertificateExpiryTime = sliceConfig.Spec.RenewBefore
-	err := util.UpdateResource(ctx, &vpnKeyRotaion)
+	vpnKeyRotation.Spec.CertificateExpiryTime = sliceConfig.Spec.RenewBefore
+	err := util.UpdateResource(ctx, &vpnKeyRotation)
 	if err != nil {
 		return &field.Error{
 			Type:   field.ErrorTypeForbidden,

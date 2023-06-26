@@ -24,7 +24,6 @@ import (
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
