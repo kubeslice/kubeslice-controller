@@ -109,7 +109,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_ValidateQosProfileStandardQosProfileNameDoesNotExist":                                        ValidateQosProfileStandardQosProfileNameDoesNotExist,
 	"SliceConfigWebhookValidation_ValidateMaxCluster":                                                                          ValidateMaxCluster,
 	"SliceConfigWebhookValidation_ValidateMaxClusterForParticipatingCluster":                                                   ValidateMaxClusterForParticipatingCluster,
-	"TestValidateCertsRotationInterval_Postive":                                                                                TestValidateCertsRotationInterval_Postive,
+	"TestValidateCertsRotationInterval_Positive":                                                                                TestValidateCertsRotationInterval_Positive,
 	"TestValidateCertsRotationInterval_Negative":                                                                               TestValidateCertsRotationInterval_Negative,
 	"TestValidateCertsRotationInterval_inProgressClusterStatus":                                                                TestValidateCertsRotationInterval_NegativeClusterStatus,
 	"TestValidateCertsRotationInterval_PositiveClusterStatus":                                                                  TestValidateCertsRotationInterval_PositiveClusterStatus,
@@ -1588,7 +1588,7 @@ func ValidateMaxClusterForParticipatingCluster(t *testing.T) {
 	require.Contains(t, err.Error(), "participating clusters cannot be greater than MaxClusterCount")
 	clientMock.AssertExpectations(t)
 }
-func TestValidateCertsRotationInterval_Postive(t *testing.T) {
+func TestValidateCertsRotationInterval_Positive(t *testing.T) {
 	now := metav1.Now()
 	name := "slice_config"
 	namespace := "randomNamespace"
