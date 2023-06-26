@@ -22,13 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
 var (
-	vpnkeyrotationlog                    = logf.Log.WithName("vpnkeyrotation-resource")
+	vpnKeyRotationLog                    = util.NewLogger().With("name", "vpnkeyrotation-resource")
 	customVpnKeyRotationCreateValidation func(ctx context.Context, vpn *VpnKeyRotation) error
 	vpnKeyRotationConfigWebhookClient    client.Client
 )
@@ -57,7 +56,7 @@ func (r *VpnKeyRotation) ValidateCreate() error {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *VpnKeyRotation) ValidateUpdate(old runtime.Object) error {
-	vpnkeyrotationlog.Info("validate update", "name", r.Name)
+	vpnKeyRotationLog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
 	return nil
@@ -65,7 +64,7 @@ func (r *VpnKeyRotation) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *VpnKeyRotation) ValidateDelete() error {
-	vpnkeyrotationlog.Info("validate delete", "name", r.Name)
+	vpnKeyRotationLog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
