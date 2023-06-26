@@ -60,6 +60,8 @@ spec:
                   name and value is array of gateways present on that cluster. This
                   is used to avoid unnecessary reconciliation in worker-operator.
                 type: object
+              rotationCount:
+                type: integer
               rotationInterval:
                 type: integer
               sliceName:
@@ -82,8 +84,6 @@ spec:
                   type: object
                 description: This is map of gateway name to the current rotation state
                 type: object
-              rotationCount:
-                type: integer
               statusHistory:
                 additionalProperties:
                   items:
