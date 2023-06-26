@@ -50,12 +50,17 @@ type VpnKeyRotationService struct {
 
 // CreateMinimalVpnKeyRotationConfig creates minimal VPNKeyRotationCR if not found
 func (v *VpnKeyRotationService) CreateMinimalVpnKeyRotationConfig(ctx context.Context, sliceName, namespace string, r int) error {
+	logger := util.CtxLogger(ctx).
+		With("name", "CreateMinimalVpnKeyRotationConfig").
+		With("reconciler", "VpnKeyRotationConfig")
+
 	vpnKeyRotationConfig := controllerv1alpha1.VpnKeyRotation{}
 	found, err := util.GetResourceIfExist(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      sliceName,
 	}, &vpnKeyRotationConfig)
 	if err != nil {
+		logger.Errorf("error fetching vpnKeyRotationConfig %s. Err: %s ", sliceName, err.Error())
 		return err
 	}
 	if !found {
@@ -70,12 +75,13 @@ func (v *VpnKeyRotationService) CreateMinimalVpnKeyRotationConfig(ctx context.Co
 			Spec: controllerv1alpha1.VpnKeyRotationSpec{
 				RotationInterval: r,
 				SliceName:        sliceName,
-				RotationCount: 1,
+				RotationCount:    1,
 			},
 		}
 		if err := util.CreateResource(ctx, &vpnKeyRotationConfig); err != nil {
 			return err
 		}
+		logger.Debugf("created vpnKeyRotationConfig %s ", sliceName)
 	}
 	return nil
 }
@@ -83,12 +89,17 @@ func (v *VpnKeyRotationService) CreateMinimalVpnKeyRotationConfig(ctx context.Co
 // ReconcileClusters checks whether any cluster is added/removed and updates it in vpnkeyrotation config
 // the first arg is returned for testing purposes
 func (v *VpnKeyRotationService) ReconcileClusters(ctx context.Context, sliceName, namespace string, clusters []string) (*controllerv1alpha1.VpnKeyRotation, error) {
+	logger := util.CtxLogger(ctx).
+		With("name", "ReconcileClusters").
+		With("reconciler", "VpnKeyRotationConfig")
+
 	vpnKeyRotationConfig := controllerv1alpha1.VpnKeyRotation{}
 	found, err := util.GetResourceIfExist(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      sliceName,
 	}, &vpnKeyRotationConfig)
 	if err != nil {
+		logger.Errorf("error fetching vpnKeyRotationConfig %s. Err: %s ", sliceName, err.Error())
 		return nil, err
 	}
 	if found {
@@ -102,12 +113,16 @@ func (v *VpnKeyRotationService) ReconcileClusters(ctx context.Context, sliceName
 
 func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get VpnKeyRotation resource
-	logger := util.CtxLogger(ctx)
+	logger := util.CtxLogger(ctx).
+		With("name", "ReconcileVpnKeyRotation").
+		With("reconciler", "VpnKeyRotationConfig")
+
 	logger.Infof("Starting Recoincilation of VpnKeyRotation with name %s in namespace %s",
 		req.Name, req.Namespace)
 	vpnKeyRotationConfig := &controllerv1alpha1.VpnKeyRotation{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, vpnKeyRotationConfig)
 	if err != nil {
+		logger.Errorf("Err: %s", err.Error())
 		return ctrl.Result{}, err
 	}
 	if !found {
@@ -117,17 +132,19 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	// get slice config
 	s, err := v.getSliceConfig(ctx, req.Name, req.Namespace)
 	if err != nil {
+		logger.Errorf("Err: %s", err.Error())
 		return ctrl.Result{}, err
 	}
 	if vpnKeyRotationConfig.GetOwnerReferences() == nil {
 		if err := controllerutil.SetControllerReference(s, vpnKeyRotationConfig, util.GetKubeSliceControllerRequestContext(ctx).Scheme); err != nil {
-			logger.Error(err, "Failed to set SliceConfig as owner of vpnKeyRotationConfig")
+			logger.Errorf("failed to set SliceConfig as owner of vpnKeyRotationConfig. Err %s", err.Error())
 			return ctrl.Result{}, err
 		}
 	}
 	// Step 1: Build map of clusterName: gateways
 	clusterGatewayMapping, err := v.constructClusterGatewayMapping(ctx, s)
 	if err != nil {
+		logger.Errorf("Err: %s", err.Error())
 		return ctrl.Result{}, err
 	}
 	copyVpnConfig := vpnKeyRotationConfig.DeepCopy()
@@ -135,6 +152,7 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	if !reflect.DeepEqual(copyVpnConfig.Spec.ClusterGatewayMapping, clusterGatewayMapping) {
 		copyVpnConfig.Spec.ClusterGatewayMapping = clusterGatewayMapping
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
+			logger.Errorf("Err: %s", err.Error())
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
@@ -144,6 +162,7 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	// b. The Current TS is pass the expiry TS
 	res, copyVpnConfig, err := v.reconcileVpnKeyRotationConfig(ctx, copyVpnConfig, s)
 	if err != nil {
+		logger.Errorf("Err: %s", err.Error())
 		return res, err
 	}
 	return ctrl.Result{RequeueAfter: (time.Duration(copyVpnConfig.Spec.RotationInterval) * 24 * time.Hour) - (time.Hour)}, nil
@@ -310,7 +329,7 @@ func (v *VpnKeyRotationService) verifyAllJobsAreCompleted(ctx context.Context, s
 func (v *VpnKeyRotationService) fetchGatewayNames(gl *workerv1alpha1.WorkerSliceGatewayList) []string {
 	var gatewayNames []string
 	for _, g := range gl.Items {
-		if g.DeletionTimestamp.IsZero(){
+		if g.DeletionTimestamp.IsZero() {
 			gatewayNames = append(gatewayNames, g.Name)
 		}
 	}
