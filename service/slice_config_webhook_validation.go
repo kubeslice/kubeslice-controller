@@ -115,7 +115,7 @@ func ValidateSliceConfigDelete(ctx context.Context, sliceConfig *controllerv1alp
 func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, old runtime.Object) *field.Error {
 	oldSliceConfig := old.(*controllerv1alpha1.SliceConfig)
 	// nochange detected
-	if sliceConfig.Spec.RenewBefore == oldSliceConfig.Spec.RenewBefore || sliceConfig.Spec.RenewBefore.IsZero() {
+	if sliceConfig.Spec.RenewBefore.Equal(oldSliceConfig.Spec.RenewBefore){
 		return nil
 	}
 	// change detected
