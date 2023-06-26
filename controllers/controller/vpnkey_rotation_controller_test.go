@@ -234,5 +234,16 @@ var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
 				return len(job.Items) > 0
 			}, timeout, interval).Should(BeTrue())
 		})
+		It("Should Update VPNKey Rotation Config in case a new cluster is added", func() {
+			// update sliceconfig
+			slice.Spec.Clusters = append(slice.Spec.Clusters, "worker-3")
+			Expect(k8sClient.Update(ctx, slice)).Should(Succeed())
+			// NOTE:since slice reconciler is not present in ITs yet, manually update vpnkeyrotaion CR
+			// update vpnsliceconfig
+			vpn.Spec.Clusters = append(vpn.Spec.Clusters, "worker-3")
+			Expect(k8sClient.Update(ctx, vpn)).Should(Succeed())
+			// should update cluster-mapping
+
+		})
 	})
 })
