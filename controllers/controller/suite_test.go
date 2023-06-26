@@ -18,6 +18,9 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
+	"net"
 	"path/filepath"
 	"testing"
 	"time"
@@ -63,7 +66,7 @@ var (
 )
 
 const (
-	timeout = time.Second * 10
+	timeout = time.Second * 30
 	// duration = time.Second * 10
 	interval              = time.Millisecond * 250
 	controlPlaneNamespace = "kubeslice-controller"
@@ -141,8 +144,14 @@ var _ = BeforeSuite(func() {
 	}
 	Expect(k8sClient.Create(ctx, controlPlaneNS)).Should(Succeed())
 
+	webhookInstallOptions := &testEnv.WebhookInstallOptions
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme: scheme.Scheme,
+		Scheme:             scheme.Scheme,
+		Host:               webhookInstallOptions.LocalServingHost,
+		Port:               webhookInstallOptions.LocalServingPort,
+		CertDir:            webhookInstallOptions.LocalServingCertDir,
+		LeaderElection:     false,
+		MetricsBindAddress: "0",
 	})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -175,8 +184,18 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	// initialize controller with SliceConfig Kind
+	err = (&SliceConfigReconciler{
+		Client:             k8sManager.GetClient(),
+		Scheme:             k8sManager.GetScheme(),
+		Log:                controllerLog.With("name", "SliceConfig"),
+		SliceConfigService: svc.SliceConfigService,
+		EventRecorder:      &eventRecorder,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	err = (&VpnKeyRotationReconciler{
-		Client:                k8sClient,
+		Client:                k8sManager.GetClient(),
 		Scheme:                k8sManager.GetScheme(),
 		Log:                   controllerLog.With("name", "VpnKeyRotationConfig"),
 		VpnKeyRotationService: svc.VpnKeyRotationService,
@@ -184,11 +203,31 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	// setup webhook
+
+	err = (&controllerv1alpha1.SliceConfig{}).SetupWebhookWithManager(k8sManager, service.ValidateSliceConfigCreate, service.ValidateSliceConfigUpdate, service.ValidateSliceConfigDelete)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(k8sManager, service.ValidateVpnKeyRotationCreate)
+	Expect(err).ToNot(HaveOccurred())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
+
+	// wait for the webhook server to get ready
+	dialer := &net.Dialer{Timeout: time.Second}
+	addrPort := fmt.Sprintf("%s:%d", webhookInstallOptions.LocalServingHost, webhookInstallOptions.LocalServingPort)
+	Eventually(func() error {
+		conn, err := tls.DialWithDialer(dialer, "tcp", addrPort, &tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return err
+		}
+		conn.Close()
+		return nil
+	}).Should(Succeed())
 
 })
 

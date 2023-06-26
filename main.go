@@ -292,12 +292,12 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SliceQoSConfig")
 			os.Exit(1)
 		}
+		if err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(mgr, service.ValidateVpnKeyRotationCreate); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "VpnKeyRotation")
+			os.Exit(1)
+		}
 	}
 
-	if err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(mgr, service.ValidateVpnKeyRotationCreate); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "VpnKeyRotation")
-		os.Exit(1)
-	}
 	//+kubebuilder:scaffold:builder
 
 	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

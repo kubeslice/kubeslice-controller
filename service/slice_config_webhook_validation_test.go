@@ -109,7 +109,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_ValidateQosProfileStandardQosProfileNameDoesNotExist":                                        ValidateQosProfileStandardQosProfileNameDoesNotExist,
 	"SliceConfigWebhookValidation_ValidateMaxCluster":                                                                          ValidateMaxCluster,
 	"SliceConfigWebhookValidation_ValidateMaxClusterForParticipatingCluster":                                                   ValidateMaxClusterForParticipatingCluster,
-	"TestValidateCertsRotationInterval_Positive":                                                                                TestValidateCertsRotationInterval_Positive,
+	"TestValidateCertsRotationInterval_Positive":                                                                               TestValidateCertsRotationInterval_Positive,
 	"TestValidateCertsRotationInterval_Negative":                                                                               TestValidateCertsRotationInterval_Negative,
 	"TestValidateCertsRotationInterval_inProgressClusterStatus":                                                                TestValidateCertsRotationInterval_NegativeClusterStatus,
 	"TestValidateCertsRotationInterval_PositiveClusterStatus":                                                                  TestValidateCertsRotationInterval_PositiveClusterStatus,
