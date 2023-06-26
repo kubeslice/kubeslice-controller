@@ -70,6 +70,7 @@ func (v *VpnKeyRotationService) CreateMinimalVpnKeyRotationConfig(ctx context.Co
 			Spec: controllerv1alpha1.VpnKeyRotationSpec{
 				RotationInterval: r,
 				SliceName:        sliceName,
+				RotationCount: 1,
 			},
 		}
 		if err := util.CreateResource(ctx, &vpnKeyRotationConfig); err != nil {
@@ -309,7 +310,9 @@ func (v *VpnKeyRotationService) verifyAllJobsAreCompleted(ctx context.Context, s
 func (v *VpnKeyRotationService) fetchGatewayNames(gl *workerv1alpha1.WorkerSliceGatewayList) []string {
 	var gatewayNames []string
 	for _, g := range gl.Items {
-		gatewayNames = append(gatewayNames, g.Name)
+		if g.DeletionTimestamp.IsZero(){
+			gatewayNames = append(gatewayNames, g.Name)
+		}
 	}
 	return gatewayNames
 }
