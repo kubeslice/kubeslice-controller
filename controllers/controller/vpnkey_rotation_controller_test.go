@@ -31,7 +31,7 @@ var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
 	var namespace v1.Namespace
 	var octet1 = 1
 	var octet = 0
-	Context("With Minimal VPNKeyRotaionConfig Created", func() {
+	Context("With Minimal VPNKeyRotationConfig Created", func() {
 		ctx := context.Background()
 		vpn = &v1alpha1.VpnKeyRotation{
 			ObjectMeta: metav1.ObjectMeta{
@@ -145,7 +145,7 @@ var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
 			Expect(k8sClient.Create(ctx, &namespace)).Should(Succeed())
 		})
 
-		It("Should Update VPNKeyRotaionConfig with correct cluster gateway mapping", func() {
+		It("Should Update VPNKeyRotationConfig with correct cluster gateway mapping", func() {
 
 			// it should create sliceconfig
 			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
@@ -238,7 +238,7 @@ var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
 			// update sliceconfig
 			slice.Spec.Clusters = append(slice.Spec.Clusters, "worker-3")
 			Expect(k8sClient.Update(ctx, slice)).Should(Succeed())
-			// NOTE:since slice reconciler is not present in ITs yet, manually update vpnkeyrotaion CR
+			// NOTE:since slice reconciler is not present in ITs yet, manually update vpnkeyrotation CR
 			// update vpnsliceconfig
 			vpn.Spec.Clusters = append(vpn.Spec.Clusters, "worker-3")
 			Expect(k8sClient.Update(ctx, vpn)).Should(Succeed())
