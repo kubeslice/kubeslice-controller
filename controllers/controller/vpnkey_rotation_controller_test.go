@@ -20,7 +20,7 @@ const (
 	sliceNamespace = "test-ns"
 )
 
-var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
+var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 	var slice *v1alpha1.SliceConfig
 	var cluster1 *v1alpha1.Cluster
 	var cluster2 *v1alpha1.Cluster
@@ -91,7 +91,7 @@ var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
 			s.Spec.RotationInterval = 100
 			Expect(k8sClient.Create(ctx, s)).Should(Not(Succeed()))
 
-			// RotationInterval < 90
+			// RotationInterval < 30
 			s.Spec.RotationInterval = 20
 			// Expected Error:
 			// {
@@ -165,7 +165,7 @@ var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
 			}, timeout, interval).Should(BeTrue())
 		})
 
-		It("Should recreate/retrigger jobs for cert creation", func() {
+		It("Should recreate/retrigger jobs for cert creation once it expires", func() {
 			os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", controlPlaneNamespace)
 
 			createdVpnKeyConfig := &v1alpha1.VpnKeyRotation{}
@@ -202,7 +202,7 @@ var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
 			}, timeout, interval).Should(BeTrue())
 		})
 		// cluster onboarding tests
-		It("Should Update VPNKey Rotation Config in case a new cluster is added", func() {
+		It("Should Update VPNKeyRotation Config in case a new cluster is added", func() {
 			// update sliceconfig
 			createdSliceConfig := &v1alpha1.SliceConfig{}
 
@@ -276,7 +276,7 @@ var _ = Describe("VpnKeyRoation Controller", Ordered, func() {
 				return createdVpnKeyConfig.Spec.Clusters
 			}, timeout, interval).Should(Equal([]string{"worker-1", "worker-2"}))
 		})
-		It("Should Update Cluster() Gateway Mapping", func() {
+		It("Should Update Cluster(2) Gateway Mapping", func() {
 			createdVpnKeyConfig := &v1alpha1.VpnKeyRotation{}
 			getKey := types.NamespacedName{
 				Namespace: slice.Namespace,

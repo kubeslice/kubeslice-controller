@@ -30,11 +30,11 @@ import (
 var (
 	vpnkeyrotationlog                    = logf.Log.WithName("vpnkeyrotation-resource")
 	customVpnKeyRotationCreateValidation func(ctx context.Context, vpn *VpnKeyRotation) error
-	vpnKeyRoationConfigWebhookClient     client.Client
+	vpnKeyRotationConfigWebhookClient     client.Client
 )
 
 func (r *VpnKeyRotation) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate func(context.Context, *VpnKeyRotation) error) error {
-	vpnKeyRoationConfigWebhookClient = mgr.GetClient()
+	vpnKeyRotationConfigWebhookClient = mgr.GetClient()
 	customVpnKeyRotationCreateValidation = validateCreate
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
@@ -51,7 +51,7 @@ var _ webhook.Validator = &VpnKeyRotation{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *VpnKeyRotation) ValidateCreate() error {
 	sliceconfigurationlog.Info("validate create", "name", r.Name)
-	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), vpnKeyRoationConfigWebhookClient, nil, "VpnKeyRotationConfigValidation", nil)
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), vpnKeyRotationConfigWebhookClient, nil, "VpnKeyRotationConfigValidation", nil)
 	return customVpnKeyRotationCreateValidation(sliceConfigCtx, r)
 }
 

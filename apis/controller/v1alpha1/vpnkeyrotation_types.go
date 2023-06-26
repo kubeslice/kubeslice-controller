@@ -36,6 +36,7 @@ type VpnKeyRotationSpec struct {
 	RotationInterval      int          `json:"rotationInterval,omitempty"`
 	// clusters contains the list of clusters attached to this slice
 	Clusters []string `json:"clusters,omitempty"`
+	RotationCount int                              `json:"rotationCount,omitempty"`
 }
 
 // VpnKeyRotationStatus defines the observed state of VpnKeyRotation
@@ -44,7 +45,6 @@ type VpnKeyRotationStatus struct {
 	CurrentRotationState map[string]StatusOfKeyRotation `json:"currentRotationState,omitempty"`
 	// This is circular array of last n number of rotation status.
 	StatusHistory map[string][]StatusOfKeyRotation `json:"statusHistory,omitempty"`
-	RotationCount int                              `json:"rotationCount,omitempty"`
 }
 
 type StatusOfKeyRotation struct {
