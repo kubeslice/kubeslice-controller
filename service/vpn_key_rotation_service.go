@@ -18,8 +18,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -41,8 +43,9 @@ type IVpnKeyRotationService interface {
 }
 
 type VpnKeyRotationService struct {
-	wsgs IWorkerSliceGatewayService
-	wscs IWorkerSliceConfigService
+	wsgs                  IWorkerSliceGatewayService
+	wscs                  IWorkerSliceConfigService
+	jobCreationInProgress atomic.Bool
 }
 
 // CreateMinimalVpnKeyRotationConfig creates minimal VPNKeyRotationCR if not found
@@ -138,45 +141,53 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	// Step 2: TODO Update Certificate Creation TimeStamp and Expiry Timestamp if
 	// a. The Creation TS and Expiry TS is empty
 	// b. The Current TS is pass the expiry TS
-	//TODO(): confirm if this is the right approach?
-	if !v.verifyAllJobsAreCompleted(ctx, vpnKeyRotationConfig.Spec.SliceName) {
-		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
-	}
-
-	copyVpnConfig, err = v.reconcileVpnKeyRotationConfig(ctx, copyVpnConfig, s)
+	res, copyVpnConfig, err := v.reconcileVpnKeyRotationConfig(ctx, copyVpnConfig, s)
 	if err != nil {
-		return ctrl.Result{}, err
+		return res, err
 	}
 	return ctrl.Result{RequeueAfter: (time.Duration(copyVpnConfig.Spec.RotationInterval) * 24 * time.Hour) - (time.Hour)}, nil
 }
 
-func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Context, copyVpnConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) (*controllerv1alpha1.VpnKeyRotation, error) {
+func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Context, copyVpnConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) (ctrl.Result, *controllerv1alpha1.VpnKeyRotation, error) {
 	logger := util.CtxLogger(ctx)
 	now := metav1.Now()
 	// Check if it's the first time creation
 	if copyVpnConfig.Spec.CertificateCreationTime.IsZero() && copyVpnConfig.Spec.CertificateExpiryTime.IsZero() {
+		// verify jobs are completed
+		if !v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName) {
+			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil, errors.New("waiting for jobs to be complete")
+		}
 		copyVpnConfig.Spec.CertificateCreationTime = &now
 		expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
 		copyVpnConfig.Spec.CertificateExpiryTime = &expiryTS
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
-			return nil, err
+			return ctrl.Result{}, nil, err
 		}
 	} else {
 		if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
-			if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
-				logger.Error("error creating new certs", err)
-				return nil, err
+			if !v.jobCreationInProgress.Load() {
+				if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
+					logger.Error("error creating new certs", err)
+					return ctrl.Result{}, nil, err
+				}
+				v.jobCreationInProgress.Store(true)
+			}
+			if !v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName) {
+				return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil, errors.New("waiting for jobs to be complete")
 			}
 			copyVpnConfig.Spec.CertificateCreationTime = &now
 			expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
 			copyVpnConfig.Spec.CertificateExpiryTime = &expiryTS
+			copyVpnConfig.Spec.RotationCount = copyVpnConfig.Spec.RotationCount + 1
 			if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
-				return nil, err
+				return ctrl.Result{}, nil, err
 			}
+			// restore the variable jobCreationInProgress to false
+			v.jobCreationInProgress.Store(false)
 		}
 	}
 
-	return copyVpnConfig, nil
+	return ctrl.Result{}, copyVpnConfig, nil
 }
 
 func (v *VpnKeyRotationService) constructClusterGatewayMapping(ctx context.Context, s *controllerv1alpha1.SliceConfig) (map[string][]string, error) {

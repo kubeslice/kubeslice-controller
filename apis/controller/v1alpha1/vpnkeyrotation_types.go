@@ -35,8 +35,8 @@ type VpnKeyRotationSpec struct {
 	CertificateExpiryTime *metav1.Time `json:"certificateExpiryTime,omitempty"`
 	RotationInterval      int          `json:"rotationInterval,omitempty"`
 	// clusters contains the list of clusters attached to this slice
-	Clusters []string `json:"clusters,omitempty"`
-	RotationCount int                              `json:"rotationCount,omitempty"`
+	Clusters      []string `json:"clusters,omitempty"`
+	RotationCount int      `json:"rotationCount,omitempty"`
 }
 
 // VpnKeyRotationStatus defines the observed state of VpnKeyRotation

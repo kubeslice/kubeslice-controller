@@ -30,7 +30,7 @@ import (
 var (
 	vpnkeyrotationlog                    = logf.Log.WithName("vpnkeyrotation-resource")
 	customVpnKeyRotationCreateValidation func(ctx context.Context, vpn *VpnKeyRotation) error
-	vpnKeyRotationConfigWebhookClient     client.Client
+	vpnKeyRotationConfigWebhookClient    client.Client
 )
 
 func (r *VpnKeyRotation) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate func(context.Context, *VpnKeyRotation) error) error {

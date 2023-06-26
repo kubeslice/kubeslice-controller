@@ -405,6 +405,7 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 					SliceName:        "test-slice",
 					Clusters:         []string{"worker-1", "worker-2"},
 					RotationInterval: 30,
+					RotationCount:    1,
 				},
 			},
 			arg2: &controllerv1alpha1.SliceConfig{
@@ -425,6 +426,7 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 					RotationInterval:        30,
 					CertificateCreationTime: &ts,
 					CertificateExpiryTime:   &expiryTs,
+					RotationCount:           1,
 				},
 			},
 			updateArg1: mock.Anything,
@@ -446,6 +448,7 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 					RotationInterval:        30,
 					CertificateCreationTime: &ts,
 					CertificateExpiryTime:   &expiryTs,
+					RotationCount:           1,
 				},
 			},
 			arg2: &controllerv1alpha1.SliceConfig{
@@ -466,6 +469,7 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 					RotationInterval:        30,
 					CertificateCreationTime: &newTs,
 					CertificateExpiryTime:   &newExpiryTs,
+					RotationCount:           2,
 				},
 			},
 			updateArg1: mock.Anything,
@@ -489,10 +493,10 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 	defer patch.Unpatch()
 	// NOTE: Monkey pathcing sometimes requires the inlining to be disabled
 	// use go test -gcflags=-l
-
 	// setup Expectations
+	gwList := &workerv1alpha1.WorkerSliceGatewayList{}
 	clientMock.
-		On("List", mock.Anything, mock.Anything, mock.Anything).
+		On("List", mock.Anything, gwList, mock.Anything).
 		Return(nil).Run(func(args mock.Arguments) {
 		w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
 		w.Items = append(w.Items,
@@ -512,6 +516,47 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 					GatewayHostType: "Client",
 					RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
 						GatewayName: "test-slice-worker-1-worker-2",
+					},
+				},
+			})
+	}).Times(1)
+
+	jobList := &batchv1.JobList{}
+
+	clientMock.
+		On("List", mock.Anything, jobList, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items,
+			batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "job-1",
+					Labels: map[string]string{
+						"SLICE_NAME": "test-slice",
+					},
+				},
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobComplete,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			},
+			batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "job-2",
+					Labels: map[string]string{
+						"SLICE_NAME": "test-slice",
+					},
+				},
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobComplete,
+							Status: corev1.ConditionTrue,
+						},
 					},
 				},
 			})
@@ -550,7 +595,7 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 	clientMock.
 		On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
 
-	gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
+	_, gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
 	require.Equal(t, gotErr, tc.expectedErr)
 
 	require.Equal(t, tc.expectedResp, gotResp)
@@ -1046,7 +1091,7 @@ func Test_reconcileVpnKeyRotation(t *testing.T) {
 				Name:      "test-slice",
 			}},
 			expectedResponse: ctrl.Result{RequeueAfter: 1 * time.Minute},
-			expectedError:    nil,
+			expectedError:    errors.New("waiting for jobs to be complete"),
 			getArg1:          mock.Anything,
 			getArg2:          mock.Anything,
 			getArg3:          mock.Anything,
