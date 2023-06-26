@@ -35,8 +35,9 @@ type VpnKeyRotationSpec struct {
 	CertificateExpiryTime *metav1.Time `json:"certificateExpiryTime,omitempty"`
 	RotationInterval      int          `json:"rotationInterval,omitempty"`
 	// clusters contains the list of clusters attached to this slice
-	Clusters      []string `json:"clusters,omitempty"`
-	RotationCount int      `json:"rotationCount,omitempty"`
+	Clusters []string `json:"clusters,omitempty"`
+	// RotationCount represent the number of times rotation has been already performed.
+	RotationCount int `json:"rotationCount,omitempty"`
 }
 
 // VpnKeyRotationStatus defines the observed state of VpnKeyRotation
@@ -47,6 +48,7 @@ type VpnKeyRotationStatus struct {
 	StatusHistory map[string][]StatusOfKeyRotation `json:"statusHistory,omitempty"`
 }
 
+// StatusOfKeyRotation represent per gateway status
 type StatusOfKeyRotation struct {
 	Status               string      `json:"status"`
 	LastUpdatedTimestamp metav1.Time `json:"lastUpdatedTimestamp"`
@@ -77,6 +79,7 @@ func init() {
 	SchemeBuilder.Register(&VpnKeyRotation{}, &VpnKeyRotationList{})
 }
 
+// status of key rotation updated by workers
 const (
 	SecretReadInProgress string = "READ_IN_PROGRESS"
 	SecretUpdated        string = "SECRET_UPDATED"

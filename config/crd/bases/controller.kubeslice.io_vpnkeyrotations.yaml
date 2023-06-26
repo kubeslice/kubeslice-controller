@@ -61,6 +61,8 @@ spec:
                   is used to avoid unnecessary reconciliation in worker-operator.
                 type: object
               rotationCount:
+                description: RotationCount represent the number of times rotation
+                  has been already performed.
                 type: integer
               rotationInterval:
                 type: integer
@@ -72,6 +74,7 @@ spec:
             properties:
               currentRotationState:
                 additionalProperties:
+                  description: StatusOfKeyRotation represent per gateway status
                   properties:
                     lastUpdatedTimestamp:
                       format: date-time
@@ -87,6 +90,7 @@ spec:
               statusHistory:
                 additionalProperties:
                   items:
+                    description: StatusOfKeyRotation represent per gateway status
                     properties:
                       lastUpdatedTimestamp:
                         format: date-time

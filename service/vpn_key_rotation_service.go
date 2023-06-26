@@ -186,7 +186,6 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 			v.jobCreationInProgress.Store(false)
 		}
 	}
-
 	return ctrl.Result{}, copyVpnConfig, nil
 }
 
