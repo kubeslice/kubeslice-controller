@@ -26,6 +26,7 @@ import (
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -129,6 +130,7 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		logger.Infof("Vpn Key Rotation Config %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
+
 	// get slice config
 	s, err := v.getSliceConfig(ctx, req.Name, req.Namespace)
 	if err != nil {
@@ -170,6 +172,13 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 
 func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Context, copyVpnConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) (ctrl.Result, *controllerv1alpha1.VpnKeyRotation, error) {
 	logger := util.CtxLogger(ctx)
+
+	//Load Event Recorder with project name, vpnkeyrotation(slice) name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(s.Namespace)).
+		WithNamespace(s.Namespace).
+		WithSlice(s.Name)
+
 	now := metav1.Now()
 	// Check if it's the first time creation
 	if copyVpnConfig.Spec.CertificateCreationTime.IsZero() && copyVpnConfig.Spec.CertificateExpiryTime.IsZero() {
@@ -183,11 +192,16 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
 			return ctrl.Result{}, nil, err
 		}
+		//register an event
+		util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventVPNKeyRotationConfigUpdated)
+
 	} else {
 		if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
 			if !v.jobCreationInProgress.Load() {
 				if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
 					logger.Error("error creating new certs", err)
+					// register an event
+					util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobCreationFailed)
 					return ctrl.Result{}, nil, err
 				}
 				v.jobCreationInProgress.Store(true)
@@ -204,6 +218,8 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 			}
 			// restore the variable jobCreationInProgress to false
 			v.jobCreationInProgress.Store(false)
+			//register an event
+			util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventVPNKeyRotationStart)
 		}
 	}
 	return ctrl.Result{}, copyVpnConfig, nil
