@@ -50,6 +50,15 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+const (
+	timeout = time.Second * 10
+	// duration = time.Second * 10
+	interval              = time.Millisecond * 250
+	controlPlaneNamespace = "kubeslice-controller"
+	projectName           = "avesha"
+	projectNamespace      = "kubeslice-" + projectName
+)
+
 var (
 	cfg           *rest.Config
 	k8sClient     client.Client
@@ -59,13 +68,17 @@ var (
 	ctx           context.Context
 	cancel        context.CancelFunc
 	controllerLog = util.NewLogger().With("name", "controllers")
-)
-
-const (
-	timeout = time.Second * 10
-	// duration = time.Second * 10
-	interval              = time.Millisecond * 250
-	controlPlaneNamespace = "kubeslice-controller"
+	mainProject   = &controllerv1alpha1.Project{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      projectName,
+			Namespace: controlPlaneNamespace,
+		},
+		Spec: controllerv1alpha1.ProjectSpec{
+			ServiceAccount: controllerv1alpha1.ServiceAccount{
+				ReadWrite: []string{"admin"},
+			},
+		},
+	}
 )
 
 func TestAPIs(t *testing.T) {
@@ -124,6 +137,7 @@ var _ = BeforeSuite(func() {
 	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs)
 
 	service.ProjectNamespacePrefix = util.AppendHyphenAndPercentageSToString("kubeslice")
+	service.ControllerEndpoint = "https://controller.cisco.com:6443/"
 	rbacResourcePrefix := util.AppendHyphenToString("kubeslice-rbac")
 	service.RoleBindingWorkerCluster = rbacResourcePrefix + "worker-%s"
 	service.RoleBindingReadOnlyUser = rbacResourcePrefix + "ro-%s"
@@ -179,9 +193,14 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
 
+	By("Setting up a project")
+	Expect(k8sClient.Create(ctx, mainProject)).Should(Succeed())
 })
 
 var _ = AfterSuite(func() {
+	By("Cleaning up the project")
+	Expect(k8sClient.Delete(ctx, mainProject)).Should(Succeed())
+
 	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()
