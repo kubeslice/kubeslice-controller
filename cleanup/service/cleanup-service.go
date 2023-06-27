@@ -225,6 +225,7 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 			logger.Errorf("%s Error deleting Project %s. %s", util.Err, project.GetName(), err.Error())
 		}
 	}
+
 	if !hasErrors {
 		logger.Infof("%s Successfully cleaned up all Kubeslice resources.", util.Party)
 	} else {

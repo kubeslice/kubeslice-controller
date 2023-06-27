@@ -28,7 +28,7 @@ func main() {
 	// Setup
 	config := ctrl.GetConfigOrDie()
 	c, _ := client.New(config, client.Options{Scheme: scheme})
-	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), c, c.Scheme(), "CleanupContext",nil)
+	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), c, c.Scheme(), "CleanupContext", nil)
 	cs := &service.CleanupService{}
 	// Cleanup resources
 	cs.CleanupResources(ctx)
