@@ -147,6 +147,8 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	// Step 5: Create VPNKeyRotation CR
 	// TODO(rahul): handle change in rotation interval
 	if err := s.vpn.CreateMinimalVpnKeyRotationConfig(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.RotationInterval); err != nil {
+		// register an event
+		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventVPNKeyRotationConfigCreationFailed)
 		return ctrl.Result{}, err
 	}
 	// Step 6: update cluster info into vpnkeyrotation Cconfig
