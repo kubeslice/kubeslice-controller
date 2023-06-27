@@ -27,6 +27,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 	var cluster3 *v1alpha1.Cluster
 	var namespace v1.Namespace
 	Context("With Minimal SliceConfig Created", func() {
+		os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", controlPlaneNamespace)
 		ctx := context.Background()
 		slice = &v1alpha1.SliceConfig{
 			ObjectMeta: metav1.ObjectMeta{
@@ -166,8 +167,6 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 		})
 
 		It("Should recreate/retrigger jobs for cert creation once it expires", func() {
-			os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", controlPlaneNamespace)
-
 			createdVpnKeyConfig := &v1alpha1.VpnKeyRotation{}
 
 			err := k8sClient.Get(ctx, types.NamespacedName{

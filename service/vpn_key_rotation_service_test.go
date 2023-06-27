@@ -26,9 +26,11 @@ import (
 	"bou.ke/monkey"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
@@ -58,7 +60,13 @@ func setupTestCase() (context.Context, *utilMock.Client, VpnKeyRotationService, 
 	utilruntime.Must(controllerv1alpha1.AddToScheme(scheme))
 	wg := &mocks.IWorkerSliceGatewayService{}
 	ws := &mocks.IWorkerSliceConfigService{}
-	return util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ClusterTestController", nil), clientMock, VpnKeyRotationService{
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	return util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ClusterTestController", &eventRecorder), clientMock, VpnKeyRotationService{
 		wsgs: wg,
 		wscs: ws,
 	}, wg, ws
@@ -561,6 +569,8 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 				},
 			})
 	}).Times(2)
+
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 
 	workerSliceConfigs := workerv1alpha1.WorkerSliceConfigList{
 		Items: []workerv1alpha1.WorkerSliceConfig{
@@ -1192,6 +1202,8 @@ func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase
 
 	clientMock.
 		On("Update", mock.Anything, mock.Anything).Return(nil).Once()
+
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 
 	clientMock.
 		On("List", mock.Anything, mock.Anything, mock.Anything).
