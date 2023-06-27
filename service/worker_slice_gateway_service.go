@@ -19,12 +19,13 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/events"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"os"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -623,8 +624,9 @@ func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName
 	environment["CLIENT_SLICEGATEWAY_NAME"] = clientGateway.Name
 	environment["SLICE_NAME"] = sliceName
 	environment["CERT_GEN_REQUESTS"], _ = util.EncodeToBase64(&cpr)
+	jobNamespace = os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE")
 	util.CtxLogger(ctx).Info("jobNamespace", jobNamespace) //todo:remove
-	_, err := s.js.CreateJob(ctx, os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"), JobImage, environment)
+	_, err := s.js.CreateJob(ctx, jobNamespace, JobImage, environment)
 	if err != nil {
 		//Register an event for gateway job creation failure
 		util.RecordEvent(ctx, eventRecorder, serverGateway, clientGateway, events.EventSliceGatewayJobCreationFailed)
