@@ -13,3 +13,63 @@ jobs:
           file: unit_tests.dockerfile
           tags: test-image:latest
           push: false
+          
+      - name: Checkout gh-pages repo
+        uses: actions/checkout@v3
+        with:
+          repository: kubeslice/e2e-allure-reports
+          path: gh-pages
+          ref: 'gh-pages'
+    
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%dT%H:%M:%S')"
+
+      - name: Allure Report with history
+        uses: PavanMudigonda/allure-html-reporter-github-pages@v1.0
+        id: Allure_report_with_history
+        with:
+          allure_results: reports
+          allure_report: allure_report
+          allure_history: allure-history
+          gh_pages: gh-pages
+          keep_reports: 500
+          github_run_id: '${{ github.run_id }}'
+          github_run_num: 'Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}'
+          report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
+          test_env: Kind
+    
+      - name: Create lockfile
+        run: touch gh-pages/lockfile
+
+      - name: Acquire lock
+        run: |
+          flock gh-pages/lockfile -c '
+            git -C gh-pages pull origin gh-pages
+            eval $(ssh-agent -s)
+            echo "${{ secrets.E2E_ALLURE_REPORTS_PRIVATE_KEY }}" | ssh-add -
+            git -C gh-pages push git@github.com:kubeslice/e2e-allure-reports.git gh-pages
+          '
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+          
+      - name: Deploy report to Github Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          publish_branch: gh-pages
+          deploy_key: ${{ secrets.E2E_ALLURE_REPORTS_PRIVATE_KEY }}
+          external_repository: kubeslice/e2e-allure-reports
+          publish_dir: allure-history
+          keep_files: true
+    
+      - name: wait for report deploy on site ( you can check report here also )
+        run: |
+         sleep 200
+         echo 'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'
+      
+      - name: Report link on Pull Request comment
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+                 report link  'https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html'
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
