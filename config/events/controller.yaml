@@ -515,3 +515,9 @@ events:
     type: Normal
     reportingController: controller
     message: Certificates to be renewed Now!
+  - name: VPNKeyRotationConfigConfigDeletedForcefully
+    reason: VPNKeyRotationConfigConfigDeletedForcefully
+    action: DeleteVPNKeyRotationConfig
+    type: Warning
+    reportingController: controller
+    message: VPNKeyRotationConfig config got deleted forcefully.
