@@ -375,10 +375,8 @@ func (v *VpnKeyRotationService) verifyAllJobsAreCompleted(ctx context.Context, s
 	}
 
 	for _, job := range jobs.Items {
-		for _, condition := range job.Status.Conditions {
-			if !(condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue) {
-				return JobStatusRunning, nil
-			}
+		if job.Status.Active > 0 {
+			return JobStatusRunning, nil
 		}
 	}
 
