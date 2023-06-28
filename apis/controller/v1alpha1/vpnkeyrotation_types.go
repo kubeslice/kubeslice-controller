@@ -28,7 +28,7 @@ type VpnKeyRotationSpec struct {
 	SliceName string `json:"sliceName,omitempty"`
 	// ClusterGatewayMapping represents a map where key is cluster name and value is array of gateways present on that cluster.
 	// This is used to avoid unnecessary reconciliation in worker-operator.
-	ClusterGatewayMapping map[string][]string `json:"gateways,omitempty"`
+	ClusterGatewayMapping map[string][]string `json:"clusterGatewayMapping,omitempty"`
 	// CertificateCreationTime is a time when certificate for all the gateway pairs is created/updated
 	CertificateCreationTime *metav1.Time `json:"certificateCreationTime,omitempty"`
 	// CertificateExpiryTime is a time when certificate for all the gateway pairs will expire
