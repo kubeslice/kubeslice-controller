@@ -81,7 +81,23 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
 		})
 		It("Should Fail Creating SliceConfig in case rotation interval validation fails", func() {
-			s := slice.DeepCopy()
+			s := &v1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice-1",
+					Namespace: sliceNamespace,
+				},
+				Spec: v1alpha1.SliceConfigSpec{
+					Clusters:    []string{"worker-1", "worker-2"},
+					MaxClusters: 4,
+					SliceSubnet: "10.1.0.0/16",
+					SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+						SliceGatewayType: "OpenVPN",
+						SliceCaType:      "Local",
+					},
+					SliceIpamType: "Local",
+					SliceType:     "Application",
+				},
+			}
 			// RotationInterval > 90
 			// Expected Error:
 			//{
