@@ -49,6 +49,17 @@ type VpnKeyRotationService struct {
 	jobCreationInProgress atomic.Bool
 }
 
+// JobStatus represents the status of a job.
+type JobStatus int
+
+const (
+	JobStatusComplete JobStatus = iota
+	JobStatusError
+	JobStatusSuspended
+	JobStatusListError
+	JobStatusRunning
+)
+
 // CreateMinimalVpnKeyRotationConfig creates minimal VPNKeyRotationCR if not found
 func (v *VpnKeyRotationService) CreateMinimalVpnKeyRotationConfig(ctx context.Context, sliceName, namespace string, r int) error {
 	logger := util.CtxLogger(ctx).
@@ -182,9 +193,20 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 	// Check if it's the first time creation
 	if copyVpnConfig.Spec.CertificateCreationTime.IsZero() && copyVpnConfig.Spec.CertificateExpiryTime.IsZero() {
 		// verify jobs are completed
-		if !v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName) {
+		status, err := v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName)
+		if err != nil {
+			return ctrl.Result{}, nil, err
+		}
+		// requeue after 1 minute if job is still running
+		if status == JobStatusRunning {
 			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil, errors.New("waiting for jobs to be complete")
 		}
+		if status == JobStatusError || status == JobStatusSuspended {
+			// register an event
+			util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobFailed)
+			return ctrl.Result{}, nil, nil
+		}
+
 		copyVpnConfig.Spec.CertificateCreationTime = &now
 		expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
 		copyVpnConfig.Spec.CertificateExpiryTime = &expiryTS
@@ -205,8 +227,19 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 				}
 				v.jobCreationInProgress.Store(true)
 			}
-			if !v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName) {
+			// verify jobs are completed
+			status, err := v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName)
+			if err != nil {
+				return ctrl.Result{}, nil, err
+			}
+			// requeue after 1 minute if job is still running
+			if status == JobStatusRunning {
 				return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil, errors.New("waiting for jobs to be complete")
+			}
+			if status == JobStatusError || status == JobStatusSuspended {
+				// register an event
+				util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobFailed)
+				return ctrl.Result{}, nil, nil
 			}
 			copyVpnConfig.Spec.CertificateCreationTime = &now
 			expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
@@ -317,27 +350,39 @@ func (v *VpnKeyRotationService) listClientPairGateway(wl *workerv1alpha1.WorkerS
 }
 
 // verifyAllJobsAreCompleted checks if all the jobs are in complete state
-func (v *VpnKeyRotationService) verifyAllJobsAreCompleted(ctx context.Context, sliceName string) bool {
+func (v *VpnKeyRotationService) verifyAllJobsAreCompleted(ctx context.Context, sliceName string) (JobStatus, error) {
 	jobs := batchv1.JobList{}
 	o := map[string]string{
 		"SLICE_NAME": sliceName,
 	}
 	listOpts := []client.ListOption{
-		client.MatchingLabels(
-			o,
-		),
+		client.MatchingLabels(o),
 	}
 	if err := util.ListResources(ctx, &jobs, listOpts...); err != nil {
-		return false
+		return JobStatusListError, err
 	}
+
 	for _, job := range jobs.Items {
 		for _, condition := range job.Status.Conditions {
-			if !(condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue) {
-				return false
+			if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
+				return JobStatusError, nil
+			}
+
+			if condition.Type == batchv1.JobSuspended && condition.Status == corev1.ConditionTrue {
+				return JobStatusSuspended, nil
 			}
 		}
 	}
-	return true
+
+	for _, job := range jobs.Items {
+		for _, condition := range job.Status.Conditions {
+			if !(condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue) {
+				return JobStatusRunning, nil
+			}
+		}
+	}
+
+	return JobStatusComplete, nil
 }
 
 // fetchGatewayNames fetches gateway names from the list of workerv1alpha1.WorkerSliceGatewayList

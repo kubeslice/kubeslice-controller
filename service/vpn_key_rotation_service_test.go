@@ -685,8 +685,9 @@ func runlistClientPairGatewayTestCase(t *testing.T, tc listClientPairGatewayTesC
 type verifyAllJobsAreCompletedTestCase struct {
 	name                         string
 	arg1                         string
-	expectedResp                 bool
+	expectedResp                 JobStatus
 	completionType               corev1.ConditionStatus
+	failedStatus                 corev1.ConditionStatus
 	listArg1, listArg2, listArg3 interface{}
 	listRet1                     interface{}
 }
@@ -694,33 +695,45 @@ type verifyAllJobsAreCompletedTestCase struct {
 func Test_verifyAllJobsAreCompleted(t *testing.T) {
 	testCases := []verifyAllJobsAreCompletedTestCase{
 		{
-			name:           "should return true if all jobs are in completed",
+			name:           "should return JobStatusComplete if all jobs are in completed",
 			arg1:           "test-slice",
-			expectedResp:   true,
+			expectedResp:   JobStatusComplete,
 			listArg1:       mock.Anything,
 			listArg2:       mock.Anything,
 			listArg3:       mock.Anything,
 			listRet1:       nil,
 			completionType: corev1.ConditionTrue,
+			failedStatus:   corev1.ConditionFalse,
 		},
 		{
-			name:           "should return false if all jobs are not in complete state",
+			name:           "should return JobStatusRunning if all jobs are not in complete state",
 			arg1:           "test-slice",
-			expectedResp:   false,
+			expectedResp:   JobStatusRunning,
 			listArg1:       mock.Anything,
 			listArg2:       mock.Anything,
 			listArg3:       mock.Anything,
 			listRet1:       nil,
 			completionType: corev1.ConditionFalse,
+			failedStatus:   corev1.ConditionFalse,
 		},
 		{
-			name:         "should return false if listing job fails",
+			name:         "should return JobStatusListError if listing job fails",
 			arg1:         "test-slice",
-			expectedResp: false,
+			expectedResp: JobStatusListError,
 			listArg1:     mock.Anything,
 			listArg2:     mock.Anything,
 			listArg3:     mock.Anything,
 			listRet1:     fmt.Errorf("cannot list jobs"),
+		},
+		{
+			name:         "should return JobStatusError if jobs are in failed state",
+			arg1:         "test-slice",
+			expectedResp: JobStatusError,
+			listArg1:     mock.Anything,
+			listArg2:     mock.Anything,
+			listArg3:     mock.Anything,
+			listRet1:     nil,
+			failedStatus: corev1.ConditionTrue,
 		},
 	}
 	for _, tc := range testCases {
@@ -730,6 +743,47 @@ func Test_verifyAllJobsAreCompleted(t *testing.T) {
 
 func runVerifyAllJobsAreCompleted(t *testing.T, tc verifyAllJobsAreCompletedTestCase) {
 	ctx, clientMock, vpn, _, _ := setupTestCase()
+
+	if tc.failedStatus == corev1.ConditionTrue {
+		clientMock.
+			On("List", tc.listArg1, tc.listArg2, tc.listArg3).
+			Return(tc.listRet1).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*batchv1.JobList)
+			w.Items = append(w.Items,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-1",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
+					},
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: corev1.ConditionTrue,
+							},
+						},
+					},
+				},
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-2",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
+					},
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobFailed,
+								Status: tc.failedStatus,
+							},
+						},
+					},
+				})
+		}).Once()
+	}
 
 	clientMock.
 		On("List", tc.listArg1, tc.listArg2, tc.listArg3).
@@ -769,8 +823,8 @@ func runVerifyAllJobsAreCompleted(t *testing.T, tc verifyAllJobsAreCompletedTest
 				},
 			})
 	}).Once()
+	gotResp, _ := vpn.verifyAllJobsAreCompleted(ctx, tc.arg1)
 
-	gotResp := vpn.verifyAllJobsAreCompleted(ctx, tc.arg1)
 	require.Equal(t, gotResp, tc.expectedResp)
 }
 
