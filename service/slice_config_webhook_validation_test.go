@@ -113,6 +113,9 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateCertsRotationInterval_Negative":                                                                               TestValidateCertsRotationInterval_Negative,
 	"TestValidateCertsRotationInterval_inProgressClusterStatus":                                                                TestValidateCertsRotationInterval_NegativeClusterStatus,
 	"TestValidateCertsRotationInterval_PositiveClusterStatus":                                                                  TestValidateCertsRotationInterval_PositiveClusterStatus,
+	"TestValidateRotationInterval_Change_Decreased":                                                                            TestValidateRotationInterval_Change_Decreased,
+	"TestValidateRotationInterval_Change_Increased":                                                                            TestValidateRotationInterval_Change_Increased,
+	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -1752,6 +1755,99 @@ func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
 	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
 	require.Nil(t, err)
+}
+
+// rotationInterval updates TC
+func TestValidateRotationInterval_NoChange(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.RotationInterval = 30
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:        name,
+			RotationInterval: 30,
+		}
+	}).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	oldSliceConfig := controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			RotationInterval: 30,
+		},
+	}
+	_, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+}
+func TestValidateRotationInterval_Change_Increased(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.RotationInterval = 45
+	now := metav1.Now()
+	expiry := metav1.Now().Add(30)
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			RotationInterval:        30,
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{expiry},
+		}
+	}).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	oldSliceConfig := controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			RotationInterval: 30,
+		},
+	}
+	expectedResp := metav1.NewTime(now.AddDate(0, 0, 45).Add(-1 * time.Hour))
+	gotResp, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+	require.Equal(t, &expectedResp, gotResp.Spec.CertificateExpiryTime)
+}
+func TestValidateRotationInterval_Change_Decreased(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	// new interval
+	sliceConfig.Spec.RotationInterval = 30
+	now := metav1.Now()
+	expiry := metav1.Now().Add(45)
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			RotationInterval:        45,
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{expiry},
+		}
+	}).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	oldSliceConfig := controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			RotationInterval: 45,
+		},
+	}
+	expectedResp := metav1.NewTime(now.AddDate(0, 0, 30).Add(-1 * time.Hour))
+	gotResp, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+	require.Equal(t, &expectedResp, gotResp.Spec.CertificateExpiryTime)
 }
 func setupSliceConfigWebhookValidationTest(name string, namespace string) (*utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context) {
 	clientMock := &utilMock.Client{}

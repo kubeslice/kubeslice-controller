@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -98,6 +99,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateRenewNowInSliceConfig(ctx, sliceConfig, old); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if _, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, old); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	return nil
 }
 
@@ -157,6 +161,35 @@ func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv
 		}
 	}
 	return nil
+}
+
+func validateRotationIntervalInSliceConfig(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, old runtime.Object) (*controllerv1alpha1.VpnKeyRotation, *field.Error) {
+	oldSliceConfig := old.(*controllerv1alpha1.SliceConfig)
+	// nochange detected
+	if sliceConfig.Spec.RotationInterval == oldSliceConfig.Spec.RotationInterval {
+		return nil, nil
+	}
+	// change detected
+	vpnKeyRotation := controllerv1alpha1.VpnKeyRotation{}
+	exists, _ := util.GetResourceIfExist(ctx, types.NamespacedName{
+		Namespace: sliceConfig.Namespace,
+		Name:      sliceConfig.Name,
+	}, &vpnKeyRotation)
+	if exists {
+		vpnKeyRotation.Spec.RotationInterval = sliceConfig.Spec.RotationInterval
+		// update the new expiry TS
+		expiryTS := metav1.NewTime(vpnKeyRotation.Spec.CertificateCreationTime.AddDate(0, 0, vpnKeyRotation.Spec.RotationInterval).Add(-1 * time.Hour))
+		vpnKeyRotation.Spec.CertificateExpiryTime = &expiryTS
+		err := util.UpdateResource(ctx, &vpnKeyRotation)
+		if err != nil {
+			return nil, &field.Error{
+				Type:   field.ErrorTypeForbidden,
+				Field:  "Field: RenewBefore",
+				Detail: "Failed to Update Renewal Time, Please try again!",
+			}
+		}
+	}
+	return &vpnKeyRotation, nil
 }
 
 // checkNamespaceDeboardingStatus checks if the namespace is deboarding
