@@ -208,7 +208,7 @@ var _ = BeforeSuite(func() {
 	err = (&controllerv1alpha1.SliceConfig{}).SetupWebhookWithManager(k8sManager, service.ValidateSliceConfigCreate, service.ValidateSliceConfigUpdate, service.ValidateSliceConfigDelete)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(k8sManager, service.ValidateVpnKeyRotationCreate)
+	err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(k8sManager, service.ValidateVpnKeyRotationCreate, service.ValidateVpnKeyRotationDelete)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
