@@ -134,7 +134,7 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	// get slice config
 	s, err := v.getSliceConfig(ctx, req.Name, req.Namespace)
 	if err != nil {
-		logger.Errorf("Err: %s", err.Error())
+		logger.Errorf("Err getting sliceconfig: %s", err.Error())
 		return ctrl.Result{}, err
 	}
 	if vpnKeyRotationConfig.GetOwnerReferences() == nil {
@@ -146,7 +146,7 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	// Step 1: Build map of clusterName: gateways
 	clusterGatewayMapping, err := v.constructClusterGatewayMapping(ctx, s)
 	if err != nil {
-		logger.Errorf("Err: %s", err.Error())
+		logger.Errorf("Err constructing clusterGatewayMapping: %s", err.Error())
 		return ctrl.Result{}, err
 	}
 	copyVpnConfig := vpnKeyRotationConfig.DeepCopy()
@@ -154,7 +154,7 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	if !reflect.DeepEqual(copyVpnConfig.Spec.ClusterGatewayMapping, clusterGatewayMapping) {
 		copyVpnConfig.Spec.ClusterGatewayMapping = clusterGatewayMapping
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
-			logger.Errorf("Err: %s", err.Error())
+			logger.Errorf("Err updating clusterGatewayMapping in vpnconfig: %s", err.Error())
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
