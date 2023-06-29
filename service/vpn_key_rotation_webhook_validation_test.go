@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,8 +77,13 @@ func setupValidationTestCase() (context.Context, *utilMock.Client) {
 	clientMock := &utilMock.Client{}
 	scheme := runtime.NewScheme()
 	utilruntime.Must(controllerv1alpha1.AddToScheme(scheme))
-
-	return util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ClusterTestController", nil), clientMock
+	eventRecorder := events.NewEventRecorder(clientMock, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
+	return util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "ClusterTestController", &eventRecorder), clientMock
 }
 
 type validateVpnKeyRotationDeleteTestCase struct {
@@ -123,6 +130,8 @@ func runValidateVpnKeyRotationDeleteTest(t *testing.T, tc validateVpnKeyRotation
 			DeletionTimestamp: &tc.deletionTs,
 		}
 	})
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+
 	gotErr := ValidateVpnKeyRotationDelete(ctx, tc.arg)
 	require.Equal(t, tc.expectedErr, gotErr)
 }

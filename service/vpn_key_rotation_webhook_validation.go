@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -29,6 +30,13 @@ func ValidateVpnKeyRotationDelete(ctx context.Context, r *controllerv1alpha1.Vpn
 		return err
 	}
 	if found && slice.ObjectMeta.DeletionTimestamp.IsZero() {
+		//Load Event Recorder with project name, vpnkeyrotation(slice) name and namespace
+		eventRecorder := util.CtxEventRecorder(ctx).
+			WithProject(util.GetProjectName(r.Namespace)).
+			WithNamespace(r.Namespace).
+			WithSlice(r.Name)
+		//Register an event for worker slice config deleted forcefully
+		util.RecordEvent(ctx, eventRecorder, r, slice, events.EventVPNKeyRotationConfigConfigDeletedForcefully)
 		return fmt.Errorf("sliceconfig %s not allowed to delete unless slice is deleted", r.Name)
 	}
 	// if not found or timestamp is non-zero,this means slice is deleted/under deletion.

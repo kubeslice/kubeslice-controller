@@ -118,12 +118,6 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		With("name", "ReconcileVpnKeyRotation").
 		With("reconciler", "VpnKeyRotationConfig")
 
-	//Load Event Recorder with project name, vpnkeyrotation(slice) name and namespace
-	_ = util.CtxEventRecorder(ctx).
-		WithProject(util.GetProjectName(req.Namespace)).
-		WithNamespace(req.Namespace).
-		WithSlice(req.Name)
-
 	logger.Infof("Starting Recoincilation of VpnKeyRotation with name %s in namespace %s",
 		req.Name, req.Namespace)
 	vpnKeyRotationConfig := &controllerv1alpha1.VpnKeyRotation{}
