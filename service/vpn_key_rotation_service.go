@@ -119,7 +119,7 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		With("reconciler", "VpnKeyRotationConfig")
 
 	//Load Event Recorder with project name, vpnkeyrotation(slice) name and namespace
-	eventRecorder := util.CtxEventRecorder(ctx).
+	_ = util.CtxEventRecorder(ctx).
 		WithProject(util.GetProjectName(req.Namespace)).
 		WithNamespace(req.Namespace).
 		WithSlice(req.Name)
@@ -136,46 +136,6 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		logger.Infof("Vpn Key Rotation Config %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-
-	// Step 2: add Finalizers to the resource
-	if vpnKeyRotationConfig.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !util.ContainsString(vpnKeyRotationConfig.GetFinalizers(), VPNKeyRotationConfigFinalizer) {
-			if shouldReturn, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, vpnKeyRotationConfig, VPNKeyRotationConfigFinalizer)); shouldReturn {
-				return result, reconErr
-			}
-		}
-	} else {
-		logger.Debug("starting delete for VPNKeyRotationConfig", req.NamespacedName)
-		result := RemoveWorkerFinalizers(ctx, vpnKeyRotationConfig, VPNKeyRotationConfigFinalizer)
-		if result.Requeue {
-			return result, nil
-		}
-		slice := &controllerv1alpha1.SliceConfig{}
-		found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
-			Name:      vpnKeyRotationConfig.Spec.SliceName,
-			Namespace: req.Namespace,
-		}, slice)
-		if err != nil {
-			return result, err
-		}
-		if found && slice.ObjectMeta.DeletionTimestamp.IsZero() {
-			logger.Debug("vpnKeyRotationConfig deleted forcefully from slice", req.NamespacedName)
-			//Register an event for worker slice config deleted forcefully
-			util.RecordEvent(ctx, eventRecorder, vpnKeyRotationConfig, slice, events.EventVPNKeyRotationConfigConfigDeletedForcefully)
-
-			if slice.Annotations == nil {
-				slice.Annotations = make(map[string]string)
-			}
-			slice.Annotations["updatedTimestamp"] = time.Now().String()
-			logger.Debug("Recreating vpnkeyrotationconfig", req.NamespacedName)
-			err = util.UpdateResource(ctx, slice)
-			if err != nil {
-				return result, err
-			}
-		}
-		return result, nil
-	}
-
 	// get slice config
 	s, err := v.getSliceConfig(ctx, req.Name, req.Namespace)
 	if err != nil {
