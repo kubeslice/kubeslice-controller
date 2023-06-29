@@ -18,7 +18,10 @@ package v1alpha1
 
 import (
 	"context"
+
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,12 +34,19 @@ var (
 	customVpnKeyRotationCreateValidation func(ctx context.Context, vpn *VpnKeyRotation) error
 	customVpnKeyRotationDeleteValidation func(ctx context.Context, vpn *VpnKeyRotation) error
 	vpnKeyRotationConfigWebhookClient    client.Client
+	eventRecorder                        events.EventRecorder
 )
 
 func (r *VpnKeyRotation) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate func(context.Context, *VpnKeyRotation) error, validateDelete func(context.Context, *VpnKeyRotation) error) error {
 	vpnKeyRotationConfigWebhookClient = mgr.GetClient()
 	customVpnKeyRotationCreateValidation = validateCreate
 	customVpnKeyRotationDeleteValidation = validateDelete
+	eventRecorder = events.NewEventRecorder(mgr.GetClient(), mgr.GetScheme(), ossEvents.EventsMap, events.EventRecorderOptions{
+		Version:   "v1alpha1",
+		Cluster:   util.ClusterController,
+		Component: util.ComponentController,
+		Slice:     util.NotApplicable,
+	})
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -52,7 +62,7 @@ var _ webhook.Validator = &VpnKeyRotation{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *VpnKeyRotation) ValidateCreate() error {
 	sliceconfigurationlog.Info("validate create", "name", r.Name)
-	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), vpnKeyRotationConfigWebhookClient, nil, "VpnKeyRotationConfigValidation", nil)
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), vpnKeyRotationConfigWebhookClient, nil, "VpnKeyRotationConfigValidation", &eventRecorder)
 	return customVpnKeyRotationCreateValidation(sliceConfigCtx, r)
 }
 
@@ -68,6 +78,6 @@ func (r *VpnKeyRotation) ValidateUpdate(old runtime.Object) error {
 func (r *VpnKeyRotation) ValidateDelete() error {
 	vpnKeyRotationLog.Info("validate delete", "name", r.Name)
 
-	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), vpnKeyRotationConfigWebhookClient, nil, "VpnKeyRotationConfigValidation", nil)
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), vpnKeyRotationConfigWebhookClient, nil, "VpnKeyRotationConfigValidation", &eventRecorder)
 	return customVpnKeyRotationDeleteValidation(sliceConfigCtx, r)
 }
