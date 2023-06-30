@@ -36,7 +36,7 @@ func ValidateVpnKeyRotationDelete(ctx context.Context, r *controllerv1alpha1.Vpn
 			WithNamespace(r.Namespace).
 			WithSlice(r.Name)
 		//Register an event for worker slice config deleted forcefully
-		util.RecordEvent(ctx, eventRecorder, r, slice, events.EventVPNKeyRotationConfigConfigDeletedForcefully)
+		util.RecordEvent(ctx, eventRecorder, r, slice, events.EventIllegalVPNKeyRotationConfigDelete)
 		return fmt.Errorf("sliceconfig %s not allowed to delete unless slice is deleted", r.Name)
 	}
 	// if not found or timestamp is non-zero,this means slice is deleted/under deletion.
