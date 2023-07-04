@@ -136,7 +136,7 @@ func Test_validateVpnKeyRotationDelete(t *testing.T) {
 					Namespace: "test-ns",
 				},
 			},
-			expectedErr: fmt.Errorf("sliceconfig %s not allowed to delete unless slice is deleted", "test-slice"),
+			expectedErr: fmt.Errorf("vpnkeyrotation config %s not allowed to delete unless sliceconfig is deleted", "test-slice"),
 		},
 	}
 	for _, tc := range testCase {
