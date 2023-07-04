@@ -30,7 +30,7 @@ import (
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 )
 
-// SliceQoSConfigReconciler reconciles a SliceQoSConfig object
+// VpnKeyRotationReconciler reconciles a VpnKeyRotation object
 type VpnKeyRotationReconciler struct {
 	client.Client
 	Scheme                *runtime.Scheme
@@ -46,7 +46,7 @@ func (r *VpnKeyRotationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// Reconcile is a function to reconcile the qos_profile, SliceQoSConfigReconciler implements it
+// Reconcile is a function to reconcile the VpnKeyRotation, VpnKeyRotationReconciler implements it
 func (r *VpnKeyRotationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "VpnKeyRotationController", r.EventRecorder)
 	return r.VpnKeyRotationService.ReconcileVpnKeyRotation(kubeSliceCtx, req)

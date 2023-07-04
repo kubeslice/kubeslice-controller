@@ -18,7 +18,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"sync/atomic"
@@ -59,6 +58,24 @@ const (
 	JobStatusListError
 	JobStatusRunning
 )
+
+// String returns the string representation of JobStatus.
+func (status JobStatus) String() string {
+	switch status {
+	case JobStatusComplete:
+		return "JobStatusComplete"
+	case JobStatusError:
+		return "JobStatusError"
+	case JobStatusSuspended:
+		return "JobStatusSuspended"
+	case JobStatusListError:
+		return "JobStatusListError"
+	case JobStatusRunning:
+		return "JobStatusRunning"
+	default:
+		return fmt.Sprintf("Unknown JobStatus: %d", status)
+	}
+}
 
 // CreateMinimalVpnKeyRotationConfig creates minimal VPNKeyRotationCR if not found
 func (v *VpnKeyRotationService) CreateMinimalVpnKeyRotationConfig(ctx context.Context, sliceName, namespace string, r int) error {
@@ -174,7 +191,12 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		copyVpnConfig.Spec.SliceName = s.Name
 		toUpdate = true
 	}
+	if !reflect.DeepEqual(copyVpnConfig.Spec.Clusters, s.Spec.Clusters) {
+		copyVpnConfig.Spec.Clusters = s.Spec.Clusters
+		toUpdate = true
+	}
 	if toUpdate {
+		logger.Debugf("vpnkeyrotation config %s deviated from sliceconfig %s", copyVpnConfig.Name, s.Name)
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
 			logger.Errorf("Err updating clusterGatewayMapping in vpnconfig: %s", err.Error())
 			return ctrl.Result{}, err
@@ -189,8 +211,16 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		logger.Errorf("Err: %s", err.Error())
 		return res, err
 	}
+	if res.RequeueAfter > 0 {
+		return res, nil
+	}
+	// always returns error but but if err==nil and copyVpnConfig==nil this means dont requeue
+	if copyVpnConfig == nil {
+		return ctrl.Result{}, nil
+	}
 	expiryTime := copyVpnConfig.Spec.CertificateExpiryTime.Time
 	remainingDuration := expiryTime.Sub(metav1.Now().Time)
+	logger.Debugf("vpnkeyrotation config reconciler will requeue after %s", remainingDuration)
 	return ctrl.Result{RequeueAfter: remainingDuration}, nil
 }
 
@@ -213,7 +243,7 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 		}
 		// requeue after 1 minute if job is still running
 		if status == JobStatusRunning {
-			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil, errors.New("waiting for jobs to be complete")
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 		}
 		if status == JobStatusError || status == JobStatusSuspended {
 			// register an event
@@ -240,15 +270,17 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 					return ctrl.Result{}, nil, err
 				}
 				v.jobCreationInProgress.Store(true)
+				logger.Debugf("jobs triggered for creating new certs for slice %s", s.Name)
 			}
 			// verify jobs are completed
 			status, err := v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName)
 			if err != nil {
 				return ctrl.Result{}, nil, err
 			}
+			logger.Debugf("certs job status for sliceconfig %s = %s ", s.Name, status.String())
 			// requeue after 1 minute if job is still running
 			if status == JobStatusRunning {
-				return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil, errors.New("waiting for jobs to be complete")
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
 			if status == JobStatusError || status == JobStatusSuspended {
 				// register an event
