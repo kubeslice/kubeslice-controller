@@ -93,3 +93,4 @@ data:
       - VPNKeyRotationConfigUpdated
       - CertificateJobCreationFailed
       - CertificatesRenewNow
+      - IllegalVPNKeyRotationConfigDelete

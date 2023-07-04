@@ -130,7 +130,6 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		logger.Infof("Vpn Key Rotation Config %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-
 	// get slice config
 	s, err := v.getSliceConfig(ctx, req.Name, req.Namespace)
 	if err != nil {

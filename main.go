@@ -292,7 +292,7 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SliceQoSConfig")
 			os.Exit(1)
 		}
-		if err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(mgr, service.ValidateVpnKeyRotationCreate); err != nil {
+		if err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(mgr, service.ValidateVpnKeyRotationCreate, service.ValidateVpnKeyRotationDelete); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "VpnKeyRotation")
 			os.Exit(1)
 		}
