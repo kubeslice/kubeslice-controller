@@ -45,13 +45,7 @@ spec:
                   all the gateway pairs will expire
                 format: date-time
                 type: string
-              clusters:
-                description: clusters contains the list of clusters attached to this
-                  slice
-                items:
-                  type: string
-                type: array
-              gateways:
+              clusterGatewayMapping:
                 additionalProperties:
                   items:
                     type: string
@@ -60,6 +54,12 @@ spec:
                   name and value is array of gateways present on that cluster. This
                   is used to avoid unnecessary reconciliation in worker-operator.
                 type: object
+              clusters:
+                description: clusters contains the list of clusters attached to this
+                  slice
+                items:
+                  type: string
+                type: array
               rotationCount:
                 description: RotationCount represent the number of times rotation
                   has been already performed.
