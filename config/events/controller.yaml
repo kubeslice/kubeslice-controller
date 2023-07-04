@@ -521,3 +521,9 @@ events:
     type: Warning
     reportingController: controller
     message: Illegaly trying to delete VPNKeyRotationConfig
+  - name: CertificateJobFailed
+    reason: CertificateJobFailed
+    action: Failed CertCreationJob
+    type: Warning
+    reportingController: controller
+    message: Warning - Certificate Creation job Failed

@@ -18,9 +18,10 @@ import (
 )
 
 type validateVpnKeyRotationCreateTestCase struct {
-	name        string
-	arg         *controllerv1alpha1.VpnKeyRotation
-	expectedErr error
+	name               string
+	arg                *controllerv1alpha1.VpnKeyRotation
+	expectedErr        error
+	sliceConfigPresent bool
 }
 
 func Test_validateVpnKeyRotationCreate(t *testing.T) {
@@ -35,7 +36,8 @@ func Test_validateVpnKeyRotationCreate(t *testing.T) {
 					SliceName: "test-slice",
 				},
 			},
-			expectedErr: nil,
+			expectedErr:        nil,
+			sliceConfigPresent: true,
 		},
 		{
 			name: "should return error if slicename is empty",
@@ -47,7 +49,8 @@ func Test_validateVpnKeyRotationCreate(t *testing.T) {
 					SliceName: "",
 				},
 			},
-			expectedErr: fmt.Errorf("invalid config,.spec.sliceName could not be empty"),
+			expectedErr:        fmt.Errorf("invalid config,.spec.sliceName could not be empty"),
+			sliceConfigPresent: true,
 		},
 		{
 			name: "should return error if name does not macthes original slice name",
@@ -59,7 +62,21 @@ func Test_validateVpnKeyRotationCreate(t *testing.T) {
 					SliceName: "test-slice-1",
 				},
 			},
-			expectedErr: fmt.Errorf("invalid config, name should match with slice name"),
+			expectedErr:        fmt.Errorf("invalid config, name should match with slice name"),
+			sliceConfigPresent: true,
+		},
+		{
+			name: "should return error if sliceconfig is not present",
+			arg: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "test-slice",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName: "test-slice",
+				},
+			},
+			expectedErr:        fmt.Errorf("sliceconfig test-slice not found"),
+			sliceConfigPresent: false,
 		},
 	}
 	for _, tc := range testCase {
@@ -68,7 +85,12 @@ func Test_validateVpnKeyRotationCreate(t *testing.T) {
 }
 
 func runValidateVpnKeyRotationCreateTest(t *testing.T, tc validateVpnKeyRotationCreateTestCase) {
-	ctx, _ := setupValidationTestCase()
+	ctx, clientMock := setupValidationTestCase()
+	if tc.sliceConfigPresent {
+		clientMock.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	} else {
+		clientMock.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("sliceconfig test-slice not found"))
+	}
 	gotErr := ValidateVpnKeyRotationCreate(ctx, tc.arg)
 	require.Equal(t, tc.expectedErr, gotErr)
 }

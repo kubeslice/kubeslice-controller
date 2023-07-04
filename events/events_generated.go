@@ -710,6 +710,14 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Illegaly trying to delete VPNKeyRotationConfig",
 	},
+	"CertificateJobFailed": {
+		Name:                "CertificateJobFailed",
+		Reason:              "CertificateJobFailed",
+		Action:              "Failed CertCreationJob",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Warning - Certificate Creation job Failed",
+	},
 }
 
 var (
@@ -799,4 +807,5 @@ var (
 	EventCertificateJobCreationFailed         events.EventName = "CertificateJobCreationFailed"
 	EventCertificatesRenewNow                 events.EventName = "CertificatesRenewNow"
 	EventIllegalVPNKeyRotationConfigDelete    events.EventName = "IllegalVPNKeyRotationConfigDelete"
+	EventCertificateJobFailed                 events.EventName = "CertificateJobFailed"
 )
