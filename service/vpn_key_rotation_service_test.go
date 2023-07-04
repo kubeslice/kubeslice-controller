@@ -785,44 +785,75 @@ func runVerifyAllJobsAreCompleted(t *testing.T, tc verifyAllJobsAreCompletedTest
 		}).Once()
 	}
 
-	clientMock.
-		On("List", tc.listArg1, tc.listArg2, tc.listArg3).
-		Return(tc.listRet1).Run(func(args mock.Arguments) {
-		w := args.Get(1).(*batchv1.JobList)
-		w.Items = append(w.Items,
-			batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "job-1",
-					Labels: map[string]string{
-						"SLICE_NAME": "test-slice",
+	if tc.completionType == corev1.ConditionTrue {
+		clientMock.
+			On("List", tc.listArg1, tc.listArg2, tc.listArg3).
+			Return(tc.listRet1).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*batchv1.JobList)
+			w.Items = append(w.Items,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-1",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
 					},
-				},
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: corev1.ConditionTrue,
+							},
 						},
 					},
 				},
-			},
-			batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "job-2",
-					Labels: map[string]string{
-						"SLICE_NAME": "test-slice",
-					},
-				},
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: tc.completionType,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-2",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
 						},
 					},
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: tc.completionType,
+							},
+						},
+					},
+				})
+		}).Once()
+	} else {
+		clientMock.
+			On("List", tc.listArg1, tc.listArg2, tc.listArg3).
+			Return(tc.listRet1).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*batchv1.JobList)
+			w.Items = append(w.Items,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-1",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
+					},
+					Status: batchv1.JobStatus{
+						Active: 1,
+					},
 				},
-			})
-	}).Once()
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-2",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
+					},
+					Status: batchv1.JobStatus{
+						Active: 1,
+					},
+				})
+		}).Once()
+	}
 	gotResp, _ := vpn.verifyAllJobsAreCompleted(ctx, tc.arg1)
 
 	require.Equal(t, gotResp, tc.expectedResp)
@@ -1220,7 +1251,8 @@ func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase
 			Namespace: "test-ns",
 		}
 		s.Spec = controllerv1alpha1.SliceConfigSpec{
-			Clusters: []string{"worker-1", "worker-2"},
+			Clusters:         []string{"worker-1", "worker-2"},
+			RotationInterval: 30,
 		}
 	}).Once()
 
@@ -1259,44 +1291,75 @@ func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase
 
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 
-	clientMock.
-		On("List", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil).Run(func(args mock.Arguments) {
-		w := args.Get(1).(*batchv1.JobList)
-		w.Items = append(w.Items,
-			batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-slice-worker-1-worker-2",
-					Labels: map[string]string{
-						"SLICE_NAME": "test-slice",
+	if tc.completionType == corev1.ConditionTrue {
+		clientMock.
+			On("List", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*batchv1.JobList)
+			w.Items = append(w.Items,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-1-worker-2",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
 					},
-				},
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: corev1.ConditionTrue,
+							},
 						},
 					},
 				},
-			},
-			batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-slice-worker-2-worker-1",
-					Labels: map[string]string{
-						"SLICE_NAME": "test-slice",
-					},
-				},
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: tc.completionType,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-2-worker-1",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
 						},
 					},
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: tc.completionType,
+							},
+						},
+					},
+				})
+		}).Once()
+	} else if tc.completionType == corev1.ConditionFalse {
+		clientMock.
+			On("List", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*batchv1.JobList)
+			w.Items = append(w.Items,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-1-worker-2",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
+					},
+					Status: batchv1.JobStatus{
+						Active: 1,
+					},
 				},
-			})
-	}).Once()
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-2-worker-1",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
+					},
+					Status: batchv1.JobStatus{
+						Active: 1,
+					},
+				})
+		}).Once()
+	}
 
 	clientMock.
 		On("Update", mock.Anything, mock.Anything).Return(nil).Once()
