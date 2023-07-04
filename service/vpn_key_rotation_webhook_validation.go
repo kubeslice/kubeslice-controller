@@ -17,6 +17,17 @@ func ValidateVpnKeyRotationCreate(ctx context.Context, r *controllerv1alpha1.Vpn
 	if r.Name != r.Spec.SliceName {
 		return fmt.Errorf("invalid config, name should match with slice name")
 	}
+	slice := &controllerv1alpha1.SliceConfig{}
+	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
+		Name:      r.Spec.SliceName,
+		Namespace: r.Namespace,
+	}, slice)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return fmt.Errorf("invalid config, sliceconfig %s not present", r.Spec.SliceName)
+	}
 	return nil
 }
 

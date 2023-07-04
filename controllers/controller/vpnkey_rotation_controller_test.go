@@ -23,7 +23,7 @@ const (
 	sliceNamespace = "kubeslice-cisco"
 )
 
-var _ = FDescribe("VpnKeyRotation Controller", Ordered, func() {
+var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 	Context("With Minimal SliceConfig Created", func() {
 		var project *v1alpha1.Project
 		var slice *v1alpha1.SliceConfig
@@ -579,6 +579,18 @@ var _ = FDescribe("VpnKeyRotation Controller", Ordered, func() {
 
 			Expect(k8sClient.Delete(ctx, project)).Should(Succeed())
 
+		})
+		It("Should not allow creating vpn keyrotation config if sliceconfig is not present", func() {
+			vpnkeyRotation := v1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "demo-vpn",
+					Namespace: slice.Namespace,
+				},
+				Spec: v1alpha1.VpnKeyRotationSpec{
+					SliceName: "demo-vpn",
+				},
+			}
+			Expect(k8sClient.Create(ctx, &vpnkeyRotation)).ShouldNot(Succeed())
 		})
 		It("Should not allow deleting vpnkeyrotation config, if slice is present and raise an event", func() {
 			// get vpnkey rotation config
