@@ -515,3 +515,9 @@ events:
     type: Normal
     reportingController: controller
     message: Certificates to be renewed Now!
+  - name: IllegalVPNKeyRotationConfigDelete
+    reason: IllegalVPNKeyRotationConfigDelete
+    action: DeleteVPNKeyRotationConfig
+    type: Warning
+    reportingController: controller
+    message: Illegaly trying to delete VPNKeyRotationConfig

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/controllers/worker"
 	"github.com/kubeslice/kubeslice-controller/metrics"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +42,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -87,6 +88,9 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 		CRDInstallOptions: envtest.CRDInstallOptions{
 			MaxTime: 60 * time.Second,
+		},
+		WebhookInstallOptions: envtest.WebhookInstallOptions{
+			Paths: []string{filepath.Join("..", "..", "config", "webhook")},
 		},
 	}
 
@@ -194,6 +198,15 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&worker.WorkerSliceConfigReconciler{
+		Client:             k8sManager.GetClient(),
+		Scheme:             k8sManager.GetScheme(),
+		Log:                controllerLog.With("name", "WorkerSliceConfig"),
+		WorkerSliceService: svc.WorkerSliceConfigService,
+		EventRecorder:      &eventRecorder,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	err = (&VpnKeyRotationReconciler{
 		Client:                k8sManager.GetClient(),
 		Scheme:                k8sManager.GetScheme(),
@@ -208,7 +221,19 @@ var _ = BeforeSuite(func() {
 	err = (&controllerv1alpha1.SliceConfig{}).SetupWebhookWithManager(k8sManager, service.ValidateSliceConfigCreate, service.ValidateSliceConfigUpdate, service.ValidateSliceConfigDelete)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(k8sManager, service.ValidateVpnKeyRotationCreate)
+	err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(k8sManager, service.ValidateVpnKeyRotationCreate, service.ValidateVpnKeyRotationDelete)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllerv1alpha1.Cluster{}).SetupWebhookWithManager(k8sManager, service.ValidateClusterCreate, service.ValidateClusterUpdate, service.ValidateClusterDelete)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&workerv1alpha1.WorkerSliceConfig{}).SetupWebhookWithManager(k8sManager, service.ValidateWorkerSliceConfigUpdate)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&workerv1alpha1.WorkerSliceGateway{}).SetupWebhookWithManager(k8sManager, service.ValidateWorkerSliceGatewayUpdate)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllerv1alpha1.Project{}).SetupWebhookWithManager(k8sManager, service.ValidateProjectCreate, service.ValidateProjectUpdate, service.ValidateProjectDelete)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {

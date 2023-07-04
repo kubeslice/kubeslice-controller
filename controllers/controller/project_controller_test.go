@@ -2,11 +2,13 @@ package controller
 
 import (
 	"context"
+
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -104,7 +106,7 @@ var _ = Describe("Project controller", func() {
 			Expect(k8sClient.Delete(ctx, createdProject)).Should(Succeed())
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, projectLookupKey, createdProject)
-				return err != nil
+				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 		})
 

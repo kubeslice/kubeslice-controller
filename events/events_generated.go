@@ -702,6 +702,14 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Certificates to be renewed Now!",
 	},
+	"IllegalVPNKeyRotationConfigDelete": {
+		Name:                "IllegalVPNKeyRotationConfigDelete",
+		Reason:              "IllegalVPNKeyRotationConfigDelete",
+		Action:              "DeleteVPNKeyRotationConfig",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Illegaly trying to delete VPNKeyRotationConfig",
+	},
 }
 
 var (
@@ -790,4 +798,5 @@ var (
 	EventVPNKeyRotationConfigUpdated          events.EventName = "VPNKeyRotationConfigUpdated"
 	EventCertificateJobCreationFailed         events.EventName = "CertificateJobCreationFailed"
 	EventCertificatesRenewNow                 events.EventName = "CertificatesRenewNow"
+	EventIllegalVPNKeyRotationConfigDelete    events.EventName = "IllegalVPNKeyRotationConfigDelete"
 )

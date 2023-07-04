@@ -275,6 +275,7 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - vpnkeyrotations
   sideEffects: None
