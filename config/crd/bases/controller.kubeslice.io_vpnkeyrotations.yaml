@@ -81,9 +81,6 @@ spec:
                       type: string
                     status:
                       type: string
-                  required:
-                  - lastUpdatedTimestamp
-                  - status
                   type: object
                 description: This is map of gateway name to the current rotation state
                 type: object
@@ -97,9 +94,6 @@ spec:
                         type: string
                       status:
                         type: string
-                    required:
-                    - lastUpdatedTimestamp
-                    - status
                     type: object
                   type: array
                 description: This is circular array of last n number of rotation status.

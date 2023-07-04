@@ -50,8 +50,8 @@ type VpnKeyRotationStatus struct {
 
 // StatusOfKeyRotation represent per gateway status
 type StatusOfKeyRotation struct {
-	Status               string      `json:"status"`
-	LastUpdatedTimestamp metav1.Time `json:"lastUpdatedTimestamp"`
+	Status               string      `json:"status,omitempty"`
+	LastUpdatedTimestamp metav1.Time `json:"lastUpdatedTimestamp,omitempty"`
 }
 
 //+kubebuilder:object:root=true

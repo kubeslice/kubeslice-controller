@@ -161,8 +161,20 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	}
 	copyVpnConfig := vpnKeyRotationConfig.DeepCopy()
 
+	toUpdate := false
 	if !reflect.DeepEqual(copyVpnConfig.Spec.ClusterGatewayMapping, clusterGatewayMapping) {
 		copyVpnConfig.Spec.ClusterGatewayMapping = clusterGatewayMapping
+		toUpdate = true
+	}
+	if !reflect.DeepEqual(copyVpnConfig.Spec.RotationInterval,s.Spec.RotationInterval){
+		copyVpnConfig.Spec.RotationInterval = s.Spec.RotationInterval
+		toUpdate = true
+	}
+	if !reflect.DeepEqual(copyVpnConfig.Spec.SliceName,s.Name){
+		copyVpnConfig.Spec.SliceName = s.Name
+		toUpdate = true
+	}
+	if toUpdate{
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
 			logger.Errorf("Err updating clusterGatewayMapping in vpnconfig: %s", err.Error())
 			return ctrl.Result{}, err
