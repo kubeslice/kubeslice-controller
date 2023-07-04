@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= aveshasystems/kubeslice-controller:latest-v2
+IMG ?= aveshasystems/kubeslice-controller:latest
 
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
