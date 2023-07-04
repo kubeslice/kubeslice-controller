@@ -177,7 +177,9 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		logger.Errorf("Err: %s", err.Error())
 		return res, err
 	}
-	return ctrl.Result{RequeueAfter: (time.Duration(copyVpnConfig.Spec.RotationInterval) * 24 * time.Hour) - (time.Hour)}, nil
+	expiryTime := copyVpnConfig.Spec.CertificateExpiryTime.Time
+	remainingDuration := expiryTime.Sub(metav1.Now().Time)
+	return ctrl.Result{RequeueAfter: remainingDuration}, nil
 }
 
 func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Context, copyVpnConfig *controllerv1alpha1.VpnKeyRotation, s *controllerv1alpha1.SliceConfig) (ctrl.Result, *controllerv1alpha1.VpnKeyRotation, error) {

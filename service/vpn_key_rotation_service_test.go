@@ -1173,7 +1173,7 @@ func Test_reconcileVpnKeyRotation(t *testing.T) {
 				Namespace: "test-ns",
 				Name:      "test-slice",
 			}},
-			expectedResponse: ctrl.Result{RequeueAfter: (time.Duration(30) * 24 * time.Hour) - (time.Hour)},
+			expectedResponse: ctrl.Result{RequeueAfter: metav1.NewTime(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC)).AddDate(0, 0, 30).Add(-1 * time.Hour).Sub(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC))},
 			expectedError:    nil,
 			getArg1:          mock.Anything,
 			getArg2:          mock.Anything,
@@ -1300,6 +1300,12 @@ func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase
 
 	clientMock.
 		On("Update", mock.Anything, mock.Anything).Return(nil).Once()
+
+	// Mocking metav1.Now() with a fixed time value
+	patch := monkey.Patch(metav1.Now, func() metav1.Time {
+		return metav1.NewTime(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC))
+	})
+	defer patch.Unpatch()
 
 	gotResp, gotErr := vpn.ReconcileVpnKeyRotation(ctx, tc.request)
 
