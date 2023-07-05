@@ -48,6 +48,7 @@ const (
 	resourceSecrets               = "secrets"
 	resourceEvents                = "events"
 	ResourceStatusSuffix          = "/status"
+	resourceVpnKeyRotationConfigs = "vpnkeyrotations"
 )
 
 // metric kind
@@ -216,13 +217,18 @@ var (
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceVpnKeyRotationConfigs},
+		},
+		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceWorker},
 			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
 			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster + ResourceStatusSuffix},
+			Resources: []string{resourceCluster + ResourceStatusSuffix, resourceVpnKeyRotationConfigs + ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
