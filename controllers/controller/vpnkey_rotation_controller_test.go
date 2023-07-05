@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -430,19 +431,13 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 		})
 	})
 	Context("Webhook Tests", func() {
-		var project *v1alpha1.Project
 		var slice *v1alpha1.SliceConfig
 		var cluster1 *v1alpha1.Cluster
 		var cluster2 *v1alpha1.Cluster
 		var cluster3 *v1alpha1.Cluster
 		os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", controlPlaneNamespace)
 		ctx := context.Background()
-		project = &v1alpha1.Project{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "cisco",
-				Namespace: controlPlaneNamespace,
-			},
-		}
+
 		slice = &v1alpha1.SliceConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      sliceName,
@@ -574,10 +569,33 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 			// it should delete sliceconfig
 			Expect(k8sClient.Delete(ctx, slice)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, cluster1)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, cluster2)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, cluster3)).Should(Succeed())
+			clusterGetKey := types.NamespacedName{
+				Namespace: cluster1.Namespace,
+				Name:      cluster1.Name,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, clusterGetKey, cluster1)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
 
-			Expect(k8sClient.Delete(ctx, project)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, cluster2)).Should(Succeed())
+			clusterGetKey = types.NamespacedName{
+				Namespace: cluster2.Namespace,
+				Name:      cluster2.Name,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, clusterGetKey, cluster2)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+			Expect(k8sClient.Delete(ctx, cluster3)).Should(Succeed())
+			clusterGetKey = types.NamespacedName{
+				Namespace: cluster3.Namespace,
+				Name:      cluster3.Name,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, clusterGetKey, cluster3)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
 
 		})
 		It("Should not allow creating vpn keyrotation config if sliceconfig is not present", func() {
@@ -613,6 +631,243 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 				return err == nil && len(eventList.Items) > 0 && eventFound(eventList, string(events.EventIllegalVPNKeyRotationConfigDelete))
 			}, timeout, interval).Should(BeTrue())
 
+		})
+	})
+	Context("SliceConfig RenewBefore Test Case", func() {
+		var project *v1alpha1.Project
+		var slice *v1alpha1.SliceConfig
+		var cluster1 *v1alpha1.Cluster
+		var cluster2 *v1alpha1.Cluster
+		var cluster3 *v1alpha1.Cluster
+		os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", controlPlaneNamespace)
+		ctx := context.Background()
+		project = &v1alpha1.Project{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cisco",
+				Namespace: controlPlaneNamespace,
+			},
+		}
+		slice = &v1alpha1.SliceConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-slice-1",
+				Namespace: sliceNamespace,
+			},
+			Spec: v1alpha1.SliceConfigSpec{
+				Clusters:    []string{"worker-1", "worker-2"},
+				MaxClusters: 4,
+				SliceSubnet: "10.1.0.0/16",
+				SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayType: "OpenVPN",
+					SliceCaType:      "Local",
+				},
+				SliceIpamType: "Local",
+				SliceType:     "Application",
+				QosProfileDetails: &v1alpha1.QOSProfile{
+					BandwidthCeilingKbps: 5120,
+					DscpClass:            "AF11",
+				},
+			},
+		}
+		cluster1 = &v1alpha1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "worker-1",
+				Namespace: "kubeslice-cisco",
+			},
+			Spec: v1alpha1.ClusterSpec{
+				NodeIPs: []string{"11.11.11.12"},
+			},
+		}
+		cluster2 = &v1alpha1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "worker-2",
+				Namespace: "kubeslice-cisco",
+			},
+			Spec: v1alpha1.ClusterSpec{
+				NodeIPs: []string{"11.11.11.13"},
+			},
+		}
+		cluster3 = &v1alpha1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "worker-3",
+				Namespace: "kubeslice-cisco",
+			},
+			Spec: v1alpha1.ClusterSpec{
+				NodeIPs: []string{"11.11.11.14"},
+			},
+		}
+		BeforeAll(func() {
+			ns := v1.Namespace{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: "kubeslice-cisco",
+				}, &ns)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+			Expect(k8sClient.Create(ctx, cluster1)).Should(Succeed())
+			// update cluster status
+			getKey := types.NamespacedName{
+				Namespace: cluster1.Namespace,
+				Name:      cluster1.Name,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, cluster1)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+			cluster1.Status.CniSubnet = []string{"192.168.0.0/24"}
+			cluster1.Status.RegistrationStatus = v1alpha1.RegistrationStatusRegistered
+			Expect(k8sClient.Status().Update(ctx, cluster1)).Should(Succeed())
+
+			Expect(k8sClient.Create(ctx, cluster2)).Should(Succeed())
+			// update cluster status
+			getKey = types.NamespacedName{
+				Namespace: cluster2.Namespace,
+				Name:      cluster2.Name,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, cluster2)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+			cluster2.Status.CniSubnet = []string{"192.168.1.0/24"}
+			cluster2.Status.RegistrationStatus = v1alpha1.RegistrationStatusRegistered
+			Expect(k8sClient.Status().Update(ctx, cluster2)).Should(Succeed())
+
+			Expect(k8sClient.Create(ctx, cluster3)).Should(Succeed())
+			// update cluster status
+			getKey = types.NamespacedName{
+				Namespace: cluster3.Namespace,
+				Name:      cluster3.Name,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, cluster3)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+			cluster3.Status.CniSubnet = []string{"10.1.1.1/16"}
+			cluster3.Status.RegistrationStatus = v1alpha1.RegistrationStatusRegistered
+			Expect(k8sClient.Status().Update(ctx, cluster3)).Should(Succeed())
+
+			// it should create sliceconfig
+			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+
+		})
+		AfterAll(func() {
+			// update sliceconfig tor remove clusters
+			createdSliceConfig := v1alpha1.SliceConfig{}
+			getKey := types.NamespacedName{
+				Namespace: sliceNamespace,
+				Name:      slice.Name,
+			}
+			Expect(k8sClient.Get(ctx, getKey, &createdSliceConfig)).Should(Succeed())
+			createdSliceConfig.Spec.Clusters = []string{}
+			Expect(k8sClient.Update(ctx, &createdSliceConfig)).Should(Succeed())
+			// wait till workersliceconfigs are deleted
+			workerSliceConfigList := workerv1alpha1.WorkerSliceConfigList{}
+			ls := map[string]string{
+				"original-slice-name": slice.Name,
+			}
+			listOpts := []client.ListOption{
+				client.MatchingLabels(ls),
+			}
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, &workerSliceConfigList, listOpts...)
+				if err != nil {
+					return false
+				}
+				return len(workerSliceConfigList.Items) == 0
+			}, timeout, interval).Should(BeTrue())
+
+			// it should delete sliceconfig
+			Expect(k8sClient.Delete(ctx, slice)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, cluster1)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, cluster2)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, cluster3)).Should(Succeed())
+
+			Expect(k8sClient.Delete(ctx, project)).Should(Succeed())
+		})
+		// NOTE:since there would be no job conrtoller present - the secrets(certs) will not be created
+		It("should create new jobs for cert creation once a valid renewBefore is set", func() {
+			By("fetching workerslice gatways")
+			workerSliceGwList := workerv1alpha1.WorkerSliceGatewayList{}
+			ls := map[string]string{
+				"original-slice-name": slice.Name,
+			}
+			listOpts := []client.ListOption{
+				client.MatchingLabels(ls),
+			}
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, &workerSliceGwList, listOpts...)
+				if err != nil {
+					return false
+				}
+				return len(workerSliceGwList.Items) == 2
+			}, timeout, interval).Should(BeTrue())
+
+			By("checking if jobs are created")
+			job := batchv1.JobList{}
+			o := map[string]string{
+				"SLICE_NAME": slice.Name,
+			}
+			listOpts = []client.ListOption{
+				client.MatchingLabels(
+					o,
+				),
+			}
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, &job, listOpts...)
+				if err != nil {
+					return false
+				}
+				fmt.Println("len of jobs", len(job.Items))
+				return len(job.Items) == 1
+			}, timeout, interval).Should(BeTrue())
+
+			createdSliceConfig := v1alpha1.SliceConfig{}
+			getKey := types.NamespacedName{
+				Namespace: sliceNamespace,
+				Name:      slice.Name,
+			}
+			Expect(k8sClient.Get(ctx, getKey, &createdSliceConfig)).Should(Succeed())
+			now := metav1.Now()
+			createdSliceConfig.Spec.RenewBefore = &now
+			// update the sliceconfig
+			Expect(k8sClient.Update(ctx, &createdSliceConfig)).Should(Succeed())
+
+			// should update vpnkeyrotation config CertExpiryTS to now
+			// get vpnkey rotation config
+			createdVpnKeyConfig := &v1alpha1.VpnKeyRotation{}
+			getKey = types.NamespacedName{
+				Namespace: slice.Namespace,
+				Name:      slice.Name,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, createdVpnKeyConfig)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			exyr, exmon, exday := now.Date()
+			gotyr, gotmonth, gotday := createdVpnKeyConfig.Spec.CertificateExpiryTime.Date()
+			Expect(exyr).To(Equal(gotyr))
+			Expect(exmon).To(Equal(gotmonth))
+			Expect(exday).To(Equal(gotday))
+
+			// should create new job to create new certs
+			By("checking if jobs are created")
+			job = batchv1.JobList{}
+			o = map[string]string{
+				"SLICE_NAME": slice.Name,
+			}
+			listOpts = []client.ListOption{
+				client.MatchingLabels(
+					o,
+				),
+			}
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, &job, listOpts...)
+				if err != nil {
+					return false
+				}
+				fmt.Println("len of jobs", len(job.Items))
+				return len(job.Items) == 2
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 })
