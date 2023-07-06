@@ -34,6 +34,7 @@ type SliceConfigSpec struct {
 	SliceIpamType          string   `json:"sliceIpamType,omitempty"`
 	Clusters               []string `json:"clusters,omitempty"`
 	StandardQosProfileName string   `json:"standardQosProfileName,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
+
 	// The custom QOS Profile Details
 	QosProfileDetails         *QOSProfile               `json:"qosProfileDetails,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
@@ -41,7 +42,8 @@ type SliceConfigSpec struct {
 	//+kubebuilder:validation:Minimum=2
 	//+kubebuilder:validation:Maximum=32
 	//+kubebuilder:default:=16
-	MaxClusters int `json:"maxClusters,omitempty"`
+	MaxClusters int               `json:"maxClusters,omitempty"`
+	VPNConfig   *VPNConfiguration `json:"vpnConfig"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/
@@ -67,6 +69,14 @@ type WorkerSliceGatewayProvider struct {
 	//+kubebuilder:default:=Local
 	// +kubebuilder:validation:Required
 	SliceCaType string `json:"sliceCaType"`
+}
+
+// VPNConfiguration defines the additional (optional) VPN Configuration to customise
+type VPNConfiguration struct {
+	//+kubebuilder:default:=AES-256-CBC
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:Enum:=AES-256-CBC;AES-128-CBC
+	Cipher string `json:"cipher"`
 }
 
 // QOSProfile is the QOS Profile configuration from backend
