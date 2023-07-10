@@ -18,11 +18,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"github.com/kubeslice/kubeslice-controller/events"
 
@@ -607,6 +609,18 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName string, namespace string,
 	serverGateway *v1alpha1.WorkerSliceGateway, clientGateway *v1alpha1.WorkerSliceGateway,
 	gatewayAddresses WorkerSliceGatewayNetworkAddresses) error {
+	sliceConfig := &controllerv1alpha1.SliceConfig{}
+	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
+		Name:      sliceName,
+		Namespace: namespace,
+	}, sliceConfig)
+	if err != nil {
+		return err
+	}
+	if !found {
+		errMsg := fmt.Sprintf("sliceConfig for %v not found in %v.", sliceName, namespace)
+		return errors.New(errMsg)
+	}
 	cpr := s.buildCertPairRequest(sliceName, serverGateway, clientGateway, gatewayAddresses)
 
 	//Load Event Recorder with project name, slice name and namespace
@@ -626,6 +640,8 @@ func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName
 	environment["CLIENT_SLICEGATEWAY_NAME"] = clientGateway.Name
 	environment["SLICE_NAME"] = sliceName
 	environment["CERT_GEN_REQUESTS"], _ = util.EncodeToBase64(&cpr)
+	environment["VPN_CIPHER"] = sliceConfig.Spec.VPNConfig.Cipher
+
 	util.CtxLogger(ctx).Info("jobNamespace", jobNamespace) //todo:remove
 	_, err := s.js.CreateJob(ctx, jobNamespace, JobImage, environment)
 	if err != nil {
