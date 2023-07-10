@@ -271,6 +271,7 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 				}
 				v.jobCreationInProgress.Store(true)
 				logger.Debugf("jobs triggered for creating new certs for slice %s", s.Name)
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
 			// verify jobs are completed
 			status, err := v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName)
