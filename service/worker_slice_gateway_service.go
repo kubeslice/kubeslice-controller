@@ -643,7 +643,7 @@ func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName
 	environment["VPN_CIPHER"] = sliceConfig.Spec.VPNConfig.Cipher
 
 	util.CtxLogger(ctx).Info("jobNamespace", jobNamespace) //todo:remove
-	_, err := s.js.CreateJob(ctx, jobNamespace, JobImage, environment)
+	_, err = s.js.CreateJob(ctx, jobNamespace, JobImage, environment)
 	if err != nil {
 		//Register an event for gateway job creation failure
 		util.RecordEvent(ctx, eventRecorder, serverGateway, clientGateway, events.EventSliceGatewayJobCreationFailed)
