@@ -11,7 +11,6 @@ spec:
     sliceCaType: Local
   sliceIpamType: Local
   clusters:
-    - worker-cluster-0
     - worker-cluster-1
     - worker-cluster-2
   qosProfileDetails:
