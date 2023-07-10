@@ -11,8 +11,9 @@ spec:
     sliceCaType: Local
   sliceIpamType: Local
   clusters:
-    - cluster-1
-    - cluster-2
+    - worker-cluster-0
+    - worker-cluster-1
+    - worker-cluster-2
   qosProfileDetails:
     queueType: HTB
     priority: 1
@@ -20,22 +21,3 @@ spec:
     bandwidthCeilingKbps: 5120
     bandwidthGuaranteedKbps: 2560
     dscpClass: AF11
-  externalGatewayConfig:
-    - ingress:
-        enabled: false
-      egress:
-        enabled: false
-      nsIngress:
-        enabled: false
-      gatewayType: none
-      clusters:
-        - "*"
-    - ingress:
-        enabled: true
-      egress:
-        enabled: true
-      nsIngress:
-        enabled: true
-      gatewayType: istio
-      clusters:
-        - cluster-2

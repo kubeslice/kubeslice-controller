@@ -43,6 +43,8 @@ spec:
                   serverId:
                     type: string
                 type: object
+              redundancyNumber:
+                type: integer
               request:
                 type: string
               sliceGwClient:
