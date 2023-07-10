@@ -57,6 +57,7 @@ const (
 	JobStatusSuspended
 	JobStatusListError
 	JobStatusRunning
+	JobNotCreated
 )
 
 // String returns the string representation of JobStatus.
@@ -250,6 +251,9 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 			util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobFailed)
 			return ctrl.Result{}, nil, nil
 		}
+		if status == JobNotCreated {
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
+		}
 
 		copyVpnConfig.Spec.CertificateCreationTime = &now
 		expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
@@ -287,6 +291,9 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 				// register an event
 				util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobFailed)
 				return ctrl.Result{}, nil, nil
+			}
+			if status == JobNotCreated {
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
 			copyVpnConfig.Spec.CertificateCreationTime = &now
 			expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
@@ -407,6 +414,10 @@ func (v *VpnKeyRotationService) verifyAllJobsAreCompleted(ctx context.Context, s
 	}
 	if err := util.ListResources(ctx, &jobs, listOpts...); err != nil {
 		return JobStatusListError, err
+	}
+
+	if len(jobs.Items) == 0 {
+		return JobNotCreated, nil
 	}
 
 	for _, job := range jobs.Items {
