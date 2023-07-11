@@ -18,15 +18,19 @@ package controller
 
 import (
 	"context"
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"crypto/tls"
+	"fmt"
+	"net"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/kubeslice/kubeslice-controller/controllers/worker"
 	"github.com/kubeslice/kubeslice-controller/metrics"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"testing"
-	"time"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
@@ -38,6 +42,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,15 +55,6 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-const (
-	timeout = time.Second * 10
-	// duration = time.Second * 10
-	interval              = time.Millisecond * 250
-	controlPlaneNamespace = "kubeslice-controller"
-	projectName           = "avesha"
-	projectNamespace      = "kubeslice-" + projectName
-)
-
 var (
 	cfg           *rest.Config
 	k8sClient     client.Client
@@ -68,17 +64,13 @@ var (
 	ctx           context.Context
 	cancel        context.CancelFunc
 	controllerLog = util.NewLogger().With("name", "controllers")
-	mainProject   = &controllerv1alpha1.Project{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      projectName,
-			Namespace: controlPlaneNamespace,
-		},
-		Spec: controllerv1alpha1.ProjectSpec{
-			ServiceAccount: controllerv1alpha1.ServiceAccount{
-				ReadWrite: []string{"admin"},
-			},
-		},
-	}
+)
+
+const (
+	timeout = time.Second * 30
+	// duration = time.Second * 10
+	interval              = time.Millisecond * 250
+	controlPlaneNamespace = "kubeslice-controller"
 )
 
 func TestAPIs(t *testing.T) {
@@ -96,6 +88,9 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 		CRDInstallOptions: envtest.CRDInstallOptions{
 			MaxTime: 60 * time.Second,
+		},
+		WebhookInstallOptions: envtest.WebhookInstallOptions{
+			Paths: []string{filepath.Join("..", "..", "config", "webhook")},
 		},
 	}
 
@@ -131,10 +126,11 @@ var _ = BeforeSuite(func() {
 	wsi := service.WithWorkerServiceImportService(mr)
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr)
+	vpn := service.WithVpnKeyRotationService(wsgs, wscs)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr, vpn)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
 	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
-	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs)
+	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn)
 
 	service.ProjectNamespacePrefix = util.AppendHyphenAndPercentageSToString("kubeslice")
 	service.ControllerEndpoint = "https://controller.cisco.com:6443/"
@@ -153,8 +149,14 @@ var _ = BeforeSuite(func() {
 	}
 	Expect(k8sClient.Create(ctx, controlPlaneNS)).Should(Succeed())
 
+	webhookInstallOptions := &testEnv.WebhookInstallOptions
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme: scheme.Scheme,
+		Scheme:             scheme.Scheme,
+		Host:               webhookInstallOptions.LocalServingHost,
+		Port:               webhookInstallOptions.LocalServingPort,
+		CertDir:            webhookInstallOptions.LocalServingCertDir,
+		LeaderElection:     false,
+		MetricsBindAddress: "0",
 	})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -187,20 +189,75 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	// initialize controller with SliceConfig Kind
+	err = (&SliceConfigReconciler{
+		Client:             k8sManager.GetClient(),
+		Scheme:             k8sManager.GetScheme(),
+		Log:                controllerLog.With("name", "SliceConfig"),
+		SliceConfigService: svc.SliceConfigService,
+		EventRecorder:      &eventRecorder,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&worker.WorkerSliceConfigReconciler{
+		Client:             k8sManager.GetClient(),
+		Scheme:             k8sManager.GetScheme(),
+		Log:                controllerLog.With("name", "WorkerSliceConfig"),
+		WorkerSliceService: svc.WorkerSliceConfigService,
+		EventRecorder:      &eventRecorder,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&VpnKeyRotationReconciler{
+		Client:                k8sManager.GetClient(),
+		Scheme:                k8sManager.GetScheme(),
+		Log:                   controllerLog.With("name", "VpnKeyRotationConfig"),
+		VpnKeyRotationService: svc.VpnKeyRotationService,
+		EventRecorder:         &eventRecorder,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	// setup webhook
+
+	err = (&controllerv1alpha1.SliceConfig{}).SetupWebhookWithManager(k8sManager, service.ValidateSliceConfigCreate, service.ValidateSliceConfigUpdate, service.ValidateSliceConfigDelete)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(k8sManager, service.ValidateVpnKeyRotationCreate, service.ValidateVpnKeyRotationDelete)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllerv1alpha1.Cluster{}).SetupWebhookWithManager(k8sManager, service.ValidateClusterCreate, service.ValidateClusterUpdate, service.ValidateClusterDelete)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&workerv1alpha1.WorkerSliceConfig{}).SetupWebhookWithManager(k8sManager, service.ValidateWorkerSliceConfigUpdate)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&workerv1alpha1.WorkerSliceGateway{}).SetupWebhookWithManager(k8sManager, service.ValidateWorkerSliceGatewayUpdate)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllerv1alpha1.Project{}).SetupWebhookWithManager(k8sManager, service.ValidateProjectCreate, service.ValidateProjectUpdate, service.ValidateProjectDelete)
+	Expect(err).ToNot(HaveOccurred())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
 
-	By("Setting up a project")
-	Expect(k8sClient.Create(ctx, mainProject)).Should(Succeed())
+	// wait for the webhook server to get ready
+	dialer := &net.Dialer{Timeout: time.Second}
+	addrPort := fmt.Sprintf("%s:%d", webhookInstallOptions.LocalServingHost, webhookInstallOptions.LocalServingPort)
+	Eventually(func() error {
+		conn, err := tls.DialWithDialer(dialer, "tcp", addrPort, &tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return err
+		}
+		conn.Close()
+		return nil
+	}).Should(Succeed())
+
 })
 
 var _ = AfterSuite(func() {
-	By("Cleaning up the project")
-	Expect(k8sClient.Delete(ctx, mainProject)).Should(Succeed())
-
 	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()

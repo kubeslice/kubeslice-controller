@@ -42,6 +42,12 @@ type SliceConfigSpec struct {
 	//+kubebuilder:validation:Maximum=32
 	//+kubebuilder:default:=16
 	MaxClusters int `json:"maxClusters,omitempty"`
+	//+kubebuilder:validation:Minimum=30
+	//+kubebuilder:validation:Maximum=90
+	//+kubebuilder:default:=30
+	RotationInterval int `json:"rotationInterval,omitempty"`
+	// RenewBefore is used for renew now!
+	RenewBefore *metav1.Time `json:"renewBefore,omitempty"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/

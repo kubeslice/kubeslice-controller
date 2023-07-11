@@ -193,9 +193,13 @@ generate-mocks: ## Generate mocks for the controller-runtime.
 
 .PHONY: unit-test
 unit-test: ## Run local unit tests.
-	go test ./service --coverprofile=coverage.out
+	go test -gcflags=-l ./service --coverprofile=coverage.out
 	mkdir -p coverage-report
 	go tool cover -html=coverage.out -o coverage-report/report.html
+
+.PHONY: integration-test
+integration-test: ## Run local integration tests.
+	cd controllers/controller && ginkgo
 
 .PHONY: unit-test-docker
 unit-test-docker: ## Run local unit tests in a docker container.

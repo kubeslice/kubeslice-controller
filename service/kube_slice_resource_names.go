@@ -48,6 +48,7 @@ const (
 	resourceSecrets               = "secrets"
 	resourceEvents                = "events"
 	ResourceStatusSuffix          = "/status"
+	resourceVpnKeyRotationConfigs = "vpnkeyrotations"
 )
 
 // metric kind
@@ -127,15 +128,16 @@ const (
 
 // Finalizers
 const (
-	ProjectFinalizer             = "controller.kubeslice.io/project-finalizer"
-	ClusterFinalizer             = "controller.kubeslice.io/cluster-finalizer"
-	ClusterDeregisterFinalizer   = "worker.kubeslice.io/cluster-deregister-finalizer"
-	SliceConfigFinalizer         = "controller.kubeslice.io/slice-configuration-finalizer"
-	serviceExportConfigFinalizer = "controller.kubeslice.io/service-export-finalizer"
-	WorkerSliceConfigFinalizer   = "worker.kubeslice.io/worker-slice-configuration-finalizer"
-	WorkerSliceGatewayFinalizer  = "worker.kubeslice.io/worker-slice-gateway-finalizer"
-	WorkerServiceImportFinalizer = "worker.kubeslice.io/worker-service-import-finalizer"
-	SliceQoSConfigFinalizer      = "controller.kubeslice.io/slice-qos-config-finalizer"
+	ProjectFinalizer              = "controller.kubeslice.io/project-finalizer"
+	ClusterFinalizer              = "controller.kubeslice.io/cluster-finalizer"
+	ClusterDeregisterFinalizer    = "worker.kubeslice.io/cluster-deregister-finalizer"
+	SliceConfigFinalizer          = "controller.kubeslice.io/slice-configuration-finalizer"
+	serviceExportConfigFinalizer  = "controller.kubeslice.io/service-export-finalizer"
+	WorkerSliceConfigFinalizer    = "worker.kubeslice.io/worker-slice-configuration-finalizer"
+	WorkerSliceGatewayFinalizer   = "worker.kubeslice.io/worker-slice-gateway-finalizer"
+	WorkerServiceImportFinalizer  = "worker.kubeslice.io/worker-service-import-finalizer"
+	SliceQoSConfigFinalizer       = "controller.kubeslice.io/slice-qos-config-finalizer"
+	VPNKeyRotationConfigFinalizer = "controller.kubeslice.io/vpn-key-rotation-config-finalizer"
 )
 
 // ControllerEndpoint
@@ -215,13 +217,18 @@ var (
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+			APIGroups: []string{apiGroupKubeSliceControllers},
+			Resources: []string{resourceVpnKeyRotationConfigs},
+		},
+		{
+			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
 			APIGroups: []string{apiGroupKubeSliceWorker},
 			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},
 			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster + ResourceStatusSuffix},
+			Resources: []string{resourceCluster + ResourceStatusSuffix, resourceVpnKeyRotationConfigs + ResourceStatusSuffix},
 		},
 		{
 			Verbs:     []string{verbUpdate, verbPatch, verbGet},

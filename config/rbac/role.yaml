@@ -75,6 +75,7 @@ rules:
   - serviceexportconfigs
   - sliceconfigs
   - sliceqosconfigs
+  - vpnkeyrotations
   verbs:
   - create
   - delete

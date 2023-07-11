@@ -21,17 +21,18 @@ import (
 	"fmt"
 	"os"
 
-	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 
-	"github.com/kubeslice/kubeslice-controller/metrics"
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -39,6 +40,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/controllers/worker"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -69,10 +71,11 @@ func main() {
 	wsi := service.WithWorkerServiceImportService(mr)
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr)
+	vpn := service.WithVpnKeyRotationService(wsgs, wscs)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr, vpn)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
 	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
-	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs))
+	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn))
 }
 
 func initialize(services *service.Services) {
@@ -249,6 +252,16 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to create controller", "controller", "SliceQoSConfig")
 		os.Exit(1)
 	}
+	if err = (&controller.VpnKeyRotationReconciler{
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		Log:                   controllerLog.With("name", "VpnKeyRotationConfig"),
+		VpnKeyRotationService: services.VpnKeyRotationService,
+		EventRecorder:         &eventRecorder,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VpnKeyRotationConfig")
+		os.Exit(1)
+	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = (&controllerv1alpha1.Project{}).SetupWebhookWithManager(mgr, service.ValidateProjectCreate, service.ValidateProjectUpdate, service.ValidateProjectDelete); err != nil {
@@ -279,6 +292,10 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SliceQoSConfig")
 			os.Exit(1)
 		}
+		if err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(mgr, service.ValidateVpnKeyRotationCreate, service.ValidateVpnKeyRotationDelete); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "VpnKeyRotation")
+			os.Exit(1)
+		}
 	}
 
 	//+kubebuilder:scaffold:builder
@@ -301,7 +318,7 @@ func initialize(services *service.Services) {
 
 //All Controller RBACs goes here.
 
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;sliceqosconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;sliceqosconfigs;vpnkeyrotations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers,verbs=update
 

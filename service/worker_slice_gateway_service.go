@@ -19,12 +19,13 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/metrics"
+	"os"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,6 +49,11 @@ type IWorkerSliceGatewayService interface {
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
+	GenerateCerts(ctx context.Context, sliceName string, namespace string,
+		serverGateway *v1alpha1.WorkerSliceGateway, clientGateway *v1alpha1.WorkerSliceGateway,
+		gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error
+	BuildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
+		clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses
 }
 
 // WorkerSliceGatewayService is a schema for interfaces JobService, WorkerSliceConfigService, SecretService
@@ -59,15 +65,6 @@ type WorkerSliceGatewayService struct {
 }
 
 // WorkerSliceGatewayNetworkAddresses is a schema for WorkerSlice gateway network parameters
-type WorkerSliceGatewayNetworkAddresses struct {
-	ServerNetwork    string
-	ClientNetwork    string
-	ServerSubnet     string
-	ClientSubnet     string
-	ServerVpnNetwork string
-	ServerVpnAddress string
-	ClientVpnAddress string
-}
 
 // ReconcileWorkerSliceGateways is a function to reconcile/restore the worker slice gateways
 func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -430,7 +427,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		for j := i + 1; j < noClusters; j++ {
 			sourceCluster, destinationCluster := clusterMapping[clusterNames[i]], clusterMapping[clusterNames[j]]
 			gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
-			gatewayAddresses := s.buildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
+			gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
 			err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, ownerLabel, gatewayNumber, gatewayAddresses)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -444,7 +441,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 // createMinimumGateWayPairIfNotExists is a function to create the pair of gatways between 2 clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx context.Context,
 	sourceCluster *controllerv1alpha1.Cluster, destinationCluster *controllerv1alpha1.Cluster, sliceName string, namespace string,
-	label map[string]string, gatewayNumber int, gatewayAddresses WorkerSliceGatewayNetworkAddresses) error {
+	label map[string]string, gatewayNumber int, gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error {
 	serverGatewayName := fmt.Sprintf(gatewayName, sliceName, sourceCluster.Name, destinationCluster.Name)
 	clientGatewayName := fmt.Sprintf(gatewayName, sliceName, destinationCluster.Name, sourceCluster.Name)
 	gateway := v1alpha1.WorkerSliceGateway{}
@@ -525,7 +522,8 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 			"object_kind": metricKindWorkerSliceGateway,
 		},
 	)
-	err = s.generateCerts(ctx, sliceName, namespace, serverGatewayObject, clientGatewayObject, gatewayAddresses)
+
+	err = s.GenerateCerts(ctx, sliceName, namespace, serverGatewayObject, clientGatewayObject, gatewayAddresses)
 	if err != nil {
 		return err
 	}
@@ -534,9 +532,9 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 }
 
 // buildNetworkAddresses - function generates the object of WorkerSliceGatewayNetworkAddresses
-func (s *WorkerSliceGatewayService) buildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
-	clusterMap map[string]int, clusterCidr string) WorkerSliceGatewayNetworkAddresses {
-	gatewayAddresses := WorkerSliceGatewayNetworkAddresses{}
+func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
+	clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses {
+	gatewayAddresses := util.WorkerSliceGatewayNetworkAddresses{}
 	ipr := strings.Split(sliceSubnet, ".")
 	serverSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr))
 	clientSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr))
@@ -604,9 +602,9 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 }
 
 // generateCerts is a function to generate the certificates between serverGateway and clientGateway
-func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName string, namespace string,
+func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName string, namespace string,
 	serverGateway *v1alpha1.WorkerSliceGateway, clientGateway *v1alpha1.WorkerSliceGateway,
-	gatewayAddresses WorkerSliceGatewayNetworkAddresses) error {
+	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error {
 	cpr := s.buildCertPairRequest(sliceName, serverGateway, clientGateway, gatewayAddresses)
 
 	//Load Event Recorder with project name, slice name and namespace
@@ -626,6 +624,7 @@ func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName
 	environment["CLIENT_SLICEGATEWAY_NAME"] = clientGateway.Name
 	environment["SLICE_NAME"] = sliceName
 	environment["CERT_GEN_REQUESTS"], _ = util.EncodeToBase64(&cpr)
+	jobNamespace = os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE")
 	util.CtxLogger(ctx).Info("jobNamespace", jobNamespace) //todo:remove
 	_, err := s.js.CreateJob(ctx, jobNamespace, JobImage, environment)
 	if err != nil {
@@ -657,7 +656,7 @@ func (s *WorkerSliceGatewayService) generateCerts(ctx context.Context, sliceName
 // buildCertPairRequest is a function to generate the pair between server-cluster and client-cluster
 func (s *WorkerSliceGatewayService) buildCertPairRequest(sliceName string,
 	gateway1, gateway2 *v1alpha1.WorkerSliceGateway,
-	gatewayAddresses WorkerSliceGatewayNetworkAddresses) CertPairRequestMap {
+	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) CertPairRequestMap {
 	clusterName := gateway1.Spec.LocalGatewayConfig.ClusterName
 	serverNumber := gateway1.Spec.GatewayNumber
 	serverId, clientId := gateway1.Name, gateway2.Name
