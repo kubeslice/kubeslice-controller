@@ -36,6 +36,8 @@ spec:
           spec:
             description: WorkerSliceGwRecyclerSpec defines the desired state of WorkerSliceGwRecycler
             properties:
+              clientRedundancyNumber:
+                type: integer
               gwPair:
                 properties:
                   clientId:
@@ -43,10 +45,10 @@ spec:
                   serverId:
                     type: string
                 type: object
-              redundancyNumber:
-                type: integer
               request:
                 type: string
+              serverRedundancyNumber:
+                type: integer
               sliceGwClient:
                 type: string
               sliceGwServer:
