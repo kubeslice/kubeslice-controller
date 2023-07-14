@@ -2,7 +2,7 @@
 
 # Create controller kind cluster if not present
 if [ ! $(kind get clusters | grep controller) ];then
-  kind create cluster --name controller --config .github/workflows/scripts/cluster.yaml --image kindest/node:v1.22.7
+  kind create cluster --name controller --config .github/workflows/scripts/cluster.yaml --image kindest/node:v1.24.15
   ip=$(docker inspect controller-control-plane | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress') 
   #  echo $ip
   # loading docker image into kind controller
@@ -13,7 +13,7 @@ fi
 
 # Create worker1 kind cluster if not present
 if [ ! $(kind get clusters | grep worker) ];then
-  kind create cluster --name worker --config .github/workflows/scripts/cluster.yaml --image kindest/node:v1.22.7
+  kind create cluster --name worker --config .github/workflows/scripts/cluster.yaml --image kindest/node:v1.24.15
   ip=$(docker inspect worker-control-plane | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
   #  echo $ip
   # loading docker image into kind controller
