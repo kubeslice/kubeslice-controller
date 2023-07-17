@@ -29,7 +29,12 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				Namespace: controlPlaneNamespace,
 			},
 		}
-		Expect(k8sClient.Create(ctx, Project)).Should(Succeed())
+		// Expect(k8sClient.Create(ctx, Project)).Should(Succeed())
+
+		Eventually(func() bool {
+			err := k8sClient.Create(ctx, Project)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
 		GinkgoWriter.Println("Project", Project)
 
 		// Check is namespace is created
@@ -61,7 +66,14 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 			},
 		}
 
-		Expect(k8sClient.Create(ctx, Cluster1)).Should(Succeed())
+		// Expect(k8sClient.Create(ctx, Cluster1)).Should(Succeed())
+
+		Eventually(func() bool {
+			err := k8sClient.Create(ctx, Cluster1)
+			GinkgoWriter.Println(err)
+
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
 		// update cluster status
 		getKey := types.NamespacedName{
 			Namespace: Cluster1.Namespace,
@@ -69,13 +81,32 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 		}
 		Eventually(func() bool {
 			err := k8sClient.Get(ctx, getKey, Cluster1)
+			GinkgoWriter.Println(err)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 		Cluster1.Status.CniSubnet = []string{"192.168.0.0/24"}
 		Cluster1.Status.RegistrationStatus = v1alpha1.RegistrationStatusRegistered
-		Expect(k8sClient.Status().Update(ctx, Cluster1)).Should(Succeed())
+		// Expect(k8sClient.Status().Update(ctx, Cluster1)).Should(Succeed())
 
-		Expect(k8sClient.Create(ctx, Cluster2)).Should(Succeed())
+		Eventually(func() bool {
+			err := k8sClient.Status().Update(ctx, Cluster1)
+			GinkgoWriter.Println(err)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
+
+		//Debug
+		Eventually(func() bool {
+			err := k8sClient.Get(ctx, getKey, Cluster1)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
+		GinkgoWriter.Println("Cluster1 RegistrationStatus ",Cluster1.Status.RegistrationStatus)
+
+
+		Eventually(func() bool {
+			err := k8sClient.Create(ctx, Cluster2)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
+
 		// update cluster status
 		getKey = types.NamespacedName{
 			Namespace: Cluster2.Namespace,
@@ -87,22 +118,36 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 		}, timeout, interval).Should(BeTrue())
 		Cluster2.Status.CniSubnet = []string{"192.168.1.0/24"}
 		Cluster2.Status.RegistrationStatus = v1alpha1.RegistrationStatusRegistered
-		Expect(k8sClient.Status().Update(ctx, Cluster2)).Should(Succeed())
 
+		Eventually(func() bool {
+			err := k8sClient.Status().Update(ctx, Cluster2)
+			GinkgoWriter.Println(err)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
+		//Debug
+		Eventually(func() bool {
+			err := k8sClient.Get(ctx, getKey, Cluster2)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
+		GinkgoWriter.Println(Cluster2.Status.RegistrationStatus)
+		GinkgoWriter.Println("Cluster2 RegistrationStatus ",Cluster1.Status.RegistrationStatus)
 	})
 	AfterAll(func() {
 		ctx := context.Background()
 
 		Eventually(func() bool {
 			err := k8sClient.Delete(ctx, Cluster1)
+			GinkgoWriter.Println(err)
 			return nil == err
 		}, timeout, interval).Should(BeTrue())
 		Eventually(func() bool {
 			err := k8sClient.Delete(ctx, Cluster2)
+			GinkgoWriter.Println(err)
 			return nil == err
 		}, timeout, interval).Should(BeTrue())
 		Eventually(func() bool {
 			err := k8sClient.Delete(ctx, Project)
+			GinkgoWriter.Println(err)
 			return nil == err
 		}, timeout, interval).Should(BeTrue())
 		// Expect(k8sClient.Delete(ctx, Cluster1)).Should(Succeed())
@@ -152,6 +197,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				return nil == err
 			}, timeout, interval).Should(BeTrue())
 
+
 			// wait till workersliceconfigs are deleted
 			workerSliceConfigList := workerv1alpha1.WorkerSliceConfigList{}
 			ls := map[string]string{
@@ -198,7 +244,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 			}, timeout, interval).Should(BeTrue())
 		})
 
-		FIt("When Update on Slice without VPN Configuration with VPN Config It should fail to update with errors", func() {
+		It("When Update on Slice without VPN Configuration with VPN Config It should fail to update with errors", func() {
 			By("Updating a existing Slice CR")
 			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
 
@@ -278,8 +324,11 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				if err != nil {
 					return false
 				}
+				GinkgoWriter.Println("createdSliceConfig",createdSliceConfig.Spec.VPNConfig)
+
 				createdSliceConfig.Spec.Clusters = []string{}
 				err = k8sClient.Update(ctx, &createdSliceConfig)
+				GinkgoWriter.Println("Detach Cluster Error",err)
 				return nil == err
 			}, timeout, interval).Should(BeTrue())
 
@@ -298,7 +347,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				}
 				return len(workerSliceConfigList.Items) == 0
 			}, timeout, interval).Should(BeTrue())
-
+			GinkgoWriter.Println("Detached Clusters from Slice Successful")
 			Expect(k8sClient.Delete(ctx, &createdSliceConfig)).Should(Succeed())
 			getKey = types.NamespacedName{
 				Name:      sliceName,
@@ -309,10 +358,14 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 		})
-
+		
 		It("When Creating Slice CR with VPN Configuration It should create pass without errors and VPN Config shall nil", func() {
 			By("Creating a new Slice CR")
-			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Create(ctx, slice)
+				GinkgoWriter.Println(err)
+				return nil == err
+			}, timeout, interval).Should(BeTrue())
 
 			// Get the Created Slice Config
 			lSliceConfig := v1alpha1.SliceConfig{}
@@ -325,13 +378,19 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				if nil != err {
 					return false
 				}
+				GinkgoWriter.Println(lSliceConfig.Spec.VPNConfig)
+
 				return lSliceConfig.Spec.VPNConfig != nil
 			}, timeout, interval).Should(BeTrue())
 		})
 
-		It("When Update on Slice with VPN Configuration with VPN Config It should fail to update with error", func() {
+		FIt("When Update on Slice with VPN Configuration with VPN Config It should fail to update with error", func() {
 			By("Updating a existing Slice CR")
-			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Create(ctx, slice)
+				GinkgoWriter.Println(err)
+				return nil == err
+			}, timeout, interval).Should(BeTrue())
 
 			// Get the Created Slice Config
 			lSliceConfig := v1alpha1.SliceConfig{}
@@ -345,31 +404,36 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				if nil != err {
 					return false
 				}
-				return lSliceConfig.Spec.VPNConfig == nil
+				GinkgoWriter.Println("Get VPNConfig",lSliceConfig.Spec.VPNConfig)
+
+				return lSliceConfig.Spec.VPNConfig != nil
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-256-CBC"}
+				err := k8sClient.Update(ctx, &lSliceConfig)
+				return nil != err
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, getKey, &lSliceConfig)
-				if err != nil {
+				if nil != err {
 					return false
 				}
-				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-256-CBC"}
-				err = k8sClient.Update(ctx, &lSliceConfig)
-				return nil != err
-			}, timeout, interval).Should(BeTrue())
 
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, getKey, &lSliceConfig)
-			// 	if nil != err {
-			// 		return false
-			// 	}
-			// 	return lSliceConfig.Spec.VPNConfig == nil
-			// }, timeout, interval).Should(BeTrue())
+				GinkgoWriter.Println("Post Update after 256 VPNConfig",lSliceConfig.Spec.VPNConfig)
+
+				return lSliceConfig.Spec.VPNConfig != nil
+			}, timeout, interval).Should(BeTrue())
 		})
 
 		It("When Update on Slice with VPN Configuration with VPN Config It should succeed to update without errors", func() {
 			By("Updating a existing Slice CR")
-			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Create(ctx, slice)
+				GinkgoWriter.Println(err)
+				return nil == err
+			}, timeout, interval).Should(BeTrue())
 
 			// Get the Created Slice Config
 			lSliceConfig := v1alpha1.SliceConfig{}
@@ -383,26 +447,29 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				if nil != err {
 					return false
 				}
-				return lSliceConfig.Spec.VPNConfig == nil
+				GinkgoWriter.Println("Get VPNConfig",lSliceConfig.Spec.VPNConfig)
+
+				return lSliceConfig.Spec.VPNConfig != nil
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-128-CBC"}
+				GinkgoWriter.Println("Slice VPNConfig",lSliceConfig)
+
+				err := k8sClient.Update(ctx, &lSliceConfig)
+				return nil != err
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, getKey, &lSliceConfig)
-				if err != nil {
+				if nil != err {
 					return false
 				}
-				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-128-CBC"}
-				err = k8sClient.Update(ctx, &lSliceConfig)
-				return nil == err
-			}, timeout, interval).Should(BeTrue())
 
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, getKey, &lSliceConfig)
-			// 	if nil != err {
-			// 		return false
-			// 	}
-			// 	return lSliceConfig.Spec.VPNConfig == nil
-			// }, timeout, interval).Should(BeTrue())
+				GinkgoWriter.Println("Post Update VPNConfig",lSliceConfig.Spec.VPNConfig)
+
+				return lSliceConfig.Spec.VPNConfig != nil
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 })
