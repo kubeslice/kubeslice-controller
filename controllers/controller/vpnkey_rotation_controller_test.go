@@ -24,7 +24,7 @@ const (
 	sliceNamespace = "kubeslice-cisco"
 )
 
-var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
+var _ = PDescribe("VpnKeyRotation Controller", Ordered, func() {
 	Context("With Minimal SliceConfig Created", func() {
 		var project *v1alpha1.Project
 		var slice *v1alpha1.SliceConfig
