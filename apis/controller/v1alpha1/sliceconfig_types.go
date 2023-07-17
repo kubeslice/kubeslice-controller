@@ -47,7 +47,8 @@ type SliceConfigSpec struct {
 	//+kubebuilder:default:=30
 	RotationInterval int `json:"rotationInterval,omitempty"`
 	// RenewBefore is used for renew now!
-	RenewBefore *metav1.Time `json:"renewBefore,omitempty"`
+	RenewBefore *metav1.Time      `json:"renewBefore,omitempty"`
+	VPNConfig   *VPNConfiguration `json:"vpnConfig,omitempty"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/
@@ -110,6 +111,14 @@ type NamespaceIsolationProfile struct {
 type SliceNamespaceSelection struct {
 	Namespace string   `json:"namespace,omitempty"`
 	Clusters  []string `json:"clusters,omitempty"`
+}
+
+// VPNConfiguration defines the additional (optional) VPN Configuration to customise
+type VPNConfiguration struct {
+	//+kubebuilder:default:=AES-256-CBC
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:Enum:=AES-256-CBC;AES-128-CBC
+	Cipher string `json:"cipher"`
 }
 
 type KubesliceEvent struct {

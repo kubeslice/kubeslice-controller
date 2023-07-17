@@ -83,6 +83,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-local: envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/controller/... -coverprofile cover.out
 
+.PHONY: int-test
+int-test: envtest
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/controller/... -coverprofile cover.out
 
 .PHONY: generate-yamls
 generate-yamls: manifests kustomize ## Generates the yaml files
