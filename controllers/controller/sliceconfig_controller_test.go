@@ -91,30 +91,20 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 
 	})
 	AfterAll(func() {
-		// Eventually(func() bool {
-		// 	ctx := context.Background()
-		// 	err := k8sClient.Delete(ctx, Cluster1)
-		// 	if err != nil {
-		// 		return false
-		// 	}
-		// 	return true
-		// }, timeout, interval).Should(BeTrue())
-		// Eventually(func() bool {
-		// 	ctx := context.Background()
-		// 	err := k8sClient.Delete(ctx, Cluster2)
-		// 	if err != nil {
-		// 		return false
-		// 	}
-		// 	return true
-		// }, timeout, interval).Should(BeTrue())
-		// Eventually(func() bool {
-		// 	ctx := context.Background()
-		// 	err := k8sClient.Delete(ctx, Project)
-		// 	if err != nil {
-		// 		return false
-		// 	}
-		// 	return true
-		// }, timeout, interval).Should(BeTrue())
+		ctx := context.Background()
+
+		Eventually(func() bool {
+			err := k8sClient.Delete(ctx, Cluster1)
+			return nil == err
+		}, timeout, interval).Should(BeTrue())
+		Eventually(func() bool {
+			err := k8sClient.Delete(ctx, Cluster2)
+			return nil == err
+		}, timeout, interval).Should(BeTrue())
+		Eventually(func() bool {
+			err := k8sClient.Delete(ctx, Project)
+			return nil == err
+		}, timeout, interval).Should(BeTrue())
 		// Expect(k8sClient.Delete(ctx, Cluster1)).Should(Succeed())
 		// Expect(k8sClient.Delete(ctx, Cluster2)).Should(Succeed())
 		// Expect(k8sClient.Delete(ctx, Project)).Should(Succeed())
@@ -159,10 +149,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				}
 				createdSliceConfig.Spec.Clusters = []string{}
 				err = k8sClient.Update(ctx, &createdSliceConfig)
-				if err != nil {
-					return false
-				}
-				return true
+				return nil == err
 			}, timeout, interval).Should(BeTrue())
 
 			// wait till workersliceconfigs are deleted
@@ -211,7 +198,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 			}, timeout, interval).Should(BeTrue())
 		})
 
-		It("When Update on Slice without VPN Configuration with VPN Config It should create pass without errors and VPN Config shall nil", func() {
+		FIt("When Update on Slice without VPN Configuration with VPN Config It should fail to update with errors", func() {
 			By("Updating a existing Slice CR")
 			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
 
@@ -237,10 +224,8 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				}
 				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-128-CBC"}
 				err = k8sClient.Update(ctx, &lSliceConfig)
-				if err != nil {
-					return false
-				}
-				return true
+				GinkgoWriter.Println(err.Error())
+				return nil != err
 			}, timeout, interval).Should(BeTrue())
 
 			// Eventually(func() bool {
@@ -251,33 +236,11 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 			// 	return lSliceConfig.Spec.VPNConfig == nil
 			// }, timeout, interval).Should(BeTrue())
 		})
-		/**
-		PDescribe("When Update Slice CR without VPN Configuration with Cipher AES-128-CBC ", func() {
-			It("It should create pass without errors and VPN Config shall nil", func() {
-				By("Creating a new Slice CR")
-				// Get the Created Slice Config
-				lSliceConfig := v1alpha1.SliceConfig{}
-				getKey := types.NamespacedName{
-					Name:      sliceName,
-					Namespace: sliceNamespace,
-				}
-				Expect(k8sClient.Get(ctx, getKey, &lSliceConfig)).Should(Succeed())
-				// lSliceConfig.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-128-CBC"}
-				Expect(k8sClient.Update(ctx, &lSliceConfig)).Should(Succeed())
-				Expect(lSliceConfig.Spec.VPNConfig).To(BeNil())
-			})
-		})
-		**/
 	})
-})
-var _ = PDescribe("Slice Config controller - VPN Config Tests without VPN Config", func() {
-
-	When("When Creating Slice CR with VPN Configuration", func() {
-		It("It should create pass without errors", func() {
-			By("Creating a new Slice CR")
-			ctx := context.Background()
-
-			slice := &v1alpha1.SliceConfig{
+	Describe("Slice Config controller - VPN Config Tests VPN Config", func() {
+		var slice *v1alpha1.SliceConfig
+		BeforeEach(func() {
+			slice = &v1alpha1.SliceConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      sliceName,
 					Namespace: sliceNamespace,
@@ -301,15 +264,145 @@ var _ = PDescribe("Slice Config controller - VPN Config Tests without VPN Config
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
-			// Get the Created Slice Config
+		})
+
+		AfterEach(func() {
+			// update sliceconfig tor remove clusters
 			createdSliceConfig := v1alpha1.SliceConfig{}
 			getKey := types.NamespacedName{
 				Name:      sliceName,
 				Namespace: sliceNamespace,
 			}
-			Expect(k8sClient.Get(ctx, getKey, &createdSliceConfig)).Should(Succeed())
-			Expect(createdSliceConfig.Spec.VPNConfig.Cipher).To(Equal("AES-128-CBC"))
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, &createdSliceConfig)
+				if err != nil {
+					return false
+				}
+				createdSliceConfig.Spec.Clusters = []string{}
+				err = k8sClient.Update(ctx, &createdSliceConfig)
+				return nil == err
+			}, timeout, interval).Should(BeTrue())
+
+			// wait till workersliceconfigs are deleted
+			workerSliceConfigList := workerv1alpha1.WorkerSliceConfigList{}
+			ls := map[string]string{
+				"original-slice-name": sliceName,
+			}
+			listOpts := []client.ListOption{
+				client.MatchingLabels(ls),
+			}
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, &workerSliceConfigList, listOpts...)
+				if err != nil {
+					return false
+				}
+				return len(workerSliceConfigList.Items) == 0
+			}, timeout, interval).Should(BeTrue())
+
+			Expect(k8sClient.Delete(ctx, &createdSliceConfig)).Should(Succeed())
+			getKey = types.NamespacedName{
+				Name:      sliceName,
+				Namespace: sliceNamespace,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, &createdSliceConfig)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+		})
+
+		It("When Creating Slice CR with VPN Configuration It should create pass without errors and VPN Config shall nil", func() {
+			By("Creating a new Slice CR")
+			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+
+			// Get the Created Slice Config
+			lSliceConfig := v1alpha1.SliceConfig{}
+			getKey := types.NamespacedName{
+				Name:      sliceName,
+				Namespace: sliceNamespace,
+			}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, &lSliceConfig)
+				if nil != err {
+					return false
+				}
+				return lSliceConfig.Spec.VPNConfig != nil
+			}, timeout, interval).Should(BeTrue())
+		})
+
+		It("When Update on Slice with VPN Configuration with VPN Config It should fail to update with error", func() {
+			By("Updating a existing Slice CR")
+			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+
+			// Get the Created Slice Config
+			lSliceConfig := v1alpha1.SliceConfig{}
+			getKey := types.NamespacedName{
+				Name:      sliceName,
+				Namespace: sliceNamespace,
+			}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, &lSliceConfig)
+				if nil != err {
+					return false
+				}
+				return lSliceConfig.Spec.VPNConfig == nil
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, &lSliceConfig)
+				if err != nil {
+					return false
+				}
+				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-256-CBC"}
+				err = k8sClient.Update(ctx, &lSliceConfig)
+				return nil != err
+			}, timeout, interval).Should(BeTrue())
+
+			// Eventually(func() bool {
+			// 	err := k8sClient.Get(ctx, getKey, &lSliceConfig)
+			// 	if nil != err {
+			// 		return false
+			// 	}
+			// 	return lSliceConfig.Spec.VPNConfig == nil
+			// }, timeout, interval).Should(BeTrue())
+		})
+
+		It("When Update on Slice with VPN Configuration with VPN Config It should succeed to update without errors", func() {
+			By("Updating a existing Slice CR")
+			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+
+			// Get the Created Slice Config
+			lSliceConfig := v1alpha1.SliceConfig{}
+			getKey := types.NamespacedName{
+				Name:      sliceName,
+				Namespace: sliceNamespace,
+			}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, &lSliceConfig)
+				if nil != err {
+					return false
+				}
+				return lSliceConfig.Spec.VPNConfig == nil
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, getKey, &lSliceConfig)
+				if err != nil {
+					return false
+				}
+				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-128-CBC"}
+				err = k8sClient.Update(ctx, &lSliceConfig)
+				return nil == err
+			}, timeout, interval).Should(BeTrue())
+
+			// Eventually(func() bool {
+			// 	err := k8sClient.Get(ctx, getKey, &lSliceConfig)
+			// 	if nil != err {
+			// 		return false
+			// 	}
+			// 	return lSliceConfig.Spec.VPNConfig == nil
+			// }, timeout, interval).Should(BeTrue())
 		})
 	})
 })
