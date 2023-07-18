@@ -238,11 +238,11 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				if nil != err {
 					return false
 				}
-				return lSliceConfig.Spec.VPNConfig == nil
+				return lSliceConfig.Spec.VPNConfig.Cipher == "AES-256-CBC"
 			}, timeout, interval).Should(BeTrue())
 		})
 
-		FIt("When Update on Slice without VPN Configuration with VPN Config It should fail to update with errors", func() {
+		It("When Update on Slice without VPN Configuration with VPN Config It should fail to update with errors", func() {
 			By("Updating a existing Slice CR")
 			Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
 
@@ -254,7 +254,8 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 			}
 
 			Eventually(func() bool {
-				// var expErrStr = `admission webhook "vsliceconfig.kb.io" denied the request: SliceConfig.controller.kubeslice.io "test-slice" is invalid: Spec.VPNConfig.Cipher: Invalid value: "AES-256-CBC": cannot be updated`
+				var errString = `admission webhook "vsliceconfig.kb.io" denied the request: SliceConfig.controller.kubeslice.io "test-slice" is invalid: Spec.VPNConfig.Cipher: Invalid value: "AES-128-CBC": cannot be updated`
+
 				err := k8sClient.Get(ctx, getKey, &lSliceConfig)
 				if nil != err {
 					return false
@@ -264,9 +265,8 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-128-CBC"}
 
 				err = k8sClient.Update(ctx, &lSliceConfig)
-				// GinkgoWriter.Println("Update Error",err)
-				return nil == err
-				// return  expErrStr == err.Error()
+				GinkgoWriter.Println("Update Error",err)
+				return  errString == err.Error()
 			}, timeout, interval).Should(BeTrue())
 		})
 	})
@@ -366,8 +366,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 					return false
 				}
 				GinkgoWriter.Println(lSliceConfig.Spec.VPNConfig)
-
-				return lSliceConfig.Spec.VPNConfig != nil
+				return lSliceConfig.Spec.VPNConfig.Cipher == "AES-128-CBC"
 			}, timeout, interval).Should(BeTrue())
 		})
 
