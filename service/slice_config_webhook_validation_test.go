@@ -707,6 +707,9 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 func UpdateValidateSliceConfigUpdatingSliceSubnet(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
 	oldSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -720,6 +723,9 @@ func UpdateValidateSliceConfigUpdatingSliceSubnet(t *testing.T) {
 
 func UpdateValidateSliceConfigUpdatingSliceType(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	oldSliceConfig.Spec.SliceType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
@@ -734,6 +740,9 @@ func UpdateValidateSliceConfigUpdatingSliceType(t *testing.T) {
 
 func UpdateValidateSliceConfigUpdatingSliceGatewayType(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
@@ -748,6 +757,9 @@ func UpdateValidateSliceConfigUpdatingSliceGatewayType(t *testing.T) {
 
 func UpdateValidateSliceConfigUpdatingSliceCaType(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	oldSliceConfig.Spec.SliceGatewayProvider.SliceCaType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
@@ -762,6 +774,9 @@ func UpdateValidateSliceConfigUpdatingSliceCaType(t *testing.T) {
 
 func UpdateValidateSliceConfigUpdatingSliceIpamType(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	oldSliceConfig.Spec.SliceIpamType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
@@ -1642,6 +1657,9 @@ func TestValidateCertsRotationInterval_Positive(t *testing.T) {
 
 	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
 	require.Nil(t, err)
 }
@@ -1668,6 +1686,9 @@ func TestValidateCertsRotationInterval_Negative(t *testing.T) {
 		}
 	}).Once()
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
 	require.NotNil(t, err)
 }
@@ -1709,6 +1730,9 @@ func TestValidateCertsRotationInterval_NegativeClusterStatus(t *testing.T) {
 		}
 	}).Once()
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
 	require.NotNil(t, err)
 	require.Equal(t, err.Type, field.ErrorTypeForbidden)
@@ -1753,6 +1777,9 @@ func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
 	}).Once()
 	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
 	require.Nil(t, err)
 }
@@ -1780,6 +1807,9 @@ func TestValidateRotationInterval_NoChange(t *testing.T) {
 		Spec: controllerv1alpha1.SliceConfigSpec{
 			RotationInterval: 30,
 		},
+	}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
 	}
 	_, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
 	require.Nil(t, err)
@@ -1810,6 +1840,9 @@ func TestValidateRotationInterval_Change_Increased(t *testing.T) {
 		Spec: controllerv1alpha1.SliceConfigSpec{
 			RotationInterval: 30,
 		},
+	}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
 	}
 	expectedResp := metav1.NewTime(now.AddDate(0, 0, 45).Add(-1 * time.Hour))
 	gotResp, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
@@ -1843,6 +1876,9 @@ func TestValidateRotationInterval_Change_Decreased(t *testing.T) {
 		Spec: controllerv1alpha1.SliceConfigSpec{
 			RotationInterval: 45,
 		},
+	}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
 	}
 	expectedResp := metav1.NewTime(now.AddDate(0, 0, 30).Add(-1 * time.Hour))
 	gotResp, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
