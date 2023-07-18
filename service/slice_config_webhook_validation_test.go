@@ -116,6 +116,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateRotationInterval_Change_Decreased":                                                                            TestValidateRotationInterval_Change_Decreased,
 	"TestValidateRotationInterval_Change_Increased":                                                                            TestValidateRotationInterval_Change_Increased,
 	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
+
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -717,6 +719,23 @@ func UpdateValidateSliceConfigUpdatingSliceSubnet(t *testing.T) {
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceSubnet: Invalid value:")
+	require.Contains(t, err.Error(), "cannot be updated")
+	clientMock.AssertExpectations(t)
+}
+
+func UpdateValidateSliceConfigUpdatingVPNCipher(t *testing.T) {
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-128-CBC",
+	}
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.VPNConfig.Cipher: Invalid value:")
 	require.Contains(t, err.Error(), "cannot be updated")
 	clientMock.AssertExpectations(t)
 }
