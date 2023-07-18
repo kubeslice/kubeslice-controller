@@ -1,6 +1,6 @@
 module github.com/kubeslice/kubeslice-controller
 
-go 1.18
+go 1.19
 
 require (
 	github.com/dailymotion/allure-go v0.7.0
