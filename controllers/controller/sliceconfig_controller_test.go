@@ -29,13 +29,11 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				Namespace: controlPlaneNamespace,
 			},
 		}
-		// Expect(k8sClient.Create(ctx, Project)).Should(Succeed())
 
 		Eventually(func() bool {
 			err := k8sClient.Create(ctx, Project)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
-		GinkgoWriter.Println("Project", Project)
 
 		// Check is namespace is created
 		ns := v1.Namespace{}
@@ -66,8 +64,6 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 			},
 		}
 
-		// Expect(k8sClient.Create(ctx, Cluster1)).Should(Succeed())
-
 		Eventually(func() bool {
 			err := k8sClient.Create(ctx, Cluster1)
 			GinkgoWriter.Println(err)
@@ -86,7 +82,6 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 		}, timeout, interval).Should(BeTrue())
 		Cluster1.Status.CniSubnet = []string{"192.168.0.0/24"}
 		Cluster1.Status.RegistrationStatus = v1alpha1.RegistrationStatusRegistered
-		// Expect(k8sClient.Status().Update(ctx, Cluster1)).Should(Succeed())
 
 		Eventually(func() bool {
 			err := k8sClient.Status().Update(ctx, Cluster1)
@@ -149,9 +144,6 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 			GinkgoWriter.Println(err)
 			return nil == err
 		}, timeout, interval).Should(BeTrue())
-		// Expect(k8sClient.Delete(ctx, Cluster1)).Should(Succeed())
-		// Expect(k8sClient.Delete(ctx, Cluster2)).Should(Succeed())
-		// Expect(k8sClient.Delete(ctx, Project)).Should(Succeed())
 	})
 
 	Describe("Slice Config controller - VPN Config Tests without VPN Config", func() {
