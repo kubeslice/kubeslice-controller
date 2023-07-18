@@ -1857,6 +1857,10 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 			Namespace: namespace,
 		},
 	}
+	sliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest", nil)
 	return clientMock, sliceConfig, ctx
 }
