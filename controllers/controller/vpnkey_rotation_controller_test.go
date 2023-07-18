@@ -19,12 +19,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	sliceName      = "test-slice"
-	sliceNamespace = "kubeslice-cisco"
-)
 
-var _ = PDescribe("VpnKeyRotation Controller", Ordered, func() {
+var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
+	const (
+		sliceName      = "test-slice"
+		sliceNamespace = "kubeslice-cisco"
+	)
 	Context("With Minimal SliceConfig Created", func() {
 		var project *v1alpha1.Project
 		var slice *v1alpha1.SliceConfig
@@ -119,12 +119,18 @@ var _ = PDescribe("VpnKeyRotation Controller", Ordered, func() {
 			}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, getKey, cluster2)
-				return err == nil
+				if err != nil {
+					return false
+				}
+				cluster2.Status.CniSubnet = []string{"192.168.1.0/24"}
+				cluster2.Status.RegistrationStatus = v1alpha1.RegistrationStatusRegistered
+				err = k8sClient.Status().Update(ctx, cluster2)
+				if err != nil {
+					return false
+				}
+				return true
 			}, timeout, interval).Should(BeTrue())
-			cluster2.Status.CniSubnet = []string{"192.168.1.0/24"}
-			cluster2.Status.RegistrationStatus = v1alpha1.RegistrationStatusRegistered
-			Expect(k8sClient.Status().Update(ctx, cluster2)).Should(Succeed())
-
+			
 			Expect(k8sClient.Create(ctx, cluster3)).Should(Succeed())
 			// update cluster status
 			getKey = types.NamespacedName{

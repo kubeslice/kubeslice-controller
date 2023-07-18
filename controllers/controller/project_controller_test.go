@@ -20,7 +20,7 @@ const (
 	projectNamespace2 = "kubeslice-" + projectName2
 )
 
-var _ = PDescribe("Project controller", func() {
+var _ = Describe("Project controller", func() {
 	When("When Creating Project CR", func() {
 		It("It should pass without errors", func() {
 			By("Creating a new Project CR")

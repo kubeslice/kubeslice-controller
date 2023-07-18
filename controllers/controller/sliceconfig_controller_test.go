@@ -16,16 +16,20 @@ import (
 )
 
 var _ = Describe("Slice Config controller Tests", Ordered, func() {
-
+	const (
+		sliceName      = "test-slice"
+		sliceNamespace = "kubeslice-ibm"
+	)
 	var Cluster1 *v1alpha1.Cluster
 	var Cluster2 *v1alpha1.Cluster
 	var Project *v1alpha1.Project
+	var projectName = "ibm"
 	BeforeAll(func() {
 		ctx := context.Background()
 
 		Project = &v1alpha1.Project{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "cisco",
+				Name:      projectName,
 				Namespace: controlPlaneNamespace,
 			},
 		}
@@ -39,7 +43,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 		ns := v1.Namespace{}
 		Eventually(func() bool {
 			err := k8sClient.Get(ctx, types.NamespacedName{
-				Name: "kubeslice-cisco",
+				Name: "kubeslice-" + projectName,
 			}, &ns)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
@@ -47,7 +51,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 		Cluster1 = &v1alpha1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "worker-1",
-				Namespace: "kubeslice-cisco",
+				Namespace: "kubeslice-" + projectName,
 			},
 			Spec: v1alpha1.ClusterSpec{
 				NodeIPs: []string{"11.11.11.12"},
@@ -57,7 +61,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 		Cluster2 = &v1alpha1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "worker-2",
-				Namespace: "kubeslice-cisco",
+				Namespace: "kubeslice-" + projectName,
 			},
 			Spec: v1alpha1.ClusterSpec{
 				NodeIPs: []string{"11.11.11.13"},
@@ -257,8 +261,8 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				lSliceConfig.Spec.VPNConfig = &v1alpha1.VPNConfiguration{Cipher: "AES-128-CBC"}
 
 				err = k8sClient.Update(ctx, &lSliceConfig)
-				GinkgoWriter.Println("Update Error",err)
-				return  errString == err.Error()
+				GinkgoWriter.Println("Update Error", err)
+				return errString == err.Error()
 			}, timeout, interval).Should(BeTrue())
 		})
 	})
