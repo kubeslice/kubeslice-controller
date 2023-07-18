@@ -396,7 +396,6 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 				lSliceConfig.Spec.VPNConfig.Cipher = "AES-256-CBC"
 
 				err = k8sClient.Update(ctx, &lSliceConfig)
-				GinkgoWriter.Println("Update Error", err.Error())
 				return expErrStr == err.Error()
 			}, timeout, interval).Should(BeTrue())
 		})
