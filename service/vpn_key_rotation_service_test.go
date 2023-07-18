@@ -394,13 +394,13 @@ type reconcileVpnKeyRotationConfigTestCase struct {
 	updateArg1, updateArg2, updateArg3 interface{}
 	updateRet1                         interface{}
 	now                                metav1.Time
+	reconcileResult                    ctrl.Result
 }
 
 func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 	ts := metav1.NewTime(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC))
 	expiryTs := metav1.NewTime(ts.AddDate(0, 0, 30).Add(-1 * time.Hour))
 	newTs := metav1.NewTime(time.Date(2021, 07, 16, 20, 34, 58, 651387237, time.UTC))
-	newExpiryTs := metav1.NewTime(newTs.AddDate(0, 0, 30).Add(-1 * time.Hour))
 	testCases := []reconcileVpnKeyRotationConfigTestCase{
 		{
 			name: "should update CertCreation TS and Expiry TS when it is nil",
@@ -437,14 +437,15 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 					RotationCount:           1,
 				},
 			},
-			updateArg1: mock.Anything,
-			updateArg2: mock.Anything,
-			updateArg3: mock.Anything,
-			updateRet1: nil,
-			now:        ts,
+			updateArg1:      mock.Anything,
+			updateArg2:      mock.Anything,
+			updateArg3:      mock.Anything,
+			updateRet1:      nil,
+			now:             ts,
+			reconcileResult: ctrl.Result{},
 		},
 		{
-			name: "should update CertCreation TS and Expiry TS and fire new jobs",
+			name: "should requeue after firing new jobs",
 			arg1: &controllerv1alpha1.VpnKeyRotation{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-slice",
@@ -465,26 +466,14 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 					Namespace: "test-ns",
 				},
 			},
-			expectedErr: nil,
-			expectedResp: &controllerv1alpha1.VpnKeyRotation{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-slice",
-					Namespace: "test-ns",
-				},
-				Spec: controllerv1alpha1.VpnKeyRotationSpec{
-					SliceName:               "test-slice",
-					Clusters:                []string{"worker-1", "worker-2"},
-					RotationInterval:        30,
-					CertificateCreationTime: &newTs,
-					CertificateExpiryTime:   &newExpiryTs,
-					RotationCount:           2,
-				},
-			},
-			updateArg1: mock.Anything,
-			updateArg2: mock.Anything,
-			updateArg3: mock.Anything,
-			updateRet1: nil,
-			now:        newTs,
+			expectedErr:     nil,
+			expectedResp:    nil,
+			updateArg1:      mock.Anything,
+			updateArg2:      mock.Anything,
+			updateArg3:      mock.Anything,
+			updateRet1:      nil,
+			now:             newTs,
+			reconcileResult: ctrl.Result{RequeueAfter: 30 * time.Second},
 		},
 	}
 	for _, tc := range testCases {
@@ -605,13 +594,11 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 	clientMock.
 		On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
 
-	_, gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
+	reconcileResult, gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
 	require.Equal(t, gotErr, tc.expectedErr)
 
 	require.Equal(t, tc.expectedResp, gotResp)
-
-	require.False(t, gotResp.Spec.CertificateCreationTime.IsZero())
-	require.False(t, gotResp.Spec.CertificateExpiryTime.IsZero())
+	require.Equal(t, tc.reconcileResult, reconcileResult)
 }
 
 type listClientPairGatewayTesCase struct {
