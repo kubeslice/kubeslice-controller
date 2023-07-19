@@ -404,6 +404,7 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	jobMock.On("CreateJob", ctx, mock.Anything, JobImage, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16")
 	expectedResult := ctrl.Result{}
