@@ -266,7 +266,7 @@ webhooks:
       namespace: system
       path: /validate-controller-kubeslice-io-v1alpha1-vpnkeyrotation
   failurePolicy: Fail
-  name: vpnkeyrotation.kb.io
+  name: vvpnkeyrotation.kb.io
   rules:
   - apiGroups:
     - controller.kubeslice.io

@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 	const (
 		sliceName      = "test-slice"
@@ -130,7 +129,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 				}
 				return true
 			}, timeout, interval).Should(BeTrue())
-			
+
 			Expect(k8sClient.Create(ctx, cluster3)).Should(Succeed())
 			// update cluster status
 			getKey = types.NamespacedName{

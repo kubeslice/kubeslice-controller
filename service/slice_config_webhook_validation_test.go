@@ -117,7 +117,6 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateRotationInterval_Change_Increased":                                                                            TestValidateRotationInterval_Change_Increased,
 	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
-
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {

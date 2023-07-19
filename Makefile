@@ -200,10 +200,6 @@ unit-test: ## Run local unit tests.
 	mkdir -p coverage-report
 	go tool cover -html=coverage.out -o coverage-report/report.html
 
-.PHONY: integration-test
-integration-test: ## Run local integration tests.
-	cd controllers/controller && ginkgo
-
 .PHONY: unit-test-docker
 unit-test-docker: ## Run local unit tests in a docker container.
 	docker build -f unit_tests.dockerfile -o . .
