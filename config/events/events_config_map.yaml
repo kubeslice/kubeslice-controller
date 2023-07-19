@@ -87,3 +87,11 @@ data:
       - WorkerSliceGatewayCreated
       - SliceGatewayJobCreationFailed
       - SliceGatewayJobCreated
+      - VPNKeyRotationConfigCreated
+      - VPNKeyRotationConfigCreationFailed
+      - VPNKeyRotationStart
+      - VPNKeyRotationConfigUpdated
+      - CertificateJobCreationFailed
+      - CertificatesRenewNow
+      - IllegalVPNKeyRotationConfigDelete
+      - CertificateJobFailed

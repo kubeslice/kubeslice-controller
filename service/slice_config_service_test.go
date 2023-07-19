@@ -93,10 +93,12 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 		arg.Name = requestObj.Namespace
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
 	}).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
 	clusterMap := map[string]int{
 		"cluster-1": 1,
 		"cluster-2": 2,
 	}
+
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{
@@ -662,6 +664,7 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 	workerServiceImportMock := &mocks.IWorkerServiceImportService{}
 	workerSliceGatewayRecyclerMock := &mocks.IWorkerSliceGatewayRecyclerService{}
 	mMock := &metricMock.IMetricRecorder{}
+	vpn := mocks.IVpnKeyRotationService{}
 	sliceConfigService := SliceConfigService{
 		sgs:   workerSliceGatewayMock,
 		ms:    workerSliceConfigMock,
@@ -669,6 +672,7 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 		si:    workerServiceImportMock,
 		wsgrs: workerSliceGatewayRecyclerMock,
 		mf:    mMock,
+		vpn:   &vpn,
 	}
 	namespacedName := types.NamespacedName{
 		Name:      name,
@@ -687,6 +691,8 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 		Component: util.ComponentController,
 		Slice:     util.NotApplicable,
 	})
+	vpn.On("CreateMinimalVpnKeyRotationConfig", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	vpn.On("ReconcileClusters", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceConfigServiceTest", &eventRecorder)
 	return workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, workerServiceImportMock, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock
 }

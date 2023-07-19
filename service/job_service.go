@@ -62,6 +62,9 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				"SLICE_NAME": environment["SLICE_NAME"],
+			},
 		},
 		Spec: batchv1.JobSpec{
 			TTLSecondsAfterFinished: &tTLSecondsAfterFinished,

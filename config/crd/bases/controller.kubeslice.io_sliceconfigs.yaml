@@ -143,6 +143,15 @@ spec:
                 - queueType
                 - tcType
                 type: object
+              renewBefore:
+                description: RenewBefore is used for renew now!
+                format: date-time
+                type: string
+              rotationInterval:
+                default: 30
+                maximum: 90
+                minimum: 30
+                type: integer
               sliceGatewayProvider:
                 description: WorkerSliceGatewayProvider defines the configuration
                   for slicegateway
@@ -167,6 +176,19 @@ spec:
                 type: string
               standardQosProfileName:
                 type: string
+              vpnConfig:
+                description: VPNConfiguration defines the additional (optional) VPN
+                  Configuration to customise
+                properties:
+                  cipher:
+                    default: AES-256-CBC
+                    enum:
+                    - AES-256-CBC
+                    - AES-128-CBC
+                    type: string
+                required:
+                - cipher
+                type: object
             required:
             - sliceGatewayProvider
             type: object

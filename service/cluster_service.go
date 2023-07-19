@@ -238,6 +238,9 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	if secret.Data == nil {
+		secret.Data = make(map[string][]byte)
+	}
 	secret.Data["controllerEndpoint"] = []byte(ControllerEndpoint)
 	secret.Data["clusterName"] = []byte(cluster.Name)
 	err = util.UpdateResource(ctx, &secret)
