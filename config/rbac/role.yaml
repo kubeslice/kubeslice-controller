@@ -92,6 +92,7 @@ rules:
   - serviceexportconfigs/finalizers
   - sliceconfigs/finalizers
   - sliceqosconfigs/finalizers
+  - vpnkeyrotations/finalizers
   verbs:
   - update
 - apiGroups:
@@ -102,6 +103,7 @@ rules:
   - serviceexportconfigs/status
   - sliceconfigs/status
   - sliceqosconfigs/status
+  - vpnkeyrotations/status
   verbs:
   - get
   - patch
