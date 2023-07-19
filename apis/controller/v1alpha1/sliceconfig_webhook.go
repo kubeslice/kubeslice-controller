@@ -54,6 +54,11 @@ var _ webhook.Defaulter = &SliceConfig{}
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *SliceConfig) Default() {
 	sliceconfigurationlog.Info("default", "name", r.Name)
+	if r.Spec.VPNConfig == nil {
+		r.Spec.VPNConfig = &VPNConfiguration{
+			Cipher: "AES-256-CBC",
+		}
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.

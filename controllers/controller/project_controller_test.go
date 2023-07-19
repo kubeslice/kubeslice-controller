@@ -2,18 +2,22 @@ package controller
 
 import (
 	"context"
+
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
-	projectName      = "avesha"
-	projectNamespace = "kubeslice-" + projectName
+	projectName1      = "avesha"
+	projectNamespace1 = "kubeslice-" + projectName1
+	projectName2      = "demo"
+	projectNamespace2 = "kubeslice-" + projectName2
 )
 
 var _ = Describe("Project controller", func() {
@@ -24,7 +28,7 @@ var _ = Describe("Project controller", func() {
 
 			project := &v1alpha1.Project{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      projectName,
+					Name:      projectName1,
 					Namespace: controlPlaneNamespace,
 				},
 				Spec: v1alpha1.ProjectSpec{
@@ -37,7 +41,7 @@ var _ = Describe("Project controller", func() {
 
 			By("Looking up the created Project CR")
 			projectLookupKey := types.NamespacedName{
-				Name:      projectName,
+				Name:      projectName1,
 				Namespace: controlPlaneNamespace,
 			}
 			createdProject := &v1alpha1.Project{}
@@ -48,7 +52,7 @@ var _ = Describe("Project controller", func() {
 
 			By("Looking up the created Project Namespace")
 			nsLookupKey := types.NamespacedName{
-				Name: projectNamespace,
+				Name: projectNamespace1,
 			}
 			createdNS := &v1.Namespace{}
 			Eventually(func() bool {
@@ -59,7 +63,7 @@ var _ = Describe("Project controller", func() {
 			By("Looking up the created Role")
 			roleLookupKey := types.NamespacedName{
 				Name:      "kubeslice-read-only",
-				Namespace: projectNamespace,
+				Namespace: projectNamespace1,
 			}
 			createdRole := &rbacv1.Role{}
 			Eventually(func() bool {
@@ -70,7 +74,7 @@ var _ = Describe("Project controller", func() {
 			By("Looking up the created Role Binding")
 			rbLookupKey := types.NamespacedName{
 				Name:      "kubeslice-rbac-rw-admin",
-				Namespace: projectNamespace,
+				Namespace: projectNamespace1,
 			}
 			createdRB := &rbacv1.RoleBinding{}
 			Eventually(func() bool {
@@ -81,7 +85,7 @@ var _ = Describe("Project controller", func() {
 			By("Looking up the created Service Account Secret")
 			secretLookupKey := types.NamespacedName{
 				Name:      "kubeslice-rbac-rw-admin",
-				Namespace: projectNamespace,
+				Namespace: projectNamespace1,
 			}
 			createdSecret := &v1.Secret{}
 			Eventually(func() bool {
@@ -92,7 +96,7 @@ var _ = Describe("Project controller", func() {
 			By("Looking up the created Project Service Account")
 			saLookupKey := types.NamespacedName{
 				Name:      "kubeslice-rbac-rw-admin",
-				Namespace: projectNamespace,
+				Namespace: projectNamespace1,
 			}
 			createdSA := &v1.ServiceAccount{}
 			Eventually(func() bool {
@@ -104,8 +108,18 @@ var _ = Describe("Project controller", func() {
 			Expect(k8sClient.Delete(ctx, createdProject)).Should(Succeed())
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, projectLookupKey, createdProject)
-				return err != nil
+				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
+
+			// nsLookupKey = types.NamespacedName{
+			// 	Name: projectNamespace,
+			// }
+			// createdNS = &v1.Namespace{}
+			// Eventually(func() bool {
+			// 	err := k8sClient.Get(ctx, nsLookupKey, createdNS)
+			// 	return errors.IsNotFound(err)
+			// }, timeout, interval).Should(BeTrue())
+
 		})
 
 		It("It should pass the deletion without errors", func() {
@@ -114,7 +128,7 @@ var _ = Describe("Project controller", func() {
 
 			project := &v1alpha1.Project{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      projectName,
+					Name:      projectName2,
 					Namespace: controlPlaneNamespace,
 				},
 				Spec: v1alpha1.ProjectSpec{
@@ -126,8 +140,8 @@ var _ = Describe("Project controller", func() {
 			Expect(k8sClient.Create(ctx, project)).Should(Succeed())
 
 			projectLookupKey := types.NamespacedName{
-				Name:      projectName,
-				Namespace: projectNamespace,
+				Name:      projectName2,
+				Namespace: projectNamespace2,
 			}
 
 			createdProject := &v1alpha1.Project{}

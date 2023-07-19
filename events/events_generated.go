@@ -654,6 +654,70 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Slice gateway job got created.",
 	},
+	"VPNKeyRotationConfigCreated": {
+		Name:                "VPNKeyRotationConfigCreated",
+		Reason:              "VPNKeyRotationConfigCreated",
+		Action:              "CreateVPNKeyRotationConfig",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "VPNKeyRotationConfig got created.",
+	},
+	"VPNKeyRotationConfigCreationFailed": {
+		Name:                "VPNKeyRotationConfigCreationFailed",
+		Reason:              "VPNKeyRotationConfigCreationFailed",
+		Action:              "CreateVPNKeyRotationConfig",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "VPNKeyRotationConfig creation failed.",
+	},
+	"VPNKeyRotationStart": {
+		Name:                "VPNKeyRotationStart",
+		Reason:              "VPNKeyRotationStart",
+		Action:              "StartedVPNKeyRotationProcess",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "VPNKeyRotation Process started , new certs will be created!",
+	},
+	"VPNKeyRotationConfigUpdated": {
+		Name:                "VPNKeyRotationConfigUpdated",
+		Reason:              "VPNKeyRotationConfigUpdated",
+		Action:              "UpdatedVPNKeyRotationConfig",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "VPNKeyRotation Config Updated with CreationTS and ExpiryTS!",
+	},
+	"CertificateJobCreationFailed": {
+		Name:                "CertificateJobCreationFailed",
+		Reason:              "CertificateJobCreationFailed",
+		Action:              "VPNKeyRotation",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Failed creating certificate creation jobs!",
+	},
+	"CertificatesRenewNow": {
+		Name:                "CertificatesRenewNow",
+		Reason:              "CertificatesRenewNow",
+		Action:              "RenewBeforeInSliceConfig",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "Certificates to be renewed Now!",
+	},
+	"IllegalVPNKeyRotationConfigDelete": {
+		Name:                "IllegalVPNKeyRotationConfigDelete",
+		Reason:              "IllegalVPNKeyRotationConfigDelete",
+		Action:              "DeleteVPNKeyRotationConfig",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Illegaly trying to delete VPNKeyRotationConfig",
+	},
+	"CertificateJobFailed": {
+		Name:                "CertificateJobFailed",
+		Reason:              "CertificateJobFailed",
+		Action:              "Failed CertCreationJob",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Warning - Certificate Creation job Failed",
+	},
 }
 
 var (
@@ -736,4 +800,12 @@ var (
 	EventWorkerSliceGatewayCreated            events.EventName = "WorkerSliceGatewayCreated"
 	EventSliceGatewayJobCreationFailed        events.EventName = "SliceGatewayJobCreationFailed"
 	EventSliceGatewayJobCreated               events.EventName = "SliceGatewayJobCreated"
+	EventVPNKeyRotationConfigCreated          events.EventName = "VPNKeyRotationConfigCreated"
+	EventVPNKeyRotationConfigCreationFailed   events.EventName = "VPNKeyRotationConfigCreationFailed"
+	EventVPNKeyRotationStart                  events.EventName = "VPNKeyRotationStart"
+	EventVPNKeyRotationConfigUpdated          events.EventName = "VPNKeyRotationConfigUpdated"
+	EventCertificateJobCreationFailed         events.EventName = "CertificateJobCreationFailed"
+	EventCertificatesRenewNow                 events.EventName = "CertificatesRenewNow"
+	EventIllegalVPNKeyRotationConfigDelete    events.EventName = "IllegalVPNKeyRotationConfigDelete"
+	EventCertificateJobFailed                 events.EventName = "CertificateJobFailed"
 )

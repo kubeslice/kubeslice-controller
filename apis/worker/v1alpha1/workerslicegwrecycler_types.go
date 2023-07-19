@@ -25,12 +25,14 @@ import (
 
 // WorkerSliceGwRecyclerSpec defines the desired state of WorkerSliceGwRecycler
 type WorkerSliceGwRecyclerSpec struct {
-	SliceGwServer string `json:"sliceGwServer,omitempty"`
-	SliceGwClient string `json:"sliceGwClient,omitempty"`
-	GwPair        GwPair `json:"gwPair,omitempty"`
-	State         string `json:"state,omitempty"`
-	Request       string `json:"request,omitempty"`
-	SliceName     string `json:"sliceName,omitempty"`
+	SliceGwServer          string `json:"sliceGwServer,omitempty"`
+	SliceGwClient          string `json:"sliceGwClient,omitempty"`
+	ServerRedundancyNumber int    `json:"serverRedundancyNumber,omitempty"`
+	ClientRedundancyNumber int    `json:"clientRedundancyNumber,omitempty"`
+	GwPair                 GwPair `json:"gwPair,omitempty"`
+	State                  string `json:"state,omitempty"`
+	Request                string `json:"request,omitempty"`
+	SliceName              string `json:"sliceName,omitempty"`
 }
 
 type GwPair struct {

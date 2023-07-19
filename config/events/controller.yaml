@@ -478,3 +478,52 @@ events:
     type: Normal
     reportingController: controller
     message: Slice gateway job got created.
+  ## vpnkeyrotation config events
+  - name: VPNKeyRotationConfigCreated
+    reason: VPNKeyRotationConfigCreated
+    action: CreateVPNKeyRotationConfig
+    type: Normal
+    reportingController: controller
+    message: VPNKeyRotationConfig got created.
+  - name: VPNKeyRotationConfigCreationFailed
+    reason: VPNKeyRotationConfigCreationFailed
+    action: CreateVPNKeyRotationConfig
+    type: Warning
+    reportingController: controller
+    message: VPNKeyRotationConfig creation failed.
+  - name: VPNKeyRotationStart
+    reason: VPNKeyRotationStart
+    action: StartedVPNKeyRotationProcess
+    type: Normal
+    reportingController: controller
+    message: VPNKeyRotation Process started , new certs will be created!
+  - name: VPNKeyRotationConfigUpdated
+    reason: VPNKeyRotationConfigUpdated
+    action: UpdatedVPNKeyRotationConfig
+    type: Normal
+    reportingController: controller
+    message: VPNKeyRotation Config Updated with CreationTS and ExpiryTS!
+  - name: CertificateJobCreationFailed
+    reason: CertificateJobCreationFailed
+    action: VPNKeyRotation
+    type: Warning
+    reportingController: controller
+    message: Failed creating certificate creation jobs!
+  - name: CertificatesRenewNow
+    reason: CertificatesRenewNow
+    action: RenewBeforeInSliceConfig
+    type: Normal
+    reportingController: controller
+    message: Certificates to be renewed Now!
+  - name: IllegalVPNKeyRotationConfigDelete
+    reason: IllegalVPNKeyRotationConfigDelete
+    action: DeleteVPNKeyRotationConfig
+    type: Warning
+    reportingController: controller
+    message: Illegaly trying to delete VPNKeyRotationConfig
+  - name: CertificateJobFailed
+    reason: CertificateJobFailed
+    action: Failed CertCreationJob
+    type: Warning
+    reportingController: controller
+    message: Warning - Certificate Creation job Failed
