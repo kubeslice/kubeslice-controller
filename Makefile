@@ -83,6 +83,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-local: envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/controller/... -coverprofile cover.out
 
+.PHONY: int-test
+int-test: envtest
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/controller/... -coverprofile cover.out
 
 .PHONY: generate-yamls
 generate-yamls: manifests kustomize ## Generates the yaml files
@@ -193,7 +196,7 @@ generate-mocks: ## Generate mocks for the controller-runtime.
 
 .PHONY: unit-test
 unit-test: ## Run local unit tests.
-	go test ./service --coverprofile=coverage.out
+	go test -gcflags=-l ./service --coverprofile=coverage.out
 	mkdir -p coverage-report
 	go tool cover -html=coverage.out -o coverage-report/report.html
 

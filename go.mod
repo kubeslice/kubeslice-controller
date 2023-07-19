@@ -1,6 +1,6 @@
 module github.com/kubeslice/kubeslice-controller
 
-go 1.18
+go 1.19
 
 require (
 	github.com/dailymotion/allure-go v0.7.0
@@ -23,6 +23,7 @@ require (
 )
 
 require (
+	bou.ke/monkey v1.0.2
 	cloud.google.com/go v0.81.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18 // indirect
@@ -53,8 +54,8 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/onsi/ginkgo/v2 v2.9.5
-	github.com/onsi/gomega v1.27.6
+	github.com/onsi/ginkgo/v2 v2.9.7
+	github.com/onsi/gomega v1.27.8
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect

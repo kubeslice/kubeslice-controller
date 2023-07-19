@@ -1,0 +1,24 @@
+# permissions for end users to edit vpnkeyrotations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vpnkeyrotation-editor-role
+rules:
+- apiGroups:
+  - controller.kubeslice.io.kubeslice.io
+  resources:
+  - vpnkeyrotations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - controller.kubeslice.io.kubeslice.io
+  resources:
+  - vpnkeyrotations/status
+  verbs:
+  - get

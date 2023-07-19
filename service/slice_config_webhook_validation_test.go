@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -107,6 +109,14 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_ValidateQosProfileStandardQosProfileNameDoesNotExist":                                        ValidateQosProfileStandardQosProfileNameDoesNotExist,
 	"SliceConfigWebhookValidation_ValidateMaxCluster":                                                                          ValidateMaxCluster,
 	"SliceConfigWebhookValidation_ValidateMaxClusterForParticipatingCluster":                                                   ValidateMaxClusterForParticipatingCluster,
+	"TestValidateCertsRotationInterval_Positive":                                                                               TestValidateCertsRotationInterval_Positive,
+	"TestValidateCertsRotationInterval_Negative":                                                                               TestValidateCertsRotationInterval_Negative,
+	"TestValidateCertsRotationInterval_inProgressClusterStatus":                                                                TestValidateCertsRotationInterval_NegativeClusterStatus,
+	"TestValidateCertsRotationInterval_PositiveClusterStatus":                                                                  TestValidateCertsRotationInterval_PositiveClusterStatus,
+	"TestValidateRotationInterval_Change_Decreased":                                                                            TestValidateRotationInterval_Change_Decreased,
+	"TestValidateRotationInterval_Change_Increased":                                                                            TestValidateRotationInterval_Change_Increased,
+	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
 }
 
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
@@ -698,6 +708,9 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 func UpdateValidateSliceConfigUpdatingSliceSubnet(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
 	oldSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -709,8 +722,28 @@ func UpdateValidateSliceConfigUpdatingSliceSubnet(t *testing.T) {
 	clientMock.AssertExpectations(t)
 }
 
+func UpdateValidateSliceConfigUpdatingVPNCipher(t *testing.T) {
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-128-CBC",
+	}
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.VPNConfig.Cipher: Invalid value:")
+	require.Contains(t, err.Error(), "cannot be updated")
+	clientMock.AssertExpectations(t)
+}
+
 func UpdateValidateSliceConfigUpdatingSliceType(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	oldSliceConfig.Spec.SliceType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
@@ -725,6 +758,9 @@ func UpdateValidateSliceConfigUpdatingSliceType(t *testing.T) {
 
 func UpdateValidateSliceConfigUpdatingSliceGatewayType(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
@@ -739,6 +775,9 @@ func UpdateValidateSliceConfigUpdatingSliceGatewayType(t *testing.T) {
 
 func UpdateValidateSliceConfigUpdatingSliceCaType(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	oldSliceConfig.Spec.SliceGatewayProvider.SliceCaType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
@@ -753,6 +792,9 @@ func UpdateValidateSliceConfigUpdatingSliceCaType(t *testing.T) {
 
 func UpdateValidateSliceConfigUpdatingSliceIpamType(t *testing.T) {
 	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
 	oldSliceConfig.Spec.SliceIpamType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
@@ -868,7 +910,6 @@ func UpdateValidateSliceConfigWithNewClusterUnhealthy(t *testing.T) {
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
 	t.Log(err.Error())
-	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
 	require.Contains(t, err.Error(), "cluster health is not normal")
 	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[2])
@@ -1612,7 +1653,256 @@ func ValidateMaxClusterForParticipatingCluster(t *testing.T) {
 	require.Contains(t, err.Error(), "participating clusters cannot be greater than MaxClusterCount")
 	clientMock.AssertExpectations(t)
 }
+func TestValidateCertsRotationInterval_Positive(t *testing.T) {
+	now := metav1.Now()
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.RenewBefore = &now
+	expiry := metav1.Now().Add(30)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{Time: expiry},
+		}
+	}).Once()
 
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+}
+
+func TestValidateCertsRotationInterval_Negative(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	// RenewBefore is 1 hour after, decline
+	renewBefore := metav1.Time{Time: metav1.Now().Add(time.Hour * 1)}
+	sliceConfig.Spec.RenewBefore = &renewBefore
+	expiry := metav1.Now().Add(30)
+	now := metav1.Now()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{Time: expiry},
+		}
+	}).Once()
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.NotNil(t, err)
+}
+
+func TestValidateCertsRotationInterval_NegativeClusterStatus(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	now := metav1.Now()
+	sliceConfig.Spec.RenewBefore = &now
+	expiry := metav1.Now().Add(30)
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{Time: expiry},
+			ClusterGatewayMapping: map[string][]string{
+				"cluster-1": {"gateway-1"},
+				"cluster-2": {"gateway-2"},
+			},
+		}
+		arg.Status = controllerv1alpha1.VpnKeyRotationStatus{
+			CurrentRotationState: map[string]controllerv1alpha1.StatusOfKeyRotation{
+
+				"gateway-1": controllerv1alpha1.StatusOfKeyRotation{
+					Status:               controllerv1alpha1.Complete,
+					LastUpdatedTimestamp: metav1.Now(),
+				},
+				"gateway-2": controllerv1alpha1.StatusOfKeyRotation{
+					Status:               controllerv1alpha1.InProgress,
+					LastUpdatedTimestamp: metav1.Now(),
+				},
+			},
+		}
+	}).Once()
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.NotNil(t, err)
+	require.Equal(t, err.Type, field.ErrorTypeForbidden)
+}
+
+func TestValidateCertsRotationInterval_PositiveClusterStatus(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	now := metav1.Now()
+	sliceConfig.Spec.RenewBefore = &now
+	expiry := metav1.Now().Add(30)
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{expiry},
+			ClusterGatewayMapping: map[string][]string{
+				"cluster-1": {"gateway-1"},
+				"cluster-2": {"gateway-2"},
+			},
+		}
+		arg.Status = controllerv1alpha1.VpnKeyRotationStatus{
+			CurrentRotationState: map[string]controllerv1alpha1.StatusOfKeyRotation{
+
+				"gateway-1": controllerv1alpha1.StatusOfKeyRotation{
+					Status:               controllerv1alpha1.Complete,
+					LastUpdatedTimestamp: metav1.Now(),
+				},
+				"gateway-2": controllerv1alpha1.StatusOfKeyRotation{
+					Status:               controllerv1alpha1.Complete,
+					LastUpdatedTimestamp: metav1.Now(),
+				},
+			},
+		}
+	}).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+	err := validateRenewNowInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+}
+
+// rotationInterval updates TC
+func TestValidateRotationInterval_NoChange(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.RotationInterval = 30
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:        name,
+			RotationInterval: 30,
+		}
+	}).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	oldSliceConfig := controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			RotationInterval: 30,
+		},
+	}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+	_, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+}
+func TestValidateRotationInterval_Change_Increased(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.RotationInterval = 45
+	now := metav1.Now()
+	expiry := metav1.Now().Add(30)
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			RotationInterval:        30,
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{expiry},
+		}
+	}).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	oldSliceConfig := controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			RotationInterval: 30,
+		},
+	}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+	expectedResp := metav1.NewTime(now.AddDate(0, 0, 45).Add(-1 * time.Hour))
+	gotResp, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+	require.Equal(t, &expectedResp, gotResp.Spec.CertificateExpiryTime)
+}
+func TestValidateRotationInterval_Change_Decreased(t *testing.T) {
+	name := "slice_config"
+	namespace := "randomNamespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	// new interval
+	sliceConfig.Spec.RotationInterval = 30
+	now := metav1.Now()
+	expiry := metav1.Now().Add(45)
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		arg.ObjectMeta = metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		}
+		arg.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               name,
+			RotationInterval:        45,
+			CertificateCreationTime: &now,
+			CertificateExpiryTime:   &metav1.Time{expiry},
+		}
+	}).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
+	oldSliceConfig := controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			RotationInterval: 45,
+		},
+	}
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+	expectedResp := metav1.NewTime(now.AddDate(0, 0, 30).Add(-1 * time.Hour))
+	gotResp, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, &oldSliceConfig)
+	require.Nil(t, err)
+	require.Equal(t, &expectedResp, gotResp.Spec.CertificateExpiryTime)
+}
 func setupSliceConfigWebhookValidationTest(name string, namespace string) (*utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context) {
 	clientMock := &utilMock.Client{}
 	sliceConfig := &controllerv1alpha1.SliceConfig{
@@ -1621,6 +1911,10 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 			Namespace: namespace,
 		},
 	}
+	sliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest", nil)
 	return clientMock, sliceConfig, ctx
 }
