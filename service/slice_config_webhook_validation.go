@@ -348,9 +348,13 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 	if sliceConfig.Spec.SliceIpamType != sc.Spec.SliceIpamType {
 		return field.Invalid(field.NewPath("Spec").Child("SliceIpamType"), sc.Spec.SliceIpamType, "cannot be updated")
 	}
-	if sliceConfig.Spec.VPNConfig.Cipher != sc.Spec.VPNConfig.Cipher {
-		return field.Invalid(field.NewPath("Spec").Child("VPNConfig").Child("Cipher"), sc.Spec.VPNConfig.Cipher, "cannot be updated")
+	// required if slice from previous releases is upgraded
+	if sliceConfig.Spec.VPNConfig != nil {
+		if sliceConfig.Spec.VPNConfig.Cipher != sc.Spec.VPNConfig.Cipher {
+			return field.Invalid(field.NewPath("Spec").Child("VPNConfig").Child("Cipher"), sc.Spec.VPNConfig.Cipher, "cannot be updated")
+		}
 	}
+
 	return nil
 }
 
