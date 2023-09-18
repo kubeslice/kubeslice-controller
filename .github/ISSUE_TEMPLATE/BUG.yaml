@@ -51,7 +51,7 @@ body:
     attributes:
       label: Version
       description: What version of our software are you running?
-      placeholder: "It used ...."
+      placeholder: "I used ...."
   - type: dropdown
     id: os
     attributes:
