@@ -159,6 +159,18 @@ spec:
                   sliceCaType:
                     default: Local
                     type: string
+                  sliceGatewayServiceType:
+                    items:
+                      properties:
+                        cluster:
+                          type: string
+                        type:
+                          enum:
+                          - NodePort
+                          - LoadBalancer
+                          type: string
+                      type: object
+                    type: array
                   sliceGatewayType:
                     default: OpenVPN
                     type: string

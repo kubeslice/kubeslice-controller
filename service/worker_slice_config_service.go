@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"time"
+
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"github.com/kubeslice/kubeslice-controller/events"
 
@@ -209,6 +210,22 @@ outer:
 	})
 	if err != nil {
 		logger.With(zap.Error(err)).Errorf("Failed to deep copy external gateway configuration")
+	}
+
+	// Reconcile Slice gateway service type
+	sliceGatewayProvider := workerv1alpha1.WorkerSliceGatewayProvider{
+		SliceGatewayType: sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType,
+		SliceCaType:      sliceConfig.Spec.SliceGatewayProvider.SliceCaType,
+	}
+	gwSvcTypePresent := false
+	for _, gwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		if gwSvcType.Cluster == "*" || gwSvcType.Cluster == workerSliceConfig.Labels["worker-cluster"] {
+			sliceGatewayProvider.SliceGatewayServiceType = gwSvcType.Type
+			gwSvcTypePresent = true
+		}
+	}
+	if !gwSvcTypePresent {
+		sliceGatewayProvider.SliceGatewayServiceType = defaultSliceGatewayServiceType
 	}
 
 	// Reconcile the Namespace Isolation Profile

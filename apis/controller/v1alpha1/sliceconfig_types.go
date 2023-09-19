@@ -74,6 +74,16 @@ type WorkerSliceGatewayProvider struct {
 	//+kubebuilder:default:=Local
 	// +kubebuilder:validation:Required
 	SliceCaType string `json:"sliceCaType"`
+
+	SliceGatewayServiceType []SliceGatewayServiceType `json:"sliceGatewayServiceType,omitempty"`
+}
+
+type SliceGatewayServiceType struct {
+	// +kubebuilder:validation:Required
+	Cluster string `json:"cluster,omitempty"`
+	// +kubebuilder:validation:Required
+	//+kubebuilder:validation:Enum:=NodePort;LoadBalancer
+	Type string `json:"type,omitempty"`
 }
 
 // QOSProfile is the QOS Profile configuration from backend
