@@ -49,6 +49,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateClustersOnCreate(ctx, sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	if err := validateQosProfile(ctx, sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
@@ -76,6 +79,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateClustersOnUpdate(ctx, sliceConfig, old); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
+	if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateQosProfile(ctx, sliceConfig); err != nil {
@@ -325,6 +331,28 @@ func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alph
 			if util.OverlapIP(cniSubnet, sliceConfig.Spec.SliceSubnet) {
 				return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
 			}
+		}
+	}
+	return nil
+}
+
+// to validate the SlicegatewayServiceType array
+func validateSlicegatewayServiceType(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	freq := make(map[string]int)
+	for _, sliceGwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		cluster := sliceGwSvcType.Cluster
+		freq[cluster] += 1
+		// cluster name can't be empty
+		if cluster == "" {
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType").Child("Cluster"), cluster, "Cluster name can't be empty")
+		}
+		// cluster should participate in slice
+		if cluster != "*" && !util.ContainsString(sliceConfig.Spec.Clusters, cluster) {
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType").Child("Cluster"), cluster, "Cluster is not participating in slice config")
+		}
+		// don't allow duplicate cluster values
+		if freq[cluster] > 1 {
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType").Child("Cluster"), cluster, "Duplicate entries are not allowed")
 		}
 	}
 	return nil

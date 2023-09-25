@@ -80,10 +80,10 @@ type WorkerSliceGatewayProvider struct {
 
 type SliceGatewayServiceType struct {
 	// +kubebuilder:validation:Required
-	Cluster string `json:"cluster,omitempty"`
+	Cluster string `json:"cluster"`
 	// +kubebuilder:validation:Required
 	//+kubebuilder:validation:Enum:=NodePort;LoadBalancer
-	Type string `json:"type,omitempty"`
+	Type string `json:"type"`
 }
 
 // QOSProfile is the QOS Profile configuration from backend

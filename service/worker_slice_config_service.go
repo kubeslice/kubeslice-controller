@@ -254,6 +254,7 @@ outer:
 	}
 
 	workerSliceConfig.Spec.ExternalGatewayConfig = externalGatewayConfig
+	workerSliceConfig.Spec.SliceGatewayProvider = sliceGatewayProvider
 	workerSliceConfig.Spec.NamespaceIsolationProfile = workerIsolationProfile
 	workerSliceConfig.Spec.SliceName = sliceConfig.Name
 	workerSliceConfig.Spec.Octet = octet

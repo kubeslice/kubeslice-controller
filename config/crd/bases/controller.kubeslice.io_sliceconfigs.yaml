@@ -169,6 +169,9 @@ spec:
                           - NodePort
                           - LoadBalancer
                           type: string
+                      required:
+                      - cluster
+                      - type
                       type: object
                     type: array
                   sliceGatewayType:
