@@ -165,6 +165,7 @@ spec:
                         cluster:
                           type: string
                         type:
+                          default: NodePort
                           enum:
                           - NodePort
                           - LoadBalancer

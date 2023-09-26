@@ -207,6 +207,21 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
+	// reconcile gateway connectivity type
+	var clusterName string
+	if workerSliceGateway.Spec.GatewayHostType == serverGateway {
+		clusterName = workerSliceGateway.Labels["worker-cluster"]
+	} else {
+		clusterName = workerSliceGateway.Labels["remote-cluster"]
+	}
+	gatewayConnectivityType := defaultSliceGatewayServiceType
+	for _, gwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		if gwSvcType.Cluster == "*" || gwSvcType.Cluster == clusterName {
+			gatewayConnectivityType = gwSvcType.Type
+		}
+	}
+	workerSliceGateway.Spec.GatewayConnectivityType = gatewayConnectivityType
+	logger.Debugf("setting gwsvctype %s", workerSliceGateway.Spec.GatewayConnectivityType)
 	workerSliceGateway.Spec.GatewayType = workerSliceGatewayType
 	workerSliceGateway.UID = ""
 	err = util.UpdateResource(ctx, workerSliceGateway)

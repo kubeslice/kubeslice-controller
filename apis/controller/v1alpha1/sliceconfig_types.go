@@ -82,6 +82,7 @@ type SliceGatewayServiceType struct {
 	// +kubebuilder:validation:Required
 	Cluster string `json:"cluster"`
 	// +kubebuilder:validation:Required
+	//+kubebuilder:default:=NodePort
 	//+kubebuilder:validation:Enum:=NodePort;LoadBalancer
 	Type string `json:"type"`
 }

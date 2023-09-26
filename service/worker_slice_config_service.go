@@ -37,6 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const workerSliceConfigNameFormat = "%s-%s"
+
 type IWorkerSliceConfigService interface {
 	ReconcileWorkerSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
@@ -293,7 +295,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 	clusterMap := s.ComputeClusterMap(clusters, workerSliceConfigs)
 	for _, cluster := range clusters {
 		logger.Debugf("Cluster Object %s", cluster)
-		workerSliceConfigName := fmt.Sprintf("%s-%s", name, cluster)
+		workerSliceConfigName := fmt.Sprintf(workerSliceConfigNameFormat, name, cluster)
 		existingSlice := &workerv1alpha1.WorkerSliceConfig{}
 		found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
 			Name:      workerSliceConfigName,

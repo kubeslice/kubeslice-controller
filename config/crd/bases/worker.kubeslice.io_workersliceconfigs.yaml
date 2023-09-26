@@ -118,6 +118,7 @@ spec:
                     default: Local
                     type: string
                   sliceGatewayServiceType:
+                    default: NodePort
                     enum:
                     - NodePort
                     - LoadBalancer
