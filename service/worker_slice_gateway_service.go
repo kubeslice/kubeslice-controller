@@ -249,11 +249,16 @@ func (s *WorkerSliceGatewayService) reconcileNodeIPAndNodePort(ctx context.Conte
 		if !reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIps, remoteGateway.Spec.RemoteGatewayConfig.NodeIps) ||
 			!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodeIp, remoteGateway.Spec.RemoteGatewayConfig.NodeIp) ||
 			localGateway.Spec.LocalGatewayConfig.NodePort != remoteGateway.Spec.RemoteGatewayConfig.NodePort ||
-			!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodePorts, remoteGateway.Spec.RemoteGatewayConfig.NodePorts) {
+			!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.NodePorts, remoteGateway.Spec.RemoteGatewayConfig.NodePorts) ||
+			(localGateway.Spec.GatewayHostType == serverGateway &&
+				!reflect.DeepEqual(localGateway.Spec.LocalGatewayConfig.LoadBalancerIps, remoteGateway.Spec.RemoteGatewayConfig.LoadBalancerIps)) {
+
 			remoteGateway.Spec.RemoteGatewayConfig.NodeIp = localGateway.Spec.LocalGatewayConfig.NodeIp
 			remoteGateway.Spec.RemoteGatewayConfig.NodeIps = localGateway.Spec.LocalGatewayConfig.NodeIps
 			remoteGateway.Spec.RemoteGatewayConfig.NodePort = localGateway.Spec.LocalGatewayConfig.NodePort
 			remoteGateway.Spec.RemoteGatewayConfig.NodePorts = localGateway.Spec.LocalGatewayConfig.NodePorts
+			remoteGateway.Spec.RemoteGatewayConfig.LoadBalancerIps = localGateway.Spec.LocalGatewayConfig.LoadBalancerIps
+
 			err = util.UpdateResource(ctx, &remoteGateway)
 			if err != nil {
 				return err
