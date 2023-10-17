@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -39,6 +40,9 @@ func preventUpdateWorkerSliceGateway(workerSliceGatewayCtx context.Context, sg *
 	workerSliceGateway := old.(*workerv1alpha1.WorkerSliceGateway)
 	if workerSliceGateway.Spec.GatewayNumber != sg.Spec.GatewayNumber {
 		return field.Invalid(field.NewPath("Spec").Child("GatewayNumber"), sg.Spec.GatewayNumber, "cannot be updated")
+	}
+	if workerSliceGateway.Spec.GatewayConnectivityType != sg.Spec.GatewayConnectivityType {
+		return field.Forbidden(field.NewPath("Spec").Child("GatewayConnectivityType"), "update not allowed")
 	}
 	return nil
 }

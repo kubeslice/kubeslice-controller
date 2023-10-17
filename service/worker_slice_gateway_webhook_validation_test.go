@@ -18,8 +18,9 @@ package service
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -43,6 +44,25 @@ func TestWorkerSliceGatewayWebhookValidationSuite(t *testing.T) {
 var WorkerSliceGatewayWebhookValidationTestBed = map[string]func(*testing.T){
 	"WorkerSliceGatewayWebhookValidation_UpdateValidateWorkerSliceGatewayUpdatingGatewayNumber": UpdateValidateWorkerSliceGatewayUpdatingGatewayNumber,
 	"WorkerSliceGatewayWebhookValidation_UpdateValidateWorkerSliceGatewayWithoutErrors":         UpdateValidateWorkerSliceGatewayWithoutErrors,
+	"WorkerSliceGatewayWebhookValidation_UpdateGatewayConnectivityType":                         UpdateGatewayConnectivityType,
+}
+
+func UpdateGatewayConnectivityType(t *testing.T) {
+	name := "slice-cx-cy"
+	namespace := "stubns"
+	clientMock, newWorkerSliceGateway, ctx := setupWorkerSliceGatewayWebhookValidationTest(name, namespace)
+	existingWorkerSliceGateway := workerv1alpha1.WorkerSliceGateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	existingWorkerSliceGateway.Spec.GatewayConnectivityType = "LoadBalancer"
+	newWorkerSliceGateway.Spec.GatewayConnectivityType = "NodePort"
+	err := ValidateWorkerSliceGatewayUpdate(ctx, &existingWorkerSliceGateway, runtime.Object(newWorkerSliceGateway))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.GatewayConnectivityType: Forbidden:")
+	clientMock.AssertExpectations(t)
 }
 
 func UpdateValidateWorkerSliceGatewayUpdatingGatewayNumber(t *testing.T) {

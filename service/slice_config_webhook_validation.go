@@ -382,7 +382,22 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 			return field.Invalid(field.NewPath("Spec").Child("VPNConfig").Child("Cipher"), sc.Spec.VPNConfig.Cipher, "cannot be updated")
 		}
 	}
-
+	// can't switch gw svc types
+	gwSvcType := map[string]string{}
+	// create cluster:GwType map from old config
+	for _, i := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		gwSvcType[i.Cluster] = i.Type
+	}
+	// check new config
+	for _, new := range sc.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		oldType, exists := gwSvcType[new.Cluster]
+		if exists && new.Type != oldType {
+			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "update not allowed")
+		}
+		if !exists && new.Type != defaultSliceGatewayServiceType {
+			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "update not allowed")
+		}
+	}
 	return nil
 }
 

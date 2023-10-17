@@ -18,8 +18,9 @@ package service
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/dailymotion/allure-go"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -43,6 +44,25 @@ func TestWorkerSliceConfigWebhookValidationSuite(t *testing.T) {
 var WorkerSliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"WorkerSliceConfigWebhookValidation_UpdateValidateWorkerSliceConfigUpdatingOctet": UpdateValidateWorkerSliceConfigUpdatingOctet,
 	"WorkerSliceConfigWebhookValidation_UpdateValidateWorkerSliceConfigWithoutErrors": UpdateValidateWorkerSliceConfigWithoutErrors,
+	"WorkerSliceConfigWebhookValidation_UpdateSliceGatewayServiceType":                UpdateSliceGatewayServiceType,
+}
+
+func UpdateSliceGatewayServiceType(t *testing.T) {
+	name := "slice-clusterx"
+	namespace := "demons"
+	clientMock, newWorkerSliceConfig, ctx := setupWorkerSliceConfigWebhookValidationTest(name, namespace)
+	existingWorkerSliceConfig := workerv1alpha1.WorkerSliceConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	existingWorkerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = "LoadBalancer"
+	newWorkerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = "NodePort"
+	err := ValidateWorkerSliceConfigUpdate(ctx, &existingWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
+	clientMock.AssertExpectations(t)
 }
 
 func UpdateValidateWorkerSliceConfigUpdatingOctet(t *testing.T) {

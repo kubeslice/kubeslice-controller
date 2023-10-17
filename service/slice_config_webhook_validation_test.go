@@ -89,6 +89,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace":            UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters":                      UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
+	"SliceConfigWebhookValidation_UpdateValidateSliceGatewayServiceType":                                                       UpdateValidateSliceConfig_SliceGatewayServiceType,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty":                                 DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_validateAllowedNamespacesWithDuplicateClusters":                                              ValidateAllowedNamespacesWithDuplicateClusters,
@@ -119,6 +120,34 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
 }
 
+func UpdateValidateSliceConfig_SliceGatewayServiceType(t *testing.T) {
+	name := "test-slice"
+	namespace := "demons"
+	oldSliceConfig := controllerv1alpha1.SliceConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster: "c1",
+			Type:    "LoadBalancer",
+		},
+	}
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster: "c1",
+			Type:    "NodePort",
+		},
+	}
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
+	require.Contains(t, err.Error(), "update not allowed")
+	clientMock.AssertExpectations(t)
+}
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"
