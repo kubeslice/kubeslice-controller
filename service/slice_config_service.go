@@ -133,7 +133,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	clusterCidr := util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
-	// create cluster wise slice gw svc info
+	// collect cluster wise slice gw svc info
 	var sliceGwSvcTypeMap = make(map[string]*v1alpha1.SliceGatewayServiceType)
 	for _, gwSvctype := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
 		if gwSvctype.Cluster == "*" {
@@ -150,7 +150,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 
 	// Step 4: Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr)
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
