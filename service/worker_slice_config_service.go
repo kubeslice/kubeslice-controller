@@ -21,20 +21,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kubeslice/kubeslice-controller/metrics"
-
-	"github.com/kubeslice/kubeslice-controller/events"
-
-	"go.uber.org/zap"
-
 	"github.com/jinzhu/copier"
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
-	"github.com/kubeslice/kubeslice-controller/util"
+	"go.uber.org/zap"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	"github.com/kubeslice/kubeslice-controller/util"
 )
 
 const workerSliceConfigNameFormat = "%s-%s"
@@ -44,7 +42,7 @@ type IWorkerSliceConfigService interface {
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
 	ListWorkerSliceConfigs(ctx context.Context, ownerLabel map[string]string, namespace string) ([]workerv1alpha1.WorkerSliceConfig, error)
 	ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int
-	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string) (map[string]int, error)
+	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error)
 }
 
 // WorkerSliceConfigService implements the IWorkerSliceConfigService interface
@@ -214,21 +212,21 @@ outer:
 		logger.With(zap.Error(err)).Errorf("Failed to deep copy external gateway configuration")
 	}
 
-	// Reconcile Slice gateway service type
-	sliceGatewayProvider := workerv1alpha1.WorkerSliceGatewayProvider{
-		SliceGatewayType: sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType,
-		SliceCaType:      sliceConfig.Spec.SliceGatewayProvider.SliceCaType,
-	}
-	gwSvcTypePresent := false
-	for _, gwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
-		if gwSvcType.Cluster == "*" || gwSvcType.Cluster == workerSliceConfig.Labels["worker-cluster"] {
-			sliceGatewayProvider.SliceGatewayServiceType = gwSvcType.Type
-			gwSvcTypePresent = true
-		}
-	}
-	if !gwSvcTypePresent {
-		sliceGatewayProvider.SliceGatewayServiceType = defaultSliceGatewayServiceType
-	}
+	// // Reconcile Slice gateway service type
+	// sliceGatewayProvider := workerv1alpha1.WorkerSliceGatewayProvider{
+	// 	SliceGatewayType: sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType,
+	// 	SliceCaType:      sliceConfig.Spec.SliceGatewayProvider.SliceCaType,
+	// }
+	// gwSvcTypePresent := false
+	// for _, gwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+	// 	if gwSvcType.Cluster == "*" || gwSvcType.Cluster == workerSliceConfig.Labels["worker-cluster"] {
+	// 		sliceGatewayProvider.SliceGatewayServiceType = gwSvcType.Type
+	// 		gwSvcTypePresent = true
+	// 	}
+	// }
+	// if !gwSvcTypePresent {
+	// 	sliceGatewayProvider.SliceGatewayServiceType = defaultSliceGatewayServiceType
+	// }
 
 	// Reconcile the Namespace Isolation Profile
 	controllerIsolationProfile := sliceConfig.Spec.NamespaceIsolationProfile
@@ -256,7 +254,7 @@ outer:
 	}
 
 	workerSliceConfig.Spec.ExternalGatewayConfig = externalGatewayConfig
-	workerSliceConfig.Spec.SliceGatewayProvider = sliceGatewayProvider
+	// workerSliceConfig.Spec.SliceGatewayProvider = sliceGatewayProvider
 	workerSliceConfig.Spec.NamespaceIsolationProfile = workerIsolationProfile
 	workerSliceConfig.Spec.SliceName = sliceConfig.Name
 	workerSliceConfig.Spec.Octet = octet
@@ -270,7 +268,7 @@ outer:
 
 // CreateMinimalWorkerSliceConfig CreateWorkerSliceConfig is a function to create the worker slice configs with minimum number of fields.
 // More fields are added in reconciliation loop.
-func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string) (map[string]int, error) {
+func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error) {
 	logger := util.CtxLogger(ctx)
 
 	//Load Event Recorder with project name, slice name and namespace
@@ -307,6 +305,11 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		}
 		ipamOctet := clusterMap[cluster]
 		clusterSubnetCIDR := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr))
+		// determine gw svc type
+		sliceGwSvcType := defaultSliceGatewayServiceType
+		if val, exists := sliceGwSvcTypeMap[cluster]; exists {
+			sliceGwSvcType = val.Type
+		}
 		if !found {
 			label["project-namespace"] = namespace
 			label["original-slice-name"] = name
@@ -325,6 +328,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			expectedSlice.Spec.Octet = &ipamOctet
 			expectedSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 			expectedSlice.Spec.SliceSubnet = sliceSubnet
+			expectedSlice.Spec.SliceGatewayProvider.SliceGatewayServiceType = sliceGwSvcType
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
 				//Register an event for worker slice config creation failure
@@ -357,6 +361,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			existingSlice.UID = ""
 			existingSlice.Spec.Octet = &ipamOctet
 			existingSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
+			existingSlice.Spec.SliceGatewayProvider.SliceGatewayServiceType = sliceGwSvcType
 			logger.Debug("updating slice with new octet", existingSlice)
 			if existingSlice.Annotations == nil {
 				existingSlice.Annotations = make(map[string]string)
