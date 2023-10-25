@@ -41,8 +41,5 @@ func preventUpdateWorkerSliceGateway(workerSliceGatewayCtx context.Context, sg *
 	if workerSliceGateway.Spec.GatewayNumber != sg.Spec.GatewayNumber {
 		return field.Invalid(field.NewPath("Spec").Child("GatewayNumber"), sg.Spec.GatewayNumber, "cannot be updated")
 	}
-	if workerSliceGateway.Spec.GatewayConnectivityType != sg.Spec.GatewayConnectivityType {
-		return field.Forbidden(field.NewPath("Spec").Child("GatewayConnectivityType"), "update not allowed")
-	}
 	return nil
 }
