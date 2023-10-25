@@ -164,6 +164,12 @@ spec:
                       properties:
                         cluster:
                           type: string
+                        protocol:
+                          default: UDP
+                          enum:
+                          - TCP
+                          - UDP
+                          type: string
                         type:
                           default: NodePort
                           enum:
@@ -172,6 +178,7 @@ spec:
                           type: string
                       required:
                       - cluster
+                      - protocol
                       - type
                       type: object
                     type: array
