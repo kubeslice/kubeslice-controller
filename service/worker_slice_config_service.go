@@ -212,21 +212,17 @@ outer:
 		logger.With(zap.Error(err)).Errorf("Failed to deep copy external gateway configuration")
 	}
 
-	// Reconcile Slice gateway service type
-	sliceGatewayProvider := workerv1alpha1.WorkerSliceGatewayProvider{
-		SliceGatewayType: sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType,
-		SliceCaType:      sliceConfig.Spec.SliceGatewayProvider.SliceCaType,
+	// determine Slice gateway service type
+	sliceGwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
+	sliceGwSvcType := defaultSliceGatewayServiceType
+	sliceGwSvcProtocol := defaultSliceGatewayServiceProtocol
+	cluster := workerSliceConfig.Labels["worker-cluster"]
+	if val, exists := sliceGwSvcTypeMap[cluster]; exists {
+		sliceGwSvcType = val.Type
+		sliceGwSvcProtocol = val.Protocol
 	}
-	gwSvcTypePresent := false
-	for _, gwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
-		if gwSvcType.Cluster == "*" || gwSvcType.Cluster == workerSliceConfig.Labels["worker-cluster"] {
-			sliceGatewayProvider.SliceGatewayServiceType = gwSvcType.Type
-			gwSvcTypePresent = true
-		}
-	}
-	if !gwSvcTypePresent {
-		sliceGatewayProvider.SliceGatewayServiceType = defaultSliceGatewayServiceType
-	}
+	logger.Debugf("setting sliceGwSvcType in reconciler %s", sliceGwSvcType)
+	logger.Debugf("setting sliceGwProtocol in reconciler %s", sliceGwSvcProtocol)
 
 	// Reconcile the Namespace Isolation Profile
 	controllerIsolationProfile := sliceConfig.Spec.NamespaceIsolationProfile
@@ -254,7 +250,8 @@ outer:
 	}
 
 	workerSliceConfig.Spec.ExternalGatewayConfig = externalGatewayConfig
-	workerSliceConfig.Spec.SliceGatewayProvider = sliceGatewayProvider
+	workerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = sliceGwSvcType
+	workerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayProtocol = sliceGwSvcProtocol
 	workerSliceConfig.Spec.NamespaceIsolationProfile = workerIsolationProfile
 	workerSliceConfig.Spec.SliceName = sliceConfig.Name
 	workerSliceConfig.Spec.Octet = octet
@@ -307,9 +304,14 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		clusterSubnetCIDR := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr))
 		// determine gw svc type
 		sliceGwSvcType := defaultSliceGatewayServiceType
+		sliceGwSvcProtocol := defaultSliceGatewayServiceProtocol
 		if val, exists := sliceGwSvcTypeMap[cluster]; exists {
 			sliceGwSvcType = val.Type
+			sliceGwSvcProtocol = val.Protocol
 		}
+		logger.Debugf("setting sliceGwSvcType in create_minwsc %s", sliceGwSvcType)
+		logger.Debugf("setting sliceGwProtocol in create_minwsc %s", sliceGwSvcProtocol)
+
 		if !found {
 			label["project-namespace"] = namespace
 			label["original-slice-name"] = name
@@ -329,6 +331,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			expectedSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 			expectedSlice.Spec.SliceSubnet = sliceSubnet
 			expectedSlice.Spec.SliceGatewayProvider.SliceGatewayServiceType = sliceGwSvcType
+			expectedSlice.Spec.SliceGatewayProvider.SliceGatewayProtocol = sliceGwSvcProtocol
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
 				//Register an event for worker slice config creation failure
@@ -362,6 +365,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			existingSlice.Spec.Octet = &ipamOctet
 			existingSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 			existingSlice.Spec.SliceGatewayProvider.SliceGatewayServiceType = sliceGwSvcType
+			existingSlice.Spec.SliceGatewayProvider.SliceGatewayProtocol = sliceGwSvcProtocol
 			logger.Debug("updating slice with new octet", existingSlice)
 			if existingSlice.Annotations == nil {
 				existingSlice.Annotations = make(map[string]string)

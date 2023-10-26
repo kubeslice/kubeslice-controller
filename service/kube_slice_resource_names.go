@@ -151,10 +151,11 @@ var (
 )
 
 const (
-	serverGateway                  = "Server"
-	clientGateway                  = "Client"
-	workerSliceGatewayType         = "OpenVPN"
-	defaultSliceGatewayServiceType = "NodePort"
+	serverGateway                      = "Server"
+	clientGateway                      = "Client"
+	workerSliceGatewayType             = "OpenVPN"
+	defaultSliceGatewayServiceType     = "NodePort"
+	defaultSliceGatewayServiceProtocol = "UDP"
 )
 
 var (

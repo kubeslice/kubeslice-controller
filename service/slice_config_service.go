@@ -133,17 +133,9 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	clusterCidr := util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
-	// collect cluster wise slice gw svc info
-	var sliceGwSvcTypeMap = make(map[string]*v1alpha1.SliceGatewayServiceType)
-	for _, gwSvctype := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
-		if gwSvctype.Cluster == "*" {
-			for _, cluster := range sliceConfig.Spec.Clusters {
-				sliceGwSvcTypeMap[cluster] = &gwSvctype
-			}
-		} else {
-			sliceGwSvcTypeMap[gwSvctype.Cluster] = &gwSvctype
-		}
-	}
+	// collect slice gw svc info for given clusters
+	sliceGwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
+
 	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err

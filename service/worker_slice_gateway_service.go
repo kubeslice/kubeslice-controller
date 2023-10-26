@@ -207,21 +207,26 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	// reconcile gateway connectivity type
+
+	// determine gateway connectivity type & gateway protocol
 	var clusterName string
 	if workerSliceGateway.Spec.GatewayHostType == serverGateway {
 		clusterName = workerSliceGateway.Labels["worker-cluster"]
 	} else {
 		clusterName = workerSliceGateway.Labels["remote-cluster"]
 	}
+	sliceGwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
 	gatewayConnectivityType := defaultSliceGatewayServiceType
-	for _, gwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
-		if gwSvcType.Cluster == "*" || gwSvcType.Cluster == clusterName {
-			gatewayConnectivityType = gwSvcType.Type
-		}
+	gatewayProtocol := defaultSliceGatewayServiceProtocol
+	if val, exists := sliceGwSvcTypeMap[clusterName]; exists {
+		gatewayConnectivityType = val.Type
+		gatewayProtocol = val.Protocol
 	}
 	workerSliceGateway.Spec.GatewayConnectivityType = gatewayConnectivityType
-	logger.Debugf("setting gwsvctype %s", workerSliceGateway.Spec.GatewayConnectivityType)
+	workerSliceGateway.Spec.GatewayProtocol = gatewayProtocol
+	logger.Debugf("setting gwConType in reconciler %s", workerSliceGateway.Spec.GatewayConnectivityType)
+	logger.Debugf("setting gwProto in reconciler %s", workerSliceGateway.Spec.GatewayProtocol)
+
 	workerSliceGateway.Spec.GatewayType = workerSliceGatewayType
 	workerSliceGateway.UID = ""
 	err = util.UpdateResource(ctx, workerSliceGateway)
@@ -435,6 +440,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 	clusterNames []string, namespace string, ownerLabel map[string]string, clusterMap map[string]int,
 	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error) {
 	noClusters := len(clusterNames)
+	logger := util.CtxLogger(ctx)
 	clusterMapping := map[string]*controllerv1alpha1.Cluster{}
 	for _, clusterName := range clusterNames {
 		cluster := controllerv1alpha1.Cluster{}
@@ -451,10 +457,14 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 			gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
 			// determine the gateway svc parameters
 			sliceGwSvcType := defaultSliceGatewayServiceType
+			gwSvcProtocol := defaultSliceGatewayServiceProtocol
 			if val, exists := sliceGwSvcTypeMap[sourceCluster.Name]; exists {
 				sliceGwSvcType = val.Type
+				gwSvcProtocol = val.Protocol
 			}
-			err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, ownerLabel, gatewayNumber, gatewayAddresses)
+			logger.Debugf("setting gwConType in create_minwsg %s", sliceGwSvcType)
+			logger.Debugf("setting gwProto in create_minwsg %s", gwSvcProtocol)
+			err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -467,7 +477,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 // createMinimumGateWayPairIfNotExists is a function to create the pair of gatways between 2 clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx context.Context,
 	sourceCluster *controllerv1alpha1.Cluster, destinationCluster *controllerv1alpha1.Cluster,
-	sliceName, namespace, sliceGwSvcType string, label map[string]string, gatewayNumber int,
+	sliceName, namespace, gatewayConnType, gatewayProtocol string, label map[string]string, gatewayNumber int,
 	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error {
 	serverGatewayName := fmt.Sprintf(gatewayName, sliceName, sourceCluster.Name, destinationCluster.Name)
 	clientGatewayName := fmt.Sprintf(gatewayName, sliceName, destinationCluster.Name, sourceCluster.Name)
@@ -499,7 +509,10 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 		WithNamespace(namespace).
 		WithSlice(sliceName)
 
-	serverGatewayObject := s.buildMinimumGateway(sourceCluster, destinationCluster, sliceName, namespace, serverGateway, sliceGwSvcType, label, gatewayNumber, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName, gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress, serverGatewayName)
+	serverGatewayObject := s.buildMinimumGateway(sourceCluster, destinationCluster, sliceName, namespace,
+		serverGateway, gatewayConnType, gatewayProtocol, label, gatewayNumber,
+		gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress,
+		clientGatewayName, gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress, serverGatewayName)
 	err = util.CreateResource(ctx, serverGatewayObject)
 	if err != nil {
 		//Register an event for worker slice gateway creation failure
@@ -524,7 +537,10 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 			"object_kind": metricKindWorkerSliceGateway,
 		},
 	)
-	clientGatewayObject := s.buildMinimumGateway(destinationCluster, sourceCluster, sliceName, namespace, clientGateway, sliceGwSvcType, label, gatewayNumber, gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress, serverGatewayName, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName)
+	clientGatewayObject := s.buildMinimumGateway(destinationCluster, sourceCluster, sliceName, namespace,
+		clientGateway, gatewayConnType, gatewayProtocol, label, gatewayNumber,
+		gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress,
+		serverGatewayName, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName)
 	err = util.CreateResource(ctx, clientGatewayObject)
 	if err != nil {
 		//Register an event for worker slice gateway creation failure
@@ -577,7 +593,7 @@ func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClu
 
 // buildMinimumGateway function returns the gateway object
 func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinationCluster *controllerv1alpha1.Cluster,
-	sliceName, namespace, gatewayHostType, sliceGwSvcType string, labels map[string]string, gatewayNumber int,
+	sliceName, namespace, gatewayHostType, gatewayConnType, gatewayProtocol string, labels map[string]string, gatewayNumber int,
 	gatewaySubnet, localVpnAddress, remoteGatewayName, remoteGatewaySubnet, remoteVpnAddress, localGatewayName string) *v1alpha1.WorkerSliceGateway {
 	labels["worker-cluster"] = sourceCluster.Name
 	labels["remote-cluster"] = destinationCluster.Name
@@ -624,7 +640,8 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 			},
 			GatewayHostType:         gatewayHostType,
 			GatewayNumber:           gatewayNumber,
-			GatewayConnectivityType: sliceGwSvcType,
+			GatewayConnectivityType: gatewayConnType,
+			GatewayProtocol:         gatewayProtocol,
 		},
 	}
 }
