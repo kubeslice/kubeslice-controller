@@ -212,21 +212,21 @@ outer:
 		logger.With(zap.Error(err)).Errorf("Failed to deep copy external gateway configuration")
 	}
 
-	// // Reconcile Slice gateway service type
-	// sliceGatewayProvider := workerv1alpha1.WorkerSliceGatewayProvider{
-	// 	SliceGatewayType: sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType,
-	// 	SliceCaType:      sliceConfig.Spec.SliceGatewayProvider.SliceCaType,
-	// }
-	// gwSvcTypePresent := false
-	// for _, gwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
-	// 	if gwSvcType.Cluster == "*" || gwSvcType.Cluster == workerSliceConfig.Labels["worker-cluster"] {
-	// 		sliceGatewayProvider.SliceGatewayServiceType = gwSvcType.Type
-	// 		gwSvcTypePresent = true
-	// 	}
-	// }
-	// if !gwSvcTypePresent {
-	// 	sliceGatewayProvider.SliceGatewayServiceType = defaultSliceGatewayServiceType
-	// }
+	// Reconcile Slice gateway service type
+	sliceGatewayProvider := workerv1alpha1.WorkerSliceGatewayProvider{
+		SliceGatewayType: sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType,
+		SliceCaType:      sliceConfig.Spec.SliceGatewayProvider.SliceCaType,
+	}
+	gwSvcTypePresent := false
+	for _, gwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		if gwSvcType.Cluster == "*" || gwSvcType.Cluster == workerSliceConfig.Labels["worker-cluster"] {
+			sliceGatewayProvider.SliceGatewayServiceType = gwSvcType.Type
+			gwSvcTypePresent = true
+		}
+	}
+	if !gwSvcTypePresent {
+		sliceGatewayProvider.SliceGatewayServiceType = defaultSliceGatewayServiceType
+	}
 
 	// Reconcile the Namespace Isolation Profile
 	controllerIsolationProfile := sliceConfig.Spec.NamespaceIsolationProfile
@@ -254,7 +254,7 @@ outer:
 	}
 
 	workerSliceConfig.Spec.ExternalGatewayConfig = externalGatewayConfig
-	// workerSliceConfig.Spec.SliceGatewayProvider = sliceGatewayProvider
+	workerSliceConfig.Spec.SliceGatewayProvider = sliceGatewayProvider
 	workerSliceConfig.Spec.NamespaceIsolationProfile = workerIsolationProfile
 	workerSliceConfig.Spec.SliceName = sliceConfig.Name
 	workerSliceConfig.Spec.Octet = octet
