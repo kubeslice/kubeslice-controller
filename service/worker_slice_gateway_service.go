@@ -50,7 +50,7 @@ type IWorkerSliceGatewayService interface {
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
-	GenerateCerts(ctx context.Context, sliceName string, namespace string,
+	GenerateCerts(ctx context.Context, sliceName, namespace, gatewayProtocol string,
 		serverGateway *v1alpha1.WorkerSliceGateway, clientGateway *v1alpha1.WorkerSliceGateway,
 		gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error
 	BuildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
@@ -566,7 +566,7 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 		},
 	)
 
-	err = s.GenerateCerts(ctx, sliceName, namespace, serverGatewayObject, clientGatewayObject, gatewayAddresses)
+	err = s.GenerateCerts(ctx, sliceName, namespace, gatewayProtocol, serverGatewayObject, clientGatewayObject, gatewayAddresses)
 	if err != nil {
 		return err
 	}
@@ -647,7 +647,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 }
 
 // generateCerts is a function to generate the certificates between serverGateway and clientGateway
-func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName string, namespace string,
+func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName, namespace, gatewayProtocol string,
 	serverGateway *v1alpha1.WorkerSliceGateway, clientGateway *v1alpha1.WorkerSliceGateway,
 	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error {
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
@@ -677,6 +677,7 @@ func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName
 
 	environment := make(map[string]string, 5)
 	environment["NAMESPACE"] = namespace
+	environment["GATEWAY_PROTOCOL"] = gatewayProtocol
 	environment["SERVER_SLICEGATEWAY_NAME"] = serverGateway.Name
 	environment["CLIENT_SLICEGATEWAY_NAME"] = clientGateway.Name
 	environment["SLICE_NAME"] = sliceName
