@@ -675,7 +675,7 @@ func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName
 		WithNamespace(namespace).
 		WithSlice(sliceName)
 
-	environment := make(map[string]string, 5)
+	environment := make(map[string]string, 6)
 	environment["NAMESPACE"] = namespace
 	environment["GATEWAY_PROTOCOL"] = gatewayProtocol
 	environment["SERVER_SLICEGATEWAY_NAME"] = serverGateway.Name

@@ -250,7 +250,7 @@ outer:
 	}
 
 	workerSliceConfig.Spec.ExternalGatewayConfig = externalGatewayConfig
-	workerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = sliceGwSvcType
+	workerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = sliceGwSvcType
 	workerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayProtocol = sliceGwSvcProtocol
 	workerSliceConfig.Spec.NamespaceIsolationProfile = workerIsolationProfile
 	workerSliceConfig.Spec.SliceName = sliceConfig.Name
