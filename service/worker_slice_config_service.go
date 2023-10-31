@@ -221,8 +221,9 @@ outer:
 		sliceGwSvcType = val.Type
 		sliceGwSvcProtocol = val.Protocol
 	}
-	logger.Debugf("setting sliceGwSvcType in reconciler %s", sliceGwSvcType)
-	logger.Debugf("setting sliceGwProtocol in reconciler %s", sliceGwSvcProtocol)
+	logger.Debugf("wsc %s reconciler, sliceGwSvcType %s", workerSliceConfig.Name, sliceGwSvcType)
+	logger.Debugf("slicegwsvctype map in wsc %s", sliceGwSvcTypeMap)
+	logger.Debugf("wsc reconciler cluster %s, sliceGwProtocol %s", workerSliceConfig.Labels["worker-cluster"], sliceGwSvcProtocol)
 
 	// Reconcile the Namespace Isolation Profile
 	controllerIsolationProfile := sliceConfig.Spec.NamespaceIsolationProfile

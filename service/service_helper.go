@@ -70,13 +70,14 @@ func RemoveWorkerFinalizers(ctx context.Context, object client.Object, workerFin
 // get Slice gateway service type for each cluster registered with given slice
 func getSliceGwSvcTypes(sliceConfig *v1alpha1.SliceConfig) map[string]*v1alpha1.SliceGatewayServiceType {
 	var sliceGwSvcTypeMap = make(map[string]*v1alpha1.SliceGatewayServiceType)
-	for _, gwSvctype := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+	for i := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		gwSvctype := &sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType[i]
 		if gwSvctype.Cluster == "*" {
 			for _, cluster := range sliceConfig.Spec.Clusters {
-				sliceGwSvcTypeMap[cluster] = &gwSvctype
+				sliceGwSvcTypeMap[cluster] = gwSvctype
 			}
 		} else {
-			sliceGwSvcTypeMap[gwSvctype.Cluster] = &gwSvctype
+			sliceGwSvcTypeMap[gwSvctype.Cluster] = gwSvctype
 		}
 	}
 	return sliceGwSvcTypeMap
