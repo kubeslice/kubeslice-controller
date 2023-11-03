@@ -72,13 +72,13 @@ func (_m *IWorkerSliceGatewayService) DeleteWorkerSliceGatewaysByLabel(ctx conte
 	return r0
 }
 
-// GenerateCerts provides a mock function with given fields: ctx, sliceName, namespace, serverGateway, clientGateway, gatewayAddresses
-func (_m *IWorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName string, namespace string, serverGateway *workerv1alpha1.WorkerSliceGateway, clientGateway *workerv1alpha1.WorkerSliceGateway, gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error {
-	ret := _m.Called(ctx, sliceName, namespace, serverGateway, clientGateway, gatewayAddresses)
+// GenerateCerts provides a mock function with given fields: ctx, sliceName, namespace, gatewayProtocol, serverGateway, clientGateway, gatewayAddresses
+func (_m *IWorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName string, namespace string, gatewayProtocol string, serverGateway *workerv1alpha1.WorkerSliceGateway, clientGateway *workerv1alpha1.WorkerSliceGateway, gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error {
+	ret := _m.Called(ctx, sliceName, namespace, gatewayProtocol, serverGateway, clientGateway, gatewayAddresses)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, *workerv1alpha1.WorkerSliceGateway, *workerv1alpha1.WorkerSliceGateway, util.WorkerSliceGatewayNetworkAddresses) error); ok {
-		r0 = rf(ctx, sliceName, namespace, serverGateway, clientGateway, gatewayAddresses)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *workerv1alpha1.WorkerSliceGateway, *workerv1alpha1.WorkerSliceGateway, util.WorkerSliceGatewayNetworkAddresses) error); ok {
+		r0 = rf(ctx, sliceName, namespace, gatewayProtocol, serverGateway, clientGateway, gatewayAddresses)
 	} else {
 		r0 = ret.Error(0)
 	}

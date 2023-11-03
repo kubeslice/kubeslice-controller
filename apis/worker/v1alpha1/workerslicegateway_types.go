@@ -32,11 +32,14 @@ type WorkerSliceGatewaySpec struct {
 	GatewayHostType string `json:"gatewayHostType,omitempty"`
 	//+kubebuilder:default:=NodePort
 	//+kubebuilder:validation:Enum:=NodePort;LoadBalancer
-	GatewayConnectivityType string             `json:"gatewayConnectivityType,omitempty"`
-	GatewayCredentials      GatewayCredentials `json:"gatewayCredentials,omitempty"`
-	LocalGatewayConfig      SliceGatewayConfig `json:"localGatewayConfig,omitempty"`
-	RemoteGatewayConfig     SliceGatewayConfig `json:"remoteGatewayConfig,omitempty"`
-	GatewayNumber           int                `json:"gatewayNumber,omitempty"`
+	GatewayConnectivityType string `json:"gatewayConnectivityType,omitempty"`
+	//+kubebuilder:default:=UDP
+	//+kubebuilder:validation:Enum:=TCP;UDP
+	GatewayProtocol     string             `json:"gatewayProtocol,omitempty"`
+	GatewayCredentials  GatewayCredentials `json:"gatewayCredentials,omitempty"`
+	LocalGatewayConfig  SliceGatewayConfig `json:"localGatewayConfig,omitempty"`
+	RemoteGatewayConfig SliceGatewayConfig `json:"remoteGatewayConfig,omitempty"`
+	GatewayNumber       int                `json:"gatewayNumber,omitempty"`
 }
 
 type SliceGatewayConfig struct {

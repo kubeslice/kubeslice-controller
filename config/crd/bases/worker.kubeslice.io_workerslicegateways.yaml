@@ -53,6 +53,12 @@ spec:
                 type: string
               gatewayNumber:
                 type: integer
+              gatewayProtocol:
+                default: UDP
+                enum:
+                - TCP
+                - UDP
+                type: string
               gatewayType:
                 default: OpenVPN
                 type: string

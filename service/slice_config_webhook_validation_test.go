@@ -142,12 +142,23 @@ func UpdateValidateSliceConfig_SliceGatewayServiceType(t *testing.T) {
 			Type:    "NodePort",
 		},
 	}
+	// loadbalancer to nodeport not allowed
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
 	require.Contains(t, err.Error(), "update not allowed")
+
+	// 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType[0].Type = "NodePort"
+	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType[0].Type = "LoadBalancer"
+	err = ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	require.NotNil(t, err)
+	require.NotContains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
+	require.NotContains(t, err.Error(), "update not allowed")
+
 	clientMock.AssertExpectations(t)
 }
+
 func CreateValidateProjectNamespaceDoesNotExist(t *testing.T) {
 	name := "slice_config"
 	namespace := "namespace"

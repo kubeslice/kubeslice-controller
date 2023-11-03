@@ -391,7 +391,7 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 	// check new config
 	for _, new := range sc.Spec.SliceGatewayProvider.SliceGatewayServiceType {
 		oldType, exists := gwSvcType[new.Cluster]
-		if exists && new.Type != oldType {
+		if exists && oldType != defaultSliceGatewayServiceType && new.Type != oldType {
 			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "update not allowed")
 		}
 		if !exists && new.Type != defaultSliceGatewayServiceType {
