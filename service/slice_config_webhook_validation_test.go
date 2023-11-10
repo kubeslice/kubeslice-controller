@@ -148,7 +148,7 @@ func UpdateValidateSliceConfig_SliceGatewayServiceType(t *testing.T) {
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
 	require.Contains(t, err.Error(), "update not allowed")
 
-	// 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	// 	NodePort to LB allowed
 	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType[0].Type = "NodePort"
 	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType[0].Type = "LoadBalancer"
 	err = ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
