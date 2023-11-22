@@ -382,18 +382,20 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 			return field.Invalid(field.NewPath("Spec").Child("VPNConfig").Child("Cipher"), sc.Spec.VPNConfig.Cipher, "cannot be updated")
 		}
 	}
-	// can't switch gw svc types
-	gwSvcType := map[string]string{}
+	// not allowed to switch gw svc types & protocols
 	// create cluster:GwType map from old config
-	for _, i := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
-		gwSvcType[i.Cluster] = i.Type
-	}
+	gwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
+
 	// check new config
 	for _, new := range sc.Spec.SliceGatewayProvider.SliceGatewayServiceType {
-		oldType, exists := gwSvcType[new.Cluster]
+		oldType, exists := gwSvcTypeMap[new.Cluster]
 		// allow user to update NodePort to LoadBalancer but not vice versa
-		if exists && oldType != defaultSliceGatewayServiceType && new.Type != oldType {
-			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "update not allowed")
+		if exists && oldType.Type != defaultSliceGatewayServiceType && new.Type != oldType.Type {
+			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway service type is not allowed")
+		}
+		// don't allow user to update TCP to UDP & vice versa
+		if exists && new.Protocol != oldType.Protocol {
+			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway protocol is not allowed")
 		}
 	}
 	return nil

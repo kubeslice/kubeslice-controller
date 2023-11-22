@@ -89,7 +89,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace":            UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOnePlace,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters":                      UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
-	"SliceConfigWebhookValidation_UpdateValidateSliceGatewayServiceType":                                                       UpdateValidateSliceConfig_SliceGatewayServiceType,
+	"SliceConfigWebhookValidation_UpdateValidateSliceGatewayServiceType":                                                       UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty":                                 DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_validateAllowedNamespacesWithDuplicateClusters":                                              ValidateAllowedNamespacesWithDuplicateClusters,
@@ -120,7 +120,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
 }
 
-func UpdateValidateSliceConfig_SliceGatewayServiceType(t *testing.T) {
+func UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType(t *testing.T) {
 	name := "test-slice"
 	namespace := "demons"
 	oldSliceConfig := controllerv1alpha1.SliceConfig{
@@ -128,11 +128,16 @@ func UpdateValidateSliceConfig_SliceGatewayServiceType(t *testing.T) {
 			Name:      name,
 			Namespace: namespace,
 		},
-	}
-	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
-		{
-			Cluster: "c1",
-			Type:    "LoadBalancer",
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			SliceGatewayProvider: controllerv1alpha1.WorkerSliceGatewayProvider{
+				SliceGatewayServiceType: []controllerv1alpha1.SliceGatewayServiceType{
+					{
+						Cluster: "c1",
+						Type:    "LoadBalancer",
+					},
+				},
+			},
+			Clusters: []string{"c1"},
 		},
 	}
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
@@ -142,19 +147,30 @@ func UpdateValidateSliceConfig_SliceGatewayServiceType(t *testing.T) {
 			Type:    "NodePort",
 		},
 	}
+	newSliceConfig.Spec.Clusters = []string{"c1"}
 	// loadbalancer to nodeport not allowed
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
-	require.Contains(t, err.Error(), "update not allowed")
+	require.Contains(t, err.Error(), "updating gateway service type is not allowed")
 
-	// 	NodePort to LB allowed
-	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType[0].Type = "NodePort"
-	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType[0].Type = "LoadBalancer"
-	err = ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	// tcp to udp & vice-versa not allowed
+	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster:  "c1",
+			Protocol: "TCP",
+		},
+	}
+	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster:  "c1",
+			Protocol: "UDP",
+		},
+	}
 	require.NotNil(t, err)
-	require.NotContains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
-	require.NotContains(t, err.Error(), "update not allowed")
+	err = ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
+	require.Contains(t, err.Error(), "updating gateway protocol is not allowed")
 
 	clientMock.AssertExpectations(t)
 }
