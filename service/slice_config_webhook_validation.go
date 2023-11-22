@@ -344,15 +344,15 @@ func validateSlicegatewayServiceType(ctx context.Context, sliceConfig *controlle
 		freq[cluster] += 1
 		// cluster name can't be empty
 		if cluster == "" {
-			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType").Child("Cluster"), cluster, "Cluster name can't be empty")
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), sliceGwSvcType, "Cluster name can't be empty")
 		}
 		// cluster should participate in slice
 		if cluster != "*" && !util.ContainsString(sliceConfig.Spec.Clusters, cluster) {
-			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType").Child("Cluster"), cluster, "Cluster is not participating in slice config")
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), sliceGwSvcType, "Cluster is not participating in slice config")
 		}
 		// don't allow duplicate cluster values
 		if freq[cluster] > 1 {
-			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType").Child("Cluster"), cluster, "Duplicate entries are not allowed")
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), sliceGwSvcType, "Duplicate entries for same cluster are not allowed")
 		}
 	}
 	return nil

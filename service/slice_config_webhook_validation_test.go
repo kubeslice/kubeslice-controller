@@ -118,11 +118,95 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateRotationInterval_Change_Increased":                                                                            TestValidateRotationInterval_Change_Increased,
 	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
+	"Test_validateSlicegatewayServiceType":                                                                                     test_validateSlicegatewayServiceType,
+}
+
+func test_validateSlicegatewayServiceType(t *testing.T) {
+	name := "test-slice"
+	namespace := "test-ns"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	// slicegatewayServiceType definition is optional
+	err := validateSlicegatewayServiceType(ctx, sliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+
+	// if defined, cluster name can't be empty
+	sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Type:     "Loadbalancer",
+			Protocol: "UDP",
+		},
+	}
+	err = validateSlicegatewayServiceType(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Invalid value:")
+	require.Contains(t, err.Error(), "Cluster name can't be empty")
+	clientMock.AssertExpectations(t)
+
+	// if defined, cluster name should be part of slice
+	sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster:  "demo-cluster",
+			Type:     "Loadbalancer",
+			Protocol: "UDP",
+		},
+	}
+	err = validateSlicegatewayServiceType(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Invalid value:")
+	require.Contains(t, err.Error(), "Cluster is not participating in slice config")
+	clientMock.AssertExpectations(t)
+
+	// if defined, cluster name should be part of slice
+	sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster:  "demo-cluster",
+			Type:     "Loadbalancer",
+			Protocol: "UDP",
+		},
+		{
+			Cluster:  "demo-cluster",
+			Type:     "Nodeport",
+			Protocol: "TCP",
+		},
+	}
+	sliceConfig.Spec.Clusters = []string{"demo-cluster"}
+	err = validateSlicegatewayServiceType(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Invalid value:")
+	require.Contains(t, err.Error(), "Duplicate entries for same cluster are not allowed")
+	clientMock.AssertExpectations(t)
+
+	// happy scenario: all check passes
+	sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster:  "demo-cluster",
+			Type:     "Loadbalancer",
+			Protocol: "UDP",
+		},
+	}
+	sliceConfig.Spec.Clusters = []string{"demo-cluster"}
+	err = validateSlicegatewayServiceType(ctx, sliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+
+	// happy scenario with wild card: all check passes
+	sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster:  "*",
+			Type:     "Loadbalancer",
+			Protocol: "UDP",
+		},
+	}
+	sliceConfig.Spec.Clusters = []string{"demo-cluster", "c2", "cx"}
+	err = validateSlicegatewayServiceType(ctx, sliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
 }
 
 func UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType(t *testing.T) {
 	name := "test-slice"
-	namespace := "demons"
+	namespace := "test-ns"
 	oldSliceConfig := controllerv1alpha1.SliceConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -153,6 +237,7 @@ func UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType(t *testing.
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
 	require.Contains(t, err.Error(), "updating gateway service type is not allowed")
+	clientMock.AssertExpectations(t)
 
 	// tcp to udp & vice-versa not allowed
 	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
@@ -171,7 +256,6 @@ func UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType(t *testing.
 	err = ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
 	require.Contains(t, err.Error(), "updating gateway protocol is not allowed")
-
 	clientMock.AssertExpectations(t)
 }
 
