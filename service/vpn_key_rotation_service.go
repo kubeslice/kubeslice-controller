@@ -356,7 +356,7 @@ func (v *VpnKeyRotationService) triggerJobsForCertCreation(ctx context.Context, 
 			// contruct gw address
 			gatewayAddresses := v.wsgs.BuildNetworkAddresses(s.Spec.SliceSubnet, gateway.Spec.LocalGatewayConfig.ClusterName, gateway.Spec.RemoteGatewayConfig.ClusterName, clusterMap, clusterCidr)
 			// call GenerateCerts()
-			if err := v.wsgs.GenerateCerts(ctx, s.Name, s.Namespace, &gateway, cl, gatewayAddresses); err != nil {
+			if err := v.wsgs.GenerateCerts(ctx, s.Name, s.Namespace, gateway.Spec.GatewayProtocol, &gateway, cl, gatewayAddresses); err != nil {
 				return err
 			}
 		}
