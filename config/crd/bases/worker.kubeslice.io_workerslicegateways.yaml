@@ -35,6 +35,12 @@ spec:
           spec:
             description: WorkerSliceGatewaySpec defines the desired state of WorkerSliceGateway
             properties:
+              gatewayConnectivityType:
+                default: NodePort
+                enum:
+                - NodePort
+                - LoadBalancer
+                type: string
               gatewayCredentials:
                 properties:
                   secretName:
@@ -47,6 +53,12 @@ spec:
                 type: string
               gatewayNumber:
                 type: integer
+              gatewayProtocol:
+                default: UDP
+                enum:
+                - TCP
+                - UDP
+                type: string
               gatewayType:
                 default: OpenVPN
                 type: string
@@ -58,6 +70,10 @@ spec:
                     type: string
                   gatewaySubnet:
                     type: string
+                  loadBalancerIps:
+                    items:
+                      type: string
+                    type: array
                   nodeIp:
                     type: string
                   nodeIps:
@@ -81,6 +97,10 @@ spec:
                     type: string
                   gatewaySubnet:
                     type: string
+                  loadBalancerIps:
+                    items:
+                      type: string
+                    type: array
                   nodeIp:
                     type: string
                   nodeIps:

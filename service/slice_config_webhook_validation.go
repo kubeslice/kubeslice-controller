@@ -49,6 +49,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateClustersOnCreate(ctx, sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	if err := validateQosProfile(ctx, sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
@@ -76,6 +79,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateClustersOnUpdate(ctx, sliceConfig, old); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
+	if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateQosProfile(ctx, sliceConfig); err != nil {
@@ -330,6 +336,28 @@ func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alph
 	return nil
 }
 
+// to validate the SlicegatewayServiceType array
+func validateSlicegatewayServiceType(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	freq := make(map[string]int)
+	for _, sliceGwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		cluster := sliceGwSvcType.Cluster
+		freq[cluster] += 1
+		// cluster name can't be empty
+		if cluster == "" {
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), sliceGwSvcType, "Cluster name can't be empty")
+		}
+		// cluster should participate in slice
+		if cluster != "*" && !util.ContainsString(sliceConfig.Spec.Clusters, cluster) {
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), sliceGwSvcType, "Cluster is not participating in slice config")
+		}
+		// don't allow duplicate cluster values
+		if freq[cluster] > 1 {
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), sliceGwSvcType, "Duplicate entries for same cluster are not allowed")
+		}
+	}
+	return nil
+}
+
 // preventUpdate is a function to stop/avoid the update of config of slice
 func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old runtime.Object) *field.Error {
 	sliceConfig := old.(*controllerv1alpha1.SliceConfig)
@@ -354,7 +382,22 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 			return field.Invalid(field.NewPath("Spec").Child("VPNConfig").Child("Cipher"), sc.Spec.VPNConfig.Cipher, "cannot be updated")
 		}
 	}
+	// not allowed to switch gw svc types & protocols
+	// create cluster:GwType map from old config
+	gwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
 
+	// check new config
+	for _, new := range sc.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		oldType, exists := gwSvcTypeMap[new.Cluster]
+		// allow user to update NodePort to LoadBalancer but not vice versa
+		if exists && oldType.Type != defaultSliceGatewayServiceType && new.Type != oldType.Type {
+			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway service type is not allowed")
+		}
+		// don't allow user to update TCP to UDP & vice versa
+		if exists && new.Protocol != oldType.Protocol {
+			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway protocol is not allowed")
+		}
+	}
 	return nil
 }
 

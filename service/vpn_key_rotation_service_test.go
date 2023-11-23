@@ -589,7 +589,7 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 
 	wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
 
-	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	clientMock.
 		On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
@@ -1103,7 +1103,7 @@ func runTriggerJobsForCertCreation(t *testing.T, tc triggerJobsForCertCreationTe
 
 	wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
 
-	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.generateCertsRet1).Once()
+	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.generateCertsRet1).Once()
 
 	gotResp := vpn.triggerJobsForCertCreation(ctx, tc.arg1, tc.arg2)
 	require.Equal(t, gotResp, tc.expectedResp)

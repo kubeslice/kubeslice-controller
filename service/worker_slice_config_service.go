@@ -19,29 +19,30 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"time"
 
-	"github.com/kubeslice/kubeslice-controller/events"
-
-	"go.uber.org/zap"
-
 	"github.com/jinzhu/copier"
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
-	"github.com/kubeslice/kubeslice-controller/util"
+	"go.uber.org/zap"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-controller/metrics"
+	"github.com/kubeslice/kubeslice-controller/util"
 )
+
+const workerSliceConfigNameFormat = "%s-%s"
 
 type IWorkerSliceConfigService interface {
 	ReconcileWorkerSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
 	ListWorkerSliceConfigs(ctx context.Context, ownerLabel map[string]string, namespace string) ([]workerv1alpha1.WorkerSliceConfig, error)
 	ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int
-	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string) (map[string]int, error)
+	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error)
 }
 
 // WorkerSliceConfigService implements the IWorkerSliceConfigService interface
@@ -211,6 +212,19 @@ outer:
 		logger.With(zap.Error(err)).Errorf("Failed to deep copy external gateway configuration")
 	}
 
+	// determine Slice gateway service type
+	sliceGwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
+	sliceGwSvcType := defaultSliceGatewayServiceType
+	sliceGwSvcProtocol := defaultSliceGatewayServiceProtocol
+	cluster := workerSliceConfig.Labels["worker-cluster"]
+	if val, exists := sliceGwSvcTypeMap[cluster]; exists {
+		sliceGwSvcType = val.Type
+		sliceGwSvcProtocol = val.Protocol
+	}
+	logger.Debugf("wsc %s reconciler, sliceGwSvcType %s", workerSliceConfig.Name, sliceGwSvcType)
+	logger.Debugf("slicegwsvctype map in wsc %s", sliceGwSvcTypeMap)
+	logger.Debugf("wsc reconciler cluster %s, sliceGwProtocol %s", workerSliceConfig.Labels["worker-cluster"], sliceGwSvcProtocol)
+
 	// Reconcile the Namespace Isolation Profile
 	controllerIsolationProfile := sliceConfig.Spec.NamespaceIsolationProfile
 	workerIsolationProfile := workerv1alpha1.NamespaceIsolationProfile{
@@ -237,6 +251,8 @@ outer:
 	}
 
 	workerSliceConfig.Spec.ExternalGatewayConfig = externalGatewayConfig
+	workerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = sliceGwSvcType
+	workerSliceConfig.Spec.SliceGatewayProvider.SliceGatewayProtocol = sliceGwSvcProtocol
 	workerSliceConfig.Spec.NamespaceIsolationProfile = workerIsolationProfile
 	workerSliceConfig.Spec.SliceName = sliceConfig.Name
 	workerSliceConfig.Spec.Octet = octet
@@ -250,7 +266,7 @@ outer:
 
 // CreateMinimalWorkerSliceConfig CreateWorkerSliceConfig is a function to create the worker slice configs with minimum number of fields.
 // More fields are added in reconciliation loop.
-func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string) (map[string]int, error) {
+func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error) {
 	logger := util.CtxLogger(ctx)
 
 	//Load Event Recorder with project name, slice name and namespace
@@ -275,7 +291,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 	clusterMap := s.ComputeClusterMap(clusters, workerSliceConfigs)
 	for _, cluster := range clusters {
 		logger.Debugf("Cluster Object %s", cluster)
-		workerSliceConfigName := fmt.Sprintf("%s-%s", name, cluster)
+		workerSliceConfigName := fmt.Sprintf(workerSliceConfigNameFormat, name, cluster)
 		existingSlice := &workerv1alpha1.WorkerSliceConfig{}
 		found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
 			Name:      workerSliceConfigName,
@@ -287,6 +303,16 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		}
 		ipamOctet := clusterMap[cluster]
 		clusterSubnetCIDR := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr))
+		// determine gw svc type
+		sliceGwSvcType := defaultSliceGatewayServiceType
+		sliceGwSvcProtocol := defaultSliceGatewayServiceProtocol
+		if val, exists := sliceGwSvcTypeMap[cluster]; exists {
+			sliceGwSvcType = val.Type
+			sliceGwSvcProtocol = val.Protocol
+		}
+		logger.Debugf("setting sliceGwSvcType in create_minwsc %s", sliceGwSvcType)
+		logger.Debugf("setting sliceGwProtocol in create_minwsc %s", sliceGwSvcProtocol)
+
 		if !found {
 			label["project-namespace"] = namespace
 			label["original-slice-name"] = name
@@ -305,6 +331,8 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			expectedSlice.Spec.Octet = &ipamOctet
 			expectedSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 			expectedSlice.Spec.SliceSubnet = sliceSubnet
+			expectedSlice.Spec.SliceGatewayProvider.SliceGatewayServiceType = sliceGwSvcType
+			expectedSlice.Spec.SliceGatewayProvider.SliceGatewayProtocol = sliceGwSvcProtocol
 			err = util.CreateResource(ctx, &expectedSlice)
 			if err != nil {
 				//Register an event for worker slice config creation failure
@@ -337,6 +365,8 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			existingSlice.UID = ""
 			existingSlice.Spec.Octet = &ipamOctet
 			existingSlice.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
+			existingSlice.Spec.SliceGatewayProvider.SliceGatewayServiceType = sliceGwSvcType
+			existingSlice.Spec.SliceGatewayProvider.SliceGatewayProtocol = sliceGwSvcProtocol
 			logger.Debug("updating slice with new octet", existingSlice)
 			if existingSlice.Annotations == nil {
 				existingSlice.Annotations = make(map[string]string)
