@@ -5,7 +5,9 @@ package mocks
 import (
 	context "context"
 
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	mock "github.com/stretchr/testify/mock"
+
 	reconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	v1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -32,25 +34,25 @@ func (_m *IWorkerSliceConfigService) ComputeClusterMap(clusterNames []string, wo
 	return r0
 }
 
-// CreateMinimalWorkerSliceConfig provides a mock function with given fields: ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr
-func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string, clusterCidr string) (map[string]int, error) {
-	ret := _m.Called(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr)
+// CreateMinimalWorkerSliceConfig provides a mock function with given fields: ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap
+func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error) {
+	ret := _m.Called(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 
 	var r0 map[string]int
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string) (map[string]int, error)); ok {
-		return rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr)
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error)); ok {
+		return rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string) map[string]int); ok {
-		r0 = rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr)
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType) map[string]int); ok {
+		r0 = rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]int)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []string, string, map[string]string, string, string, string) error); ok {
-		r1 = rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr)
+	if rf, ok := ret.Get(1).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType) error); ok {
+		r1 = rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	} else {
 		r1 = ret.Error(1)
 	}

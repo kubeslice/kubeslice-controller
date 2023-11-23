@@ -226,6 +226,11 @@ func (in *SliceGatewayConfig) DeepCopyInto(out *SliceGatewayConfig) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.LoadBalancerIps != nil {
+		in, out := &in.LoadBalancerIps, &out.LoadBalancerIps
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NodePorts != nil {
 		in, out := &in.NodePorts, &out.NodePorts
 		*out = make([]int, len(*in))

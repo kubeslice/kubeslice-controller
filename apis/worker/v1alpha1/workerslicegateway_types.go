@@ -29,7 +29,13 @@ type WorkerSliceGatewaySpec struct {
 	//+kubebuilder:default:=OpenVPN
 	GatewayType string `json:"gatewayType,omitempty"`
 	//+kubebuilder:validation:Enum:=Client;Server
-	GatewayHostType     string             `json:"gatewayHostType,omitempty"`
+	GatewayHostType string `json:"gatewayHostType,omitempty"`
+	//+kubebuilder:default:=NodePort
+	//+kubebuilder:validation:Enum:=NodePort;LoadBalancer
+	GatewayConnectivityType string `json:"gatewayConnectivityType,omitempty"`
+	//+kubebuilder:default:=UDP
+	//+kubebuilder:validation:Enum:=TCP;UDP
+	GatewayProtocol     string             `json:"gatewayProtocol,omitempty"`
 	GatewayCredentials  GatewayCredentials `json:"gatewayCredentials,omitempty"`
 	LocalGatewayConfig  SliceGatewayConfig `json:"localGatewayConfig,omitempty"`
 	RemoteGatewayConfig SliceGatewayConfig `json:"remoteGatewayConfig,omitempty"`
@@ -38,14 +44,15 @@ type WorkerSliceGatewaySpec struct {
 
 type SliceGatewayConfig struct {
 	//+kubebuilder:deprecatedversion:warning="worker/v1alpha1 NodeIp is deprecated...use NodeIps"
-	NodeIp        string   `json:"nodeIp,omitempty"`
-	NodeIps       []string `json:"nodeIps,omitempty"`
-	NodePort      int      `json:"nodePort,omitempty"`
-	NodePorts     []int    `json:"nodePorts,omitempty"`
-	GatewayName   string   `json:"gatewayName,omitempty"`
-	ClusterName   string   `json:"clusterName,omitempty"`
-	VpnIp         string   `json:"vpnIp,omitempty"`
-	GatewaySubnet string   `json:"gatewaySubnet,omitempty"`
+	NodeIp          string   `json:"nodeIp,omitempty"`
+	NodeIps         []string `json:"nodeIps,omitempty"`
+	LoadBalancerIps []string `json:"loadBalancerIps,omitempty"`
+	NodePort        int      `json:"nodePort,omitempty"`
+	NodePorts       []int    `json:"nodePorts,omitempty"`
+	GatewayName     string   `json:"gatewayName,omitempty"`
+	ClusterName     string   `json:"clusterName,omitempty"`
+	VpnIp           string   `json:"vpnIp,omitempty"`
+	GatewaySubnet   string   `json:"gatewaySubnet,omitempty"`
 }
 
 type GatewayCredentials struct {

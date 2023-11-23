@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	"go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -64,4 +65,20 @@ func RemoveWorkerFinalizers(ctx context.Context, object client.Object, workerFin
 		logger.With(zap.Error(err)).Errorf("Failed to cleanup finalizers")
 	}
 	return result
+}
+
+// get Slice gateway service type for each cluster registered with given slice
+func getSliceGwSvcTypes(sliceConfig *v1alpha1.SliceConfig) map[string]*v1alpha1.SliceGatewayServiceType {
+	var sliceGwSvcTypeMap = make(map[string]*v1alpha1.SliceGatewayServiceType)
+	for i := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+		gwSvctype := &sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType[i]
+		if gwSvctype.Cluster == "*" {
+			for _, cluster := range sliceConfig.Spec.Clusters {
+				sliceGwSvcTypeMap[cluster] = gwSvctype
+			}
+		} else {
+			sliceGwSvcTypeMap[gwSvctype.Cluster] = gwSvctype
+		}
+	}
+	return sliceGwSvcTypeMap
 }

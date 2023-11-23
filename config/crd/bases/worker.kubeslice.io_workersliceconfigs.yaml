@@ -117,6 +117,18 @@ spec:
                   sliceCaType:
                     default: Local
                     type: string
+                  sliceGatewayProtocol:
+                    default: UDP
+                    enum:
+                    - TCP
+                    - UDP
+                    type: string
+                  sliceGatewayServiceType:
+                    default: NodePort
+                    enum:
+                    - NodePort
+                    - LoadBalancer
+                    type: string
                   sliceGatewayType:
                     default: OpenVPN
                     type: string
