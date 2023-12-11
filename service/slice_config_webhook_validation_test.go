@@ -157,7 +157,7 @@ func test_validateSlicegatewayServiceType(t *testing.T) {
 	require.Contains(t, err.Error(), "Cluster is not participating in slice config")
 	clientMock.AssertExpectations(t)
 
-	// if defined, cluster name should be part of slice
+	// shouldn't define service config for same cluster
 	sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
 		{
 			Cluster:  "demo-cluster",
@@ -250,6 +250,20 @@ func UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType(t *testing.
 		{
 			Cluster:  "c1",
 			Protocol: "UDP",
+		},
+	}
+	require.NotNil(t, err)
+	err = ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
+	require.Contains(t, err.Error(), "Spec.SliceGatewayProvider.SliceGatewayServiceType: Forbidden:")
+	require.Contains(t, err.Error(), "updating gateway protocol is not allowed")
+	clientMock.AssertExpectations(t)
+
+	// if no protocol is defined default value is assumed to be UDP, thus protocol can't be set to TCP afterwards
+	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{}
+	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
+		{
+			Cluster:  "c1",
+			Protocol: "TCP",
 		},
 	}
 	require.NotNil(t, err)
