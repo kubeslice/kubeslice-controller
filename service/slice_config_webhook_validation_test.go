@@ -157,7 +157,7 @@ func test_validateSlicegatewayServiceType(t *testing.T) {
 	require.Contains(t, err.Error(), "Cluster is not participating in slice config")
 	clientMock.AssertExpectations(t)
 
-	// can't repeat cluster name
+	// shouldn't define service config for same cluster
 	sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
 		{
 			Cluster:  "demo-cluster",

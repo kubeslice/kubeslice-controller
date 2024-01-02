@@ -398,7 +398,7 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway protocol is not allowed")
 		}
 		// when no protocol is specified then it's assumed to be UDP, so can't be updated to TCP
-		if !exists && new.Protocol != defaultSliceGatewayServiceProtocol {
+		if util.ContainsString(sliceConfig.Spec.Clusters, new.Cluster) && !exists && new.Protocol != defaultSliceGatewayServiceProtocol {
 			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway protocol is not allowed")
 		}
 	}
