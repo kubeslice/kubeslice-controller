@@ -58,10 +58,14 @@ type ServiceDiscoveryEndpoint struct {
 type ServiceDiscoveryPort struct {
 	// The name of the port.
 	Name string `json:"name,omitempty"`
-	// The port number.
+	// The target port number.
 	Port int32 `json:"port,omitempty"`
 	// The protocol.
 	Protocol string `json:"protocol,omitempty"`
+	// The port exposed by service
+	ServicePort int32 `json:"servicePort,omitempty"`
+	// The service protocol
+	ServiceProtocol string `json:"serviceProtocol,omitempty"`
 }
 
 // WorkerServiceImportStatus defines the observed state of WorkerServiceImport

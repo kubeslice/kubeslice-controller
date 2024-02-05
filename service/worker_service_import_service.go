@@ -19,8 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kubeslice/kubeslice-controller/metrics"
 	"time"
+
+	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"github.com/kubeslice/kubeslice-controller/events"
 
@@ -424,9 +425,11 @@ func (s *WorkerServiceImportService) copySpecFromServiceExportConfigToWorkerServ
 	}
 	for _, port := range serviceExport.Spec.ServiceDiscoveryPorts {
 		sdp = append(sdp, workerv1alpha1.ServiceDiscoveryPort{
-			Name:     port.Name,
-			Port:     port.Port,
-			Protocol: port.Protocol,
+			Name:            port.Name,
+			Port:            port.Port,
+			Protocol:        port.Protocol,
+			ServicePort:     port.ServicePort,
+			ServiceProtocol: port.ServiceProtocol,
 		})
 	}
 	spec.SourceClusters = sc
