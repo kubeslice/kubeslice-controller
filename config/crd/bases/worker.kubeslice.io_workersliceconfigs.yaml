@@ -78,6 +78,12 @@ spec:
                 type: object
               octet:
                 type: integer
+              overlayNetworkDeploymentMode:
+                default: single-network
+                enum:
+                - single-network
+                - multi-network
+                type: string
               qosProfileDetails:
                 description: QOSProfile is the QOS Profile configuration from backend
                 properties:
