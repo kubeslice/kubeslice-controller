@@ -51,6 +51,9 @@ type WorkerSliceConfigSpec struct {
 	Octet                 *int                  `json:"octet"`
 	ClusterSubnetCIDR     string                `json:"clusterSubnetCIDR,omitempty"`
 	ExternalGatewayConfig ExternalGatewayConfig `json:"externalGatewayConfig,omitempty"`
+	//+kubebuilder:default:=single-network
+	//+kubebuilder:validation:Enum:=single-network;multi-network
+	OverlayNetworkDeploymentMode string `json:"overlayNetworkDeploymentMode,omitempty"`
 }
 
 // WorkerSliceGatewayProvider defines the configuration for slicegateway

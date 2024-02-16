@@ -25,7 +25,10 @@ import (
 
 // SliceConfigSpec defines the desired state of SliceConfig
 type SliceConfigSpec struct {
-	SliceSubnet string `json:"sliceSubnet,omitempty"`
+	//+kubebuilder:default:=single-network
+	//+kubebuilder:validation:Enum:=single-network;multi-network
+	OverlayNetworkDeploymentMode string `json:"overlayNetworkDeploymentMode,omitempty"`
+	SliceSubnet                  string `json:"sliceSubnet,omitempty"`
 	//+kubebuilder:default:=Application
 	SliceType string `json:"sliceType,omitempty"`
 	// +kubebuilder:validation:Required

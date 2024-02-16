@@ -103,6 +103,12 @@ spec:
                     default: false
                     type: boolean
                 type: object
+              overlayNetworkDeploymentMode:
+                default: single-network
+                enum:
+                - single-network
+                - multi-network
+                type: string
               qosProfileDetails:
                 description: The custom QOS Profile Details
                 properties:
