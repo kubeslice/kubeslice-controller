@@ -108,6 +108,7 @@ spec:
                 enum:
                 - single-network
                 - multi-network
+                - no-network
                 type: string
               qosProfileDetails:
                 description: The custom QOS Profile Details

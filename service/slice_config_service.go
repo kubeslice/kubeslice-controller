@@ -141,6 +141,10 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
+	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
+		return ctrl.Result{}, err
+	}
+
 	// Step 4: Create gateways with minimum specification
 	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {

@@ -163,6 +163,11 @@ spec:
                       type: string
                   type: object
                 type: array
+              networkPresent:
+                default: true
+                description: NetworkPresent denotes if the networking components (NSM,
+                  Spire) are installed on a cluster
+                type: boolean
               nodeIPs:
                 description: NodeIPs of the gateway node of worker cluster
                 items:

@@ -23,12 +23,26 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// +kubebuilder:validation:Enum:=single-network;multi-network;no-network
+type NetworkType string
+
+const (
+	// all workloads would be connected to the slice l3 overlay network
+	SINGLENET NetworkType = "single-network"
+
+	// workloads would be connected at l7 through network of envoy gateways.
+	// And the gateways would be connected through slice l3 overlay
+	MULTINET NetworkType = "multi-network"
+
+	// slice without any connectivity between clusters
+	NONET NetworkType = "no-network"
+)
+
 // SliceConfigSpec defines the desired state of SliceConfig
 type SliceConfigSpec struct {
 	//+kubebuilder:default:=single-network
-	//+kubebuilder:validation:Enum:=single-network;multi-network
-	OverlayNetworkDeploymentMode string `json:"overlayNetworkDeploymentMode,omitempty"`
-	SliceSubnet                  string `json:"sliceSubnet,omitempty"`
+	OverlayNetworkDeploymentMode NetworkType `json:"overlayNetworkDeploymentMode,omitempty"`
+	SliceSubnet                  string      `json:"sliceSubnet,omitempty"`
 	//+kubebuilder:default:=Application
 	SliceType string `json:"sliceType,omitempty"`
 	// +kubebuilder:validation:Required
