@@ -17,6 +17,7 @@
 package v1alpha1
 
 import (
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -52,8 +53,7 @@ type WorkerSliceConfigSpec struct {
 	ClusterSubnetCIDR     string                `json:"clusterSubnetCIDR,omitempty"`
 	ExternalGatewayConfig ExternalGatewayConfig `json:"externalGatewayConfig,omitempty"`
 	//+kubebuilder:default:=single-network
-	//+kubebuilder:validation:Enum:=single-network;multi-network
-	OverlayNetworkDeploymentMode string `json:"overlayNetworkDeploymentMode,omitempty"`
+	OverlayNetworkDeploymentMode controllerv1alpha1.NetworkType `json:"overlayNetworkDeploymentMode,omitempty"`
 }
 
 // WorkerSliceGatewayProvider defines the configuration for slicegateway
