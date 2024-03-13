@@ -9,11 +9,11 @@ using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/acce
 ## Get Started
 
 The KubeSlice Controller orchestrates the creation and management of slices on worker clusters.
-It is strongly recommended that you use a released version. Follow the instructions provided in this [document](https://kubeslice.io/documentation/open-source/1.1.0/category/install-kubeslice) to install Kubeslice on cloud clusters.
+It is strongly recommended that you use a released version. Follow the instructions provided in this [document](https://kubeslice.io/documentation/open-source/1.2.0/category/install-kubeslice) to install Kubeslice on cloud clusters.
 
 ## Build and Deploy a KubeSlice Controller on a Kind Cluster
 
-See our documentation on [installing the KubeSlice Controller](https://kubeslice.io/documentation/open-source/1.1.0/install-kubeslice/yaml/yaml-controller-install).
+See our documentation on [installing the KubeSlice Controller](https://kubeslice.io/documentation/open-source/1.2.0/install-kubeslice/yaml/yaml-controller-install).
 
 ### Prerequisites
 
@@ -22,7 +22,7 @@ Before you begin, make sure the following prerequisites are met:
 * Docker is installed and running on your local machine.
 * A running [`kind`](https://kind.sigs.k8s.io/) cluster.
 * [`kubectl`](https://kubernetes.io/docs/tasks/tools/) is installed and configured.
-* You have prepared the environment for the installation of [`kubeslice-controller`](https://github.com/kubeslice/kubeslice-controller) on the controller cluster and [`worker-operator`](https://github.com/kubeslice/worker-operator) on the worker cluster. For more information, see [Prerequisites](https://kubeslice.io/documentation/open-source/1.1.0/category/prerequisites)
+* You have prepared the environment for the installation of [`kubeslice-controller`](https://github.com/kubeslice/kubeslice-controller) on the controller cluster and [`worker-operator`](https://github.com/kubeslice/worker-operator) on the worker cluster. For more information, see [Prerequisites](https://kubeslice.io/documentation/open-source/1.2.0/category/prerequisites).
 
 ### Set up Your Helm Repo
 If you have not added avesha helm repo yet, add it.
@@ -129,7 +129,7 @@ kubeslice-controller-manager-5b548fb865-kzb7c   2/2     Running   0          102
 ```
 
 ### Uninstall the KubeSlice Controller
-For more information, see [uninstall KubeSlice](https://kubeslice.io/documentation/open-source/1.1.0/uninstall-kubeslice/).
+For more information, see [uninstall KubeSlice](https://kubeslice.io/documentation/open-source/1.2.0/uninstall-kubeslice/).
 
 ```console
 make chart-undeploy
