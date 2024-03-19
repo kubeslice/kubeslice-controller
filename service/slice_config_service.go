@@ -142,7 +142,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	// Step 4: Create gateways with minimum specification
