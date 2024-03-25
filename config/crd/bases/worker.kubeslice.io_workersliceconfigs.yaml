@@ -150,8 +150,6 @@ spec:
               sliceType:
                 default: Application
                 type: string
-            required:
-            - octet
             type: object
           status:
             description: WorkerSliceConfigStatus defines the observed state of Slice

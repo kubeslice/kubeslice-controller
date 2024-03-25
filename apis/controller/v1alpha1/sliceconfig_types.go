@@ -44,9 +44,8 @@ type SliceConfigSpec struct {
 	OverlayNetworkDeploymentMode NetworkType `json:"overlayNetworkDeploymentMode,omitempty"`
 	SliceSubnet                  string      `json:"sliceSubnet,omitempty"`
 	//+kubebuilder:default:=Application
-	SliceType string `json:"sliceType,omitempty"`
-	// +kubebuilder:validation:Required
-	SliceGatewayProvider WorkerSliceGatewayProvider `json:"sliceGatewayProvider"`
+	SliceType            string                      `json:"sliceType,omitempty"`
+	SliceGatewayProvider *WorkerSliceGatewayProvider `json:"sliceGatewayProvider,omitempty"`
 	//+kubebuilder:default:=Local
 	SliceIpamType          string   `json:"sliceIpamType,omitempty"`
 	Clusters               []string `json:"clusters,omitempty"`
@@ -58,7 +57,7 @@ type SliceConfigSpec struct {
 	//+kubebuilder:validation:Minimum=2
 	//+kubebuilder:validation:Maximum=32
 	//+kubebuilder:default:=16
-	MaxClusters int `json:"maxClusters,omitempty"`
+	MaxClusters int `json:"maxClusters"`
 	//+kubebuilder:validation:Minimum=30
 	//+kubebuilder:validation:Maximum=90
 	//+kubebuilder:default:=30

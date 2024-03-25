@@ -164,7 +164,7 @@ spec:
                   type: object
                 type: array
               networkPresent:
-                default: true
+                default: false
                 description: NetworkPresent denotes if the networking components (NSM,
                   Spire) are installed on a cluster
                 type: boolean

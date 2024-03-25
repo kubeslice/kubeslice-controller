@@ -128,21 +128,26 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	// Step 3: Creation of worker slice Objects and Cluster Labels
-	// get cluster cidr from maxClusters of slice config
-	clusterCidr := util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
+
+	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
+		// Try Cleanup
+		err = s.ms.CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name)
+		return ctrl.Result{}, err
+	}
+
+	// Step 3: Creation of worker slice Objects and Cluster Labels
+	// get cluster cidr from maxClusters of slice config
+	clusterCidr := ""
+	clusterCidr = util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
+
 	// collect slice gw svc info for given clusters
 	sliceGwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
 
 	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err
-	}
-
-	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
-		return ctrl.Result{}, nil
 	}
 
 	// Step 4: Create gateways with minimum specification

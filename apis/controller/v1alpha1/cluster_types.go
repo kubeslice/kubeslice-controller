@@ -126,7 +126,7 @@ type ClusterStatus struct {
 	// IsDeregisterInProgress is the flag to check if the cluster deregister is InProgress
 	IsDeregisterInProgress bool `json:"isDeregisterInProgress,omitempty"`
 	// NetworkPresent denotes if the networking components (NSM, Spire) are installed on a cluster
-	//+kubebuilder:default:=true
+	//+kubebuilder:default:=false
 	NetworkPresent bool `json:"networkPresent,omitempty"`
 
 	// VCPURestriction is the restriction on the cluster disabling the creation of new pods

@@ -220,7 +220,7 @@ spec:
                 - cipher
                 type: object
             required:
-            - sliceGatewayProvider
+            - maxClusters
             type: object
           status:
             description: SliceConfigStatus defines the observed state of SliceConfig

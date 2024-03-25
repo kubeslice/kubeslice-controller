@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
@@ -27,7 +29,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // SliceConfigReconciler reconciles a SliceConfig object
@@ -45,9 +50,25 @@ func (r *SliceConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return r.SliceConfigService.ReconcileSliceConfig(kubeSliceCtx, req)
 }
 
+func networkTransitionPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(ue event.UpdateEvent) bool {
+			oldResource := ue.ObjectOld.(*controllerv1alpha1.SliceConfig)
+			newResource := ue.ObjectNew.(*controllerv1alpha1.SliceConfig)
+			shouldReconcile := true
+			if oldResource.Spec.OverlayNetworkDeploymentMode != newResource.Spec.OverlayNetworkDeploymentMode {
+				fmt.Println("Network Transition Detected")
+				shouldReconcile = false
+			}
+
+			return shouldReconcile
+		},
+	}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *SliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&controllerv1alpha1.SliceConfig{}).
+		For(&controllerv1alpha1.SliceConfig{}, builder.WithPredicates(networkTransitionPredicate())).
 		Complete(r)
 }
