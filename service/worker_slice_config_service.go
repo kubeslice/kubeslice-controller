@@ -43,6 +43,7 @@ type IWorkerSliceConfigService interface {
 	ListWorkerSliceConfigs(ctx context.Context, ownerLabel map[string]string, namespace string) ([]workerv1alpha1.WorkerSliceConfig, error)
 	ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int
 	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error)
+	CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx context.Context, clusters []string, namespace string, label map[string]string, name string) error
 }
 
 // WorkerSliceConfigService implements the IWorkerSliceConfigService interface
@@ -403,6 +404,120 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		}
 	}
 	return clusterMap, nil
+}
+
+func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx context.Context, clusters []string, namespace string, label map[string]string, name string) error {
+
+	logger := util.CtxLogger(ctx)
+
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(name)
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(name)
+
+	err := s.cleanUpSlices(ctx, label, namespace, clusters)
+	if err != nil {
+		return err
+	}
+	for _, cluster := range clusters {
+		logger.Debugf("Cluster Object %s", cluster)
+		workerSliceConfigName := fmt.Sprintf(workerSliceConfigNameFormat, name, cluster)
+		existingSlice := &workerv1alpha1.WorkerSliceConfig{}
+		found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
+			Name:      workerSliceConfigName,
+			Namespace: namespace,
+		}, existingSlice)
+
+		if err != nil {
+			return err
+		}
+		if !found {
+			label["project-namespace"] = namespace
+			label["original-slice-name"] = name
+			label["worker-cluster"] = cluster
+			label["kubeslice-manager"] = "controller"
+
+			expectedSlice := workerv1alpha1.WorkerSliceConfig{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      workerSliceConfigName,
+					Labels:    label,
+					Namespace: namespace,
+				},
+			}
+			expectedSlice.Spec.SliceName = name
+			err = util.CreateResource(ctx, &expectedSlice)
+			if err != nil {
+				//Register an event for worker slice config creation failure
+				util.RecordEvent(ctx, eventRecorder, &expectedSlice, nil, events.EventWorkerSliceConfigCreationFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "creation_failed",
+						"event":       string(events.EventWorkerSliceConfigCreationFailed),
+						"object_name": expectedSlice.Name,
+						"object_kind": metricKindWorkerSliceConfig,
+					},
+				)
+				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
+					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
+						expectedSlice.Name, namespace)
+					return err
+				}
+			}
+			//Register an event for worker slice config creation success
+			util.RecordEvent(ctx, eventRecorder, &expectedSlice, nil, events.EventWorkerSliceConfigCreated)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "created",
+					"event":       string(events.EventWorkerSliceConfigCreated),
+					"object_name": expectedSlice.Name,
+					"object_kind": metricKindWorkerSliceConfig,
+				},
+			)
+		} else {
+			existingSlice.UID = ""
+			if existingSlice.Annotations == nil {
+				existingSlice.Annotations = make(map[string]string)
+			}
+			existingSlice.Annotations["updatedTimestamp"] = time.Now().String()
+			err = util.UpdateResource(ctx, existingSlice)
+			if err != nil {
+				//Register an event for worker slice config update failure
+				util.RecordEvent(ctx, eventRecorder, existingSlice, nil, events.EventWorkerSliceConfigUpdateFailed)
+				s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "update_failed",
+						"event":       string(events.EventWorkerSliceConfigUpdateFailed),
+						"object_name": existingSlice.Name,
+						"object_kind": metricKindWorkerSliceConfig,
+					},
+				)
+				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
+					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
+						workerSliceConfigName, namespace)
+					return err
+				}
+			}
+			//Register an event for worker slice config update success
+			util.RecordEvent(ctx, eventRecorder, existingSlice, nil, events.EventWorkerSliceConfigUpdated)
+			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "updated",
+					"event":       string(events.EventWorkerSliceConfigUpdated),
+					"object_name": existingSlice.Name,
+					"object_kind": metricKindWorkerSliceConfig,
+				},
+			)
+		}
+	}
+
+	return nil
 }
 
 // DeleteWorkerSliceConfigByLabel is a function to delete configs of workerslice by label

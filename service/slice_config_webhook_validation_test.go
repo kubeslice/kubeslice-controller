@@ -213,7 +213,7 @@ func UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType(t *testing.
 			Namespace: namespace,
 		},
 		Spec: controllerv1alpha1.SliceConfigSpec{
-			SliceGatewayProvider: controllerv1alpha1.WorkerSliceGatewayProvider{
+			SliceGatewayProvider: &controllerv1alpha1.WorkerSliceGatewayProvider{
 				SliceGatewayServiceType: []controllerv1alpha1.SliceGatewayServiceType{
 					{
 						Cluster: "c1",

@@ -47,7 +47,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 				Clusters:    []string{"worker-1", "worker-2"},
 				MaxClusters: 4,
 				SliceSubnet: "10.1.0.0/16",
-				SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+				SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
 					SliceGatewayType: "OpenVPN",
 					SliceCaType:      "Local",
 				},
@@ -200,7 +200,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 					Clusters:    []string{"worker-1", "worker-2"},
 					MaxClusters: 4,
 					SliceSubnet: "10.1.0.0/16",
-					SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
 						SliceGatewayType: "OpenVPN",
 						SliceCaType:      "Local",
 					},
@@ -452,7 +452,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 				Clusters:    []string{"worker-1", "worker-2"},
 				MaxClusters: 4,
 				SliceSubnet: "10.1.0.0/16",
-				SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+				SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
 					SliceGatewayType: "OpenVPN",
 					SliceCaType:      "Local",
 				},
@@ -661,7 +661,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 				Clusters:    []string{"worker-1", "worker-2"},
 				MaxClusters: 4,
 				SliceSubnet: "10.1.0.0/16",
-				SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+				SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
 					SliceGatewayType: "OpenVPN",
 					SliceCaType:      "Local",
 				},
