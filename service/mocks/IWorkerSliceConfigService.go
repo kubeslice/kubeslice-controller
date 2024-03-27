@@ -60,6 +60,20 @@ func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.
 	return r0, r1
 }
 
+// CreateMinimalWorkerSliceConfigForNoNetworkSlice provides a mock function with given fields: ctx, clusters, namespace, label, name
+func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx context.Context, clusters []string, namespace string, label map[string]string, name string) error {
+	ret := _m.Called(ctx, clusters, namespace, label, name)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string) error); ok {
+		r0 = rf(ctx, clusters, namespace, label, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteWorkerSliceConfigByLabel provides a mock function with given fields: ctx, label, namespace
 func (_m *IWorkerSliceConfigService) DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error {
 	ret := _m.Called(ctx, label, namespace)

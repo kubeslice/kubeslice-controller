@@ -43,19 +43,7 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateProjectNamespace(ctx, sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	if err := validateSliceSubnet(sliceConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
 	if err := validateClustersOnCreate(ctx, sliceConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
-	if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
-	if err := validateQosProfile(ctx, sliceConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
-	if err := validateExternalGatewayConfig(sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateApplicationNamespaces(ctx, sliceConfig); err != nil {
@@ -70,24 +58,43 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateMaxClusterCount(sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
+		if err := validateSliceSubnet(sliceConfig); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+		if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+		if err := validateQosProfile(ctx, sliceConfig); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+		if err := validateExternalGatewayConfig(sliceConfig); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+	}
 	return nil
 }
 
 // ValidateSliceConfigUpdate is function to verify the update of slice config
 func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, old runtime.Object) error {
-	if err := preventUpdate(ctx, sliceConfig, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	oldSc := old.(*controllerv1alpha1.SliceConfig)
+	isNetworkTransitioning := sliceConfig.Spec.OverlayNetworkDeploymentMode != oldSc.Spec.OverlayNetworkDeploymentMode
+
+	if isNetworkTransitioning && sliceConfig.Spec.OverlayNetworkDeploymentMode == controllerv1alpha1.NONET {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{
+			field.Forbidden(field.NewPath("Spec").Child("OverlayNetworkDeploymentMode"), fmt.Sprintf("Slice cannot be transitioned to %v mode from %v mode", sliceConfig.Spec.OverlayNetworkDeploymentMode, oldSc.Spec.OverlayNetworkDeploymentMode)),
+		})
+
 	}
+	// if overlay network deployment mode is transitioning, we can allow change in optional fields
+	if !isNetworkTransitioning {
+		if err := preventUpdate(ctx, sliceConfig, old); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+	}
+
+	// Common validations to be done irrespective of overlay network deployment mode
 	if err := validateClustersOnUpdate(ctx, sliceConfig, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
-	if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
-	if err := validateQosProfile(ctx, sliceConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
-	if err := validateExternalGatewayConfig(sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateApplicationNamespaces(ctx, sliceConfig); err != nil {
@@ -99,15 +106,35 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	if err := preventMaxClusterCountUpdate(ctx, sliceConfig, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	// Validate single/multi overlay network deployment mode specific fields
+	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
+		if err := validateSliceSubnet(sliceConfig); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+		if !isNetworkTransitioning {
+			if err := preventMaxClusterCountUpdate(ctx, sliceConfig, old); err != nil {
+				return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+			}
+		}
+		if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+		if err := validateQosProfile(ctx, sliceConfig); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+		if err := validateExternalGatewayConfig(sliceConfig); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+
+		if err := validateRenewNowInSliceConfig(ctx, sliceConfig, old); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+		if _, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, old); err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+
 	}
-	if err := validateRenewNowInSliceConfig(ctx, sliceConfig, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
-	if _, err := validateRotationIntervalInSliceConfig(ctx, sliceConfig, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
-	}
+
 	return nil
 }
 
@@ -231,6 +258,9 @@ func checkNamespaceDeboardingStatus(ctx context.Context, sliceConfig *controller
 
 // validateSliceSubnet is function to validate the the subnet of slice
 func validateSliceSubnet(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if sliceConfig.Spec.SliceSubnet == "" {
+		return field.Required(field.NewPath("Spec").Child("SliceSubnet"), "SliceSubnet is required for slice config")
+	}
 	if !util.IsPrivateSubnet(sliceConfig.Spec.SliceSubnet) {
 		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), sliceConfig.Spec.SliceSubnet, "must be a private subnet")
 	}
@@ -283,12 +313,18 @@ func validateClustersOnCreate(ctx context.Context, sliceConfig *controllerv1alph
 		if len(cluster.Spec.NodeIPs) == 0 && len(cluster.Status.NodeIPs) == 0 {
 			return field.NotFound(field.NewPath("Status").Child("NodeIPs"), "in cluster "+clusterName+". Autodetected node IPs are not available. Possible cause: Slice Operator installation is pending on the cluster.")
 		}
-		if len(cluster.Status.CniSubnet) == 0 {
-			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
-		}
-		for _, cniSubnet := range cluster.Status.CniSubnet {
-			if util.OverlapIP(cniSubnet, sliceConfig.Spec.SliceSubnet) {
-				return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
+		// If overlay network is enabled, check if network components are installed and cluster's CNI subnet is set and not overlapping with slice subnet
+		if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
+			if !cluster.Status.NetworkPresent {
+				return field.Invalid(field.NewPath("Spec").Child("Clusters").Index(i), clusterName, "cluster network is not present")
+			}
+			if len(cluster.Status.CniSubnet) == 0 {
+				return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
+			}
+			for _, cniSubnet := range cluster.Status.CniSubnet {
+				if util.OverlapIP(cniSubnet, sliceConfig.Spec.SliceSubnet) {
+					return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
+				}
 			}
 		}
 	}
@@ -324,12 +360,17 @@ func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alph
 		if len(cluster.Spec.NodeIPs) == 0 && len(cluster.Status.NodeIPs) == 0 {
 			return field.NotFound(field.NewPath("Status").Child("NodeIPs"), "in cluster "+clusterName+". Autodetected node IPs are not available. Possible cause: Slice Operator installation is pending on the cluster.")
 		}
-		if len(cluster.Status.CniSubnet) == 0 {
-			return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
-		}
-		for _, cniSubnet := range cluster.Status.CniSubnet {
-			if util.OverlapIP(cniSubnet, sliceConfig.Spec.SliceSubnet) {
-				return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
+		if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
+			if !cluster.Status.NetworkPresent {
+				return field.Invalid(field.NewPath("Spec").Child("Clusters").Index(i), clusterName, "cluster network is not present")
+			}
+			if len(cluster.Status.CniSubnet) == 0 {
+				return field.NotFound(field.NewPath("Status").Child("CniSubnet"), "in cluster "+clusterName+". Possible cause: Slice Operator installation is pending on the cluster.")
+			}
+			for _, cniSubnet := range cluster.Status.CniSubnet {
+				if util.OverlapIP(cniSubnet, sliceConfig.Spec.SliceSubnet) {
+					return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
+				}
 			}
 		}
 	}
@@ -338,6 +379,10 @@ func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alph
 
 // to validate the SlicegatewayServiceType array
 func validateSlicegatewayServiceType(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if sliceConfig.Spec.SliceGatewayProvider == nil {
+		return field.Required(field.NewPath("Spec").Child("SliceGatewayProvider"), "SliceGatewayProvider is required for slice config")
+
+	}
 	freq := make(map[string]int)
 	for _, sliceGwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
 		cluster := sliceGwSvcType.Cluster
@@ -367,11 +412,13 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 	if sliceConfig.Spec.SliceType != sc.Spec.SliceType {
 		return field.Invalid(field.NewPath("Spec").Child("SliceType"), sc.Spec.SliceType, "cannot be updated")
 	}
-	if sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType != sc.Spec.SliceGatewayProvider.SliceGatewayType {
-		return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayType"), sc.Spec.SliceGatewayProvider.SliceGatewayType, "cannot be updated")
-	}
-	if sliceConfig.Spec.SliceGatewayProvider.SliceCaType != sc.Spec.SliceGatewayProvider.SliceCaType {
-		return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceCaType"), sc.Spec.SliceGatewayProvider.SliceCaType, "cannot be updated")
+	if sliceConfig.Spec.SliceGatewayProvider != nil && sc.Spec.SliceGatewayProvider != nil {
+		if sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType != sc.Spec.SliceGatewayProvider.SliceGatewayType {
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayType"), sc.Spec.SliceGatewayProvider.SliceGatewayType, "cannot be updated")
+		}
+		if sliceConfig.Spec.SliceGatewayProvider.SliceCaType != sc.Spec.SliceGatewayProvider.SliceCaType {
+			return field.Invalid(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceCaType"), sc.Spec.SliceGatewayProvider.SliceCaType, "cannot be updated")
+		}
 	}
 	if sliceConfig.Spec.SliceIpamType != sc.Spec.SliceIpamType {
 		return field.Invalid(field.NewPath("Spec").Child("SliceIpamType"), sc.Spec.SliceIpamType, "cannot be updated")
@@ -387,19 +434,21 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 	gwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
 
 	// check new config
-	for _, new := range sc.Spec.SliceGatewayProvider.SliceGatewayServiceType {
-		oldType, exists := gwSvcTypeMap[new.Cluster]
-		// allow user to update NodePort to LoadBalancer but not vice versa
-		if exists && oldType.Type != defaultSliceGatewayServiceType && new.Type != oldType.Type {
-			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway service type is not allowed")
-		}
-		// don't allow user to update TCP to UDP & vice versa
-		if exists && new.Protocol != oldType.Protocol {
-			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway protocol is not allowed")
-		}
-		// when no protocol is specified then it's assumed to be UDP, so can't be updated to TCP
-		if util.ContainsString(sliceConfig.Spec.Clusters, new.Cluster) && !exists && new.Protocol != defaultSliceGatewayServiceProtocol {
-			return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway protocol is not allowed")
+	if sc.Spec.SliceGatewayProvider != nil && gwSvcTypeMap != nil {
+		for _, new := range sc.Spec.SliceGatewayProvider.SliceGatewayServiceType {
+			oldType, exists := gwSvcTypeMap[new.Cluster]
+			// allow user to update NodePort to LoadBalancer but not vice versa
+			if exists && oldType.Type != defaultSliceGatewayServiceType && new.Type != oldType.Type {
+				return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway service type is not allowed")
+			}
+			// don't allow user to update TCP to UDP & vice versa
+			if exists && new.Protocol != oldType.Protocol {
+				return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway protocol is not allowed")
+			}
+			// when no protocol is specified then it's assumed to be UDP, so can't be updated to TCP
+			if util.ContainsString(sliceConfig.Spec.Clusters, new.Cluster) && !exists && new.Protocol != defaultSliceGatewayServiceProtocol {
+				return field.Forbidden(field.NewPath("Spec").Child("SliceGatewayProvider").Child("SliceGatewayServiceType"), "updating gateway protocol is not allowed")
+			}
 		}
 	}
 	return nil
@@ -589,13 +638,15 @@ func validateMaxClusterCount(s *controllerv1alpha1.SliceConfig) *field.Error {
 
 // prevent update MaxClusterCount if it is already set
 func preventMaxClusterCountUpdate(ctx context.Context, s *controllerv1alpha1.SliceConfig, old runtime.Object) *field.Error {
-	sliceConfig := old.(*controllerv1alpha1.SliceConfig)
-	if sliceConfig.Spec.MaxClusters != s.Spec.MaxClusters {
+	oldSc := old.(*controllerv1alpha1.SliceConfig)
+
+	if s.Spec.MaxClusters != oldSc.Spec.MaxClusters {
 		return field.Invalid(field.NewPath("Spec").Child("MaxClusterCount"), s.Spec.MaxClusters, "MaxClusterCount cannot be updated.")
 	}
 	if len(s.Spec.Clusters) > s.Spec.MaxClusters {
 		return field.Invalid(field.NewPath("Spec").Child("Clusters"), s.Spec.Clusters, "participating clusters cannot be greater than MaxClusterCount :"+strconv.Itoa(s.Spec.MaxClusters))
 	}
+
 	return nil
 }
 

@@ -271,9 +271,12 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	}
 
 	//Step 6: NodeIP Reconciliation to WorkerSliceGateways
-	err = c.sgws.NodeIpReconciliationOfWorkerSliceGateways(ctx, cluster, req.Namespace)
-	if err != nil {
-		return ctrl.Result{}, err
+	// Should be only done if Network componets are present
+	if cluster.Status.NetworkPresent {
+		err = c.sgws.NodeIpReconciliationOfWorkerSliceGateways(ctx, cluster, req.Namespace)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	logger.Infof("cluster %v reconciled", req.NamespacedName)

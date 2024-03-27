@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -162,7 +163,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 					Clusters:    []string{"worker-1", "worker-2"},
 					MaxClusters: 4,
 					SliceSubnet: "10.1.0.0/16",
-					SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
 						SliceGatewayType: "OpenVPN",
 						SliceCaType:      "Local",
 					},
@@ -278,7 +279,7 @@ var _ = Describe("Slice Config controller Tests", Ordered, func() {
 					Clusters:    []string{"worker-1", "worker-2"},
 					MaxClusters: 4,
 					SliceSubnet: "10.1.0.0/16",
-					SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
 						SliceGatewayType: "OpenVPN",
 						SliceCaType:      "Local",
 					},

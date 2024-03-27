@@ -32,7 +32,7 @@ func test_getSliceGwSvcTypes(t *testing.T) {
 			Namespace: "test-ns",
 		},
 		Spec: v1alpha1.SliceConfigSpec{
-			SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+			SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
 				SliceGatewayServiceType: []v1alpha1.SliceGatewayServiceType{
 					{
 						Cluster:  "c1",
@@ -67,7 +67,7 @@ func test_getSliceGwSvcTypes_wildcard(t *testing.T) {
 			Clusters: []string{
 				"c1", "c2", "cx",
 			},
-			SliceGatewayProvider: v1alpha1.WorkerSliceGatewayProvider{
+			SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
 				SliceGatewayServiceType: []v1alpha1.SliceGatewayServiceType{
 					{
 						Cluster: "*",
