@@ -125,12 +125,16 @@ func test_validateSlicegatewayServiceType(t *testing.T) {
 	name := "test-slice"
 	namespace := "test-ns"
 	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	// if defined, cluster name can't be empty
+	sliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{
+		SliceGatewayType: "some",
+		SliceCaType:      "value",
+	}
 	// slicegatewayServiceType definition is optional
 	err := validateSlicegatewayServiceType(ctx, sliceConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 
-	// if defined, cluster name can't be empty
 	sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
 		{
 			Type:     "Loadbalancer",
@@ -225,6 +229,7 @@ func UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType(t *testing.
 		},
 	}
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType = []controllerv1alpha1.SliceGatewayServiceType{
 		{
 			Cluster: "c1",
@@ -324,6 +329,23 @@ func CreateValidateSliceConfigSubnetIsNotPrivate(t *testing.T) {
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 	}).Once()
 	sliceConfig.Spec.SliceSubnet = "34.2.0.0/16"
+	sliceConfig.Spec.Clusters = []string{"cluster-1"}
+	sliceConfig.Spec.MaxClusters = 16
+	sliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
+	clusterCniSubnet := "48.2.0.0/16"
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
+		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.NetworkPresent = true
+	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.sliceSubnet: Invalid value:")
@@ -346,6 +368,7 @@ func CreateValidateSliceConfigSubnetHasPrefixOtherThan16(t *testing.T) {
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 	}).Once()
 	sliceConfig.Spec.SliceSubnet = "192.168.0.0/32"
+	sliceConfig.Spec.MaxClusters = 16
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.sliceSubnet: Invalid value:")
@@ -368,6 +391,7 @@ func CreateValidateSliceConfigSubnetHasLastTwoOctetsOtherThanZero(t *testing.T) 
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 	}).Once()
 	sliceConfig.Spec.SliceSubnet = "192.168.1.1/16"
+	sliceConfig.Spec.MaxClusters = 16
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.sliceSubnet: Invalid value:")
@@ -549,6 +573,7 @@ func CreateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster(t *testin
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
 		arg.Status.CniSubnet = []string{}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
@@ -584,6 +609,7 @@ func CreateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipa
 		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
@@ -607,6 +633,8 @@ func CreateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 	}).Once()
 	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	sliceConfig.Spec.MaxClusters = 16
+	sliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType:               "SomeType",
 		BandwidthGuaranteedKbps: 5120,
@@ -633,6 +661,8 @@ func CreateValidateSliceConfigWithExternalGatewayConfigClusterHasAsteriskAndOthe
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 	}).Once()
 	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	sliceConfig.Spec.MaxClusters = 16
+	sliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	sliceConfig.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
 		{
 			Clusters: []string{"*", "cluster-1"},
@@ -668,6 +698,8 @@ func CreateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 		},
 	}
 	sliceConfig.Spec.Clusters = []string{"cluster-1"}
+	sliceConfig.Spec.MaxClusters = 16
+	sliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	clusterCniSubnet := "10.10.1.1/16"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[0],
@@ -680,6 +712,7 @@ func CreateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "SomeType",
@@ -705,6 +738,8 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOne
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 	}).Once()
 	sliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	sliceConfig.Spec.MaxClusters = 16
+	sliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	sliceConfig.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
 		{
 			Clusters: []string{"*"},
@@ -746,6 +781,8 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		},
 	}
 	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	sliceConfig.Spec.MaxClusters = 16
+	sliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	clusterCniSubnet := "10.10.1.1/16"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[0],
@@ -758,6 +795,7 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[1],
@@ -770,6 +808,7 @@ func CreateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "SomeType",
@@ -818,6 +857,7 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 	sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Namespace = "randomNamespace"
 	sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters = []string{"cluster-1"}
 	sliceConfig.Spec.MaxClusters = 2
+	sliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	clusterCniSubnet := "10.10.1.1/16"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[0],
@@ -830,6 +870,7 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[1],
@@ -842,6 +883,7 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[0],
@@ -853,6 +895,7 @@ func CreateValidateSliceConfigWithoutErrors(t *testing.T) {
 		}
 		arg.Status.Namespaces[0].Name = "randomNamespace"
 		arg.Status.Namespaces[0].SliceName = ""
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.Nil(t, err)
@@ -915,10 +958,12 @@ func UpdateValidateSliceConfigUpdatingSliceGatewayType(t *testing.T) {
 	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
 		Cipher: "AES-256-CBC",
 	}
+	oldSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	oldSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	newSliceConfig.Spec.SliceGatewayProvider.SliceGatewayType = "TYPE_2"
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
@@ -932,10 +977,12 @@ func UpdateValidateSliceConfigUpdatingSliceCaType(t *testing.T) {
 	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
 		Cipher: "AES-256-CBC",
 	}
+	oldSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	oldSliceConfig.Spec.SliceGatewayProvider.SliceCaType = "TYPE_1"
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	newSliceConfig.Spec.SliceGatewayProvider.SliceCaType = "TYPE_2"
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(&oldSliceConfig))
 	require.NotNil(t, err)
@@ -1099,6 +1146,8 @@ func UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess(t *testing.T) {
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	clusterCniSubnet := "10.10.1.1/16"
 	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType:               "SomeType",
 		BandwidthGuaranteedKbps: 5120,
@@ -1112,7 +1161,7 @@ func UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"11.11.14.114"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
-
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.Nil(t, err)
@@ -1124,6 +1173,8 @@ func UpdateValidateSliceConfigWithNodeIPsInStatusIsSuccess(t *testing.T) {
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
 	clusterCniSubnet := "10.10.1.1/16"
 	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType:               "SomeType",
 		BandwidthGuaranteedKbps: 5120,
@@ -1137,6 +1188,7 @@ func UpdateValidateSliceConfigWithNodeIPsInStatusIsSuccess(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Status.NodeIPs = []string{"11.11.14.114"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.Nil(t, err)
@@ -1155,6 +1207,7 @@ func UpdateValidateSliceConfigWithCniSubnetEmptyInParticipatingCluster(t *testin
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
@@ -1176,6 +1229,7 @@ func UpdateValidateSliceConfigWithOverlappingSliceSubnetWithCniSubnetOfParticipa
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
@@ -1194,6 +1248,8 @@ func UpdateValidateSliceConfigWithBandwidthGuaranteedGreaterThanBandwidthCeiling
 		BandwidthGuaranteedKbps: 5120,
 		BandwidthCeilingKbps:    4096,
 	}
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.QosProfileDetails.BandwidthGuaranteedKbps: Invalid value:")
@@ -1205,6 +1261,11 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterHasAsteriskAndOthe
 	name := "slice_config"
 	namespace := "namespace"
 	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{
+		SliceGatewayType: "SomeType",
+		SliceCaType:      "SomeType",
+	}
 	newSliceConfig.Spec.ExternalGatewayConfig = []controllerv1alpha1.ExternalGatewayConfig{
 		{
 			Clusters: []string{"*", "cluster-1"},
@@ -1230,6 +1291,9 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 		},
 	}
 	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
+	newSliceConfig.Spec.MaxClusters = 2
 	clusterCniSubnet := "10.10.1.1/16"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -1238,6 +1302,11 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigClusterIsNotParticipating
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "SomeType",
@@ -1264,6 +1333,9 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasAsterisksInMoreThanOne
 	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "SomeType",
 	}
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	newSliceConfig.Spec.MaxClusters = 2
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ExternalGatewayConfig.Clusters: Invalid value:")
@@ -1287,6 +1359,9 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "SomeType",
 	}
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	newSliceConfig.Spec.MaxClusters = 2
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	clusterCniSubnet := "10.10.1.1/16"
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -1295,6 +1370,7 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[1],
@@ -1303,6 +1379,7 @@ func UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters(t *t
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
@@ -1323,6 +1400,8 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 		},
 	}
 	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{}
 	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType:               "SomeType",
 		BandwidthGuaranteedKbps: 4096,
@@ -1345,6 +1424,7 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[1],
@@ -1353,6 +1433,7 @@ func UpdateValidateSliceConfigWithoutErrors(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[0],
@@ -1640,6 +1721,7 @@ func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
 		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      sliceConfig.Spec.Clusters[1],
@@ -1652,6 +1734,7 @@ func ValidateSliceConfigCreateWithErrorInNSIsolationProfile(t *testing.T) {
 		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
 			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
 		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigCreate(ctx, sliceConfig)
 	require.NotNil(t, err)
@@ -1683,6 +1766,11 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name:      newSliceConfig.Spec.Clusters[1],
@@ -1691,6 +1779,11 @@ func ValidateSliceConfigUpdateWithErrorInNSIsolationProfile(t *testing.T) {
 		arg := args.Get(2).(*controllerv1alpha1.Cluster)
 		arg.Spec.NodeIPs = []string{"10.10.1.1"}
 		arg.Status.CniSubnet = []string{clusterCniSubnet}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.NetworkPresent = true
 	}).Once()
 	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(newSliceConfig))
 	require.NotNil(t, err)
