@@ -108,6 +108,7 @@ spec:
                 enum:
                 - single-network
                 - multi-network
+                - no-network
                 type: string
               qosProfileDetails:
                 description: The custom QOS Profile Details
@@ -219,7 +220,7 @@ spec:
                 - cipher
                 type: object
             required:
-            - sliceGatewayProvider
+            - maxClusters
             type: object
           status:
             description: SliceConfigStatus defines the observed state of SliceConfig

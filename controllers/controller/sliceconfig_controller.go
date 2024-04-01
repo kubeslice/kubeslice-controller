@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
