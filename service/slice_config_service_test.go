@@ -58,6 +58,7 @@ func TestSliceConfigSuite(t *testing.T) {
 
 var SliceConfigTestBed = map[string]func(*testing.T){
 	"SliceConfig_ReconciliationCompleteHappyCase":                SliceConfigReconciliationCompleteHappyCase,
+	"SliceConfigReconciliationNoNetCompleteHappyCase":            SliceConfigReconciliationNoNetCompleteHappyCase,
 	"SliceConfig_GetObjectErrorOtherThanNotFound":                SliceConfigGetObjectErrorOtherThanNotFound,
 	"SliceConfig_GetObjectErrorNotFound":                         SliceConfigGetObjectErrorNotFound,
 	"SliceConfig_DeleteTheObjectHappyCase":                       SliceConfigDeleteTheObjectHappyCase,
@@ -131,7 +132,7 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 	mMock.AssertExpectations(t)
 }
 
-func TestSliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
+func SliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
 	_, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
