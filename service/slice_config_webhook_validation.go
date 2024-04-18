@@ -79,12 +79,8 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, old runtime.Object) error {
 	oldSc := old.(*controllerv1alpha1.SliceConfig)
 	isNetworkTransitioning := sliceConfig.Spec.OverlayNetworkDeploymentMode != oldSc.Spec.OverlayNetworkDeploymentMode
-	// Do NOT allow transition from overlay network to nonet mode
-	// And multi-network to single-network mode
-	isTransitioningToNonet := isNetworkTransitioning && sliceConfig.Spec.OverlayNetworkDeploymentMode == controllerv1alpha1.NONET
-	isTransitioningToSingleNetFromMultiNetwork := isNetworkTransitioning && oldSc.Spec.OverlayNetworkDeploymentMode == controllerv1alpha1.MULTINET && sliceConfig.Spec.OverlayNetworkDeploymentMode == controllerv1alpha1.SINGLENET
 
-	if isTransitioningToNonet || isTransitioningToSingleNetFromMultiNetwork {
+	if isNetworkTransitioning && oldSc.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{
 			field.Forbidden(field.NewPath("Spec").Child("OverlayNetworkDeploymentMode"), fmt.Sprintf("Slice cannot be transitioned to %v mode from %v mode", sliceConfig.Spec.OverlayNetworkDeploymentMode, oldSc.Spec.OverlayNetworkDeploymentMode)),
 		})
