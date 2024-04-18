@@ -132,7 +132,6 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
 
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
-		// Try Cleanup
 		err = s.ms.CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name)
 		return ctrl.Result{}, err
 	}

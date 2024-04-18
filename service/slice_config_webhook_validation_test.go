@@ -2150,6 +2150,157 @@ func TestValidateRotationInterval_Change_Decreased(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, &expectedResp, gotResp.Spec.CertificateExpiryTime)
 }
+
+func TestValidateSliceConfigCreate_NoNetHappyCase(t *testing.T) {
+	name := "slice_config"
+	namespace := "random"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	}).Once()
+	sliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	sliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	if sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces == nil {
+		sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces = make([]controllerv1alpha1.SliceNamespaceSelection, 1)
+	}
+	if sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters == nil {
+		sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters = make([]string, 1)
+	}
+	sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Namespace = "randomNamespace"
+	sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters = []string{"cluster-1"}
+	sliceConfig.Spec.MaxClusters = 2
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.NetworkPresent = false
+	}).Once()
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[1],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.NetworkPresent = false
+	}).Once()
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.NetworkPresent = false
+	}).Once()
+
+	err := ValidateSliceConfigCreate(ctx, sliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func TestValidateSliceConfigCreate_SingleNetWithNoNetCLustersError(t *testing.T) {
+	name := "slice_config"
+	namespace := "random"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	}).Once()
+	sliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.SINGLENET
+	sliceConfig.Spec.Clusters = []string{"cluster-1"}
+	if sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces == nil {
+		sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces = make([]controllerv1alpha1.SliceNamespaceSelection, 1)
+	}
+	if sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters == nil {
+		sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters = make([]string, 1)
+	}
+	sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Namespace = "randomNamespace"
+	sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces[0].Clusters = []string{"cluster-1"}
+	sliceConfig.Spec.MaxClusters = 2
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      sliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.NetworkPresent = false
+	}).Once()
+
+	err := ValidateSliceConfigCreate(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "cluster network is not present")
+	clientMock.AssertExpectations(t)
+}
+func TestValidateSliceConfigUpdate_SingleToNoNetError(t *testing.T) {
+	oldSliceConfig := &controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.SINGLENET
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest("slice_config", "random")
+	newSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+
+	err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Forbidden: Slice cannot be transitioned to no-network mode from single-network mode")
+	clientMock.AssertExpectations(t)
+
+}
+
+func TestValidateClustersOnUpdate_NetworkSliceOnNoNetClustersError(t *testing.T) {
+	oldSliceConfig := &controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.SINGLENET
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest("slice_config", "random")
+	newSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.SINGLENET
+	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[0],
+		Namespace: "random",
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Status.NodeIPs = []string{"1.1.1.1"}
+		arg.Status.NetworkPresent = false
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+	}).Twice()
+
+	err := validateClustersOnUpdate(ctx, newSliceConfig, oldSliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "cluster network is not present")
+	clientMock.AssertExpectations(t)
+
+}
+
 func setupSliceConfigWebhookValidationTest(name string, namespace string) (*utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context) {
 	clientMock := &utilMock.Client{}
 	sliceConfig := &controllerv1alpha1.SliceConfig{
