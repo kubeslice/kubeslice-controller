@@ -131,6 +131,39 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 	mMock.AssertExpectations(t)
 }
 
+func TestSliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
+	_, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	}).Once()
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	namespace := corev1.Namespace{}
+	clientMock.On("Get", ctx, mock.Anything, &namespace).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = requestObj.Namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
+	}).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
+
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfigForNoNetworkSlice", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything).Return(nil).Once()
+
+	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
+	expectedResult := ctrl.Result{}
+	require.NoError(t, nil)
+	require.Equal(t, expectedResult, result)
+	require.Nil(t, err)
+	require.False(t, result.Requeue)
+	clientMock.AssertExpectations(t)
+	workerSliceConfigMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
+}
+
 func SliceConfigGetObjectErrorOtherThanNotFound(t *testing.T) {
 	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, _ := setupSliceConfigTest("slice_config", "namespace")
 	err1 := errors.New("internal_error")
