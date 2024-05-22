@@ -90,11 +90,10 @@ type NamespaceIsolationProfile struct {
 }
 
 type ExternalGatewayConfig struct {
-	Ingress   ExternalGatewayConfigOptions `json:"ingress,omitempty"`
-	Egress    ExternalGatewayConfigOptions `json:"egress,omitempty"`
-	NsIngress ExternalGatewayConfigOptions `json:"nsIngress,omitempty"`
-	//+kubebuilder:validation:Enum:=none;istio
-	GatewayType string `json:"gatewayType,omitempty"`
+	Ingress     ExternalGatewayConfigOptions   `json:"ingress,omitempty"`
+	Egress      ExternalGatewayConfigOptions   `json:"egress,omitempty"`
+	NsIngress   ExternalGatewayConfigOptions   `json:"nsIngress,omitempty"`
+	GatewayType controllerv1alpha1.GatewayType `json:"gatewayType,omitempty"`
 }
 
 type ExternalGatewayConfigOptions struct {

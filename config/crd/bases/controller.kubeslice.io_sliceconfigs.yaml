@@ -57,6 +57,7 @@ spec:
                       enum:
                       - none
                       - istio
+                      - envoy
                       type: string
                     ingress:
                       properties:
