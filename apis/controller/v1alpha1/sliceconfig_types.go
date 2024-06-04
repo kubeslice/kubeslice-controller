@@ -78,11 +78,17 @@ type SliceConfigSpec struct {
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/
 type ExternalGatewayConfig struct {
-	Ingress     ExternalGatewayConfigOptions `json:"ingress,omitempty"`
-	Egress      ExternalGatewayConfigOptions `json:"egress,omitempty"`
-	NsIngress   ExternalGatewayConfigOptions `json:"nsIngress,omitempty"`
-	GatewayType GatewayType                  `json:"gatewayType,omitempty"`
-	Clusters    []string                     `json:"clusters,omitempty"`
+	Ingress          ExternalGatewayConfigOptions `json:"ingress,omitempty"`
+	Egress           ExternalGatewayConfigOptions `json:"egress,omitempty"`
+	NsIngress        ExternalGatewayConfigOptions `json:"nsIngress,omitempty"`
+	GatewayType      GatewayType                  `json:"gatewayType,omitempty"`
+	Clusters         []string                     `json:"clusters,omitempty"`
+	VPCServiceAccess ServiceAccess                `json:"vpcServiceAccess,omitempty"`
+}
+
+type ServiceAccess struct {
+	Ingress ExternalGatewayConfigOptions `json:"ingress,omitempty"`
+	Egress  ExternalGatewayConfigOptions `json:"egress,omitempty"`
 }
 
 type ExternalGatewayConfigOptions struct {
