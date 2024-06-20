@@ -57,6 +57,7 @@ spec:
                       enum:
                       - none
                       - istio
+                      - envoy
                       type: string
                     ingress:
                       properties:
@@ -67,6 +68,19 @@ spec:
                       properties:
                         enabled:
                           type: boolean
+                      type: object
+                    vpcServiceAccess:
+                      properties:
+                        egress:
+                          properties:
+                            enabled:
+                              type: boolean
+                          type: object
+                        ingress:
+                          properties:
+                            enabled:
+                              type: boolean
+                          type: object
                       type: object
                   type: object
                 type: array
