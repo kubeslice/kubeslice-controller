@@ -38,6 +38,15 @@ const (
 	NONET NetworkType = "no-network"
 )
 
+// +kubebuilder:validation:Enum:=none;istio;envoy
+type GatewayType string
+
+const (
+	NONE  GatewayType = "none"
+	ISTIO GatewayType = "istio"
+	ENVOY GatewayType = "envoy"
+)
+
 // SliceConfigSpec defines the desired state of SliceConfig
 type SliceConfigSpec struct {
 	//+kubebuilder:default:=single-network
@@ -69,12 +78,17 @@ type SliceConfigSpec struct {
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/
 type ExternalGatewayConfig struct {
-	Ingress   ExternalGatewayConfigOptions `json:"ingress,omitempty"`
-	Egress    ExternalGatewayConfigOptions `json:"egress,omitempty"`
-	NsIngress ExternalGatewayConfigOptions `json:"nsIngress,omitempty"`
-	//+kubebuilder:validation:Enum:=none;istio
-	GatewayType string   `json:"gatewayType,omitempty"`
-	Clusters    []string `json:"clusters,omitempty"`
+	Ingress          ExternalGatewayConfigOptions `json:"ingress,omitempty"`
+	Egress           ExternalGatewayConfigOptions `json:"egress,omitempty"`
+	NsIngress        ExternalGatewayConfigOptions `json:"nsIngress,omitempty"`
+	GatewayType      GatewayType                  `json:"gatewayType,omitempty"`
+	Clusters         []string                     `json:"clusters,omitempty"`
+	VPCServiceAccess ServiceAccess                `json:"vpcServiceAccess,omitempty"`
+}
+
+type ServiceAccess struct {
+	Ingress ExternalGatewayConfigOptions `json:"ingress,omitempty"`
+	Egress  ExternalGatewayConfigOptions `json:"egress,omitempty"`
 }
 
 type ExternalGatewayConfigOptions struct {
