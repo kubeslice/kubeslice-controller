@@ -173,6 +173,44 @@ spec:
                 items:
                   type: string
                 type: array
+              nodeInventory:
+                description: NodeInventory is the inventory of the nodes in the cluster
+                items:
+                  properties:
+                    gpuProperties:
+                      properties:
+                        gpuNodeType:
+                          type: string
+                        gpuSharingType:
+                          type: string
+                        gpuUtilization:
+                          properties:
+                            allocated:
+                              type: integer
+                            free:
+                              type: integer
+                            reserved:
+                              items:
+                                properties:
+                                  numReservedGPUs:
+                                    type: integer
+                                  sliceName:
+                                    type: string
+                                type: object
+                              type: array
+                            totalGPUs:
+                              type: integer
+                          type: object
+                      type: object
+                    name:
+                      type: string
+                    type:
+                      enum:
+                      - cpu
+                      - gpu
+                      type: string
+                  type: object
+                type: array
               registrationStatus:
                 description: RegistrationStatus shows the status of cluster registration
                 enum:
