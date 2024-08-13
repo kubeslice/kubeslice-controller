@@ -186,20 +186,22 @@ spec:
                         gpuUtilization:
                           properties:
                             allocated:
-                              type: integer
+                              type: string
                             free:
-                              type: integer
+                              type: string
+                            memory:
+                              type: string
                             reserved:
                               items:
                                 properties:
                                   numReservedGPUs:
-                                    type: integer
+                                    type: string
                                   sliceName:
                                     type: string
                                 type: object
                               type: array
                             totalGPUs:
-                              type: integer
+                              type: string
                           type: object
                       type: object
                     name:

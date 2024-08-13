@@ -149,15 +149,16 @@ type GpuProperties struct {
 }
 
 type GpuUtilization struct {
-	TotalGPUs uint       `json:"totalGPUs,omitempty"`
-	Allocated uint       `json:"allocated,omitempty"`
-	Free      uint       `json:"free,omitempty"`
+	TotalGPUs string     `json:"totalGPUs,omitempty"`
+	Free      string     `json:"free,omitempty"`
+	Allocated string     `json:"allocated,omitempty"`
+	Memory    string     `json:"memory,omitempty"`
 	Reserved  []Reserved `json:"reserved,omitempty"`
 }
 
 type Reserved struct {
 	SliceName       string `json:"sliceName,omitempty"`
-	NumReservedGPUs uint   `json:"numReservedGPUs,omitempty"`
+	NumReservedGPUs string `json:"numReservedGPUs,omitempty"`
 }
 
 type VCPURestriction struct {
