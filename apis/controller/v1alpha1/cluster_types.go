@@ -143,22 +143,31 @@ type NodeInventory struct {
 }
 
 type GpuProperties struct {
-	GpuNodeType    string         `json:"gpuNodeType,omitempty"`
-	GpuSharingType string         `json:"gpuSharingType,omitempty"`
-	GpuUtilization GpuUtilization `json:"gpuUtilization,omitempty"`
+	GpuNodeType       string         `json:"gpuNodeType,omitempty"`
+	GpuSharingType    string         `json:"gpuSharingType,omitempty"`
+	GpuSlicingType    string         `json:"gpuSlicingType,omitempty"`
+	GpuSlicingProfile []GPUSlice     `json:"gpuSlicingProfile,omitempty"`
+	GpuUtilization    GpuUtilization `json:"gpuUtilization,omitempty"`
 }
 
 type GpuUtilization struct {
-	TotalGPUs string     `json:"totalGPUs,omitempty"`
-	Free      string     `json:"free,omitempty"`
-	Allocated string     `json:"allocated,omitempty"`
+	TotalGPUs uint       `json:"totalGPUs,omitempty"`
+	Free      uint       `json:"free,omitempty"`
+	Allocated uint       `json:"allocated,omitempty"`
 	Memory    string     `json:"memory,omitempty"`
 	Reserved  []Reserved `json:"reserved,omitempty"`
 }
 
 type Reserved struct {
-	SliceName       string `json:"sliceName,omitempty"`
-	NumReservedGPUs string `json:"numReservedGPUs,omitempty"`
+	SliceName           string `json:"sliceName,omitempty"`
+	NumReservedGPUs     uint   `json:"numReservedGPUs,omitempty"`
+	GPUSliceProfileName string `json:"gpuSliceProfileName,omitempty"`
+}
+
+type GPUSlice struct {
+	ProfileName string `json:"profileName,omitempty"`
+	Memory      string `json:"memory,omitempty"`
+	NumGPUs     uint   `json:"numGPUs,omitempty"`
 }
 
 type VCPURestriction struct {

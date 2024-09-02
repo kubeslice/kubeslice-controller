@@ -183,25 +183,40 @@ spec:
                           type: string
                         gpuSharingType:
                           type: string
+                        gpuSlicingProfile:
+                          items:
+                            properties:
+                              memory:
+                                type: string
+                              numGPUs:
+                                type: integer
+                              profileName:
+                                type: string
+                            type: object
+                          type: array
+                        gpuSlicingType:
+                          type: string
                         gpuUtilization:
                           properties:
                             allocated:
-                              type: string
+                              type: integer
                             free:
-                              type: string
+                              type: integer
                             memory:
                               type: string
                             reserved:
                               items:
                                 properties:
-                                  numReservedGPUs:
+                                  gpuSliceProfileName:
                                     type: string
+                                  numReservedGPUs:
+                                    type: integer
                                   sliceName:
                                     type: string
                                 type: object
                               type: array
                             totalGPUs:
-                              type: string
+                              type: integer
                           type: object
                       type: object
                     name:
