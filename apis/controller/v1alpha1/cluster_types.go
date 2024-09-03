@@ -169,6 +169,7 @@ type GPUSlice struct {
 	ProfileName string `json:"profileName,omitempty"`
 	Memory      string `json:"memory,omitempty"`
 	NumGPUs     uint   `json:"numGPUs,omitempty"`
+	DeviceName  string `json:"deviceName,omitempty"`
 }
 
 type VCPURestriction struct {

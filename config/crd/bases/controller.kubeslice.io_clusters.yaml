@@ -186,6 +186,8 @@ spec:
                         gpuSlicingProfile:
                           items:
                             properties:
+                              deviceName:
+                                type: string
                               memory:
                                 type: string
                               numGPUs:
