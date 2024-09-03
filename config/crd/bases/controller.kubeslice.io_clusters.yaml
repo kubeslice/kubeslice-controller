@@ -207,6 +207,8 @@ spec:
                             reserved:
                               items:
                                 properties:
+                                  gprName:
+                                    type: string
                                   gpuSliceProfileName:
                                     type: string
                                   numReservedGPUs:

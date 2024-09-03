@@ -160,6 +160,7 @@ type GpuUtilization struct {
 
 type Reserved struct {
 	SliceName           string `json:"sliceName,omitempty"`
+	GprName             string `json:"gprName,omitempty"`
 	NumReservedGPUs     uint   `json:"numReservedGPUs,omitempty"`
 	GPUSliceProfileName string `json:"gpuSliceProfileName,omitempty"`
 }
