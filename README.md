@@ -70,7 +70,7 @@ To download the latest docker image for `kubeslice-controller`, click [here](htt
    kind load docker-image aveshasystems/kubeslice-controller --name kind
    ```
 
-2. Check the loaded image in the cluster. Modify the node name if required.
+2. Check the loaded image in the cluster. Modify the node name as required.
    
  * Note: `kind-control-plane` is the name of the Docker container. Modify the name if needed.
   
