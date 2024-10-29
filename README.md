@@ -9,11 +9,11 @@ using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/acce
 ## Get Started
 
 The KubeSlice Controller orchestrates the creation and management of slices on worker clusters.
-It is strongly recommended that you use a released version. Follow the instructions provided in this [document](https://kubeslice.io/documentation/open-source/1.3.0/category/install-kubeslice) to install Kubeslice on cloud clusters.
+It is strongly recommended that you use a released version. Follow the instructions provided in this [document](https://kubeslice.io/documentation/open-source/latest/category/install-kubeslice) to install Kubeslice on cloud clusters.
 
 ## Build and Deploy a KubeSlice Controller on a Kind Cluster
 
-See our documentation on [installing the KubeSlice Controller](https://kubeslice.io/documentation/open-source/1.3.0/install-kubeslice/yaml/yaml-controller-install).
+See our documentation on [installing the KubeSlice Controller](https://kubeslice.io/documentation/open-source/latest/install-kubeslice/yaml/yaml-controller-install).
 
 ### Prerequisites
 
@@ -22,16 +22,16 @@ Before you begin, make sure the following prerequisites are met:
 * Docker is installed and running on your local machine.
 * A running [`kind`](https://kind.sigs.k8s.io/) cluster.
 * [`kubectl`](https://kubernetes.io/docs/tasks/tools/) is installed and configured.
-* You have prepared the environment for the installation of [`kubeslice-controller`](https://github.com/kubeslice/kubeslice-controller) on the controller cluster and [`worker-operator`](https://github.com/kubeslice/worker-operator) on the worker cluster. For more information, see [Prerequisites](https://kubeslice.io/documentation/open-source/1.3.0/category/prerequisites).
+* You have prepared the environment for the installation of [`kubeslice-controller`](https://github.com/kubeslice/kubeslice-controller) on the controller cluster and [`worker-operator`](https://github.com/kubeslice/worker-operator) on the worker cluster. For more information, see [Prerequisites](https://kubeslice.io/documentation/open-source/latest/category/prerequisites).
 
 ### Set up Your Helm Repo
-If you have not added avesha helm repo yet, add it.
+If you have not added Avesha's `helm repo` yet, add it.
 
 ```console
 helm repo add avesha https://kubeslice.github.io/charts/
 ```
 
-Upgrade the avesha helm repo.
+Upgrade Avesha's `helm repo`.
 
 ```console
 helm repo update
@@ -48,7 +48,7 @@ To download the latest docker image for `kubeslice-controller`, click [here](htt
    ```
 
 2. Edit the image name variable `IMG` in the [`Makefile`](Makefile) to change the docker tag to be built.
-   The default image is set as `IMG ?= aveshasystems/kubeslice-controller:latest`. Modify this if required.
+   The default image is set as `IMG ?= aveshasystems/kubeslice-controller:latest`. Modify this as required.
 
    ```console
    make docker-build
@@ -70,13 +70,13 @@ To download the latest docker image for `kubeslice-controller`, click [here](htt
    kind load docker-image aveshasystems/kubeslice-controller --name kind
    ```
 
-2. Check the loaded image in the cluster. Modify the node name if required.
+2. Check the loaded image in the cluster. Modify the node name as required.
    
  * Note: `kind-control-plane` is the name of the Docker container. Modify the name if needed.
   
 
 ```console
-docker exec -it kind-control-plane crictl images
+docker exec -it kind-control-plane critical images
 ```
 ### Deploy the KubeSlice Controller on a Cluster
 1. Create a chart values file called `yourvaluesfile.yaml`. Refer to [values.yaml](https://github.com/kubeslice/charts/blob/master/charts/kubeslice-controller/values.yaml) to update the `kubeslice-controller` image to the local build image.
