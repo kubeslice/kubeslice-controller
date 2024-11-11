@@ -198,6 +198,22 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Namespace creation failed.",
 	},
+	"NamespaceUpdated": {
+		Name:                "NamespaceUpdated",
+		Reason:              "NamespaceUpdated",
+		Action:              "UpdateNamespace",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "Namespace updated.",
+	},
+	"NamespaceUpdateFailed": {
+		Name:                "NamespaceUpdateFailed",
+		Reason:              "NamespaceUpdateFailed",
+		Action:              "UpdateNamespace",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Namespace update failed.",
+	},
 	"NamespaceDeleted": {
 		Name:                "NamespaceDeleted",
 		Reason:              "NamespaceDeleted",
@@ -743,6 +759,8 @@ var (
 	EventSecretDeletionFailed                 events.EventName = "SecretDeletionFailed"
 	EventNamespaceCreated                     events.EventName = "NamespaceCreated"
 	EventNamespaceCreationFailed              events.EventName = "NamespaceCreationFailed"
+	EventNamespaceUpdated                     events.EventName = "NamespaceUpdated"
+	EventNamespaceUpdateFailed                events.EventName = "NamespaceUpdateFailed"
 	EventNamespaceDeleted                     events.EventName = "NamespaceDeleted"
 	EventNamespaceDeletionFailed              events.EventName = "NamespaceDeletionFailed"
 	EventWorkerClusterRoleCreated             events.EventName = "WorkerClusterRoleCreated"

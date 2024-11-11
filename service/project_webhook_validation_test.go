@@ -43,8 +43,8 @@ func TestProjectWebhookSuite(t *testing.T) {
 }
 
 var ProjectWebhookTestbed = map[string]func(*testing.T){
-	"TestValidateProjectCreate_Applied_Namespace_Error":                                  TestValidateProjectCreate_Applied_Namespace_Error,
-	"TestValidateProjectCreate_FailsIfNamespaceAlreadyExists":                            TestValidateProjectCreate_FailsIfNamespaceAlreadyExists,
+	"TestValidateProjectCreate_Applied_Namespace_Error": TestValidateProjectCreate_Applied_Namespace_Error,
+	// "TestValidateProjectCreate_FailsIfNamespaceAlreadyExists":                            TestValidateProjectCreate_FailsIfNamespaceAlreadyExists,
 	"TestValidateProjectCreate_FailsIf_Sa_Name_Not_DNS_Compliant":                        TestValidateProjectCreate_FailsIf_Sa_Name_Not_DNS_Compliant,
 	"TestValidateProjectCreate_FailsIfNameContainsDot":                                   TestValidateProjectCreate_FailsIfNameContainsDot,
 	"TestValidateProjectCreate_FailsIfNameContainsGreaterThan30Characters":               TestValidateProjectCreate_FailsIfNameContainsGreaterThan30Characters,
@@ -101,21 +101,21 @@ func TestValidateProjectCreate_FailsIfNameContainsGreaterThan30Characters(t *tes
 	clientMock.AssertExpectations(t)
 }
 
-func TestValidateProjectCreate_FailsIfNamespaceAlreadyExists(t *testing.T) { //todo
-	project := &controllerv1alpha1.Project{}
-	clientMock := &utilMock.Client{}
-	name := "testProject"
-	project.ObjectMeta.Name = name
-	namespace := "avesha-controller"
-	project.ObjectMeta.Namespace = namespace
-	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
-	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
-	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
-	err := ValidateProjectCreate(ctx, project)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "already exists", namespace)
-	clientMock.AssertExpectations(t)
-}
+// func TestValidateProjectCreate_FailsIfNamespaceAlreadyExists(t *testing.T) { //todo
+// 	project := &controllerv1alpha1.Project{}
+// 	clientMock := &utilMock.Client{}
+// 	name := "testProject"
+// 	project.ObjectMeta.Name = name
+// 	namespace := "avesha-controller"
+// 	project.ObjectMeta.Namespace = namespace
+// 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
+// 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
+// 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+// 	err := ValidateProjectCreate(ctx, project)
+// 	require.Error(t, err)
+// 	require.Contains(t, err.Error(), "already exists", namespace)
+// 	clientMock.AssertExpectations(t)
+// }
 
 func TestValidateProjectCreate_FailsIf_Sa_Name_Not_DNS_Compliant(t *testing.T) { //todo
 	project := &controllerv1alpha1.Project{}
@@ -131,9 +131,9 @@ func TestValidateProjectCreate_FailsIf_Sa_Name_Not_DNS_Compliant(t *testing.T) {
 	project.Spec.ServiceAccount.ReadOnly = []string{invalidName1, invalidName2}
 	project.Spec.ServiceAccount.ReadWrite = []string{invalidNameRw1, invalidNameRw2}
 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
-	notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
+	// notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
-	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Once()
+	// clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Once()
 	err := ValidateProjectCreate(ctx, project)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Invalid value", invalidName1, invalidName2)
@@ -155,9 +155,9 @@ func TestValidateProjectCreate_HappyPath(t *testing.T) { //todo
 	project.Spec.ServiceAccount.ReadOnly = []string{validName1, validName2}
 	project.Spec.ServiceAccount.ReadWrite = []string{validNameRw1, validNameRw2}
 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
-	notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
+	// notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
-	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Once()
+	// clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Once()
 	err := ValidateProjectCreate(ctx, project)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -220,8 +220,8 @@ func Test_ValidateProjectUpdate_ThrowsErrorIf_SA_DNS_Invalid_throws_error(t *tes
 	project.Spec.ServiceAccount.ReadWrite = []string{invalidNameRw1, invalidNameRw2}
 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
-	notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
-	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Times(4)
+	// notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
+	// clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Times(4)
 	//calls rolebinding next
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Times(1)
 	err := ValidateProjectUpdate(ctx, project)
