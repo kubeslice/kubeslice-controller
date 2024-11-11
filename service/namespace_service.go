@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+
 	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -84,6 +85,34 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 				"object_kind": metricKindNamespace,
 			},
 		)
+	} else {
+		// check if the namespace has the correct labels
+		if !util.CompareLabels(nsResource.Labels, n.getResourceLabel(namespace, owner)) {
+			nsResource.Labels = n.getResourceLabel(namespace, owner)
+			err := util.UpdateResource(ctx, nsResource)
+			nsResource.Namespace = ControllerNamespace
+			if err != nil {
+				util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventNamespaceUpdateFailed)
+				n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "update_failed",
+						"event":       string(events.EventNamespaceUpdateFailed),
+						"object_name": nsResource.Name,
+						"object_kind": metricKindNamespace,
+					},
+				)
+				return ctrl.Result{}, err
+			}
+			util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventNamespaceUpdated)
+			n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "updated",
+					"event":       string(events.EventNamespaceUpdated),
+					"object_name": nsResource.Name,
+					"object_kind": metricKindNamespace,
+				},
+			)
+		}
 	}
 	return ctrl.Result{}, nil
 }

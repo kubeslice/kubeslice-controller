@@ -133,6 +133,18 @@ events:
     type: Warning
     reportingController: controller
     message: Namespace creation failed.
+  - name: NamespaceUpdated
+    reason: NamespaceUpdated
+    action: UpdateNamespace
+    type: Normal
+    reportingController: controller
+    message: Namespace updated.
+  - name: NamespaceUpdateFailed
+    reason: NamespaceUpdateFailed
+    action: UpdateNamespace
+    type: Warning
+    reportingController: controller
+    message: Namespace update failed.
   - name: NamespaceDeleted
     reason: NamespaceDeleted
     action: DeleteNamespace

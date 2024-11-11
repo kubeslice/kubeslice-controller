@@ -22,10 +22,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
-	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"strings"
+
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
+	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -266,6 +267,19 @@ func EncodeToBase64(v interface{}) (string, error) {
 // CheckForProjectNamespace is a function to check namespace is in decided format
 func CheckForProjectNamespace(namespace *corev1.Namespace) bool {
 	return namespace.Labels[LabelName] == fmt.Sprintf(LabelValue, "Project", namespace.Name)
+}
+
+// CompareLabels is a function to compare the labels
+func CompareLabels(label1 map[string]string, label2 map[string]string) bool {
+	if len(label1) != len(label2) {
+		return false
+	}
+	for key, value := range label1 {
+		if label2[key] != value {
+			return false
+		}
+	}
+	return true
 }
 
 // GetProjectName is function to get the project name from the namespace
