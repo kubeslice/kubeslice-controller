@@ -88,7 +88,12 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 	} else {
 		// check if the namespace has the correct labels
 		if !util.CompareLabels(nsResource.Labels, n.getResourceLabel(namespace, owner)) {
-			nsResource.Labels = n.getResourceLabel(namespace, owner)
+			// append missing labels
+			for key, value := range n.getResourceLabel(namespace, owner) {
+				if nsResource.Labels[key] != value {
+					nsResource.Labels[key] = value
+				}
+			}
 			err := util.UpdateResource(ctx, nsResource)
 			nsResource.Namespace = ControllerNamespace
 			if err != nil {
