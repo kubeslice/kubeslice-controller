@@ -19,10 +19,11 @@ package service
 import (
 	"context"
 	"fmt"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"os"
 	"strings"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -40,9 +41,11 @@ func ValidateProjectCreate(ctx context.Context, project *controllerv1alpha1.Proj
 	if err := validateProjectName(project.Name); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	if err := validateProjectNamespaceIfAlreadyExists(ctx, project.Name); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
-	}
+	// FIXME: Remove the comment after testing.
+	// Validation for existing project namespace is not required. User may want to use an existing namespace.
+	// if err := validateProjectNamespaceIfAlreadyExists(ctx, project.Name); err != nil {
+	// 	return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+	// }
 	if err := validateDNSCompliantSANames(ctx, project); err != nil {
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
@@ -99,14 +102,14 @@ func validateAppliedInControllerNamespace(ctx context.Context, project *controll
 	return nil
 }
 
-// validateProjectNamespaceIfAlreadyExists is a function validate the whether the project namespace already exists or not
-func validateProjectNamespaceIfAlreadyExists(ctx context.Context, projectName string) *field.Error {
-	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, projectName)
-	if exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: projectNamespace}, &corev1.Namespace{}); exist {
-		return field.Invalid(field.NewPath("project namespace"), projectNamespace, "already exists")
-	}
-	return nil
-}
+// // validateProjectNamespaceIfAlreadyExists is a function validate the whether the project namespace already exists or not
+// func validateProjectNamespaceIfAlreadyExists(ctx context.Context, projectName string) *field.Error {
+// 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, projectName)
+// 	if exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: projectNamespace}, &corev1.Namespace{}); exist {
+// 		return field.Invalid(field.NewPath("project namespace"), projectNamespace, "already exists")
+// 	}
+// 	return nil
+// }
 
 // validateDNSCompliantSANames is a function to validate the service account name whether it is DNS compliant
 func validateDNSCompliantSANames(ctx context.Context, project *controllerv1alpha1.Project) *field.Error {
