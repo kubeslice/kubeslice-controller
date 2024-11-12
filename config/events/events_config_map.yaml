@@ -30,6 +30,8 @@ data:
       - SecretDeletionFailed
       - NamespaceCreated
       - NamespaceCreationFailed
+      - NamespaceUpdated
+      - NamespaceUpdateFailed
       - NamespaceDeleted
       - NamespaceDeletionFailed
       - WorkerClusterRoleCreated
