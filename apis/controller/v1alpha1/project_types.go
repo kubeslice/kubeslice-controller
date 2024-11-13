@@ -24,6 +24,8 @@ import (
 type ProjectSpec struct {
 	// ServiceAccount is a field of Project. Edit project_types.go to remove/update
 	ServiceAccount ServiceAccount `json:"serviceAccount,omitempty"`
+	// If defaultSliceCreation is true, then the default slice will be created
+	DefaultSliceCreation bool `json:"defaultSliceCreation,omitemtpy"`
 }
 
 // ServiceAccount defines the field of ProjectSpec
@@ -33,8 +35,7 @@ type ServiceAccount struct {
 }
 
 // ProjectStatus defines the observed state of Project
-type ProjectStatus struct {
-}
+type ProjectStatus struct{}
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
