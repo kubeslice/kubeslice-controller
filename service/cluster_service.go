@@ -28,6 +28,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,7 +61,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		logger.Infof("cluster %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	//Load Event Recorder with project name and namespace
+	// Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(cluster.Namespace)).WithNamespace(cluster.Namespace)
 
 	// Load metrics with project name and namespace
@@ -76,7 +77,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		logger.Infof("Created Cluster %v is not in project namespace. Returning from reconciliation loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	//Step 1: Finalizers
+	// Step 1: Finalizers
 	if cluster.ObjectMeta.DeletionTimestamp.IsZero() {
 		logger.Debugf("Not deleting")
 		if !util.ContainsString(cluster.GetFinalizers(), ClusterFinalizer) {
@@ -92,7 +93,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 				return result, reconErr
 			}
 			if shouldRequeue, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterFinalizer)); shouldRequeue {
-				//Register an event for cluster deletion fail
+				// Register an event for cluster deletion fail
 				util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
 				c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 					map[string]string{
@@ -104,7 +105,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 				)
 				return result, reconErr
 			}
-			//Register an event for cluster deletion
+			// Register an event for cluster deletion
 			util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeleted)
 			c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 				map[string]string{
@@ -127,7 +128,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			// Wait until ClusterDeregisterFinalizer is removed by the worker cluster. If not removed even after 10 mins, remove it.
 			if cluster.ObjectMeta.DeletionTimestamp.Add(10 * time.Minute).Before(time.Now()) {
 				if shouldRequeue, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterDeregisterFinalizer)); shouldRequeue {
-					//Register an event for cluster deletion fail
+					// Register an event for cluster deletion fail
 					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
 					c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 						map[string]string{
@@ -201,13 +202,13 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			}
 		}
 	}
-	//Step 2: Get ServiceAccount
+	// Step 2: Get ServiceAccount
 	serviceAccount := &corev1.ServiceAccount{}
 	_, err = util.GetResourceIfExist(ctx, types.NamespacedName{Name: fmt.Sprintf(ServiceAccountWorkerCluster, cluster.Name), Namespace: req.Namespace}, serviceAccount)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	//Step 3: Create ServiceAccount & Reconcile
+	// Step 3: Create ServiceAccount & Reconcile
 	if shouldReturn, result, reconErr := util.IsReconciled(c.acs.ReconcileWorkerClusterServiceAccountAndRoleBindings(ctx, req.Name, req.Namespace, cluster)); shouldReturn {
 		return result, reconErr
 	}
@@ -216,7 +217,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		logger.Infof("Service Account Token not populated. Requeuing")
 		return ctrl.Result{Requeue: true, RequeueAfter: RequeueTime}, nil
 	}
-	//Step 4: Get Secret
+	// Step 4: Get Secret
 	secret := corev1.Secret{}
 	serviceAccountSecretNamespacedName := types.NamespacedName{
 		Namespace: req.Namespace,
@@ -232,7 +233,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	//Step 5: Update Cluster with Secret
+	// Step 5: Update Cluster with Secret
 	cluster.Status.SecretName = secret.Name
 	err = util.UpdateStatus(ctx, cluster)
 	if err != nil {
@@ -270,13 +271,57 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	//Step 6: NodeIP Reconciliation to WorkerSliceGateways
+	// Step 6: NodeIP Reconciliation to WorkerSliceGateways
 	// Should be only done if Network componets are present
 	if cluster.Status.NetworkPresent {
 		err = c.sgws.NodeIpReconciliationOfWorkerSliceGateways(ctx, cluster, req.Namespace)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+	}
+
+	// Step 7: create default slice or copy namespaces to default slice
+	projectName := util.GetProjectName(req.Namespace)
+	project := &controllerv1alpha1.Project{}
+	present, err := util.GetResourceIfExist(ctx, req.NamespacedName, project)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	defaultSliceName := fmt.Sprintf("%s-default-slice", projectName)
+
+	// also check for defaultSliceCreation flag
+	if present {
+		// create default slice if not present
+		projectDefaultSlice := &controllerv1alpha1.SliceConfig{}
+		defaultSliceNamespacedName := types.NamespacedName{
+			Namespace: req.Namespace,
+			Name:      defaultSliceName,
+		}
+		foundDefaultSlice, err := util.GetResourceIfExist(ctx, defaultSliceNamespacedName, projectDefaultSlice)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		if !foundDefaultSlice {
+
+			projectDefaultSlice = &controllerv1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      defaultSliceName,
+					Namespace: req.Namespace,
+				},
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					OverlayNetworkDeploymentMode: v1alpha1.NONET,
+					Clusters:                     []string{req.Name},
+					NamespaceIsolationProfile:    controllerv1alpha1.NamespaceIsolationProfile{},
+				},
+			}
+			err := util.CreateResource(ctx, projectDefaultSlice)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
 	}
 
 	logger.Infof("cluster %v reconciled", req.NamespacedName)
@@ -306,7 +351,7 @@ func (c *ClusterService) DeleteClusters(ctx context.Context, namespace string) (
 	}
 	for _, cluster := range clusters.Items {
 		err = util.DeleteResource(ctx, &cluster)
-		//Load Event Recorder with project name and namespace
+		// Load Event Recorder with project name and namespace
 		eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(cluster.Namespace)).WithNamespace(cluster.Namespace)
 
 		// Load metrics with project name and namespace
@@ -314,7 +359,7 @@ func (c *ClusterService) DeleteClusters(ctx context.Context, namespace string) (
 			WithNamespace(cluster.Namespace)
 
 		if err != nil {
-			//Register an event for cluster deletion fail
+			// Register an event for cluster deletion fail
 			util.RecordEvent(ctx, eventRecorder, &cluster, nil, events.EventClusterDeletionFailed)
 			c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 				map[string]string{
@@ -326,7 +371,7 @@ func (c *ClusterService) DeleteClusters(ctx context.Context, namespace string) (
 			)
 			return ctrl.Result{}, err
 		}
-		//Register an event for cluster deletion
+		// Register an event for cluster deletion
 		util.RecordEvent(ctx, eventRecorder, &cluster, nil, events.EventClusterDeleted)
 		c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 			map[string]string{
