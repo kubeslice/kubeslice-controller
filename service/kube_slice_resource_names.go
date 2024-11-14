@@ -68,9 +68,7 @@ const (
 	metricKindWorkerSliceGateway  = "worker_slice_gateway"
 )
 
-var (
-	MetricPort = "18080"
-)
+var MetricPort = "18080"
 
 // Verbs
 const (
@@ -183,8 +181,7 @@ type IAccessControlRuleProvider interface {
 	ReadWriteRoleRules() []rbacv1.PolicyRule
 }
 
-type AccessControlRuleProvider struct {
-}
+type AccessControlRuleProvider struct{}
 
 func (k *AccessControlRuleProvider) WorkerClusterRoleRules() []rbacv1.PolicyRule {
 	return workerClusterRoleRules
@@ -200,112 +197,106 @@ func (k *AccessControlRuleProvider) ReadWriteRoleRules() []rbacv1.PolicyRule {
 
 // Rules
 
-var (
-	workerClusterRoleRules = []rbacv1.PolicyRule{
-		{
-			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceServiceExportConfigs},
-		},
-		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster},
-		},
-		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch, verbCreate, verbDelete},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceGwRecycler},
-		},
-		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceVpnKeyRotationConfigs},
-		},
-		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
-		},
-		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster + ResourceStatusSuffix, resourceVpnKeyRotationConfigs + ResourceStatusSuffix},
-		},
-		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix, resourceWorkerSliceGwRecycler + ResourceStatusSuffix},
-		},
-		{
-			Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
-			APIGroups: []string{""},
-			Resources: []string{resourceSecrets},
-		},
-		{
-			Verbs:     []string{verbCreate, verbPatch},
-			APIGroups: []string{""},
-			Resources: []string{resourceEvents},
-		},
-	}
-)
+var workerClusterRoleRules = []rbacv1.PolicyRule{
+	{
+		Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+		APIGroups: []string{apiGroupKubeSliceControllers},
+		Resources: []string{resourceServiceExportConfigs},
+	},
+	{
+		Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+		APIGroups: []string{apiGroupKubeSliceControllers},
+		Resources: []string{resourceCluster},
+	},
+	{
+		Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch, verbCreate, verbDelete},
+		APIGroups: []string{apiGroupKubeSliceWorker},
+		Resources: []string{resourceWorkerSliceGwRecycler},
+	},
+	{
+		Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+		APIGroups: []string{apiGroupKubeSliceControllers},
+		Resources: []string{resourceVpnKeyRotationConfigs},
+	},
+	{
+		Verbs:     []string{verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+		APIGroups: []string{apiGroupKubeSliceWorker},
+		Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
+	},
+	{
+		Verbs:     []string{verbUpdate, verbPatch, verbGet},
+		APIGroups: []string{apiGroupKubeSliceControllers},
+		Resources: []string{resourceCluster + ResourceStatusSuffix, resourceVpnKeyRotationConfigs + ResourceStatusSuffix},
+	},
+	{
+		Verbs:     []string{verbUpdate, verbPatch, verbGet},
+		APIGroups: []string{apiGroupKubeSliceWorker},
+		Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix, resourceWorkerSliceGwRecycler + ResourceStatusSuffix},
+	},
+	{
+		Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch},
+		APIGroups: []string{""},
+		Resources: []string{resourceSecrets},
+	},
+	{
+		Verbs:     []string{verbCreate, verbPatch},
+		APIGroups: []string{""},
+		Resources: []string{resourceEvents},
+	},
+}
 
-var (
-	readOnlyRoleRules = []rbacv1.PolicyRule{
-		{
-			Verbs:     []string{verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
-		},
-		{
-			Verbs:     []string{verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
-		},
-		{
-			Verbs:     []string{verbGet},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster + ResourceStatusSuffix, resourceSliceConfig + ResourceStatusSuffix, resourceServiceExportConfigs + ResourceStatusSuffix},
-		},
-		{
-			Verbs:     []string{verbGet},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
-		},
-		{
-			Verbs:     []string{verbGet, verbList, verbWatch},
-			APIGroups: []string{""},
-			Resources: []string{resourceSecrets, resourceEvents},
-		},
-	}
-)
+var readOnlyRoleRules = []rbacv1.PolicyRule{
+	{
+		Verbs:     []string{verbGet, verbList, verbWatch},
+		APIGroups: []string{apiGroupKubeSliceControllers},
+		Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
+	},
+	{
+		Verbs:     []string{verbGet, verbList, verbWatch},
+		APIGroups: []string{apiGroupKubeSliceWorker},
+		Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
+	},
+	{
+		Verbs:     []string{verbGet},
+		APIGroups: []string{apiGroupKubeSliceControllers},
+		Resources: []string{resourceCluster + ResourceStatusSuffix, resourceSliceConfig + ResourceStatusSuffix, resourceServiceExportConfigs + ResourceStatusSuffix},
+	},
+	{
+		Verbs:     []string{verbGet},
+		APIGroups: []string{apiGroupKubeSliceWorker},
+		Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
+	},
+	{
+		Verbs:     []string{verbGet, verbList, verbWatch},
+		APIGroups: []string{""},
+		Resources: []string{resourceSecrets, resourceEvents},
+	},
+}
 
-var (
-	readWriteRoleRules = []rbacv1.PolicyRule{
-		{
-			Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
-		},
-		{
-			Verbs:     []string{verbGet, verbList, verbWatch},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
-		},
-		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet},
-			APIGroups: []string{apiGroupKubeSliceControllers},
-			Resources: []string{resourceCluster + ResourceStatusSuffix, resourceSliceConfig + ResourceStatusSuffix, resourceServiceExportConfigs + ResourceStatusSuffix},
-		},
-		{
-			Verbs:     []string{verbUpdate, verbPatch, verbGet},
-			APIGroups: []string{apiGroupKubeSliceWorker},
-			Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
-		},
-		{
-			Verbs:     []string{verbGet, verbList, verbWatch},
-			APIGroups: []string{""},
-			Resources: []string{resourceSecrets, resourceEvents},
-		},
-	}
-)
+var readWriteRoleRules = []rbacv1.PolicyRule{
+	{
+		Verbs:     []string{verbCreate, verbDelete, verbUpdate, verbPatch, verbGet, verbList, verbWatch},
+		APIGroups: []string{apiGroupKubeSliceControllers},
+		Resources: []string{resourceCluster, resourceSliceConfig, resourceSliceQoSConfig, resourceServiceExportConfigs},
+	},
+	{
+		Verbs:     []string{verbGet, verbList, verbWatch},
+		APIGroups: []string{apiGroupKubeSliceWorker},
+		Resources: []string{resourceWorkerSliceConfig, resourceWorkerSliceGateways, resourceWorkerServiceImport},
+	},
+	{
+		Verbs:     []string{verbUpdate, verbPatch, verbGet},
+		APIGroups: []string{apiGroupKubeSliceControllers},
+		Resources: []string{resourceCluster + ResourceStatusSuffix, resourceSliceConfig + ResourceStatusSuffix, resourceServiceExportConfigs + ResourceStatusSuffix},
+	},
+	{
+		Verbs:     []string{verbUpdate, verbPatch, verbGet},
+		APIGroups: []string{apiGroupKubeSliceWorker},
+		Resources: []string{resourceWorkerSliceConfig + ResourceStatusSuffix, resourceWorkerSliceGateways + ResourceStatusSuffix, resourceWorkerServiceImport + ResourceStatusSuffix},
+	},
+	{
+		Verbs:     []string{verbGet, verbList, verbWatch},
+		APIGroups: []string{""},
+		Resources: []string{resourceSecrets, resourceEvents},
+	},
+}
