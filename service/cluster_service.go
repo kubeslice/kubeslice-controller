@@ -339,99 +339,116 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 				return ctrl.Result{}, err
 			}
 			logger.Infof("successfully created default slice %s", defaultSliceName)
+		} else {
+			logger.Infof("default slice %s already present", defaultSliceName)
+			// if default slice is already present, either the cluster is new or there is some change in cluster
+			// check if cluster is already registered
+			isNewCluster := true
+			for _, cluster := range defaultProjectSlice.Spec.Clusters {
+				if cluster == req.Name {
+					isNewCluster = false
+					break
+				}
+			}
+
+			if isNewCluster {
+				defaultProjectSlice.Spec.Clusters = append(defaultProjectSlice.Spec.Clusters, req.Name)
+			}
+
+			// create map for easy look up
+			namespaceToClusterMap := make(map[string]struct{})
+			mapKeyFormat := "namespace=%s&cluster=%s"
+			namespaceIndexMap := make(map[string]int)
+
+			for index, appns := range defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+				namespaceIndexMap[appns.Namespace] = index
+				for _, cluster := range appns.Clusters {
+					mapKey := fmt.Sprintf(mapKeyFormat, appns.Namespace, cluster)
+					namespaceToClusterMap[mapKey] = struct{}{}
+				}
+			}
+
+			// if any namespace is added to cluster, add it to default slice
+			isNamespaceAddedToCluster := false
+			for _, ns := range cluster.Status.Namespaces {
+				if ns.SliceName != "" {
+					continue
+				}
+				mapKey := fmt.Sprintf(mapKeyFormat, ns.Name, cluster.Name)
+				if _, ok := namespaceToClusterMap[mapKey]; ok {
+					logger.Info("already present namespace and cluster, skipping operations...")
+				} else {
+					isNamespaceAddedToCluster = true
+					// check if namespace is already present
+					if nsIndex, ok := namespaceIndexMap[ns.Name]; ok {
+						prevData := defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces[nsIndex]
+						modifiedData := controllerv1alpha1.SliceNamespaceSelection{
+							Namespace: prevData.Namespace,
+							Clusters:  append(prevData.Clusters, cluster.Name),
+						}
+						defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces[nsIndex] = modifiedData
+					} else {
+						// if namespace is not present, add another entry
+						defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = append(defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces, controllerv1alpha1.SliceNamespaceSelection{
+							Namespace: ns.Name,
+							Clusters:  []string{cluster.Name},
+						})
+					}
+				}
+			}
+			logger.Infof("handling ns addition slice config %v", defaultProjectSlice)
+			if isNamespaceAddedToCluster {
+				logger.Infof("handling ns addition cluster %v", cluster.Name)
+				err := util.UpdateResource(ctx, defaultProjectSlice)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
+			}
+
+			isNamespaceRemovedFromCluster := false
+			// if any namespace is removed from cluster that is still present in default slice, remove it
+			namespacesInCluster := make(map[string]struct{})
+			for _, ns := range cluster.Status.Namespaces {
+				if ns.SliceName == "" {
+					namespacesInCluster[ns.Name] = struct{}{}
+				}
+			}
+
+			modifiedDefaultSliceApplicationNamespace := []controllerv1alpha1.SliceNamespaceSelection{}
+			for _, appns := range defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
+				if _, ok := namespaceIndexMap[appns.Namespace]; !ok {
+					isNamespaceRemovedFromCluster = true
+					// if certain ns is present in default slice but not in cluster, it is possible that it is removed from cluster
+					// check if current cluster is still present in default slice
+					for _, attachedCluster := range appns.Clusters {
+						if attachedCluster == cluster.Name {
+							// need to detach curr cluster if clusters lenght is more than one
+							if len(appns.Clusters) > 1 {
+								util.RemoveElementFromArray(appns.Clusters, cluster.Name)
+							} else {
+								// remove the entire appns item
+								continue
+							}
+						}
+						modifiedDefaultSliceApplicationNamespace = append(modifiedDefaultSliceApplicationNamespace, appns)
+					}
+				}
+			}
+
+			defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = modifiedDefaultSliceApplicationNamespace
+
+			logger.Infof("handling ns removal slice config %v", defaultProjectSlice)
+
+			if isNamespaceRemovedFromCluster {
+				logger.Infof("handling ns removal from cluster %v", cluster.Name)
+				err := util.UpdateResource(ctx, defaultProjectSlice)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
+			}
 		}
-		// else {
-		// 	// if default slice is already present, either the cluster is new or there is some change in cluster
-		// 	// check if cluster is already registered
-		// 	isNewCluster := true
-		// 	for _, cluster := range defaultProjectSlice.Spec.Clusters {
-		// 		if cluster == req.Name {
-		// 			isNewCluster = false
-		// 			break
-		// 		}
-		// 	}
-		//
-		// 	if isNewCluster {
-		// 		defaultProjectSlice.Spec.Clusters = append(defaultProjectSlice.Spec.Clusters, req.Name)
-		// 	}
-		//
-		// 	// create map for easy look up
-		// 	namespaceToClusterMap := make(map[string]struct{})
-		// 	mapKeyFormat := "namespace=%s&cluster=%s"
-		// 	namespaceIndexMap := make(map[string]int)
-		//
-		// 	for index, appns := range defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
-		// 		namespaceIndexMap[appns.Namespace] = index
-		// 		for _, cluster := range appns.Clusters {
-		// 			mapKey := fmt.Sprintf(mapKeyFormat, appns.Namespace, cluster)
-		// 			namespaceToClusterMap[mapKey] = struct{}{}
-		// 		}
-		// 	}
-		//
-		// 	// if any namespace is added to cluster, add it to default slice
-		// 	for _, ns := range cluster.Status.Namespaces {
-		// 		if ns.SliceName != "" {
-		// 			continue
-		// 		}
-		// 		mapKey := fmt.Sprintf(mapKeyFormat, ns.Name, cluster.Name)
-		// 		if _, ok := namespaceToClusterMap[mapKey]; ok {
-		// 			logger.Info("already present namespace and cluster, skipping operations...")
-		// 		} else {
-		// 			// check if namespace is already present
-		// 			if nsIndex, ok := namespaceIndexMap[ns.Name]; ok {
-		// 				prevData := defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces[nsIndex]
-		// 				modifiedData := controllerv1alpha1.SliceNamespaceSelection{
-		// 					Namespace: prevData.Namespace,
-		// 					Clusters:  append(prevData.Clusters, cluster.Name),
-		// 				}
-		// 				defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces[nsIndex] = modifiedData
-		// 			} else {
-		// 				// if namespace is not present, add another entry
-		// 				defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = append(defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces, controllerv1alpha1.SliceNamespaceSelection{
-		// 					Namespace: ns.Name,
-		// 					Clusters:  []string{cluster.Name},
-		// 				})
-		// 			}
-		// 		}
-		// 	}
-		// 	logger.Infof("handling ns addition slice config %v", defaultProjectSlice)
-		//
-		// 	// if any namespace is removed from cluster that is still present in default slice, remove it
-		// 	namespacesInCluster := make(map[string]struct{})
-		// 	for _, ns := range cluster.Status.Namespaces {
-		// 		if ns.SliceName == "" {
-		// 			namespacesInCluster[ns.Name] = struct{}{}
-		// 		}
-		// 	}
-		//
-		// 	modifiedDefaultSliceApplicationNamespace := []controllerv1alpha1.SliceNamespaceSelection{}
-		// 	for _, appns := range defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
-		// 		if _, ok := namespaceIndexMap[appns.Namespace]; !ok {
-		// 			// if certain ns is present in default slice but not in cluster, it is possible that it is removed from cluster
-		// 			// check if current cluster is still present in default slice
-		// 			for _, attachedCluster := range appns.Clusters {
-		// 				if attachedCluster == cluster.Name {
-		// 					// need to detach curr cluster if clusters lenght is more than one
-		// 					if len(appns.Clusters) > 1 {
-		// 						util.RemoveElementFromArray(appns.Clusters, cluster.Name)
-		// 					} else {
-		// 						// remove the entire appns item
-		// 						continue
-		// 					}
-		// 				}
-		// 				modifiedDefaultSliceApplicationNamespace = append(modifiedDefaultSliceApplicationNamespace, appns)
-		// 			}
-		// 		}
-		// 	}
-		//
-		// 	defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = modifiedDefaultSliceApplicationNamespace
-		//
-		// 	logger.Infof("handling ns removal slice config %v", defaultProjectSlice)
-		// 	err := util.UpdateResource(ctx, defaultProjectSlice)
-		// 	if err != nil {
-		// 		return ctrl.Result{}, err
-		// 	}
-		// }
 
 	}
 
