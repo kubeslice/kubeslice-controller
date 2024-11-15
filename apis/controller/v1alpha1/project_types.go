@@ -25,6 +25,7 @@ type ProjectSpec struct {
 	// ServiceAccount is a field of Project. Edit project_types.go to remove/update
 	ServiceAccount ServiceAccount `json:"serviceAccount,omitempty"`
 	// If defaultSliceCreation is true, then the default slice will be created
+	//+kubebuilder:validation:Optional
 	DefaultSliceCreation bool `json:"defaultSliceCreation,omitemtpy"`
 }
 
