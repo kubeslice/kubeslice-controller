@@ -1,22 +1,15 @@
 apiVersion: controller.kubeslice.io/v1alpha1
 kind: SliceConfig
 metadata:
-  name: red
+  name: rohan
 spec:
-  sliceSubnet: 10.1.0.0/16
   sliceType: Application
   maxClusters: 14
-  sliceGatewayProvider:
-    sliceGatewayType: OpenVPN
-    sliceCaType: Local
-  sliceIpamType: Local
   clusters:
-    - worker-cluster-1
-    - worker-cluster-2
-  qosProfileDetails:
-    queueType: HTB
-    priority: 1
-    tcType: BANDWIDTH_CONTROL
-    bandwidthCeilingKbps: 5120
-    bandwidthGuaranteedKbps: 2560
-    dscpClass: AF11
+    - worker-1
+  overlayNetworkDeploymentMode: no-network
+  namespaceIsolationProfile:
+    applicationNamespaces:
+      - clusters:
+          - worker-1
+        namespace: test
