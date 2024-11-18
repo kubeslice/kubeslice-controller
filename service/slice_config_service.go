@@ -19,13 +19,16 @@ package service
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -62,7 +65,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	//Load Event Recorder with project name, slice name and namespace
+	// Load Event Recorder with project name, slice name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).
 		WithProject(util.GetProjectName(sliceConfig.Namespace)).
 		WithNamespace(sliceConfig.Namespace).
@@ -77,7 +80,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		logger.Infof("Duplicate cluster name %v found in sliceConfig %v", value, req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	//Step 1: Finalizers
+	// Step 1: Finalizers
 	if sliceConfig.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(sliceConfig.GetFinalizers(), SliceConfigFinalizer) {
 			if shouldReturn, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, sliceConfig, SliceConfigFinalizer)); shouldReturn {
@@ -90,7 +93,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 			return result, reconErr
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, sliceConfig, SliceConfigFinalizer)); shouldReturn {
-			//Register an event for slice config deletion fail
+			// Register an event for slice config deletion fail
 			util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceConfigDeletionFailed)
 			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 				map[string]string{
@@ -102,7 +105,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 			)
 			return result, reconErr
 		}
-		//Register an event for slice config deletion
+		// Register an event for slice config deletion
 		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceConfigDeleted)
 		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 			map[string]string{
@@ -126,6 +129,50 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	if !found || !s.checkForProjectNamespace(nsResource) {
 		logger.Infof("Created SliceConfig %v is not in project namespace. Returning from reconciliation loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
+	}
+
+	// Before creation or update of worker slice config, remove namespace from default slice
+
+	projectName := util.GetProjectName(req.Namespace)
+	defaultSliceName := fmt.Sprintf("%s-default-slice", projectName)
+
+	defaultProjectSlice := &controllerv1alpha1.SliceConfig{}
+	defaultSliceNamespacedName := types.NamespacedName{
+		Namespace: req.Namespace,
+		Name:      defaultSliceName,
+	}
+	foundDefaultSlice, err := util.GetResourceIfExist(ctx, defaultSliceNamespacedName, defaultProjectSlice)
+	if err != nil {
+		logger.Errorf("error while getting default slice %v", defaultSliceName)
+		return ctrl.Result{}, err
+	}
+	if foundDefaultSlice {
+		// remove all namespaces from default slice that are present in this slice config
+		defaultApplicationNamespaces := defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces
+		sliceConfigApplicationNamespaces := sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces
+
+		sliceAppnsMap := s.constructApplicationNamespaceMap(sliceConfig.Spec.Clusters, sliceConfigApplicationNamespaces)
+		defaultAppnsMap := s.constructApplicationNamespaceMap(defaultProjectSlice.Spec.Clusters, defaultApplicationNamespaces)
+		appnsMapToRemove := make(map[string]NamespaceWithCluster)
+
+		for key := range sliceAppnsMap {
+			// if same namespace and cluster is present in default slice, then  add it to appnsMapToRemove
+			if namespaceWithCluster, ok := defaultAppnsMap[key]; ok {
+				appnsMapToRemove[key] = namespaceWithCluster
+			}
+		}
+
+		filteredDefaultApplicationNamespaces := s.removeSliceApplicationNamespaces(appnsMapToRemove, defaultApplicationNamespaces)
+		if !reflect.DeepEqual(filteredDefaultApplicationNamespaces, defaultApplicationNamespaces) {
+			logger.Info("updating default slice config %s", filteredDefaultApplicationNamespaces)
+			defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = filteredDefaultApplicationNamespaces
+			err := util.UpdateResource(ctx, defaultProjectSlice)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			logger.Info("successfully updated default slice config")
+			return ctrl.Result{}, nil
+		}
 	}
 
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
@@ -194,7 +241,8 @@ func (s *SliceConfigService) checkForProjectNamespace(namespace *corev1.Namespac
 
 // cleanUpSliceConfigResources is a function to delete the slice config resources
 func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
-	slice *v1alpha1.SliceConfig, namespace string) (ctrl.Result, error) {
+	slice *v1alpha1.SliceConfig, namespace string,
+) (ctrl.Result, error) {
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(slice), slice.GetName())
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
 	err := s.sgs.DeleteWorkerSliceGatewaysByLabel(ctx, ownershipLabel, namespace)
@@ -223,7 +271,7 @@ func (s *SliceConfigService) DeleteSliceConfigs(ctx context.Context, namespace s
 		return ctrl.Result{}, err
 	}
 	for _, sliceConfig := range sliceConfigs.Items {
-		//Load Event Recorder with project name, slice name and namespace
+		// Load Event Recorder with project name, slice name and namespace
 		eventRecorder := util.CtxEventRecorder(ctx).
 			WithProject(util.GetProjectName(sliceConfig.Namespace)).
 			WithNamespace(sliceConfig.Namespace).
@@ -236,7 +284,7 @@ func (s *SliceConfigService) DeleteSliceConfigs(ctx context.Context, namespace s
 
 		err = util.DeleteResource(ctx, &sliceConfig)
 		if err != nil {
-			//Register an event for slice config deletion fail
+			// Register an event for slice config deletion fail
 			util.RecordEvent(ctx, eventRecorder, &sliceConfig, nil, events.EventSliceConfigDeletionFailed)
 			s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 				map[string]string{
@@ -248,7 +296,7 @@ func (s *SliceConfigService) DeleteSliceConfigs(ctx context.Context, namespace s
 			)
 			return ctrl.Result{}, err
 		}
-		//Register an event for slice config deletion
+		// Register an event for slice config deletion
 		util.RecordEvent(ctx, eventRecorder, &sliceConfig, nil, events.EventSliceConfigDeleted)
 		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 			map[string]string{
@@ -281,4 +329,54 @@ func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig 
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(serviceExportConfig), resourceName)
 	ownerLabels = util.GetOwnerLabel(completeResourceName)
 	return ownerLabels
+}
+
+func (s *SliceConfigService) constructApplicationNamespaceMap(registeredClusters []string, sliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) map[string]NamespaceWithCluster {
+	nsMap := make(map[string]NamespaceWithCluster)
+	mapKeyFormat := "namespcae=%s&cluster=%s"
+	for _, appns := range sliceConfigApplicationNamespaces {
+		if len(appns.Clusters) > 0 && appns.Clusters[0] == "*" {
+			// add all cluster and namespace combnination to the map
+			for _, cluster := range registeredClusters {
+				namespaceToClusterMapKey := fmt.Sprintf(mapKeyFormat, appns.Namespace, cluster)
+				nsMap[namespaceToClusterMapKey] = NamespaceWithCluster{
+					Namespace: appns.Namespace,
+					Cluster:   cluster,
+				}
+			}
+		} else {
+			for _, cluster := range appns.Clusters {
+				namespaceToClusterMapKey := fmt.Sprintf(mapKeyFormat, appns.Namespace, cluster)
+				nsMap[namespaceToClusterMapKey] = NamespaceWithCluster{
+					Namespace: appns.Namespace,
+					Cluster:   cluster,
+				}
+			}
+		}
+	}
+	return nsMap
+}
+
+func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithCluster map[string]NamespaceWithCluster, defaultSliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) []controllerv1alpha1.SliceNamespaceSelection {
+	filteredApplicaitonNamespaces := []controllerv1alpha1.SliceNamespaceSelection{}
+
+	for _, appns := range defaultSliceConfigApplicationNamespaces {
+		if len(appns.Clusters) > 1 {
+			for _, cluster := range appns.Clusters {
+				mapKey := fmt.Sprintf("namespace=%s&cluster=%s", appns.Namespace, cluster)
+				if _, ok := namespaceWithCluster[mapKey]; ok {
+					appns.Clusters = util.RemoveElementFromArray(appns.Clusters, cluster)
+				}
+			}
+			filteredApplicaitonNamespaces = append(filteredApplicaitonNamespaces, appns)
+		} else {
+			mapKey := fmt.Sprintf("namespace=%s&cluster=%s", appns.Namespace, appns.Clusters[0])
+			if _, ok := namespaceWithCluster[mapKey]; ok {
+				continue
+			}
+
+			filteredApplicaitonNamespaces = append(filteredApplicaitonNamespaces, appns)
+		}
+	}
+	return filteredApplicaitonNamespaces
 }

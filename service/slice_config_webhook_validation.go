@@ -84,7 +84,6 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{
 			field.Forbidden(field.NewPath("Spec").Child("OverlayNetworkDeploymentMode"), fmt.Sprintf("Slice cannot be transitioned to %v mode from %v mode", sliceConfig.Spec.OverlayNetworkDeploymentMode, oldSc.Spec.OverlayNetworkDeploymentMode)),
 		})
-
 	}
 	// if overlay network deployment mode is transitioning, we can allow change in optional fields
 	if !isNetworkTransitioning {
@@ -381,7 +380,6 @@ func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alph
 func validateSlicegatewayServiceType(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	if sliceConfig.Spec.SliceGatewayProvider == nil {
 		return field.Required(field.NewPath("Spec").Child("SliceGatewayProvider"), "SliceGatewayProvider is required for slice config")
-
 	}
 	freq := make(map[string]int)
 	for _, sliceGwSvcType := range sliceConfig.Spec.SliceGatewayProvider.SliceGatewayServiceType {
@@ -466,7 +464,6 @@ func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.Sli
 		exists := checkIfQoSConfigExists(ctx, sliceConfig.Namespace, sliceConfig.Spec.StandardQosProfileName)
 		if !exists {
 			return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "SliceQoSConfig not found.")
-
 		}
 	}
 	if sliceConfig.Spec.QosProfileDetails != nil && sliceConfig.Spec.QosProfileDetails.BandwidthCeilingKbps < sliceConfig.Spec.QosProfileDetails.BandwidthGuaranteedKbps {
@@ -539,8 +536,10 @@ func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv
 func validateGrantedClusterNamespaces(ctx context.Context, clusterName string, applicationNamespace string, sliceName string, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	cluster := controllerv1alpha1.Cluster{}
 	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
+	projectName := util.GetProjectName(sliceConfig.Namespace)
+	defaultSliceName := fmt.Sprintf("%s-default-slice", projectName)
 	for _, clusterNamespace := range cluster.Status.Namespaces {
-		if applicationNamespace == clusterNamespace.Name && len(clusterNamespace.SliceName) > 0 && clusterNamespace.SliceName != sliceName {
+		if applicationNamespace == clusterNamespace.Name && len(clusterNamespace.SliceName) > 0 && clusterNamespace.SliceName != sliceName && clusterNamespace.SliceName != defaultSliceName {
 			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces"), applicationNamespace, "The given namespace: "+applicationNamespace+" in cluster "+clusterName+" is already acquired by other slice: "+clusterNamespace.SliceName)
 		}
 	}
@@ -573,7 +572,7 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 		if validNamespace == false {
 			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace, "Namespaces cannot contain special characteres")
 		}
-		//check if the clusters are already specified for a namespace
+		// check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedApplicationNs, nsSelection.Namespace) {
 			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Namespace"), nsSelection.Namespace)
 		}
@@ -584,7 +583,7 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "Other clusters are not allowed when * is present")
 			}
 		}
-		//check if the cluster is valid
+		// check if the cluster is valid
 		for _, cluster := range nsSelection.Clusters {
 			if cluster != "*" && !util.ContainsString(participatingClusters, cluster) {
 				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), cluster, "Cluster is not participating in slice config")
@@ -605,7 +604,7 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 		if len(nsSelection.Namespace) > 0 && len(nsSelection.Clusters) == 0 {
 			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), "clusters")
 		}
-		//check if the clusters are already specified for a namespace
+		// check if the clusters are already specified for a namespace
 		if util.ContainsString(checkedAllowedNs, nsSelection.Namespace) {
 			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Namespace"), nsSelection.Namespace)
 		}
@@ -616,7 +615,7 @@ func validateNamespaceIsolationProfile(s *controllerv1alpha1.SliceConfig) *field
 				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), strings.Join(nsSelection.Clusters, ", "), "Other clusters are not allowed when * is present")
 			}
 		}
-		//check if the cluster is valid
+		// check if the cluster is valid
 		for _, cluster := range nsSelection.Clusters {
 			if cluster != "*" && !util.ContainsString(participatingClusters, cluster) {
 				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("AllowedNamespaces").Child("Clusters"), cluster, "Cluster is not participating in slice config")
