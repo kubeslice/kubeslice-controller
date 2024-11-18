@@ -406,18 +406,18 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 				return ctrl.Result{}, nil
 			}
 
-			isNamespaceRemovedFromCluster := false
 			// if any namespace is removed from cluster that is still present in default slice, remove it
+			isNamespaceRemovedFromCluster := false
 			namespacesInCluster := make(map[string]struct{})
 			for _, ns := range cluster.Status.Namespaces {
-				if ns.SliceName == "" {
+				if ns.SliceName == "" || ns.SliceName == defaultSliceName {
 					namespacesInCluster[ns.Name] = struct{}{}
 				}
 			}
 
 			modifiedDefaultSliceApplicationNamespace := []controllerv1alpha1.SliceNamespaceSelection{}
 			for _, appns := range defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
-				if _, ok := namespaceIndexMap[appns.Namespace]; !ok {
+				if _, ok := namespacesInCluster[appns.Namespace]; !ok {
 					isNamespaceRemovedFromCluster = true
 					// if certain ns is present in default slice but not in cluster, it is possible that it is removed from cluster
 					// check if current cluster is still present in default slice
@@ -425,7 +425,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 						if attachedCluster == cluster.Name {
 							// need to detach curr cluster if clusters lenght is more than one
 							if len(appns.Clusters) > 1 {
-								util.RemoveElementFromArray(appns.Clusters, cluster.Name)
+								appns.Clusters = util.RemoveElementFromArray(appns.Clusters, cluster.Name)
 							} else {
 								// remove the entire appns item
 								continue
