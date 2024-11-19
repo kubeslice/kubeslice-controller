@@ -537,7 +537,7 @@ func validateGrantedClusterNamespaces(ctx context.Context, clusterName string, a
 	cluster := controllerv1alpha1.Cluster{}
 	_, _ = util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: sliceConfig.Namespace}, &cluster)
 	projectName := util.GetProjectName(sliceConfig.Namespace)
-	defaultSliceName := fmt.Sprintf("%s-default-slice", projectName)
+	defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
 	for _, clusterNamespace := range cluster.Status.Namespaces {
 		if applicationNamespace == clusterNamespace.Name && len(clusterNamespace.SliceName) > 0 && clusterNamespace.SliceName != sliceName && clusterNamespace.SliceName != defaultSliceName {
 			return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces"), applicationNamespace, "The given namespace: "+applicationNamespace+" in cluster "+clusterName+" is already acquired by other slice: "+clusterNamespace.SliceName)

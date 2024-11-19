@@ -13,11 +13,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type NamespaceWithCluster struct {
-	Namespace string
-	Cluster   string
-}
-
 func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, cluster *controllerv1alpha1.Cluster) error {
 	// Step 7: create default slice or copy namespaces to default slice
 	projectName := util.GetProjectName(req.Namespace)
@@ -31,7 +26,7 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 		return err
 	}
 
-	defaultSliceName := fmt.Sprintf("%s-default-slice", projectName)
+	defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
 
 	// also check for defaultSliceCreation flag
 	if present && project.Spec.DefaultSliceCreation {
