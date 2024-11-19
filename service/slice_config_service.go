@@ -22,6 +22,7 @@ import (
 	"reflect"
 
 	"github.com/kubeslice/kubeslice-controller/metrics"
+	"go.uber.org/zap"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -131,48 +132,23 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	// Before creation or update of worker slice config, remove namespace from default slice
-
+	// Step 3: Before creation or update of worker slice config, handle default slice appns removal if project has defaultSliceCreation enabled
 	projectName := util.GetProjectName(req.Namespace)
-	defaultSliceName := fmt.Sprintf("%s-default-slice", projectName)
-
-	defaultProjectSlice := &controllerv1alpha1.SliceConfig{}
-	defaultSliceNamespacedName := types.NamespacedName{
-		Namespace: req.Namespace,
-		Name:      defaultSliceName,
-	}
-	foundDefaultSlice, err := util.GetResourceIfExist(ctx, defaultSliceNamespacedName, defaultProjectSlice)
+	project := &controllerv1alpha1.Project{}
+	foundProject, err := util.GetResourceIfExist(ctx, types.NamespacedName{
+		Name:      projectName,
+		Namespace: ControllerNamespace,
+	}, project)
 	if err != nil {
-		logger.Errorf("error while getting default slice %v", defaultSliceName)
 		return ctrl.Result{}, err
 	}
-	if foundDefaultSlice {
-		// remove all namespaces from default slice that are present in this slice config
-		defaultApplicationNamespaces := defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces
-		sliceConfigApplicationNamespaces := sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces
 
-		sliceAppnsMap := s.constructApplicationNamespaceMap(sliceConfig.Spec.Clusters, sliceConfigApplicationNamespaces)
-		defaultAppnsMap := s.constructApplicationNamespaceMap(defaultProjectSlice.Spec.Clusters, defaultApplicationNamespaces)
-		appnsMapToRemove := make(map[string]NamespaceWithCluster)
-
-		for key := range sliceAppnsMap {
-			// if same namespace and cluster is present in default slice, then  add it to appnsMapToRemove
-			if namespaceWithCluster, ok := defaultAppnsMap[key]; ok {
-				appnsMapToRemove[key] = namespaceWithCluster
-			}
+	if foundProject && project.Spec.DefaultSliceCreation {
+		err := s.handleDefaultSliceConfigAppns(ctx, req, logger, projectName, sliceConfig)
+		if err != nil {
+			return ctrl.Result{}, err
 		}
-
-		filteredDefaultApplicationNamespaces := s.removeSliceApplicationNamespaces(appnsMapToRemove, defaultApplicationNamespaces)
-		if !reflect.DeepEqual(filteredDefaultApplicationNamespaces, defaultApplicationNamespaces) {
-			logger.Info("updating default slice config %s", filteredDefaultApplicationNamespaces)
-			defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = filteredDefaultApplicationNamespaces
-			err := util.UpdateResource(ctx, defaultProjectSlice)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			logger.Info("successfully updated default slice config")
-			return ctrl.Result{}, nil
-		}
+		return ctrl.Result{}, nil
 	}
 
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
@@ -183,7 +159,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Step 3: Creation of worker slice Objects and Cluster Labels
+	// Step 4: Creation of worker slice Objects and Cluster Labels
 	// get cluster cidr from maxClusters of slice config
 	clusterCidr := ""
 	clusterCidr = util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
@@ -196,26 +172,26 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Step 4: Create gateways with minimum specification
+	// Step 5: Create gateways with minimum specification
 	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
 
-	// Step 5: Create VPNKeyRotation CR
+	// Step 6: Create VPNKeyRotation CR
 	// TODO(rahul): handle change in rotation interval
 	if err := s.vpn.CreateMinimalVpnKeyRotationConfig(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.RotationInterval); err != nil {
 		// register an event
 		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventVPNKeyRotationConfigCreationFailed)
 		return ctrl.Result{}, err
 	}
-	// Step 6: update cluster info into vpnkeyrotation Cconfig
+	// Step 7: update cluster info into vpnkeyrotation Cconfig
 	if _, err := s.vpn.ReconcileClusters(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.Clusters); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Step 7: Create ServiceImport Objects
+	// Step 8: Create ServiceImport Objects
 	serviceExports := &v1alpha1.ServiceExportConfigList{}
 	_, err = s.getServiceExportBySliceName(ctx, req.Namespace, sliceConfig.Name, serviceExports)
 	if err != nil {
@@ -331,33 +307,27 @@ func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig 
 	return ownerLabels
 }
 
-func (s *SliceConfigService) constructApplicationNamespaceMap(registeredClusters []string, sliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) map[string]NamespaceWithCluster {
-	nsMap := make(map[string]NamespaceWithCluster)
+func (s *SliceConfigService) constructApplicationNamespaceMap(registeredClusters []string, sliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) map[string]struct{} {
+	nsMap := make(map[string]struct{})
 	mapKeyFormat := "namespcae=%s&cluster=%s"
 	for _, appns := range sliceConfigApplicationNamespaces {
 		if len(appns.Clusters) > 0 && appns.Clusters[0] == "*" {
 			// add all cluster and namespace combnination to the map
 			for _, cluster := range registeredClusters {
 				namespaceToClusterMapKey := fmt.Sprintf(mapKeyFormat, appns.Namespace, cluster)
-				nsMap[namespaceToClusterMapKey] = NamespaceWithCluster{
-					Namespace: appns.Namespace,
-					Cluster:   cluster,
-				}
+				nsMap[namespaceToClusterMapKey] = struct{}{}
 			}
 		} else {
 			for _, cluster := range appns.Clusters {
 				namespaceToClusterMapKey := fmt.Sprintf(mapKeyFormat, appns.Namespace, cluster)
-				nsMap[namespaceToClusterMapKey] = NamespaceWithCluster{
-					Namespace: appns.Namespace,
-					Cluster:   cluster,
-				}
+				nsMap[namespaceToClusterMapKey] = struct{}{}
 			}
 		}
 	}
 	return nsMap
 }
 
-func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithCluster map[string]NamespaceWithCluster, defaultSliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) []controllerv1alpha1.SliceNamespaceSelection {
+func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithCluster map[string]struct{}, defaultSliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) []controllerv1alpha1.SliceNamespaceSelection {
 	filteredApplicaitonNamespaces := []controllerv1alpha1.SliceNamespaceSelection{}
 
 	for _, appns := range defaultSliceConfigApplicationNamespaces {
@@ -379,4 +349,47 @@ func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithClust
 		}
 	}
 	return filteredApplicaitonNamespaces
+}
+
+func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, projectName string, sliceConfig *controllerv1alpha1.SliceConfig) error {
+	defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
+	defaultProjectSlice := &controllerv1alpha1.SliceConfig{}
+	defaultSliceNamespacedName := types.NamespacedName{
+		Namespace: req.Namespace,
+		Name:      defaultSliceName,
+	}
+	foundDefaultSlice, err := util.GetResourceIfExist(ctx, defaultSliceNamespacedName, defaultProjectSlice)
+	if err != nil {
+		logger.Error("error while getting default slice %v", defaultSliceName)
+		return err
+	}
+	if foundDefaultSlice {
+		// remove all namespaces from default slice that are present in this slice config
+		defaultApplicationNamespaces := defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces
+		sliceConfigApplicationNamespaces := sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces
+
+		sliceAppnsMap := s.constructApplicationNamespaceMap(sliceConfig.Spec.Clusters, sliceConfigApplicationNamespaces)
+		defaultAppnsMap := s.constructApplicationNamespaceMap(defaultProjectSlice.Spec.Clusters, defaultApplicationNamespaces)
+		appnsMapToRemove := make(map[string]struct{})
+
+		for key := range sliceAppnsMap {
+			// if same namespace and cluster is present in default slice, then  add it to appnsMapToRemove
+			if namespaceWithCluster, ok := defaultAppnsMap[key]; ok {
+				appnsMapToRemove[key] = namespaceWithCluster
+			}
+		}
+
+		filteredDefaultApplicationNamespaces := s.removeSliceApplicationNamespaces(appnsMapToRemove, defaultApplicationNamespaces)
+		if !reflect.DeepEqual(filteredDefaultApplicationNamespaces, defaultApplicationNamespaces) {
+			logger.Info("updating default slice config from %s to %s", defaultApplicationNamespaces, filteredDefaultApplicationNamespaces)
+			defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = filteredDefaultApplicationNamespaces
+			err := util.UpdateResource(ctx, defaultProjectSlice)
+			if err != nil {
+				return err
+			}
+			logger.Info("successfully updated default slice config")
+			return nil
+		}
+	}
+	return nil
 }
