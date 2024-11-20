@@ -514,6 +514,11 @@ func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv
 			return field.Duplicate(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces").Child("Clusters"), strings.Join(value, ", "))
 		}
 		if applicationNamespace.Clusters[0] == "*" {
+			projectName := util.GetProjectName(sliceConfig.Namespace)
+			defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
+			if defaultSliceName == sliceConfig.Name {
+				return field.Invalid(field.NewPath("Spec").Child("NamespaceIsolationProfile.ApplicationNamespaces").Child("Clusters"), strings.Join(applicationNamespace.Clusters, ", "), "Namespace sameness is not allowed in default slice")
+			}
 			for _, clusterName := range sliceConfig.Spec.Clusters {
 				err := validateGrantedClusterNamespaces(ctx, clusterName, applicationNamespace.Namespace, sliceConfig.Name, sliceConfig)
 				if err != nil {
