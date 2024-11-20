@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
 	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -39,8 +41,39 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 			logger.Errorf("error while getting default slice %v", defaultSliceName)
 			return err
 		}
+		// if not found, create with all namespace of cluster
+		if !foundDefaultSlice {
+			appns := []controllerv1alpha1.SliceNamespaceSelection{}
+			for _, ns := range cluster.Status.Namespaces {
+				if ns.SliceName == "" {
+					appns = append(appns, controllerv1alpha1.SliceNamespaceSelection{
+						Namespace: ns.Name,
+						Clusters:  []string{cluster.Name},
+					})
+				}
+			}
+			logger.Infof("appns %v", appns)
+			defaultProjectSlice = &controllerv1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      defaultSliceName,
+					Namespace: req.Namespace,
+				},
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					OverlayNetworkDeploymentMode: v1alpha1.NONET,
+					Clusters:                     []string{req.Name},
+					NamespaceIsolationProfile: controllerv1alpha1.NamespaceIsolationProfile{
+						ApplicationNamespaces: appns,
+					},
+					MaxClusters: 16,
+				},
+			}
+			err := util.CreateResource(ctx, defaultProjectSlice)
+			if err != nil {
+				return err
+			}
+			logger.Infof("successfully created default slice %s", defaultSliceName)
+		} else {
 
-		if foundDefaultSlice {
 			logger.Infof("default slice %s already present %v", defaultSliceName, defaultProjectSlice)
 			// if default slice is already present, either the cluster is new or there is some change in cluster
 			// check if cluster is already registered
