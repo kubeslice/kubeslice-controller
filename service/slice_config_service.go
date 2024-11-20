@@ -52,6 +52,8 @@ type SliceConfigService struct {
 	vpn   IVpnKeyRotationService
 }
 
+const NamespaceAndClusterFormat = "namespace=%s&cluster=%s"
+
 // ReconcileSliceConfig is a function to reconcile the sliceconfig
 func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get SliceConfig resource
@@ -144,11 +146,11 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 
 	if foundProject && project.Spec.DefaultSliceCreation {
+		logger.Info("found project and defaultslicecreation is enable")
 		err := s.handleDefaultSliceConfigAppns(ctx, req, logger, projectName, sliceConfig)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, nil
 	}
 
 	completeResourceName := fmt.Sprintf(util.LabelValue, util.GetObjectKind(sliceConfig), sliceConfig.GetName())
@@ -309,17 +311,16 @@ func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig 
 
 func (s *SliceConfigService) constructApplicationNamespaceMap(registeredClusters []string, sliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) map[string]struct{} {
 	nsMap := make(map[string]struct{})
-	mapKeyFormat := "namespcae=%s&cluster=%s"
 	for _, appns := range sliceConfigApplicationNamespaces {
 		if len(appns.Clusters) > 0 && appns.Clusters[0] == "*" {
 			// add all cluster and namespace combnination to the map
 			for _, cluster := range registeredClusters {
-				namespaceToClusterMapKey := fmt.Sprintf(mapKeyFormat, appns.Namespace, cluster)
+				namespaceToClusterMapKey := fmt.Sprintf(NamespaceAndClusterFormat, appns.Namespace, cluster)
 				nsMap[namespaceToClusterMapKey] = struct{}{}
 			}
 		} else {
 			for _, cluster := range appns.Clusters {
-				namespaceToClusterMapKey := fmt.Sprintf(mapKeyFormat, appns.Namespace, cluster)
+				namespaceToClusterMapKey := fmt.Sprintf(NamespaceAndClusterFormat, appns.Namespace, cluster)
 				nsMap[namespaceToClusterMapKey] = struct{}{}
 			}
 		}
@@ -333,14 +334,14 @@ func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithClust
 	for _, appns := range defaultSliceConfigApplicationNamespaces {
 		if len(appns.Clusters) > 1 {
 			for _, cluster := range appns.Clusters {
-				mapKey := fmt.Sprintf("namespace=%s&cluster=%s", appns.Namespace, cluster)
+				mapKey := fmt.Sprintf(NamespaceAndClusterFormat, appns.Namespace, cluster)
 				if _, ok := namespaceWithCluster[mapKey]; ok {
 					appns.Clusters = util.RemoveElementFromArray(appns.Clusters, cluster)
 				}
 			}
 			filteredApplicaitonNamespaces = append(filteredApplicaitonNamespaces, appns)
 		} else {
-			mapKey := fmt.Sprintf("namespace=%s&cluster=%s", appns.Namespace, appns.Clusters[0])
+			mapKey := fmt.Sprintf(NamespaceAndClusterFormat, appns.Namespace, appns.Clusters[0])
 			if _, ok := namespaceWithCluster[mapKey]; ok {
 				continue
 			}
@@ -364,6 +365,12 @@ func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, 
 		return err
 	}
 	if foundDefaultSlice {
+
+		logger.Info("found default slice", defaultProjectSlice.Name)
+		if defaultProjectSlice.Name == sliceConfig.Name {
+			// reconciling for default-slice so no need to remove ns
+			return nil
+		}
 		// remove all namespaces from default slice that are present in this slice config
 		defaultApplicationNamespaces := defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces
 		sliceConfigApplicationNamespaces := sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces
@@ -380,6 +387,7 @@ func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, 
 		}
 
 		filteredDefaultApplicationNamespaces := s.removeSliceApplicationNamespaces(appnsMapToRemove, defaultApplicationNamespaces)
+
 		if !reflect.DeepEqual(filteredDefaultApplicationNamespaces, defaultApplicationNamespaces) {
 			logger.Info("updating default slice config from %s to %s", defaultApplicationNamespaces, filteredDefaultApplicationNamespaces)
 			defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = filteredDefaultApplicationNamespaces
