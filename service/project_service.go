@@ -24,12 +24,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type IProjectService interface {
@@ -192,59 +190,6 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 				"object_kind": metricKindSliceQoSConfig,
 			},
 		)
-	}
-
-	// Step 8: Create default sliece
-
-	defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, project.Name)
-	defaultProjectSlice := &controllerv1alpha1.SliceConfig{}
-	defaultSliceNamespacedName := types.NamespacedName{
-		Namespace: req.Namespace,
-		Name:      defaultSliceName,
-	}
-	foundDefaultSlice, err := util.GetResourceIfExist(ctx, defaultSliceNamespacedName, defaultProjectSlice)
-	if err != nil {
-		logger.Errorf("error while getting default slice %v", defaultSliceName)
-		return ctrl.Result{}, err
-	}
-
-	// check for defaultSliceCreation flag
-	if project.Spec.DefaultSliceCreation {
-		// create default slice if not present, with empty cluster and ns
-		if !foundDefaultSlice {
-			defaultProjectSlice = &controllerv1alpha1.SliceConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultSliceName,
-					Namespace: req.Namespace,
-				},
-				Spec: controllerv1alpha1.SliceConfigSpec{
-					OverlayNetworkDeploymentMode: v1alpha1.NONET,
-					Clusters:                     []string{req.Name},
-					NamespaceIsolationProfile: controllerv1alpha1.NamespaceIsolationProfile{
-						ApplicationNamespaces: []controllerv1alpha1.SliceNamespaceSelection{},
-					},
-					MaxClusters: 16,
-				},
-			}
-			scheme := util.GetKubeSliceControllerRequestContext(ctx).Scheme
-			if err != controllerutil.SetControllerReference(project, defaultProjectSlice, scheme) {
-				return ctrl.Result{}, err
-			}
-			err := util.CreateResource(ctx, defaultProjectSlice)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			logger.Infof("successfully created default slice %s", defaultSliceName)
-		}
-	} else {
-		if foundDefaultSlice {
-			// if defaultSlicecreation is false, and default slice is present, delete it
-			err := util.DeleteResource(ctx, defaultProjectSlice)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			logger.Info("successfully deleted default slice %s ", defaultSliceName)
-		}
 	}
 
 	logger.Infof("project %s reconciled", req.Name)
