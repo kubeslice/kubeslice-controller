@@ -279,7 +279,11 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	err = DefaultSliceOperations(ctx, req, logger, cluster)
+	if shouldReturn, result, reconErr := util.IsReconciled(DefaultSliceOperations(ctx,
+		req, logger, cluster)); shouldReturn {
+		return result, reconErr
+	}
+
 	if err != nil {
 		return ctrl.Result{}, err
 	}

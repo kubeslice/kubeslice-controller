@@ -147,9 +147,8 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 
 	if foundProject && project.Spec.DefaultSliceCreation {
 		logger.Info("found project and defaultslicecreation is enable")
-		err := s.handleDefaultSliceConfigAppns(ctx, req, logger, projectName, sliceConfig)
-		if err != nil {
-			return ctrl.Result{}, err
+		if shouldReturn, result, reconErr := util.IsReconciled(s.handleDefaultSliceConfigAppns(ctx, req, logger, projectName, sliceConfig)); shouldReturn {
+			return result, reconErr
 		}
 	}
 
@@ -352,7 +351,7 @@ func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithClust
 	return filteredApplicaitonNamespaces
 }
 
-func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, projectName string, sliceConfig *controllerv1alpha1.SliceConfig) error {
+func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, projectName string, sliceConfig *controllerv1alpha1.SliceConfig) (ctrl.Result, error) {
 	defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
 	defaultProjectSlice := &controllerv1alpha1.SliceConfig{}
 	defaultSliceNamespacedName := types.NamespacedName{
@@ -362,14 +361,14 @@ func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, 
 	foundDefaultSlice, err := util.GetResourceIfExist(ctx, defaultSliceNamespacedName, defaultProjectSlice)
 	if err != nil {
 		logger.Error("error while getting default slice %v", defaultSliceName)
-		return err
+		return ctrl.Result{}, err
 	}
 	if foundDefaultSlice {
 
 		logger.Info("found default slice", defaultProjectSlice.Name)
 		if defaultProjectSlice.Name == sliceConfig.Name {
 			// reconciling for default-slice so no need to remove ns
-			return nil
+			return ctrl.Result{}, nil
 		}
 		// remove all namespaces from default slice that are present in this slice config
 		defaultApplicationNamespaces := defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces
@@ -393,11 +392,12 @@ func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, 
 			defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = filteredDefaultApplicationNamespaces
 			err := util.UpdateResource(ctx, defaultProjectSlice)
 			if err != nil {
-				return err
+				return ctrl.Result{}, err
 			}
 			logger.Info("successfully updated default slice config")
-			return nil
+
+			return ctrl.Result{}, nil
 		}
 	}
-	return nil
+	return ctrl.Result{}, nil
 }

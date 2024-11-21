@@ -13,7 +13,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, cluster *controllerv1alpha1.Cluster) error {
+func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, cluster *controllerv1alpha1.Cluster) (ctrl.Result, error) {
 	// Step 7: create default slice or copy namespaces to default slice
 	projectName := util.GetProjectName(req.Namespace)
 	project := &controllerv1alpha1.Project{}
@@ -23,7 +23,7 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 	}, project)
 	if err != nil {
 		logger.Errorf("error while getting project %v", projectName)
-		return err
+		return ctrl.Result{}, err
 	}
 
 	defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
@@ -39,7 +39,7 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 		foundDefaultSlice, err := util.GetResourceIfExist(ctx, defaultSliceNamespacedName, defaultProjectSlice)
 		if err != nil {
 			logger.Errorf("error while getting default slice %v", defaultSliceName)
-			return err
+			return ctrl.Result{}, err
 		}
 		// if not found, create with all namespace of cluster
 		if !foundDefaultSlice {
@@ -69,7 +69,7 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 			}
 			err := util.CreateResource(ctx, defaultProjectSlice)
 			if err != nil {
-				return err
+				return ctrl.Result{}, err
 			}
 			logger.Infof("successfully created default slice %s", defaultSliceName)
 		} else {
@@ -115,6 +115,7 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 					isNamespaceAddedToCluster = true
 					// check if namespace is already present
 					if nsIndex, ok := namespaceIndexMap[ns.Name]; ok {
+						// not handling same namespace in multiple cluster for now
 						prevData := defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces[nsIndex]
 						modifiedData := controllerv1alpha1.SliceNamespaceSelection{
 							Namespace: prevData.Namespace,
@@ -134,38 +135,40 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 				logger.Infof("handling ns addition cluster %v slice %v", cluster.Name, defaultProjectSlice)
 				err := util.UpdateResource(ctx, defaultProjectSlice)
 				if err != nil {
-					return err
+					return ctrl.Result{}, err
 				}
-				return nil
+				return ctrl.Result{}, nil
 			}
 
 			// if any namespace is removed from cluster that is still present in default slice, remove it
 			isNamespaceRemovedFromCluster := false
 			namespacesInCluster := make(map[string]struct{})
 			for _, ns := range cluster.Status.Namespaces {
-				if ns.SliceName == "" || ns.SliceName == defaultSliceName {
+				if ns.SliceName == defaultSliceName {
 					namespacesInCluster[ns.Name] = struct{}{}
 				}
 			}
 
 			modifiedDefaultSliceApplicationNamespace := []controllerv1alpha1.SliceNamespaceSelection{}
 			for _, appns := range defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
-				if _, ok := namespacesInCluster[appns.Namespace]; !ok {
-					isNamespaceRemovedFromCluster = true
-					// if certain ns is present in default slice but not in cluster, it is possible that it is removed from cluster
-					// check if current cluster is still present in default slice
-					for _, attachedCluster := range appns.Clusters {
-						if attachedCluster == cluster.Name {
-							// need to detach curr cluster if clusters lenght is more than one
+				foundClusterName := false
+				for _, clusterName := range appns.Clusters {
+					if clusterName == req.Name {
+						foundClusterName = true
+						if _, ok := namespacesInCluster[appns.Namespace]; !ok {
+							isNamespaceRemovedFromCluster = true
 							if len(appns.Clusters) > 1 {
 								appns.Clusters = util.RemoveElementFromArray(appns.Clusters, cluster.Name)
 								modifiedDefaultSliceApplicationNamespace = append(modifiedDefaultSliceApplicationNamespace, appns)
+							} else {
+								continue
 							}
-							// if the appns.Clusters == 1, we skip to add it in modified slice so that it can be removed
+						} else {
+							modifiedDefaultSliceApplicationNamespace = append(modifiedDefaultSliceApplicationNamespace, appns)
 						}
 					}
-				} else {
-					// if ns is still present in cluster, add it to modified slice
+				}
+				if !foundClusterName {
 					modifiedDefaultSliceApplicationNamespace = append(modifiedDefaultSliceApplicationNamespace, appns)
 				}
 			}
@@ -175,16 +178,17 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 			defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = modifiedDefaultSliceApplicationNamespace
 
 			logger.Info("after update appns %v ", defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces)
-			if isNamespaceRemovedFromCluster {
+			if isNamespaceRemovedFromCluster && !isNamespaceAddedToCluster {
 				logger.Infof("handling ns removal from cluster %v and slice %s", cluster.Name, defaultProjectSlice)
 				err := util.UpdateResource(ctx, defaultProjectSlice)
 				if err != nil {
-					return err
+					return ctrl.Result{}, err
 				}
-				return nil
+
+				return ctrl.Result{}, nil
 			}
 		}
 
 	}
-	return nil
+	return ctrl.Result{}, nil
 }
