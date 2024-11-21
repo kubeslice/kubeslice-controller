@@ -1,15 +1,22 @@
 apiVersion: controller.kubeslice.io/v1alpha1
 kind: SliceConfig
 metadata:
-  name: rohan
+  name: red
 spec:
   sliceType: Application
   maxClusters: 14
   clusters:
     - worker-1
+    - worker-2
   overlayNetworkDeploymentMode: no-network
   namespaceIsolationProfile:
     applicationNamespaces:
       - clusters:
           - worker-1
-        namespace: test
+        namespace: test-01
+      - clusters:
+          - worker-1
+        namespace: test-02
+      - clusters:
+          - worker-2
+        namespace: test-04
