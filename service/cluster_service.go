@@ -91,6 +91,10 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			if shouldRequeue, result, reconErr := util.IsReconciled(c.cleanUpClusterResources(ctx, req, cluster)); shouldRequeue {
 				return result, reconErr
 			}
+			if shouldRequeue, result, reconErr := util.IsReconciled(DeregisterClusterFromDefaultSlice(ctx, req, logger, req.Name)); shouldRequeue {
+				return result, reconErr
+			}
+
 			if shouldRequeue, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, cluster, ClusterFinalizer)); shouldRequeue {
 				// Register an event for cluster deletion fail
 				util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeletionFailed)
