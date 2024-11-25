@@ -87,11 +87,12 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	} else {
 		logger.Debug("starting delete for cluster", req.NamespacedName)
 		//  Check if ClusterDeregisterFinalizer is added by worker cluster.
+		if shouldRequeue, result, reconErr := util.IsReconciled(DeregisterClusterFromDefaultSlice(ctx, req, logger, req.Name)); shouldRequeue {
+			return result, reconErr
+		}
+		logger.Info("after cluster deregister")
 		if !util.ContainsString(cluster.GetFinalizers(), ClusterDeregisterFinalizer) {
 			if shouldRequeue, result, reconErr := util.IsReconciled(c.cleanUpClusterResources(ctx, req, cluster)); shouldRequeue {
-				return result, reconErr
-			}
-			if shouldRequeue, result, reconErr := util.IsReconciled(DeregisterClusterFromDefaultSlice(ctx, req, logger, req.Name)); shouldRequeue {
 				return result, reconErr
 			}
 
