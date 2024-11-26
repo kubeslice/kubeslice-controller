@@ -78,7 +78,7 @@ func validateIfSliceConfigExists(ctx context.Context, project *controllerv1alpha
 	sliceConfig := &controllerv1alpha1.SliceConfigList{}
 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 	err := util.ListResources(ctx, sliceConfig, client.InNamespace(projectNamespace))
-	// if the only existing slice config is the default slice config, the project can be deleted, such that we can handle cleanup of default slice in project finalizer
+	// if the only existing slice config is the default slice config, the project can be deleted
 	if err == nil && len(sliceConfig.Items) == 1 && sliceConfig.Items[0].Name == fmt.Sprintf(util.DefaultProjectSliceName, project.GetName()) {
 		return false
 	}
