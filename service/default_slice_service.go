@@ -13,10 +13,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// TODO: Remove cluster object
 func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, cluster *controllerv1alpha1.Cluster) (ctrl.Result, error) {
-	if cluster.Status.IsDeregisterInProgress {
-		logger.Info("cluster is in deregistration state, skipping default slice operations")
+	if cluster.Status.IsDeregisterInProgress || !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
+		logger.Info("cluster is in deregistration state or already deleted, skipping default slice operations")
 		return ctrl.Result{}, nil
 	}
 
@@ -205,8 +204,6 @@ func DeregisterClusterFromDefaultSlice(ctx context.Context, req ctrl.Request, lo
 	}
 
 	defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
-	// also check for defaultSliceCreation flag
-	logger.Info("deregister worker cluster")
 	if present && project.Spec.DefaultSliceCreation {
 		// create default slice if not present
 		defaultProjectSlice := &controllerv1alpha1.SliceConfig{}
@@ -221,7 +218,7 @@ func DeregisterClusterFromDefaultSlice(ctx context.Context, req ctrl.Request, lo
 		}
 
 		if !foundDefaultSlice {
-			logger.Info("default slice not found")
+			logger.Info("default slice not found %s", defaultSliceName)
 			return ctrl.Result{}, nil
 		}
 
@@ -237,7 +234,6 @@ func DeregisterClusterFromDefaultSlice(ctx context.Context, req ctrl.Request, lo
 			logger.Info("worker %s is not present in default slice %s, returning without update....", clusterName, defaultSliceName)
 			return ctrl.Result{}, nil
 		}
-		logger.Info("default slice found %v", defaultProjectSlice)
 
 		// to deregisterCluster from default, assume it doesn't have any namespace, so every namespace attach to this clusterName will be removed
 		cluster := controllerv1alpha1.Cluster{
@@ -273,17 +269,16 @@ func DeregisterClusterFromDefaultSlice(ctx context.Context, req ctrl.Request, lo
 				modifiedDefaultSliceApplicationNamespace = append(modifiedDefaultSliceApplicationNamespace, appns)
 			}
 		}
-		logger.Info("modifiedDefaultSliceApplicationNamespace %v", modifiedDefaultSliceApplicationNamespace)
 
 		defaultProjectSlice.Spec.NamespaceIsolationProfile.ApplicationNamespaces = modifiedDefaultSliceApplicationNamespace
 		if isNamespaceRemovedFromCluster {
 			defaultProjectSlice.Spec.Clusters = util.RemoveElementFromArray(defaultProjectSlice.Spec.Clusters, cluster.Name)
 			err := util.UpdateResource(ctx, defaultProjectSlice)
 			if err != nil {
-				logger.Errorf("could not update default slice %v of clusterName", defaultProjectSlice, clusterName)
+				logger.Errorf("could not remove cluster %s from default slice %s", clusterName, defaultSliceName)
 				return ctrl.Result{}, err
 			}
-			logger.Infof("successfully deregisterd cluster %s from default slice %s", clusterName, defaultSliceName)
+			logger.Infof("successfully removed cluster %s from default slice %s", clusterName, defaultSliceName)
 			return ctrl.Result{}, nil
 		}
 
