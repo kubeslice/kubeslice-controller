@@ -67,7 +67,7 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 					NamespaceIsolationProfile: controllerv1alpha1.NamespaceIsolationProfile{
 						ApplicationNamespaces: appns,
 					},
-					MaxClusters: 16,
+					MaxClusters: 32,
 				},
 			}
 			err := util.CreateResource(ctx, defaultProjectSlice)

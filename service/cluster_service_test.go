@@ -79,15 +79,15 @@ var ClusterTestbed = map[string]func(*testing.T){
 }
 
 func testReconcileClusterClusterNotFound(t *testing.T) {
-	//fine
-	//requeue must be false and error nil
+	// fine
+	// requeue must be false and error nil
 	nsServiceMock := &mocks.INamespaceService{}
 	acsService := &mocks.IAccessControlService{}
 	clusterService := ClusterService{
 		ns:  nsServiceMock,
 		acs: acsService,
 	}
-	clusterName := types.NamespacedName{} //passing empty clusterName(name and namespace)
+	clusterName := types.NamespacedName{} // passing empty clusterName(name and namespace)
 	requestObj := ctrl.Request{
 		clusterName,
 	}
@@ -111,7 +111,7 @@ func testReconcileClusterProjectNamespaceNotFound(t *testing.T) {
 		mf:  mMock,
 	}
 
-	clusterName := types.NamespacedName{} //passing empty clusterName(name and namespace)
+	clusterName := types.NamespacedName{} // passing empty clusterName(name and namespace)
 	requestObj := ctrl.Request{
 		clusterName,
 	}
@@ -132,7 +132,7 @@ func testReconcileClusterProjectNamespaceNotFound(t *testing.T) {
 }
 
 func testReconcileClusterDeletionClusterFail(t *testing.T) {
-	//var errList errorList
+	// var errList errorList
 	nsServiceMock := &mocks.INamespaceService{}
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -171,7 +171,8 @@ func testReconcileClusterDeletionClusterFail(t *testing.T) {
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
 		arg.Name = "cisco"
 	})
-	//finaliser
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	// finaliser
 	err := errors.New(" RemoveWorkerClusterServiceAccountAndRoleBindings internal error")
 	acsService.On("RemoveWorkerClusterServiceAccountAndRoleBindings", ctx, requestObj.Name, requestObj.Namespace, mock.AnythingOfType("*v1alpha1.Cluster")).Return(ctrl.Result{}, nil)
 	clientMock.On("Update", ctx, mock.Anything).Return(err).Once()
@@ -244,7 +245,7 @@ func testReconcileClusterSecretNotFound(t *testing.T) {
 func testDeleteClustersListFail(t *testing.T) {
 	clusters := &controllerv1alpha1.ClusterList{}
 	nsServiceMock := &mocks.INamespaceService{}
-	//var errList errorList
+	// var errList errorList
 	acsService := &mocks.IAccessControlService{}
 	clusterService := ClusterService{
 		ns:  nsServiceMock,
@@ -262,9 +263,9 @@ func testDeleteClustersListFail(t *testing.T) {
 }
 
 func testDeleteClusterDeletePass(t *testing.T) {
-	//clusters := &controllerv1alpha1.ClusterList{}
+	// clusters := &controllerv1alpha1.ClusterList{}
 	nsServiceMock := &mocks.INamespaceService{}
-	//var errList errorList
+	// var errList errorList
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
 	clusterService := ClusterService{
@@ -296,9 +297,9 @@ func testDeleteClusterDeletePass(t *testing.T) {
 }
 
 func testDeleteClusterDeleteFail(t *testing.T) {
-	//clusters := &controllerv1alpha1.ClusterList{}
+	// clusters := &controllerv1alpha1.ClusterList{}
 	nsServiceMock := &mocks.INamespaceService{}
-	//var errList errorList
+	// var errList errorList
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
 	clusterService := ClusterService{
@@ -331,7 +332,8 @@ func testDeleteClusterDeleteFail(t *testing.T) {
 }
 
 func prepareTestContext(ctx context.Context, client util.Client,
-	scheme *runtime.Scheme) context.Context {
+	scheme *runtime.Scheme,
+) context.Context {
 	if scheme == nil {
 		scheme = runtime.NewScheme()
 	}
@@ -348,7 +350,7 @@ func prepareTestContext(ctx context.Context, client util.Client,
 
 func testClusterPass(t *testing.T) {
 	nsServiceMock := &mocks.INamespaceService{}
-	//var errList errorList
+	// var errList errorList
 	acsService := &mocks.IAccessControlService{}
 	ssgService := &mocks.IWorkerSliceGatewayService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -393,7 +395,7 @@ func testClusterPass(t *testing.T) {
 
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), mock.AnythingOfType("*v1alpha1.Cluster")).Return(nil).Once()
-	serviceAccount := &corev1.ServiceAccount{} //Secrets: nil, //secret= nil should return requeue true and requeuetime>0
+	serviceAccount := &corev1.ServiceAccount{} // Secrets: nil, //secret= nil should return requeue true and requeuetime>0
 	clientMock.On("Get", ctx, mock.Anything, serviceAccount).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*corev1.ServiceAccount)
 		if arg.Secrets == nil {
@@ -424,7 +426,7 @@ func testClusterPass(t *testing.T) {
 
 func testClusterResetNodeIPsIfEmptyString(t *testing.T) {
 	nsServiceMock := &mocks.INamespaceService{}
-	//var errList errorList
+	// var errList errorList
 	acsService := &mocks.IAccessControlService{}
 	ssgService := &mocks.IWorkerSliceGatewayService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -472,7 +474,7 @@ func testClusterResetNodeIPsIfEmptyString(t *testing.T) {
 		arg.Spec.NodeIPs = make([]string, 1)
 		arg.Spec.NodeIPs[0] = ""
 	}).Once()
-	serviceAccount := &corev1.ServiceAccount{} //Secrets: nil, //secret= nil should return requeue true and requeuetime>0
+	serviceAccount := &corev1.ServiceAccount{} // Secrets: nil, //secret= nil should return requeue true and requeuetime>0
 	clientMock.On("Get", ctx, mock.Anything, serviceAccount).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*corev1.ServiceAccount)
 		if arg.Secrets == nil {
@@ -503,7 +505,7 @@ func testClusterResetNodeIPsIfEmptyString(t *testing.T) {
 
 func testReconcileClusterUpdateSecretFail(t *testing.T) {
 	nsServiceMock := &mocks.INamespaceService{}
-	//var errList errorList
+	// var errList errorList
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
 
@@ -545,7 +547,7 @@ func testReconcileClusterUpdateSecretFail(t *testing.T) {
 
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), mock.AnythingOfType("*v1alpha1.Cluster")).Return(nil).Once()
-	serviceAccount := &corev1.ServiceAccount{} //Secrets: nil, //secret= nil should return requeue true and requeuetime>0
+	serviceAccount := &corev1.ServiceAccount{} // Secrets: nil, //secret= nil should return requeue true and requeuetime>0
 	clientMock.On("Get", ctx, mock.Anything, serviceAccount).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*corev1.ServiceAccount)
 		if arg.Secrets == nil {
@@ -593,7 +595,7 @@ func testReconcileClusterServiceAccountSecretNil(t *testing.T) {
 
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
-	//timeStamp := kubermachine.Date(0000, 0, 0, 0, 0, 0, 0, time.UTC)
+	// timeStamp := kubermachine.Date(0000, 0, 0, 0, 0, 0, 0, time.UTC)
 	clientMock.On("Get", ctx, requestObj.NamespacedName, cluster).Return(nil).Once()
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name: requestObj.Namespace,
@@ -606,12 +608,14 @@ func testReconcileClusterServiceAccountSecretNil(t *testing.T) {
 		arg.Name = "cisco"
 	})
 
-	//finaliser
+	// finaliser
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), mock.AnythingOfType("*v1alpha1.Cluster")).Return(nil).Once()
-	serviceAccount := &corev1.ServiceAccount{} //Secrets: nil, //secret= nil should return requeue true and requeuetime>0
-	serviceAccountNamespacedName := types.NamespacedName{Name: fmt.Sprintf(ServiceAccountWorkerCluster, cluster.Name),
-		Namespace: requestObj.Namespace}
+	serviceAccount := &corev1.ServiceAccount{} // Secrets: nil, //secret= nil should return requeue true and requeuetime>0
+	serviceAccountNamespacedName := types.NamespacedName{
+		Name:      fmt.Sprintf(ServiceAccountWorkerCluster, cluster.Name),
+		Namespace: requestObj.Namespace,
+	}
 	clientMock.On("Get", ctx, serviceAccountNamespacedName, serviceAccount).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*corev1.ServiceAccount)
 		arg.Secrets = nil
@@ -626,7 +630,7 @@ func testReconcileClusterServiceAccountSecretNil(t *testing.T) {
 }
 
 func testReconcileClusterDeletionRaisesEvent(t *testing.T) {
-	//var errList errorList
+	// var errList errorList
 	nsServiceMock := &mocks.INamespaceService{}
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -665,7 +669,8 @@ func testReconcileClusterDeletionRaisesEvent(t *testing.T) {
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
 		arg.Name = "cisco"
 	})
-	//finaliser
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	// finaliser
 	acsService.On("RemoveWorkerClusterServiceAccountAndRoleBindings", ctx, requestObj.Name, requestObj.Namespace, mock.AnythingOfType("*v1alpha1.Cluster")).Return(ctrl.Result{}, nil)
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
@@ -678,7 +683,7 @@ func testReconcileClusterDeletionRaisesEvent(t *testing.T) {
 }
 
 func testReconcileClusterDeletionRequeueForDeregister(t *testing.T) {
-	//var errList errorList
+	// var errList errorList
 	nsServiceMock := &mocks.INamespaceService{}
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -719,7 +724,8 @@ func testReconcileClusterDeletionRequeueForDeregister(t *testing.T) {
 		arg.Name = "cisco"
 	})
 
-	//Status Update
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	// Status Update
 	clientMock.On("Status").Return(clientMock)
 	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil)
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
@@ -735,7 +741,7 @@ func testReconcileClusterDeletionRequeueForDeregister(t *testing.T) {
 }
 
 func testReconcileClusterDeletionSuccessAfterWorkerFailedToRemoveFinalizer(t *testing.T) {
-	//var errList errorList
+	// var errList errorList
 	nsServiceMock := &mocks.INamespaceService{}
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -776,6 +782,7 @@ func testReconcileClusterDeletionSuccessAfterWorkerFailedToRemoveFinalizer(t *te
 		arg.Name = "cisco"
 	})
 
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	// Remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 
@@ -789,7 +796,7 @@ func testReconcileClusterDeletionSuccessAfterWorkerFailedToRemoveFinalizer(t *te
 }
 
 func testReconcileClusterDeletionFailureAfterWorkerFailedToRemoveFinalizer(t *testing.T) {
-	//var errList errorList
+	// var errList errorList
 	nsServiceMock := &mocks.INamespaceService{}
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -829,6 +836,7 @@ func testReconcileClusterDeletionFailureAfterWorkerFailedToRemoveFinalizer(t *te
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
 		arg.Name = "cisco"
 	})
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	err := errors.New("failed to remove finalizer")
 	clientMock.On("Update", ctx, mock.Anything).Return(err).Once()
@@ -843,7 +851,7 @@ func testReconcileClusterDeletionFailureAfterWorkerFailedToRemoveFinalizer(t *te
 }
 
 func testReconcileClusterDeletionDeregisterFailed(t *testing.T) {
-	//var errList errorList
+	// var errList errorList
 	nsServiceMock := &mocks.INamespaceService{}
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -885,6 +893,7 @@ func testReconcileClusterDeletionDeregisterFailed(t *testing.T) {
 		arg.Name = "cisco"
 	})
 
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	// Remove finalizer
 
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
@@ -897,7 +906,7 @@ func testReconcileClusterDeletionDeregisterFailed(t *testing.T) {
 }
 
 func testReconcileClusterDeletionDeregisterSuccess(t *testing.T) {
-	//var errList errorList
+	// var errList errorList
 	nsServiceMock := &mocks.INamespaceService{}
 	acsService := &mocks.IAccessControlService{}
 	mMock := &metricMock.IMetricRecorder{}
@@ -939,6 +948,7 @@ func testReconcileClusterDeletionDeregisterSuccess(t *testing.T) {
 		arg.Name = "cisco"
 	})
 
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	// Remove finalizer
 
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
