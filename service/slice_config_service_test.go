@@ -206,7 +206,7 @@ func SliceConfigDeleteTheObjectHappyCase(t *testing.T) {
 		"slice_name": requestObj.Name,
 	}
 	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
-	//remove finalizer
+	// remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
@@ -313,6 +313,7 @@ func SliceConfigErrorOnCreateWorkerSliceConfig(t *testing.T) {
 		"cluster-1": 1,
 		"cluster-2": 2,
 	}
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, err1).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
@@ -345,6 +346,8 @@ func SliceConfigErrorOnCreateWorkerSliceGateway(t *testing.T) {
 		"cluster-1": 1,
 		"cluster-2": 2,
 	}
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	err1 := errors.New("internal_error")
 	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, err1).Once()
@@ -621,6 +624,7 @@ func SliceConfigErrorOnListingServiceExport(t *testing.T) {
 		"cluster-1": 1,
 		"cluster-2": 2,
 	}
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{
@@ -660,6 +664,8 @@ func SliceConfigErrorOnCreateOrUpdateServiceImport(t *testing.T) {
 		"cluster-1": 1,
 		"cluster-2": 2,
 	}
+
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{

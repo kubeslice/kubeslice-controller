@@ -235,3 +235,12 @@ func DifferenceOfArray(a, b []string) (diff []string) {
 	}
 	return diff
 }
+
+func RemoveElementFromArray(slice []string, element string) (arr []string) {
+	for i, v := range slice {
+		if v == element {
+			return append(slice[:i], slice[i+1:]...)
+		}
+	}
+	return slice
+}

@@ -31,8 +31,7 @@ var (
 	logger               = util.NewLogger().With("controller", "GracefulCleanup")
 )
 
-type CleanupService struct {
-}
+type CleanupService struct{}
 
 func (cs *CleanupService) CleanupResources(ctx context.Context) {
 	controllerManagerNamespace = os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE")
@@ -63,6 +62,16 @@ func (cs *CleanupService) CleanupResources(ctx context.Context) {
 	for _, project := range projects.Items {
 
 		projectNamespace := project.Labels["kubeslice-project-namespace"]
+		if project.Spec.DefaultSliceCreation == true {
+			logger.Info("default slice creation is enabled for project %s. Disable defaultSliceCreation for cleanup", project.Name)
+			project.Spec.DefaultSliceCreation = false
+			err := util.CleanupUpdateResource(ctx, &project)
+			if err != nil {
+				hasErrors = true
+				logger.Errorf("%s Error disabling defaultSliceCreation in project ", util.Err, project.Name, err.Error())
+			}
+		}
+
 		// Delete all ServiceExports
 		logger.Infof("%s Fetching all ServiceExports for Project %s", util.Find, project.GetName())
 
