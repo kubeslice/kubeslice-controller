@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -80,6 +81,23 @@ func validateClusterInAnySlice(ctx context.Context, c *controllerv1alpha1.Cluste
 	workerSlice := &workerv1alpha1.WorkerSliceConfigList{}
 	label := map[string]string{"worker-cluster": c.Name}
 	err := util.ListResources(ctx, workerSlice, client.MatchingLabels(label), client.InNamespace(c.Namespace))
+
+	workerSliceCount := len(workerSlice.Items)
+	defaultWorkerSliceCount := 0
+	for _, slice := range workerSlice.Items {
+		projectNamespace := slice.Labels["project-namespace"]
+		originalSliceName := slice.Labels["original-slice-name"]
+		projectName := util.GetProjectName(projectNamespace)
+		defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
+		if defaultSliceName == originalSliceName {
+			defaultWorkerSliceCount++
+		}
+	}
+	// if all the workerslice are default workeslice, then allow cluster deletion
+	if err == nil && workerSliceCount == defaultWorkerSliceCount {
+		return nil
+	}
+
 	if err == nil && len(workerSlice.Items) > 0 {
 		return field.Forbidden(field.NewPath("Cluster"), "The cluster cannot be deleted which is participating in slice config")
 	}

@@ -60,7 +60,7 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		logger.Infof("project %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	//Load Event Recorder with project name and namespace
+	// Load Event Recorder with project name and namespace
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(project.Name).WithNamespace(ControllerNamespace)
 
 	// Load metrics with project name and namespace
@@ -68,7 +68,7 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		WithNamespace(ControllerNamespace)
 
 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
-	//Finalizers
+	// Finalizers
 	if project.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !util.ContainsString(project.GetFinalizers(), ProjectFinalizer) {
 			if shouldReturn, result, reconErr := util.IsReconciled(util.AddFinalizer(ctx, project, ProjectFinalizer)); shouldReturn {
@@ -81,7 +81,7 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 			return result, reconErr
 		}
 		if shouldReturn, result, reconErr := util.IsReconciled(util.RemoveFinalizer(ctx, project, ProjectFinalizer)); shouldReturn {
-			//Register an event for project deletion fail
+			// Register an event for project deletion fail
 			util.RecordEvent(ctx, eventRecorder, project, nil, events.EventProjectDeletionFailed)
 			t.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 				map[string]string{
@@ -93,7 +93,7 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 			)
 			return result, reconErr
 		}
-		//Register an event for project deletion
+		// Register an event for project deletion
 		util.RecordEvent(ctx, eventRecorder, project, nil, events.EventProjectDeleted)
 		t.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 			map[string]string{

@@ -24,4 +24,5 @@ const (
 
 const (
 	DefaultSliceQOSConfigName = "default"
+	DefaultProjectSliceName   = "%s-default-slice"
 )
