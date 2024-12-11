@@ -55,9 +55,10 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 					})
 				}
 			}
+			defaultSliceDesc := fmt.Sprintf("This is the default slice created for project %s", projectName)
 			defaultProjectSlice = &controllerv1alpha1.SliceConfig{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{"slice-managed-by": projectName},
+					Annotations: map[string]string{"slice-managed-by": projectName, "desc": defaultSliceDesc},
 					Name:        defaultSliceName,
 					Namespace:   req.Namespace,
 				},
@@ -67,7 +68,7 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 					NamespaceIsolationProfile: controllerv1alpha1.NamespaceIsolationProfile{
 						ApplicationNamespaces: appns,
 					},
-					MaxClusters: 32,
+					MaxClusters: 8,
 				},
 			}
 			err := util.CreateResource(ctx, defaultProjectSlice)
@@ -77,7 +78,7 @@ func DefaultSliceOperations(ctx context.Context, req ctrl.Request, logger *zap.S
 			logger.Infof("successfully created default slice %s", defaultSliceName)
 		} else {
 
-			logger.Infof("default slice %s already present %v", defaultSliceName, defaultProjectSlice)
+			logger.Infof("default slice %s already present", defaultSliceName)
 			// if default slice is already present, either the cluster is new or there is some change in cluster
 			// check if cluster is already registered
 			isNewCluster := true
