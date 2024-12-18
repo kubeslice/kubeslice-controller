@@ -1,7 +1,5 @@
 # kubeslice-controller
 
-[![multicloud-opensource](https://github.com/kubeslice/nightly-build/actions/workflows/e2e_oss_osstest_multicloud_nightlybuild.yaml/badge.svg?branch=master)](https://github.com/kubeslice/nightly-build/actions/workflows/e2e_oss_osstest_multicloud_nightlybuild.yaml)
-
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeslice/kubeslice-controller)](https://goreportcard.com/report/github.com/kubeslice/kubeslice-controller)
 [![License](https://img.shields.io/github/license/kubeslice/kubeslice-controller)](https://github.com/kubeslice/kubeslice-controller/blob/master/LICENSE)
 [![GitHub release](https://img.shields.io/github/release/kubeslice/kubeslice-controller.svg)](https://GitHub.com/kubeslice/kubeslice-controller/releases/)
