@@ -2,6 +2,14 @@
 
 [![multicloud-opensource](https://github.com/kubeslice/nightly-build/actions/workflows/e2e_oss_osstest_multicloud_nightlybuild.yaml/badge.svg?branch=master)](https://github.com/kubeslice/nightly-build/actions/workflows/e2e_oss_osstest_multicloud_nightlybuild.yaml)
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/kubeslice/kubeslice-controller)](https://goreportcard.com/report/github.com/kubeslice/kubeslice-controller)
+[![License](https://img.shields.io/github/license/kubeslice/kubeslice-controller)](https://github.com/kubeslice/kubeslice-controller/blob/master/LICENSE)
+[![GitHub release](https://img.shields.io/github/release/kubeslice/kubeslice-controller.svg)](https://GitHub.com/kubeslice/kubeslice-controller/releases/)
+[![GitHub issues](https://img.shields.io/github/issues/kubeslice/kubeslice-controller.svg)](https://GitHub.com/kubeslice/kubeslice-controller/issues/)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/kubeslice/kubeslice-controller.svg)](https://GitHub.com/kubeslice/kubeslice-controller/pulls/)
+[![Code Size](https://img.shields.io/github/languages/code-size/kubeslice/kubeslice-controller.svg)](https://github.com/kubeslice/kubeslice-controller)
+[![Contributors](https://img.shields.io/github/contributors/kubeslice/kubeslice-controller.svg)](https://GitHub.com/kubeslice/kubeslice-controller/graphs/contributors)
+
 
 kubeslice-controller uses Kubebuilder, a framework for building Kubernetes APIs
 using [custom resource definitions (CRDs)](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions).
