@@ -57,6 +57,7 @@ type ClusterSpec struct {
 	NetworkInterface string `json:"networkInterface,omitempty"`
 	//put in an object
 	ClusterProperty ClusterProperty `json:"clusterProperty,omitempty"`
+	EnableAutoEviction bool `json:"enableAutoEviction,omitempty"`
 }
 
 type ClusterProperty struct {
