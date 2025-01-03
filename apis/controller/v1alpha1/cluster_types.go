@@ -55,57 +55,58 @@ type ClusterSpec struct {
 	NodeIPs []string `json:"nodeIPs,omitempty"`
 	// NetworkInterface is the network interface attached with the cluster.
 	NetworkInterface string `json:"networkInterface,omitempty"`
-	//put in an object
-	ClusterProperty ClusterProperty `json:"clusterProperty,omitempty"`
-	EnableAutoEviction bool `json:"enableAutoEviction,omitempty"`
+	// put in an object
+	ClusterProperty    ClusterProperty `json:"clusterProperty,omitempty"`
+	EnableAutoEviction bool            `json:"enableAutoEviction,omitempty"`
+	RequeueOnFailure   bool            `json:"requeueOnFailure,omitempty"`
 }
 
 type ClusterProperty struct {
-	//Telemetry contains Telemetry information
+	// Telemetry contains Telemetry information
 	Telemetry Telemetry `json:"telemetry,omitempty"`
-	//GeoLocation contains information regarding Geographical Location of the Cluster
+	// GeoLocation contains information regarding Geographical Location of the Cluster
 	GeoLocation GeoLocation `json:"geoLocation,omitempty"`
-	//Monitoring contains the Kubernetes Monitoring Dashboard
+	// Monitoring contains the Kubernetes Monitoring Dashboard
 	Monitoring Monitoring `json:"monitoring,omitempty"`
 }
 
 // Telemetry defines the field of ClusterSpec
 type Telemetry struct {
-	//Enabled is the enable status of the Telemetry
+	// Enabled is the enable status of the Telemetry
 	Enabled bool `json:"enabled,omitempty"`
-	//TelemetryProvider is the Telemetry Provider information
+	// TelemetryProvider is the Telemetry Provider information
 	TelemetryProvider string `json:"telemetryProvider,omitempty"`
-	//Endpoint is the Telemetry Endpoint
+	// Endpoint is the Telemetry Endpoint
 	Endpoint string `json:"endpoint,omitempty"`
 }
 
 // GeoLocation defines the field of ClusterSpec
 type GeoLocation struct {
-	//CloudProvider is the cloud service provider
+	// CloudProvider is the cloud service provider
 	CloudProvider string `json:"cloudProvider,omitempty"`
-	//CloudRegion is the region of the cloud
+	// CloudRegion is the region of the cloud
 	CloudRegion string `json:"cloudRegion,omitempty"`
-	//Latitude is the latitude of the cluster
+	// Latitude is the latitude of the cluster
 	Latitude string `json:"latitude,omitempty"`
-	//Longitude is the longitude of the cluster
+	// Longitude is the longitude of the cluster
 	Longitude string `json:"longitude,omitempty"`
 }
 
 // Monitoring defines the field of ClusterSpec
 type Monitoring struct {
-	//KubernetesDashboard contains the information regarding Kubernetes Monitoring Dashboard
+	// KubernetesDashboard contains the information regarding Kubernetes Monitoring Dashboard
 	KubernetesDashboard KubernetesDashboard `json:"kubernetesDashboard,omitempty"`
 }
 
 // KubernetesDashboard defines the field of ClusterSpec
 type KubernetesDashboard struct {
-	//Enabled is the enable status of the KubernetesDashboard
+	// Enabled is the enable status of the KubernetesDashboard
 	Enabled bool `json:"enabled,omitempty"`
-	//AccessToken is the Access Token to access the KubernetesDashboard
+	// AccessToken is the Access Token to access the KubernetesDashboard
 	AccessToken string `json:"accessToken,omitempty"`
-	//IngressPrefix is the prefix of ingress gateway for KubernetesDashboard
+	// IngressPrefix is the prefix of ingress gateway for KubernetesDashboard
 	IngressPrefix string `json:"ingressPrefix,omitempty"`
-	//Endpoint is the base endpoint to access the kubernetes dashboard
+	// Endpoint is the base endpoint to access the kubernetes dashboard
 	Endpoint string `json:"endpoint,omitempty"`
 }
 
@@ -113,7 +114,7 @@ type KubernetesDashboard struct {
 type ClusterStatus struct {
 	// SecretName is the name of the secret for the worker cluster.
 	SecretName string `json:"secretName,omitempty"`
-	//CniSubnet is the podip and service ip subnet of CNI
+	// CniSubnet is the podip and service ip subnet of CNI
 	CniSubnet []string `json:"cniSubnet,omitempty"`
 	// Namespaces present in cluster
 	Namespaces []NamespacesConfig `json:"namespaces,omitempty"`
