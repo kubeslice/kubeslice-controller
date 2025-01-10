@@ -97,6 +97,8 @@ spec:
                         type: string
                     type: object
                 type: object
+              enableAutoEviction:
+                type: boolean
               networkInterface:
                 description: NetworkInterface is the network interface attached with
                   the cluster.
@@ -109,6 +111,8 @@ spec:
                 items:
                   type: string
                 type: array
+              requeueOnFailure:
+                type: boolean
             type: object
           status:
             description: ClusterStatus defines the observed state of Cluster
