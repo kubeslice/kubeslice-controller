@@ -62,6 +62,18 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 				Labels: n.getResourceLabel(namespace, owner),
 			},
 		}
+		// NEW: append additional labels
+		for key, value := range owner.GetLabels() {
+			expectedNS.Labels[key] = value
+		}
+		if expectedNS.Annotations == nil {
+			expectedNS.Annotations = make(map[string]string)
+		}
+		// NEW: append additional annotations
+		for key, value := range owner.GetAnnotations() {
+			expectedNS.Annotations[key] = value
+		}
+
 		err := util.CreateResource(ctx, expectedNS)
 		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
@@ -93,6 +105,17 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 				if nsResource.Labels[key] != value {
 					nsResource.Labels[key] = value
 				}
+			}
+			// NEW: append additional labels
+			for key, value := range owner.GetLabels() {
+				nsResource.Labels[key] = value
+			}
+			if nsResource.Annotations == nil {
+				nsResource.Annotations = make(map[string]string)
+			}
+			// NEW: append additional annotations
+			for key, value := range owner.GetAnnotations() {
+				nsResource.Annotations[key] = value
 			}
 			err := util.UpdateResource(ctx, nsResource)
 			nsResource.Namespace = ControllerNamespace

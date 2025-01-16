@@ -34,7 +34,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -79,20 +78,26 @@ func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsR
 	project := &controllerv1alpha1.Project{}
 
 	labels := namespaceService.getResourceLabel(namespaceName, project)
+	labels["kubeslice-resource-owner"] = "controller"
+	labels["kubeslice-controller-resource-name"] = "Project-cisco"
 
-	projectToCreateWithLabel := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   namespaceName,
-			Labels: labels,
-		},
-	}
-	clientMock.On("Create", ctx, projectToCreateWithLabel).Return(nil)
+	// projectToCreateWithLabel := &corev1.Namespace{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Name:   namespaceName,
+	// 		Labels: labels,
+	// 	},
+	// }
+	// clientMock.On("Create", ctx, projectToCreateWithLabel).Return(nil)
+	clientMock.On("Create", ctx, mock.MatchedBy(func(ns *corev1.Namespace) bool {
+		return ns.Name == "cisco" &&
+			ns.Labels["kubeslice-controller-resource-name"] == "Project-cisco" &&
+			ns.Labels["kubeslice-resource-owner"] == "controller"
+	})).Return(nil)
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := namespaceService.ReconcileProjectNamespace(ctx, namespaceName, project)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
+	require.NoError(t, err)
 	require.Equal(t, result, expectedResult)
-	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 	mMock.AssertExpectations(t)
 }
