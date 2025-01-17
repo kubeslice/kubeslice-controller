@@ -245,7 +245,7 @@ func RemoveElementFromArray(slice []string, element string) (arr []string) {
 	return slice
 }
 
-var toFilter = []string{"kubeslice.io", "kubernetes.io"}
+var toFilter = []string{"kubeslice-", "kubernetes.io"}
 
 func partialContains(slice []string, str string) bool {
 	for _, s := range slice {
