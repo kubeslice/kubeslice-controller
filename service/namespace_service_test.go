@@ -78,20 +78,12 @@ func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsR
 	project := &controllerv1alpha1.Project{}
 
 	labels := namespaceService.getResourceLabel(namespaceName, project)
-	labels["kubeslice-resource-owner"] = "controller"
-	labels["kubeslice-controller-resource-name"] = "Project-cisco"
-
-	// projectToCreateWithLabel := &corev1.Namespace{
-	// 	ObjectMeta: metav1.ObjectMeta{
-	// 		Name:   namespaceName,
-	// 		Labels: labels,
-	// 	},
-	// }
-	// clientMock.On("Create", ctx, projectToCreateWithLabel).Return(nil)
+	labels[util.LabelResourceOwner] = util.LabelValueResourceOwner
+	labels[util.LabelManagedBy] = "Project-cisco"
 	clientMock.On("Create", ctx, mock.MatchedBy(func(ns *corev1.Namespace) bool {
 		return ns.Name == "cisco" &&
-			ns.Labels["kubeslice-controller-resource-name"] == "Project-cisco" &&
-			ns.Labels["kubeslice-resource-owner"] == "controller"
+			ns.Labels[util.LabelManagedBy] == "Project-cisco" &&
+			ns.Labels[util.LabelResourceOwner] == util.LabelValueResourceOwner
 	})).Return(nil)
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := namespaceService.ReconcileProjectNamespace(ctx, namespaceName, project)

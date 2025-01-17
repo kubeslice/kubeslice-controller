@@ -26,3 +26,16 @@ const (
 	DefaultSliceQOSConfigName = "default"
 	DefaultProjectSliceName   = "%s-default-slice"
 )
+
+const (
+	LabelProjectName      = "kubeslice.io/project"
+	LabelProjectNamespace = "kubeslice.io/project-namespace"
+	LabelManagedBy        = "kubeslice.io/managed-by"
+	LabelResourceOwner    = "kubeslice.io/resource-owner"
+)
+
+const ProjectKind = "Project"
+
+const (
+	LabelValueResourceOwner = "kubeslice-controller"
+)

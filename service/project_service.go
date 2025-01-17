@@ -106,46 +106,47 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// Step 1: Namespace Reconciliation
+	// Step 1: adding ProjectNamespace in labels
+	if project.Labels == nil {
+		project.Labels = make(map[string]string)
+	}
+	project.Labels[util.LabelProjectNamespace] = projectNamespace
+
+	err = util.UpdateResource(ctx, project)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Step 2: Namespace Reconciliation
 	if shouldReturn, result, reconErr := util.IsReconciled(t.ns.ReconcileProjectNamespace(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// Step 2: Worker-Cluster Role reconciliation
+	// Step 3: Worker-Cluster Role reconciliation
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileWorkerClusterRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
-	// Step 3: Create shared Read-Only and Read-Write Roles for end-users
-	// 3.1 Read-Only Shared Role
+	// Step 4: Create shared Read-Only and Read-Write Roles for end-users
+	// 4.1 Read-Only Shared Role
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadOnlyRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// 3.2 Read-Write Shared Role
+	// 4.2 Read-Write Shared Role
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadWriteRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// Step 4: Reconciliation for Read-Only Users
+	// Step 5: Reconciliation for Read-Only Users
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadOnlyUserServiceAccountAndRoleBindings(ctx,
 		projectNamespace, project.Spec.ServiceAccount.ReadOnly, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// Step 5: Reconciliation for Read-Write Users
+	// Step 6: Reconciliation for Read-Write Users
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadWriteUserServiceAccountAndRoleBindings(ctx,
 		projectNamespace, project.Spec.ServiceAccount.ReadWrite, project)); shouldReturn {
 		return result, reconErr
-	}
-
-	// Step 6: adding ProjectNamespace in labels
-	labels := make(map[string]string)
-	labels["kubeslice-project-namespace"] = projectNamespace
-	project.Labels = labels
-
-	err = util.UpdateResource(ctx, project)
-	if err != nil {
-		return ctrl.Result{}, err
 	}
 
 	// Step 7: Create default SliceQOSConfig (10 gbps ceiling, 1 gbps guaranteed)
