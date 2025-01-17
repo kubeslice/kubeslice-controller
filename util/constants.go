@@ -29,9 +29,12 @@ const (
 
 const (
 	LabelProjectName      = "kubeslice.io/project"
-	LabelProjectNamespace = "kubeslice.io/project-namespace"
-	LabelManagedBy        = "kubeslice.io/managed-by"
-	LabelResourceOwner    = "kubeslice.io/resource-owner"
+	LabelProjectNamespace = "kubeslice-project-namespace"
+	// LabelProjectNamespace = "kubeslice.io/project-namespace" // TODO: implement this later
+	LabelManagedBy = "kubeslice-controller-resource-name"
+	// LabelManagedBy     = "kubeslice.io/managed-by" // TODO: implement this later
+	LabelResourceOwner = "kubeslice-resource-owner"
+	// LabelResourceOwner = "kubeslice.io/resource-owner" // TODO: implement this later
 )
 
 const ProjectKind = "Project"
