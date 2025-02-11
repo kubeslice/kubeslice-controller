@@ -94,6 +94,8 @@ type GeoLocation struct {
 
 // Monitoring defines the field of ClusterSpec
 type Monitoring struct {
+	// GrafanaDashboardBaseURL is the base URL for the grafana dashboard
+	GrafanaDashboardBaseURL string `json:"grafanaDashboardBaseURL,omitempty"`
 	// KubernetesDashboard contains the information regarding Kubernetes Monitoring Dashboard
 	KubernetesDashboard KubernetesDashboard `json:"kubernetesDashboard,omitempty"`
 }
