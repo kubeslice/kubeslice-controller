@@ -63,7 +63,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: generate-events
-generate-events: 
+generate-events:
 	go run hack/events/generate/generate.go
 	go fmt ./...
 
@@ -105,11 +105,13 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	docker buildx create --name container --driver=docker-container || true
+	docker build --builder container --platform linux/amd64,linux/arm64 -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+	docker buildx create --name container --driver=docker-container || true
+	docker build --push --builder container --platform linux/amd64,linux/arm64 -t ${IMG} .
 
 ##@ Deployment
 
@@ -185,7 +187,7 @@ webhookCA: ## Install the Cert Manager for Admission controller Webhooks.
 	kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.0/cert-manager.yaml
 
 .PHONY: cleanup
-cleanup: 
+cleanup:
 	kubectl apply -f config/cleanup/cleanup_job.yaml -n=kubeslice-controller
 
 .PHONY: generate-mocks
@@ -226,5 +228,3 @@ chart-deploy-controller:
 	## Deploy the artifacts using helm
     ## Usage: make chart-deploy VALUESFILE=[valuesfilename]
 	helm upgrade --install kubeslice-controller -n kubeslice-controller avesha/kubeslice-controller -f ${VALUESFILE} --create-namespace
-
-
