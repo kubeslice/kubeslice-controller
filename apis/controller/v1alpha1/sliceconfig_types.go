@@ -119,6 +119,9 @@ type SliceGatewayServiceType struct {
 	//+kubebuilder:default:=UDP
 	//+kubebuilder:validation:Enum:=TCP;UDP
 	Protocol string `json:"protocol"`
+	//+kubebuilder:default:=any
+	//+kubebuilder:validation:Enum:=server;client;any
+	Role string `json:"role,omitempty"`
 }
 
 // QOSProfile is the QOS Profile configuration from backend
