@@ -62,6 +62,17 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 				Labels: n.getResourceLabel(namespace, owner),
 			},
 		}
+		//append additional labels
+		for key, value := range util.FilterLabelsAndAnnotations(owner.GetLabels()) {
+			expectedNS.Labels[key] = value
+		}
+		if expectedNS.Annotations == nil {
+			expectedNS.Annotations = make(map[string]string)
+		}
+		//append additional annotations
+		for key, value := range util.FilterLabelsAndAnnotations(owner.GetAnnotations()) {
+			expectedNS.Annotations[key] = value
+		}
 		err := util.CreateResource(ctx, expectedNS)
 		expectedNS.Namespace = ControllerNamespace
 		if err != nil {
@@ -92,6 +103,52 @@ func (n *NamespaceService) ReconcileProjectNamespace(ctx context.Context, namesp
 			for key, value := range n.getResourceLabel(namespace, owner) {
 				if nsResource.Labels[key] != value {
 					nsResource.Labels[key] = value
+				}
+			}
+			// append additional labels
+			for key, value := range util.FilterLabelsAndAnnotations(owner.GetLabels()) {
+				nsResource.Labels[key] = value
+			}
+			if nsResource.Annotations == nil {
+				nsResource.Annotations = make(map[string]string)
+			}
+			//  append additional annotations
+			for key, value := range util.FilterLabelsAndAnnotations(owner.GetAnnotations()) {
+				nsResource.Annotations[key] = value
+			}
+			err := util.UpdateResource(ctx, nsResource)
+			nsResource.Namespace = ControllerNamespace
+			if err != nil {
+				util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventNamespaceUpdateFailed)
+				n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+					map[string]string{
+						"action":      "update_failed",
+						"event":       string(events.EventNamespaceUpdateFailed),
+						"object_name": nsResource.Name,
+						"object_kind": metricKindNamespace,
+					},
+				)
+				return ctrl.Result{}, err
+			}
+			util.RecordEvent(ctx, eventRecorder, nsResource, nil, events.EventNamespaceUpdated)
+			n.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+				map[string]string{
+					"action":      "updated",
+					"event":       string(events.EventNamespaceUpdated),
+					"object_name": nsResource.Name,
+					"object_kind": metricKindNamespace,
+				},
+			)
+		}
+		// check if the namespace has the correct annotations
+		if !util.CompareAnnotations(nsResource.Annotations, util.FilterLabelsAndAnnotations(owner.GetAnnotations())) {
+			if nsResource.Annotations == nil {
+				nsResource.Annotations = make(map[string]string)
+			}
+			// append missing annotations
+			for key, value := range util.FilterLabelsAndAnnotations(owner.GetAnnotations()) {
+				if nsResource.Annotations[key] != value {
+					nsResource.Annotations[key] = value
 				}
 			}
 			err := util.UpdateResource(ctx, nsResource)

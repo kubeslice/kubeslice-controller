@@ -165,6 +165,27 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 	slice := s.copySpecFromSliceConfigToWorkerSlice(ctx, *sliceConfig)
 	workerSliceConfig.Spec = slice.Spec
 
+	// add missing project label to sliceConfig
+	additionalLabels := util.FilterLabelsAndAnnotations(sliceConfig.Labels)
+	additionalAnnotations := util.FilterLabelsAndAnnotations(sliceConfig.Annotations)
+	if workerSliceConfig.Labels == nil {
+		workerSliceConfig.Labels = make(map[string]string)
+	}
+	// add missing labels to workerSliceConfig
+	for key, value := range additionalLabels {
+		if val, ok := workerSliceConfig.Labels[key]; !ok && val != value {
+			workerSliceConfig.Labels[key] = value
+		}
+	}
+	if workerSliceConfig.Annotations == nil {
+		workerSliceConfig.Annotations = make(map[string]string)
+	}
+	for key, value := range additionalAnnotations {
+		if val, ok := workerSliceConfig.Annotations[key]; !ok && val != value {
+			workerSliceConfig.Annotations[key] = value
+		}
+	}
+
 	// if standardQos Found update the workerSliceConfig
 	if sliceConfig.Spec.StandardQosProfileName != "" {
 		qos := &controllerv1alpha1.SliceQoSConfig{}

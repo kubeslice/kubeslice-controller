@@ -25,7 +25,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
-	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
@@ -136,13 +135,44 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 
 	// Step 3: Before creation or update of worker slice config, handle default slice appns removal if project has defaultSliceCreation enabled
 	projectName := util.GetProjectName(req.Namespace)
-	project := &controllerv1alpha1.Project{}
+	project := &v1alpha1.Project{}
 	foundProject, err := util.GetResourceIfExist(ctx, types.NamespacedName{
 		Name:      projectName,
 		Namespace: ControllerNamespace,
 	}, project)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if foundProject {
+		// add missing project label to sliceConfig
+		additionalLabels := util.FilterLabelsAndAnnotations(project.Labels)
+		additionalAnnotations := util.FilterLabelsAndAnnotations(project.Annotations)
+		if sliceConfig.Labels == nil {
+			sliceConfig.Labels = make(map[string]string)
+		}
+		// check if project label is already present in sliceConfig
+		isUpadataRequired := false
+		for key, value := range additionalLabels {
+			if val, ok := sliceConfig.Labels[key]; !ok && val != value {
+				sliceConfig.Labels[key] = value
+				isUpadataRequired = true
+			}
+		}
+		if sliceConfig.Annotations == nil {
+			sliceConfig.Annotations = make(map[string]string)
+		}
+		for key, value := range additionalAnnotations {
+			if val, ok := sliceConfig.Annotations[key]; !ok && val != value {
+				sliceConfig.Annotations[key] = value
+				isUpadataRequired = true
+			}
+		}
+		if isUpadataRequired {
+			if err := util.UpdateResource(ctx, sliceConfig); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
 	if foundProject && project.Spec.DefaultSliceCreation {
@@ -308,7 +338,7 @@ func (s *SliceConfigService) getOwnerLabelsForServiceExport(serviceExportConfig 
 	return ownerLabels
 }
 
-func (s *SliceConfigService) constructApplicationNamespaceMap(registeredClusters []string, sliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) map[string]struct{} {
+func (s *SliceConfigService) constructApplicationNamespaceMap(registeredClusters []string, sliceConfigApplicationNamespaces []v1alpha1.SliceNamespaceSelection) map[string]struct{} {
 	nsMap := make(map[string]struct{})
 	for _, appns := range sliceConfigApplicationNamespaces {
 		if len(appns.Clusters) > 0 && appns.Clusters[0] == "*" {
@@ -327,8 +357,8 @@ func (s *SliceConfigService) constructApplicationNamespaceMap(registeredClusters
 	return nsMap
 }
 
-func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithCluster map[string]struct{}, defaultSliceConfigApplicationNamespaces []controllerv1alpha1.SliceNamespaceSelection) []controllerv1alpha1.SliceNamespaceSelection {
-	filteredApplicaitonNamespaces := []controllerv1alpha1.SliceNamespaceSelection{}
+func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithCluster map[string]struct{}, defaultSliceConfigApplicationNamespaces []v1alpha1.SliceNamespaceSelection) []v1alpha1.SliceNamespaceSelection {
+	filteredApplicaitonNamespaces := []v1alpha1.SliceNamespaceSelection{}
 
 	for _, appns := range defaultSliceConfigApplicationNamespaces {
 		if len(appns.Clusters) > 1 {
@@ -351,9 +381,9 @@ func (s *SliceConfigService) removeSliceApplicationNamespaces(namespaceWithClust
 	return filteredApplicaitonNamespaces
 }
 
-func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, projectName string, sliceConfig *controllerv1alpha1.SliceConfig) (ctrl.Result, error) {
+func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, req ctrl.Request, logger *zap.SugaredLogger, projectName string, sliceConfig *v1alpha1.SliceConfig) (ctrl.Result, error) {
 	defaultSliceName := fmt.Sprintf(util.DefaultProjectSliceName, projectName)
-	defaultProjectSlice := &controllerv1alpha1.SliceConfig{}
+	defaultProjectSlice := &v1alpha1.SliceConfig{}
 	defaultSliceNamespacedName := types.NamespacedName{
 		Namespace: req.Namespace,
 		Name:      defaultSliceName,
