@@ -324,7 +324,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			return clusterMap, err
 		}
 		ipamOctet := clusterMap[cluster]
-		clusterSubnetCIDR := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr))
+		clusterSubnetCIDR := util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr)
 		// determine gw svc type
 		sliceGwSvcType := defaultSliceGatewayServiceType
 		sliceGwSvcProtocol := defaultSliceGatewayServiceProtocol
