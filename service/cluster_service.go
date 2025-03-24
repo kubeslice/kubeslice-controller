@@ -68,11 +68,11 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		WithNamespace(cluster.Namespace)
 
 	// Step 0: check if cluster is in project namespace
-	nsResource := &corev1.Namespace{}
+	projectNs := &corev1.Namespace{}
 	found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
 		Name: req.Namespace,
-	}, nsResource)
-	if !found || !c.checkForProjectNamespace(nsResource) {
+	}, projectNs)
+	if !found || !c.checkForProjectNamespace(projectNs) {
 		logger.Infof("Created Cluster %v is not in project namespace. Returning from reconciliation loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
@@ -206,7 +206,35 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 			}
 		}
 	}
-	// Step 2: Get ServiceAccount
+
+	// Step 2: Apply ProjectNS labels/annotations
+	isUpdateRequired := false
+	if !util.CompareLabels(cluster.Labels, util.FilterLabelsAndAnnotations(projectNs.GetLabels())) {
+		if cluster.Labels == nil {
+			cluster.Labels = make(map[string]string)
+		}
+		for key, value := range util.FilterLabelsAndAnnotations(projectNs.GetLabels()) {
+			cluster.Labels[key] = value
+		}
+		isUpdateRequired = true
+	}
+	if !util.CompareAnnotations(cluster.Annotations, util.FilterLabelsAndAnnotations(projectNs.GetAnnotations())) {
+		if cluster.Annotations == nil {
+			cluster.Annotations = make(map[string]string)
+		}
+		for key, value := range util.FilterLabelsAndAnnotations(projectNs.GetAnnotations()) {
+			cluster.Annotations[key] = value
+		}
+		isUpdateRequired = true
+	}
+	if isUpdateRequired {
+		err := util.UpdateResource(ctx, cluster)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Step 3: Get ServiceAccount
 	serviceAccount := &corev1.ServiceAccount{}
 	_, err = util.GetResourceIfExist(ctx, types.NamespacedName{Name: fmt.Sprintf(ServiceAccountWorkerCluster, cluster.Name), Namespace: req.Namespace}, serviceAccount)
 	if err != nil {

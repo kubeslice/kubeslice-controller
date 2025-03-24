@@ -18,9 +18,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/kubeslice/kubeslice-controller/metrics"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -28,6 +30,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type IProjectService interface {
@@ -106,39 +109,63 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// Step 1: Namespace Reconciliation
+	// Step 1: adding ProjectNamespace in labels/annotations from ConfigMap
+	configLabels, configAnnotations, err := t.getNamespaceConfigFromConfigMap(ctx)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if project.Labels == nil {
+		project.Labels = make(map[string]string)
+	}
+	for k, v := range configLabels {
+		project.Labels[k] = v
+	}
+	project.Labels[util.LabelProjectNamespace] = projectNamespace
+	if project.Annotations == nil {
+		project.Annotations = make(map[string]string)
+	}
+	for k, v := range configAnnotations {
+		project.Annotations[k] = v
+	}
+
+	err = util.UpdateResource(ctx, project)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Step 2: Namespace Reconciliation
 	if shouldReturn, result, reconErr := util.IsReconciled(t.ns.ReconcileProjectNamespace(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// Step 2: Worker-Cluster Role reconciliation
+	// Step 3: Worker-Cluster Role reconciliation
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileWorkerClusterRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
-	// Step 3: Create shared Read-Only and Read-Write Roles for end-users
-	// 3.1 Read-Only Shared Role
+	// Step 4: Create shared Read-Only and Read-Write Roles for end-users
+	// 4.1 Read-Only Shared Role
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadOnlyRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// 3.2 Read-Write Shared Role
+	// 4.2 Read-Write Shared Role
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadWriteRole(ctx, projectNamespace, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// Step 4: Reconciliation for Read-Only Users
+	// Step 5: Reconciliation for Read-Only Users
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadOnlyUserServiceAccountAndRoleBindings(ctx,
 		projectNamespace, project.Spec.ServiceAccount.ReadOnly, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// Step 5: Reconciliation for Read-Write Users
+	// Step 6: Reconciliation for Read-Write Users
 	if shouldReturn, result, reconErr := util.IsReconciled(t.acs.ReconcileReadWriteUserServiceAccountAndRoleBindings(ctx,
 		projectNamespace, project.Spec.ServiceAccount.ReadWrite, project)); shouldReturn {
 		return result, reconErr
 	}
 
-	// Step 6: adding ProjectNamespace in labels
+	// Step 7: adding ProjectNamespace in labels
 	labels := make(map[string]string)
 	labels["kubeslice-project-namespace"] = projectNamespace
 	project.Labels = labels
@@ -148,7 +175,7 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Step 7: Create default SliceQOSConfig (10 gbps ceiling, 1 gbps guaranteed)
+	// Step 8: Create default SliceQOSConfig (10 gbps ceiling, 1 gbps guaranteed)
 	defaultSliceQOSConfig := &controllerv1alpha1.SliceQoSConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      util.DefaultSliceQOSConfigName,
@@ -213,4 +240,34 @@ func (t *ProjectService) CleanUpProjectResources(ctx context.Context, namespace 
 		return result, reconErr
 	}
 	return ctrl.Result{}, nil
+}
+
+// Fetch namespace ConfigMap from controller cluster
+func (p *ProjectService) getNamespaceConfigFromConfigMap(ctx context.Context) (map[string]string, map[string]string, error) {
+
+	cm := &corev1.ConfigMap{}
+	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
+		Name:      "namespace-labels-config",
+		Namespace: ControllerNamespace,
+	}, cm)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !found {
+		return nil, nil, err
+	}
+
+	labels := make(map[string]string)
+	annotations := make(map[string]string)
+
+	if err := json.Unmarshal([]byte(cm.Data["labels"]), &labels); err != nil {
+		return nil, nil, err
+	}
+	if err := json.Unmarshal([]byte(cm.Data["annotations"]), &annotations); err != nil {
+		return labels, nil, err
+	}
+
+	return labels, annotations, nil
 }

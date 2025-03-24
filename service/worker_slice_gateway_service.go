@@ -579,8 +579,8 @@ func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClu
 	clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses {
 	gatewayAddresses := util.WorkerSliceGatewayNetworkAddresses{}
 	ipr := strings.Split(sliceSubnet, ".")
-	serverSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr))
-	clientSubnet := fmt.Sprintf(util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr))
+	serverSubnet := util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr)
+	clientSubnet := util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr)
 	gatewayAddresses.ServerNetwork = strings.SplitN(serverSubnet, "/", -1)[0]
 	gatewayAddresses.ClientNetwork = strings.SplitN(clientSubnet, "/", -1)[0]
 	gatewayAddresses.ServerSubnet = serverSubnet
