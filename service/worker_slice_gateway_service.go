@@ -475,9 +475,9 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		}
 	}
 
-	// Go over all the clusters and create the gateways
+	// Go over all the clusters and create the gateways for explicit server and client roles
 	peers := map[int]int{}
-	// Create the VPN tunnels having the server side attached to the hub cluster
+	// Create first the VPN tunnels having the server side configured
 	for i := 0; i < noClusters; i++ {
 		for j := i + 1; j < noClusters; j++ {
 			// Set default left cluster role
@@ -492,16 +492,38 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 				rightRole = role
 			}
 
-			// Handle the supported cases:
-			// - left cluster role is server or any
-			// - right cluster role is client or any
-			if leftRole == "client" || rightRole == "server" {
-				continue
+			// Explicit server and client roles are required
+			if leftRole == "server" && rightRole == "client" {
+				// Record the tunnel start and endpoint
+				peers[i] = j
+				// Log the tunnel creation
+				logger.Infof("Tunnel from %s to %s role:%s-%s", clusterNames[i], clusterNames[j], leftRole, rightRole)
+			}
+		}
+	}
+
+	// Create the VPN tunnels where the server and client roles are not set
+	for i := 0; i < noClusters; i++ {
+		for j := i + 1; j < noClusters; j++ {
+			// Set default left cluster role
+			leftRole := "any"
+			if role, found := gwServiceRole[clusterNames[i]]; found {
+				leftRole = role
 			}
 
-			// Record the tunnel start and endpoint
-			peers[i] = j
-			logger.Infof("Tunnel from %s to %s role:%s-%s", clusterNames[i], clusterNames[j], leftRole, rightRole)
+			// Set default right cluster role
+			rightRole := "any"
+			if role, found := gwServiceRole[clusterNames[j]]; found {
+				rightRole = role
+			}
+
+			// Handle the case where server and client properties are not set
+			if leftRole == "any" && rightRole == "any" {
+				// Record the tunnel start and endpoint
+				peers[i] = j
+				// Log the tunnel creation
+				logger.Infof("Tunnel from %s to %s role:%s-%s", clusterNames[i], clusterNames[j], leftRole, rightRole)
+			}
 		}
 	}
 
