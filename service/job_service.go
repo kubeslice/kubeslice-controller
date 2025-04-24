@@ -87,6 +87,37 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 						},
 					},
 					ServiceAccountName: JobServiceAccount,
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "kubernetes.io/arch",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"amd64", "arm64"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "kubernetes.io/arch",
+							Operator: v1.TolerationOpEqual,
+							Value:    "amd64",
+							Effect:   v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:      "kubernetes.io/arch",
+							Operator: v1.TolerationOpEqual,
+							Value:    "arm64",
+							Effect:   v1.TaintEffectNoSchedule,
+						},
+					},
 				},
 			},
 		},
