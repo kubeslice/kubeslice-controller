@@ -84,6 +84,17 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 							Name:  "ovpn-cert-generator",
 							Image: jobImage,
 							Env:   envValues,
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser:                int64Ptr(65536),
+								RunAsGroup:               int64Ptr(65536),
+								RunAsNonRoot:             boolPtr(true),
+								SeccompProfile:           &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
+								AllowPrivilegeEscalation: boolPtr(false),
+								Capabilities: &v1.Capabilities{
+									Drop: []v1.Capability{"ALL"},
+								},
+								ReadOnlyRootFilesystem: boolPtr(true),
+							},
 						},
 					},
 					ServiceAccountName: JobServiceAccount,
@@ -118,6 +129,14 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 							Effect:   v1.TaintEffectNoSchedule,
 						},
 					},
+					SecurityContext: &v1.PodSecurityContext{
+						RunAsUser:    int64Ptr(65536),
+						RunAsGroup:   int64Ptr(65536),
+						RunAsNonRoot: boolPtr(true),
+						SeccompProfile: &v1.SeccompProfile{
+							Type: v1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 				},
 			},
 		},
@@ -133,4 +152,13 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
+}
+
+// Helper functions to create pointers for primitive types
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
