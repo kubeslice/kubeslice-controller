@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   end-to-end:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: ${{ github.event.label.name == 'ready-to-test' }}
     steps:
     - name: checkout the repo
