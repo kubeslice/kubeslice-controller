@@ -16,7 +16,6 @@ package envtest
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -49,6 +48,11 @@ type WebhookInstallOptions struct {
 
 	// ValidatingWebhooks is a list of ValidatingWebhookConfigurations to install
 	ValidatingWebhooks []*admissionv1.ValidatingWebhookConfiguration
+
+	// IgnoreSchemeConvertible, will modify any CRD conversion webhook to use the local serving host and port,
+	// bypassing the need to have the types registered in the Scheme. This is useful for testing CRD conversion webhooks
+	// with unregistered or unstructured types.
+	IgnoreSchemeConvertible bool
 
 	// IgnoreErrorIfPathMissing will ignore an error if a DirectoryPath does not exist when set to true
 	IgnoreErrorIfPathMissing bool
@@ -117,7 +121,7 @@ func (o *WebhookInstallOptions) generateHostPort() (string, error) {
 	if o.LocalServingPort == 0 {
 		port, host, err := addr.Suggest(o.LocalServingHost)
 		if err != nil {
-			return "", fmt.Errorf("unable to grab random port for serving webhooks on: %v", err)
+			return "", fmt.Errorf("unable to grab random port for serving webhooks on: %w", err)
 		}
 		o.LocalServingPort = port
 		o.LocalServingHost = host
@@ -148,6 +152,8 @@ func (o *WebhookInstallOptions) PrepWithoutInstalling() error {
 
 // Install installs specified webhooks to the API server.
 func (o *WebhookInstallOptions) Install(config *rest.Config) error {
+	defaultWebhookOptions(o)
+
 	if len(o.LocalServingCAData) == 0 {
 		if err := o.PrepWithoutInstalling(); err != nil {
 			return err
@@ -169,22 +175,33 @@ func (o *WebhookInstallOptions) Cleanup() error {
 	return nil
 }
 
+// defaultWebhookOptions sets the default values for Webhooks.
+func defaultWebhookOptions(o *WebhookInstallOptions) {
+	if o.MaxTime == 0 {
+		o.MaxTime = defaultMaxWait
+	}
+	if o.PollInterval == 0 {
+		o.PollInterval = defaultPollInterval
+	}
+}
+
 // WaitForWebhooks waits for the Webhooks to be available through API server.
 func WaitForWebhooks(config *rest.Config,
 	mutatingWebhooks []*admissionv1.MutatingWebhookConfiguration,
 	validatingWebhooks []*admissionv1.ValidatingWebhookConfiguration,
-	options WebhookInstallOptions) error {
-	waitingFor := map[schema.GroupVersionKind]*sets.String{}
+	options WebhookInstallOptions,
+) error {
+	waitingFor := map[schema.GroupVersionKind]*sets.Set[string]{}
 
 	for _, hook := range mutatingWebhooks {
 		h := hook
 		gvk, err := apiutil.GVKForObject(h, scheme.Scheme)
 		if err != nil {
-			return fmt.Errorf("unable to get gvk for MutatingWebhookConfiguration %s: %v", hook.GetName(), err)
+			return fmt.Errorf("unable to get gvk for MutatingWebhookConfiguration %s: %w", hook.GetName(), err)
 		}
 
 		if _, ok := waitingFor[gvk]; !ok {
-			waitingFor[gvk] = &sets.String{}
+			waitingFor[gvk] = &sets.Set[string]{}
 		}
 		waitingFor[gvk].Insert(h.GetName())
 	}
@@ -193,18 +210,18 @@ func WaitForWebhooks(config *rest.Config,
 		h := hook
 		gvk, err := apiutil.GVKForObject(h, scheme.Scheme)
 		if err != nil {
-			return fmt.Errorf("unable to get gvk for ValidatingWebhookConfiguration %s: %v", hook.GetName(), err)
+			return fmt.Errorf("unable to get gvk for ValidatingWebhookConfiguration %s: %w", hook.GetName(), err)
 		}
 
 		if _, ok := waitingFor[gvk]; !ok {
-			waitingFor[gvk] = &sets.String{}
+			waitingFor[gvk] = &sets.Set[string]{}
 		}
 		waitingFor[gvk].Insert(hook.GetName())
 	}
 
 	// Poll until all resources are found in discovery
 	p := &webhookPoller{config: config, waitingFor: waitingFor}
-	return wait.PollImmediate(options.PollInterval, options.MaxTime, p.poll)
+	return wait.PollUntilContextTimeout(context.TODO(), options.PollInterval, options.MaxTime, true, p.poll)
 }
 
 // poller checks if all the resources have been found in discovery, and returns false if not.
@@ -213,11 +230,11 @@ type webhookPoller struct {
 	config *rest.Config
 
 	// waitingFor is the map of resources keyed by group version that have not yet been found in discovery
-	waitingFor map[schema.GroupVersionKind]*sets.String
+	waitingFor map[schema.GroupVersionKind]*sets.Set[string]
 }
 
 // poll checks if all the resources have been found in discovery, and returns false if not.
-func (p *webhookPoller) poll() (done bool, err error) {
+func (p *webhookPoller) poll(ctx context.Context) (done bool, err error) {
 	// Create a new clientset to avoid any client caching of discovery
 	c, err := client.New(p.config, client.Options{})
 	if err != nil {
@@ -230,8 +247,8 @@ func (p *webhookPoller) poll() (done bool, err error) {
 			delete(p.waitingFor, gvk)
 			continue
 		}
-		for _, name := range names.List() {
-			var obj = &unstructured.Unstructured{}
+		for _, name := range names.UnsortedList() {
+			obj := &unstructured.Unstructured{}
 			obj.SetGroupVersionKind(gvk)
 			err := c.Get(context.Background(), client.ObjectKey{
 				Namespace: "",
@@ -257,31 +274,31 @@ func (p *webhookPoller) poll() (done bool, err error) {
 func (o *WebhookInstallOptions) setupCA() error {
 	hookCA, err := certs.NewTinyCA()
 	if err != nil {
-		return fmt.Errorf("unable to set up webhook CA: %v", err)
+		return fmt.Errorf("unable to set up webhook CA: %w", err)
 	}
 
 	names := []string{"localhost", o.LocalServingHost, o.LocalServingHostExternalName}
 	hookCert, err := hookCA.NewServingCert(names...)
 	if err != nil {
-		return fmt.Errorf("unable to set up webhook serving certs: %v", err)
+		return fmt.Errorf("unable to set up webhook serving certs: %w", err)
 	}
 
-	localServingCertsDir, err := ioutil.TempDir("", "envtest-serving-certs-")
+	localServingCertsDir, err := os.MkdirTemp("", "envtest-serving-certs-")
 	o.LocalServingCertDir = localServingCertsDir
 	if err != nil {
-		return fmt.Errorf("unable to create directory for webhook serving certs: %v", err)
+		return fmt.Errorf("unable to create directory for webhook serving certs: %w", err)
 	}
 
 	certData, keyData, err := hookCert.AsBytes()
 	if err != nil {
-		return fmt.Errorf("unable to marshal webhook serving certs: %v", err)
+		return fmt.Errorf("unable to marshal webhook serving certs: %w", err)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(localServingCertsDir, "tls.crt"), certData, 0640); err != nil { //nolint:gosec
-		return fmt.Errorf("unable to write webhook serving cert to disk: %v", err)
+	if err := os.WriteFile(filepath.Join(localServingCertsDir, "tls.crt"), certData, 0640); err != nil {
+		return fmt.Errorf("unable to write webhook serving cert to disk: %w", err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(localServingCertsDir, "tls.key"), keyData, 0640); err != nil { //nolint:gosec
-		return fmt.Errorf("unable to write webhook serving key to disk: %v", err)
+	if err := os.WriteFile(filepath.Join(localServingCertsDir, "tls.key"), keyData, 0640); err != nil {
+		return fmt.Errorf("unable to write webhook serving key to disk: %w", err)
 	}
 
 	o.LocalServingCAData = certData
@@ -296,14 +313,12 @@ func createWebhooks(config *rest.Config, mutHooks []*admissionv1.MutatingWebhook
 
 	// Create each webhook
 	for _, hook := range mutHooks {
-		hook := hook
 		log.V(1).Info("installing mutating webhook", "webhook", hook.GetName())
 		if err := ensureCreated(cs, hook); err != nil {
 			return err
 		}
 	}
 	for _, hook := range valHooks {
-		hook := hook
 		log.V(1).Info("installing validating webhook", "webhook", hook.GetName())
 		if err := ensureCreated(cs, hook); err != nil {
 			return err
@@ -359,7 +374,7 @@ func parseWebhook(options *WebhookInstallOptions) error {
 // returns slice of mutating and validating webhook configurations.
 func readWebhooks(path string) ([]*admissionv1.MutatingWebhookConfiguration, []*admissionv1.ValidatingWebhookConfiguration, error) {
 	// Get the webhook files
-	var files []os.FileInfo
+	var files []string
 	var err error
 	log.V(1).Info("reading Webhooks from path", "path", path)
 	info, err := os.Stat(path)
@@ -367,9 +382,15 @@ func readWebhooks(path string) ([]*admissionv1.MutatingWebhookConfiguration, []*
 		return nil, nil, err
 	}
 	if !info.IsDir() {
-		path, files = filepath.Dir(path), []os.FileInfo{info}
-	} else if files, err = ioutil.ReadDir(path); err != nil {
-		return nil, nil, err
+		path, files = filepath.Dir(path), []string{info.Name()}
+	} else {
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, e := range entries {
+			files = append(files, e.Name())
+		}
 	}
 
 	// file extensions that may contain Webhooks
@@ -379,12 +400,12 @@ func readWebhooks(path string) ([]*admissionv1.MutatingWebhookConfiguration, []*
 	var valHooks []*admissionv1.ValidatingWebhookConfiguration
 	for _, file := range files {
 		// Only parse allowlisted file types
-		if !resourceExtensions.Has(filepath.Ext(file.Name())) {
+		if !resourceExtensions.Has(filepath.Ext(file)) {
 			continue
 		}
 
 		// Unmarshal Webhooks from file into structs
-		docs, err := readDocuments(filepath.Join(path, file.Name()))
+		docs, err := readDocuments(filepath.Join(path, file))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -422,7 +443,7 @@ func readWebhooks(path string) ([]*admissionv1.MutatingWebhookConfiguration, []*
 			}
 		}
 
-		log.V(1).Info("read webhooks from file", "file", file.Name())
+		log.V(1).Info("read webhooks from file", "file", file)
 	}
 	return mutHooks, valHooks, nil
 }
