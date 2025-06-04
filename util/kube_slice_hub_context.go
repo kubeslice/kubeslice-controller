@@ -23,6 +23,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sUuid "k8s.io/apimachinery/pkg/util/uuid"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var Loglevel zapcore.Level
@@ -33,7 +34,7 @@ type kubeSliceControllerContextKey struct {
 
 // kubeSliceControllerRequestContext is a schema for request context
 type kubeSliceControllerRequestContext struct {
-	Client
+	client.Client
 	Scheme        *runtime.Scheme
 	Log           *zap.SugaredLogger
 	eventRecorder *events.EventRecorder
@@ -43,7 +44,7 @@ type kubeSliceControllerRequestContext struct {
 var kubeSliceControllerContext = &kubeSliceControllerContextKey{}
 
 // PrepareKubeSliceControllersRequestContext is a function to create the context for kube slice
-func PrepareKubeSliceControllersRequestContext(ctx context.Context, client Client,
+func PrepareKubeSliceControllersRequestContext(ctx context.Context, client client.Client,
 	scheme *runtime.Scheme, controllerName string, er *events.EventRecorder) context.Context {
 	uuid := k8sUuid.NewUUID()[:8]
 
@@ -83,7 +84,7 @@ func CtxLogger(ctx context.Context) *zap.SugaredLogger {
 }
 
 // CtxClient is a function to get the Client
-func CtxClient(ctx context.Context) Client {
+func CtxClient(ctx context.Context) client.Client {
 	return GetKubeSliceControllerRequestContext(ctx).Client
 }
 

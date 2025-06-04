@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
@@ -10,12 +11,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ValidateVpnKeyRotationCreate(ctx context.Context, r *controllerv1alpha1.VpnKeyRotation) error {
+func ValidateVpnKeyRotationCreate(ctx context.Context, r *controllerv1alpha1.VpnKeyRotation) (admission.Warnings, error) {
 	if r.Spec.SliceName == "" {
-		return fmt.Errorf("invalid config,.spec.sliceName could not be empty")
+		return nil, fmt.Errorf("invalid config,.spec.sliceName could not be empty")
 	}
 	if r.Name != r.Spec.SliceName {
-		return fmt.Errorf("invalid config, name should match with slice name")
+		return nil, fmt.Errorf("invalid config, name should match with slice name")
 	}
 	slice := &controllerv1alpha1.SliceConfig{}
 	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
@@ -23,22 +24,22 @@ func ValidateVpnKeyRotationCreate(ctx context.Context, r *controllerv1alpha1.Vpn
 		Namespace: r.Namespace,
 	}, slice)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !found {
-		return fmt.Errorf("invalid config, sliceconfig %s not present", r.Spec.SliceName)
+		return nil, fmt.Errorf("invalid config, sliceconfig %s not present", r.Spec.SliceName)
 	}
-	return nil
+	return nil, nil
 }
 
-func ValidateVpnKeyRotationDelete(ctx context.Context, r *controllerv1alpha1.VpnKeyRotation) error {
+func ValidateVpnKeyRotationDelete(ctx context.Context, r *controllerv1alpha1.VpnKeyRotation) (admission.Warnings, error) {
 	slice := &controllerv1alpha1.SliceConfig{}
 	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
 		Name:      r.Spec.SliceName,
 		Namespace: r.Namespace,
 	}, slice)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if found && slice.ObjectMeta.DeletionTimestamp.IsZero() {
 		//Load Event Recorder with project name, vpnkeyrotation(slice) name and namespace
@@ -48,8 +49,8 @@ func ValidateVpnKeyRotationDelete(ctx context.Context, r *controllerv1alpha1.Vpn
 			WithSlice(r.Name)
 		//Register an event for worker slice config deleted forcefully
 		util.RecordEvent(ctx, eventRecorder, r, slice, events.EventIllegalVPNKeyRotationConfigDelete)
-		return fmt.Errorf("vpnkeyrotation config %s not allowed to delete unless sliceconfig is deleted", r.Name)
+		return nil, fmt.Errorf("vpnkeyrotation config %s not allowed to delete unless sliceconfig is deleted", r.Name)
 	}
 	// if not found or timestamp is non-zero,this means slice is deleted/under deletion.
-	return nil
+	return nil, nil
 }

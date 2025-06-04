@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,61 +27,56 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// log is for logging in this package.
-var serviceexportlog = util.NewLogger().With("name", "serviceexport-resource")
+type customValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) (admission.Warnings, error)
 
-type customValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) error
-
-var customCreateValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) error = nil
-var customUpdateValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) error = nil
-var customDeleteValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) error = nil
-var serviceExportConfigWebhookClient client.Client
+var customCreateValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) (admission.Warnings, error) = nil
+var customUpdateValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) (admission.Warnings, error) = nil
+var customDeleteValidationServiceExport func(ctx context.Context, serviceExportConfig *ServiceExportConfig) (admission.Warnings, error) = nil
 
 func (r *ServiceExportConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customValidationServiceExport, validateUpdate customValidationServiceExport, validateDelete customValidationServiceExport) error {
-	serviceExportConfigWebhookClient = mgr.GetClient()
+	w := &serviceExportConfigWebhook{Client: mgr.GetClient()}
 	customCreateValidationServiceExport = validateCreate
 	customUpdateValidationServiceExport = validateUpdate
 	customDeleteValidationServiceExport = validateDelete
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(w).
+		WithValidator(w).
 		Complete()
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+type serviceExportConfigWebhook struct {
+	client.Client
+}
 
 //+kubebuilder:webhook:path=/mutate-controller-kubeslice-io-v1alpha1-serviceexportconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=serviceexportconfigs,verbs=create;update,versions=v1alpha1,name=mserviceexportconfig.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &ServiceExportConfig{}
+var _ webhook.CustomDefaulter = &serviceExportConfigWebhook{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *ServiceExportConfig) Default() {
-	serviceexportlog.Info("default", "name", r.Name)
-
-	// TODO(user): fill in your defaulting logic.
+func (r *serviceExportConfigWebhook) Default(ctx context.Context, obj runtime.Object) error {
+	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-serviceexportconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=serviceexportconfigs,verbs=create;update;delete,versions=v1alpha1,name=vserviceexportconfig.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &ServiceExportConfig{}
+var _ webhook.CustomValidator = &serviceExportConfigWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceExportConfig) ValidateCreate() error {
-	serviceexportlog.Info("validate create", "name", r.Name)
-	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation", nil)
-	return customCreateValidationServiceExport(serviceExportConfigCtx, r)
+func (r *serviceExportConfigWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ServiceExportConfigValidation", nil)
+	return customCreateValidationServiceExport(serviceExportConfigCtx, obj.(*ServiceExportConfig))
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceExportConfig) ValidateUpdate(old runtime.Object) error {
-	serviceexportlog.Info("validate update", "name", r.Name)
-	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation", nil)
-	return customUpdateValidationServiceExport(serviceExportConfigCtx, r)
+func (r *serviceExportConfigWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ServiceExportConfigValidation", nil)
+	return customUpdateValidationServiceExport(serviceExportConfigCtx, newObj.(*ServiceExportConfig))
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceExportConfig) ValidateDelete() error {
-	serviceexportlog.Info("validate delete", "name", r.Name)
-	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), serviceExportConfigWebhookClient, nil, "ServiceExportConfigValidation", nil)
-	return customDeleteValidationServiceExport(serviceExportConfigCtx, r)
+func (r *serviceExportConfigWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	serviceExportConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ServiceExportConfigValidation", nil)
+	return customDeleteValidationServiceExport(serviceExportConfigCtx, obj.(*ServiceExportConfig))
 }

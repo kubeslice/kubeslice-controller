@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -109,7 +108,7 @@ func (ps *State) Init(name string) error {
 	}
 
 	if ps.Dir == "" {
-		newDir, err := ioutil.TempDir("", "k8s_test_framework_")
+		newDir, err := os.MkdirTemp("", "k8s_test_framework_")
 		if err != nil {
 			return err
 		}
@@ -156,6 +155,7 @@ func (ps *State) Start(stdout, stderr io.Writer) (err error) {
 	ps.Cmd = exec.Command(ps.Path, ps.Args...)
 	ps.Cmd.Stdout = stdout
 	ps.Cmd.Stderr = stderr
+	ps.Cmd.SysProcAttr = GetSysProcAttr()
 
 	ready := make(chan bool)
 	timedOut := time.After(ps.StartTimeout)
@@ -185,16 +185,12 @@ func (ps *State) Start(stdout, stderr io.Writer) (err error) {
 		ps.ready = true
 		return nil
 	case <-ps.waitDone:
-		if pollerStopCh != nil {
-			close(pollerStopCh)
-		}
+		close(pollerStopCh)
 		return fmt.Errorf("timeout waiting for process %s to start successfully "+
 			"(it may have failed to start, or stopped unexpectedly before becoming ready)",
 			path.Base(ps.Path))
 	case <-timedOut:
-		if pollerStopCh != nil {
-			close(pollerStopCh)
-		}
+		close(pollerStopCh)
 		if ps.Cmd != nil {
 			// intentionally ignore this -- we might've crashed, failed to start, etc
 			ps.Cmd.Process.Signal(syscall.SIGTERM) //nolint:errcheck
@@ -219,7 +215,7 @@ func pollURLUntilOK(url url.URL, interval time.Duration, ready chan bool, stopCh
 				// there's probably certs *somewhere*,
 				// but it's fine to just skip validating
 				// them for health checks during testing
-				InsecureSkipVerify: true, //nolint:gosec
+				InsecureSkipVerify: true,
 			},
 		},
 	}
@@ -270,6 +266,9 @@ func (ps *State) Stop() error {
 	case <-ps.waitDone:
 		break
 	case <-timedOut:
+		if err := ps.Cmd.Process.Signal(syscall.SIGKILL); err != nil {
+			return fmt.Errorf("unable to kill process %s: %w", ps.Path, err)
+		}
 		return fmt.Errorf("timeout waiting for process %s to stop", path.Base(ps.Path))
 	}
 	ps.ready = false

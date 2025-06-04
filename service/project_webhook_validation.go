@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,12 +35,12 @@ import (
 )
 
 // ValidateProjectCreate is a function to validate the creation of project
-func ValidateProjectCreate(ctx context.Context, project *controllerv1alpha1.Project) error {
+func ValidateProjectCreate(ctx context.Context, project *controllerv1alpha1.Project) (admission.Warnings, error) {
 	if err := validateAppliedInControllerNamespace(ctx, project); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
 	if err := validateProjectName(project.Name); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
 	// FIXME: Remove the comment after testing.
 	// Validation for existing project namespace is not required. User may want to use an existing namespace.
@@ -47,31 +48,31 @@ func ValidateProjectCreate(ctx context.Context, project *controllerv1alpha1.Proj
 	// 	return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	// }
 	if err := validateDNSCompliantSANames(ctx, project); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateProjectUpdate is a function to verify the project - service account, role binding, service account names
-func ValidateProjectUpdate(ctx context.Context, project *controllerv1alpha1.Project) error {
+func ValidateProjectUpdate(ctx context.Context, project *controllerv1alpha1.Project) (admission.Warnings, error) {
 	if err := validateServiceAccount(ctx, project); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
 	if err := validateRoleBinding(ctx, project); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
 	if err := validateDNSCompliantSANames(ctx, project); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
-func ValidateProjectDelete(ctx context.Context, project *controllerv1alpha1.Project) error {
+func ValidateProjectDelete(ctx context.Context, project *controllerv1alpha1.Project) (admission.Warnings, error) {
 	if exists := validateIfSliceConfigExists(ctx, project); exists {
 		err := field.Forbidden(field.NewPath("Project"), "The Project can be delete only after deleting the slice config")
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 func validateIfSliceConfigExists(ctx context.Context, project *controllerv1alpha1.Project) bool {
