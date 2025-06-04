@@ -67,7 +67,7 @@ func testValidateClusterCreateOtherThanProjectNamespace(t *testing.T) {
 		Namespace: cluster.Name,
 		Name:      cluster.Namespace,
 	}, &actualNamespace).Return(nil).Once()
-	ans := ValidateClusterCreate(ctx, cluster)
+	_, ans := ValidateClusterCreate(ctx, cluster)
 	require.NotNil(t, ans)
 	require.Contains(t, ans.Error(), "cluster must be applied on project namespace")
 	clientMock.AssertExpectations(t)
@@ -84,9 +84,8 @@ func testValidateClusterDeleteFail(t *testing.T) {
 		if arg.Items == nil {
 			arg.Items = make([]workerv1alpha1.WorkerSliceConfig, 1)
 		}
-		arg.Items[0].ClusterName = "cisco"
 	}).Once()
-	err := ValidateClusterDelete(ctx, cluster)
+	_, err := ValidateClusterDelete(ctx, cluster)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "The cluster cannot be deleted which is participating in slice config")
 	clientMock.AssertExpectations(t)
@@ -106,7 +105,7 @@ func testValidateClusterGeolocationFailOnCreate(t *testing.T) {
 		arg := args.Get(2).(*corev1.Namespace)
 		arg.Labels = map[string]string{util.LabelName: fmt.Sprintf(util.LabelValue, "Project", cluster.Namespace)}
 	}).Once()
-	err := ValidateClusterCreate(ctx, cluster)
+	_, err := ValidateClusterCreate(ctx, cluster)
 	require.Contains(t, err.Error(), "Latitude and longitude are not valid")
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
@@ -118,7 +117,7 @@ func testValidateClusterGeolocationFailOnUpdate(t *testing.T) {
 	}
 	clientMock := &utilmock.Client{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
+	_, err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Latitude and longitude are not valid")
 	clientMock.AssertExpectations(t)
@@ -141,7 +140,7 @@ func testValidateClusterNodeIPsFailOnCreate(t *testing.T) {
 		arg := args.Get(2).(*corev1.Namespace)
 		arg.Labels = map[string]string{util.LabelName: fmt.Sprintf(util.LabelValue, "Project", cluster.Namespace)}
 	}).Once()
-	err := ValidateClusterCreate(ctx, cluster)
+	_, err := ValidateClusterCreate(ctx, cluster)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)")
 	clientMock.AssertExpectations(t)
@@ -154,7 +153,7 @@ func testValidateClusterNodeIPsFailOnUpdate(t *testing.T) {
 	}
 	clientMock := &utilmock.Client{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
+	_, err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)")
 	clientMock.AssertExpectations(t)
@@ -175,7 +174,7 @@ func testValidateNodeIPsPassOnCreate(t *testing.T) {
 		arg := args.Get(2).(*corev1.Namespace)
 		arg.Labels = map[string]string{util.LabelName: fmt.Sprintf(util.LabelValue, "Project", cluster.Namespace)}
 	}).Once()
-	err := ValidateClusterCreate(ctx, cluster)
+	_, err := ValidateClusterCreate(ctx, cluster)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -188,7 +187,7 @@ func testValidateNodeIPsPassOnUpdate(t *testing.T) {
 	}
 	clientMock := &utilmock.Client{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
+	_, err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -206,7 +205,7 @@ func testValidateClusterGeolocationPassOnCreate(t *testing.T) {
 		arg := args.Get(2).(*corev1.Namespace)
 		arg.Labels = map[string]string{util.LabelName: fmt.Sprintf(util.LabelValue, "Project", cluster.Namespace)}
 	}).Once()
-	err := ValidateClusterCreate(ctx, cluster)
+	_, err := ValidateClusterCreate(ctx, cluster)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -217,7 +216,7 @@ func testValidateClusterGeolocationPassOnUpdate(t *testing.T) {
 	}
 	clientMock := &utilmock.Client{}
 	ctx := prepareTestContext(context.Background(), clientMock, nil)
-	err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
+	_, err := ValidateClusterUpdate(ctx, cluster, runtime.Object(cluster))
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }

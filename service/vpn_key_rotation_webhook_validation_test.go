@@ -91,7 +91,7 @@ func runValidateVpnKeyRotationCreateTest(t *testing.T, tc validateVpnKeyRotation
 	} else {
 		clientMock.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("sliceconfig test-slice not found"))
 	}
-	gotErr := ValidateVpnKeyRotationCreate(ctx, tc.arg)
+	_, gotErr := ValidateVpnKeyRotationCreate(ctx, tc.arg)
 	require.Equal(t, tc.expectedErr, gotErr)
 }
 
@@ -154,6 +154,6 @@ func runValidateVpnKeyRotationDeleteTest(t *testing.T, tc validateVpnKeyRotation
 	})
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 
-	gotErr := ValidateVpnKeyRotationDelete(ctx, tc.arg)
+	_, gotErr := ValidateVpnKeyRotationDelete(ctx, tc.arg)
 	require.Equal(t, tc.expectedErr, gotErr)
 }
