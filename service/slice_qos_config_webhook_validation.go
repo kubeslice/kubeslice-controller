@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
@@ -14,35 +15,35 @@ import (
 )
 
 // ValidateSliceQosConfigCreate is a function to validate the creation of SliceQosConfig
-func ValidateSliceQosConfigCreate(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) error {
+func ValidateSliceQosConfigCreate(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) (admission.Warnings, error) {
 	if err := validateSliceQosConfigAppliedInProjectNamespace(ctx, sliceQoSConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
 	}
 	if err := validateSliceQosConfigSpec(ctx, sliceQoSConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateSliceQosConfigUpdate is a function to validate the update of SliceQosConfig
-func ValidateSliceQosConfigUpdate(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) error {
+func ValidateSliceQosConfigUpdate(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) (admission.Warnings, error) {
 	if err := validateSliceQosConfigSpec(ctx, sliceQoSConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateSliceQosConfigDelete is a function to validate the deletion of SliceQosConfig
-func ValidateSliceQosConfigDelete(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) error {
+func ValidateSliceQosConfigDelete(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) (admission.Warnings, error) {
 	exists, slices, err := validateIfQosExistsOnAnySlice(ctx, sliceQoSConfig)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if exists {
 		err := field.Forbidden(field.NewPath("SliceQoSConfig"), "The SliceQoSProfile "+sliceQoSConfig.Name+" cannot be deleted. It is present on slices [ "+util.ArrayToString(slices)+" ]")
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceQosConfig"}, sliceQoSConfig.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 func validateSliceQosConfigSpec(ctx context.Context, sliceQosConfig *controllerv1alpha1.SliceQoSConfig) *field.Error {

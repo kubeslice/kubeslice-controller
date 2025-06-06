@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -28,11 +29,11 @@ import (
 )
 
 // ValidateWorkerSliceConfigUpdate is a function to verify the update of config of workerslice
-func ValidateWorkerSliceConfigUpdate(ctx context.Context, workerSliceConfig *workerv1alpha1.WorkerSliceConfig, old runtime.Object) error {
+func ValidateWorkerSliceConfigUpdate(ctx context.Context, workerSliceConfig *workerv1alpha1.WorkerSliceConfig, old runtime.Object) (admission.Warnings, error) {
 	if err := preventUpdateWorkerSliceConfig(ctx, workerSliceConfig, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceWorker, Kind: "WorkerSliceConfig"}, workerSliceConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceWorker, Kind: "WorkerSliceConfig"}, workerSliceConfig.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 // preventUpdateWorkerSliceConfig is a function to prevent the update of workersliceconfig

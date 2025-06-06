@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,51 +27,50 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// log is for logging in this package.
-var workersliceconfiglog = util.NewLogger().With("name", "workersliceconfig-resource")
+type customWorkerSliceConfigValidation func(ctx context.Context, workerSliceConfig *WorkerSliceConfig, old runtime.Object) (admission.Warnings, error)
 
-type customWorkerSliceConfigValidation func(ctx context.Context, workerSliceConfig *WorkerSliceConfig, old runtime.Object) error
-
-var customWorkerSliceConfigUpdateValidation func(ctx context.Context, workerSliceConfig *WorkerSliceConfig, old runtime.Object) error = nil
-var workerSliceConfigWebhookClient client.Client
+var customWorkerSliceConfigUpdateValidation func(ctx context.Context, workerSliceConfig *WorkerSliceConfig, old runtime.Object) (admission.Warnings, error) = nil
 
 func (r *WorkerSliceConfig) SetupWebhookWithManager(mgr ctrl.Manager, validateUpdate customWorkerSliceConfigValidation) error {
-	workerSliceConfigWebhookClient = mgr.GetClient()
+	w := &workerSliceConfigWebhook{Client: mgr.GetClient()}
 	customWorkerSliceConfigUpdateValidation = validateUpdate
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(w).
+		WithValidator(w).
 		Complete()
+}
+
+type workerSliceConfigWebhook struct {
+	client.Client
 }
 
 //+kubebuilder:webhook:path=/mutate-worker-kubeslice-io-v1alpha1-workersliceconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=worker.kubeslice.io,resources=workersliceconfigs,verbs=create;update,versions=v1alpha1,name=mworkersliceconfig.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &WorkerSliceConfig{}
+var _ webhook.CustomDefaulter = &workerSliceConfigWebhook{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *WorkerSliceConfig) Default() {
-	workersliceconfiglog.Info("default", "name", r.Name)
+func (r *workerSliceConfigWebhook) Default(ctx context.Context, obj runtime.Object) error {
+	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-worker-kubeslice-io-v1alpha1-workersliceconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=worker.kubeslice.io,resources=workersliceconfigs,verbs=create;update,versions=v1alpha1,name=vworkersliceconfig.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &WorkerSliceConfig{}
+var _ webhook.CustomValidator = &workerSliceConfigWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *WorkerSliceConfig) ValidateCreate() error {
-	workersliceconfiglog.Info("validate create", "name", r.Name)
-	return nil
+func (r *workerSliceConfigWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *WorkerSliceConfig) ValidateUpdate(old runtime.Object) error {
-	workersliceconfiglog.Info("validate update", "name", r.Name)
-	workerSliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), workerSliceConfigWebhookClient, nil, "WorkerSliceConfigValidation", nil)
-	return customWorkerSliceConfigUpdateValidation(workerSliceConfigCtx, r, old)
+func (r *workerSliceConfigWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
+	workerSliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "WorkerSliceConfigValidation", nil)
+	return customWorkerSliceConfigUpdateValidation(workerSliceConfigCtx, newObj.(*WorkerSliceConfig), oldObj)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *WorkerSliceConfig) ValidateDelete() error {
-	workersliceconfiglog.Info("validate delete", "name", r.Name)
-	return nil
+func (r *workerSliceConfigWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	return nil, nil
 }
