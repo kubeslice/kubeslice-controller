@@ -121,6 +121,18 @@ spec:
           status:
             description: ClusterStatus defines the observed state of Cluster
             properties:
+              GPURestriction:
+                properties:
+                  enforceRestrictions:
+                    description: EnforceRestrictions is the flag to check if the cluster
+                      is restricted
+                    type: boolean
+                  lastUpdatedTimestamp:
+                    description: LastUpdatedTimestamp is the timestamp when the enforcement
+                      was updated
+                    format: date-time
+                    type: string
+                type: object
               clusterHealth:
                 description: ClusterHealth shows the health of the worker cluster
                 properties:
