@@ -20,9 +20,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,15 +84,17 @@ type CRDInstallOptions struct {
 	WebhookOptions WebhookInstallOptions
 }
 
-const defaultPollInterval = 100 * time.Millisecond
-const defaultMaxWait = 10 * time.Second
+const (
+	defaultPollInterval = 100 * time.Millisecond
+	defaultMaxWait      = 10 * time.Second
+)
 
 // InstallCRDs installs a collection of CRDs into a cluster by reading the crd yaml files from a directory.
 func InstallCRDs(config *rest.Config, options CRDInstallOptions) ([]*apiextensionsv1.CustomResourceDefinition, error) {
 	defaultCRDOptions(&options)
 
 	// Read the CRD yamls into options.CRDs
-	if err := readCRDFiles(&options); err != nil {
+	if err := ReadCRDFiles(&options); err != nil {
 		return nil, fmt.Errorf("unable to read CRD files: %w", err)
 	}
 
@@ -113,8 +115,8 @@ func InstallCRDs(config *rest.Config, options CRDInstallOptions) ([]*apiextensio
 	return options.CRDs, nil
 }
 
-// readCRDFiles reads the directories of CRDs in options.Paths and adds the CRD structs to options.CRDs.
-func readCRDFiles(options *CRDInstallOptions) error {
+// ReadCRDFiles reads the directories of CRDs in options.Paths and adds the CRD structs to options.CRDs.
+func ReadCRDFiles(options *CRDInstallOptions) error {
 	if len(options.Paths) > 0 {
 		crdList, err := renderCRDs(options)
 		if err != nil {
@@ -142,7 +144,7 @@ func defaultCRDOptions(o *CRDInstallOptions) {
 // WaitForCRDs waits for the CRDs to appear in discovery.
 func WaitForCRDs(config *rest.Config, crds []*apiextensionsv1.CustomResourceDefinition, options CRDInstallOptions) error {
 	// Add each CRD to a map of GroupVersion to Resource
-	waitingFor := map[schema.GroupVersion]*sets.String{}
+	waitingFor := map[schema.GroupVersion]*sets.Set[string]{}
 	for _, crd := range crds {
 		gvs := []schema.GroupVersion{}
 		for _, version := range crd.Spec.Versions {
@@ -155,7 +157,7 @@ func WaitForCRDs(config *rest.Config, crds []*apiextensionsv1.CustomResourceDefi
 			log.V(1).Info("adding API in waitlist", "GV", gv)
 			if _, found := waitingFor[gv]; !found {
 				// Initialize the set
-				waitingFor[gv] = &sets.String{}
+				waitingFor[gv] = &sets.Set[string]{}
 			}
 			// Add the Resource
 			waitingFor[gv].Insert(crd.Spec.Names.Plural)
@@ -164,7 +166,7 @@ func WaitForCRDs(config *rest.Config, crds []*apiextensionsv1.CustomResourceDefi
 
 	// Poll until all resources are found in discovery
 	p := &poller{config: config, waitingFor: waitingFor}
-	return wait.PollImmediate(options.PollInterval, options.MaxTime, p.poll)
+	return wait.PollUntilContextTimeout(context.TODO(), options.PollInterval, options.MaxTime, true, p.poll)
 }
 
 // poller checks if all the resources have been found in discovery, and returns false if not.
@@ -173,11 +175,11 @@ type poller struct {
 	config *rest.Config
 
 	// waitingFor is the map of resources keyed by group version that have not yet been found in discovery
-	waitingFor map[schema.GroupVersion]*sets.String
+	waitingFor map[schema.GroupVersion]*sets.Set[string]
 }
 
 // poll checks if all the resources have been found in discovery, and returns false if not.
-func (p *poller) poll() (done bool, err error) {
+func (p *poller) poll(ctx context.Context) (done bool, err error) {
 	// Create a new clientset to avoid any client caching of discovery
 	cs, err := clientset.NewForConfig(p.config)
 	if err != nil {
@@ -215,7 +217,7 @@ func (p *poller) poll() (done bool, err error) {
 // UninstallCRDs uninstalls a collection of CRDs by reading the crd yaml files from a directory.
 func UninstallCRDs(config *rest.Config, options CRDInstallOptions) error {
 	// Read the CRD yamls into options.CRDs
-	if err := readCRDFiles(&options); err != nil {
+	if err := ReadCRDFiles(&options); err != nil {
 		return err
 	}
 
@@ -227,7 +229,6 @@ func UninstallCRDs(config *rest.Config, options CRDInstallOptions) error {
 
 	// Uninstall each CRD
 	for _, crd := range options.CRDs {
-		crd := crd
 		log.V(1).Info("uninstalling CRD", "crd", crd.GetName())
 		if err := cs.Delete(context.TODO(), crd); err != nil {
 			// If CRD is not found, we can consider success
@@ -249,7 +250,6 @@ func CreateCRDs(config *rest.Config, crds []*apiextensionsv1.CustomResourceDefin
 
 	// Create each CRD
 	for _, crd := range crds {
-		crd := crd
 		log.V(1).Info("installing CRD", "crd", crd.GetName())
 		existingCrd := crd.DeepCopy()
 		err := cs.Get(context.TODO(), client.ObjectKey{Name: crd.GetName()}, existingCrd)
@@ -278,12 +278,6 @@ func CreateCRDs(config *rest.Config, crds []*apiextensionsv1.CustomResourceDefin
 
 // renderCRDs iterate through options.Paths and extract all CRD files.
 func renderCRDs(options *CRDInstallOptions) ([]*apiextensionsv1.CustomResourceDefinition, error) {
-	var (
-		err   error
-		info  os.FileInfo
-		files []os.FileInfo
-	)
-
 	type GVKN struct {
 		GVK  schema.GroupVersionKind
 		Name string
@@ -292,7 +286,12 @@ func renderCRDs(options *CRDInstallOptions) ([]*apiextensionsv1.CustomResourceDe
 	crds := map[GVKN]*apiextensionsv1.CustomResourceDefinition{}
 
 	for _, path := range options.Paths {
-		var filePath = path
+		var (
+			err      error
+			info     os.FileInfo
+			files    []string
+			filePath = path
+		)
 
 		// Return the error if ErrorIfPathMissing exists
 		if info, err = os.Stat(path); os.IsNotExist(err) {
@@ -303,9 +302,15 @@ func renderCRDs(options *CRDInstallOptions) ([]*apiextensionsv1.CustomResourceDe
 		}
 
 		if !info.IsDir() {
-			filePath, files = filepath.Dir(path), []os.FileInfo{info}
-		} else if files, err = ioutil.ReadDir(path); err != nil {
-			return nil, err
+			filePath, files = filepath.Dir(path), []string{info.Name()}
+		} else {
+			entries, err := os.ReadDir(path)
+			if err != nil {
+				return nil, err
+			}
+			for _, e := range entries {
+				files = append(files, e.Name())
+			}
 		}
 
 		log.V(1).Info("reading CRDs from path", "path", path)
@@ -357,19 +362,26 @@ func modifyConversionWebhooks(crds []*apiextensionsv1.CustomResourceDefinition, 
 	if err != nil {
 		return err
 	}
-	url := pointer.StringPtr(fmt.Sprintf("https://%s/convert", hostPort))
+	url := ptr.To(fmt.Sprintf("https://%s/convert", hostPort))
 
 	for i := range crds {
 		// Continue if we're preserving unknown fields.
 		if crds[i].Spec.PreserveUnknownFields {
 			continue
 		}
-		// Continue if the GroupKind isn't registered as being convertible.
-		if _, ok := convertibles[schema.GroupKind{
-			Group: crds[i].Spec.Group,
-			Kind:  crds[i].Spec.Names.Kind,
-		}]; !ok {
-			continue
+		if !webhookOptions.IgnoreSchemeConvertible {
+			// Continue if the GroupKind isn't registered as being convertible,
+			// and remove any existing conversion webhooks if they exist.
+			// This is to prevent the CRD from being rejected by the apiserver, usually
+			// manifests that are generated by controller-gen will have a conversion
+			// webhook set, but we don't want to enable it if the type isn't registered.
+			if _, ok := convertibles[schema.GroupKind{
+				Group: crds[i].Spec.Group,
+				Kind:  crds[i].Spec.Names.Kind,
+			}]; !ok {
+				crds[i].Spec.Conversion = nil
+				continue
+			}
 		}
 		if crds[i].Spec.Conversion == nil {
 			crds[i].Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -389,7 +401,7 @@ func modifyConversionWebhooks(crds []*apiextensionsv1.CustomResourceDefinition, 
 }
 
 // readCRDs reads the CRDs from files and Unmarshals them into structs.
-func readCRDs(basePath string, files []os.FileInfo) ([]*apiextensionsv1.CustomResourceDefinition, error) {
+func readCRDs(basePath string, files []string) ([]*apiextensionsv1.CustomResourceDefinition, error) {
 	var crds []*apiextensionsv1.CustomResourceDefinition
 
 	// White list the file extensions that may contain CRDs
@@ -397,12 +409,12 @@ func readCRDs(basePath string, files []os.FileInfo) ([]*apiextensionsv1.CustomRe
 
 	for _, file := range files {
 		// Only parse allowlisted file types
-		if !crdExts.Has(filepath.Ext(file.Name())) {
+		if !crdExts.Has(filepath.Ext(file)) {
 			continue
 		}
 
 		// Unmarshal CRDs from file into structs
-		docs, err := readDocuments(filepath.Join(basePath, file.Name()))
+		docs, err := readDocuments(filepath.Join(basePath, file))
 		if err != nil {
 			return nil, err
 		}
@@ -419,14 +431,14 @@ func readCRDs(basePath string, files []os.FileInfo) ([]*apiextensionsv1.CustomRe
 			crds = append(crds, crd)
 		}
 
-		log.V(1).Info("read CRDs from file", "file", file.Name())
+		log.V(1).Info("read CRDs from file", "file", file)
 	}
 	return crds, nil
 }
 
 // readDocuments reads documents from file.
 func readDocuments(fp string) ([][]byte, error) {
-	b, err := ioutil.ReadFile(fp) //nolint:gosec
+	b, err := os.ReadFile(fp)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +449,7 @@ func readDocuments(fp string) ([][]byte, error) {
 		// Read document
 		doc, err := reader.Read()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 
