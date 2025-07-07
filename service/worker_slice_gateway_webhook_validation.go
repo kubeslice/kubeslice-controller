@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -28,11 +29,11 @@ import (
 )
 
 // ValidateWorkerSliceGatewayUpdate is function to validate the update of gateways
-func ValidateWorkerSliceGatewayUpdate(ctx context.Context, workerSliceGateway *workerv1alpha1.WorkerSliceGateway, old runtime.Object) error {
+func ValidateWorkerSliceGatewayUpdate(ctx context.Context, workerSliceGateway *workerv1alpha1.WorkerSliceGateway, old runtime.Object) (admission.Warnings, error) {
 	if err := preventUpdateWorkerSliceGateway(ctx, workerSliceGateway, old); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceWorker, Kind: "WorkerSliceGateway"}, workerSliceGateway.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceWorker, Kind: "WorkerSliceGateway"}, workerSliceGateway.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 // preventUpdateWorkerSliceGateway is a function to check the GatewayNumber of WorkerSliceGateway

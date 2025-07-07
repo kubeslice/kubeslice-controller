@@ -53,7 +53,7 @@ func UpdateValidateWorkerSliceGatewayUpdatingGatewayNumber(t *testing.T) {
 	existingWorkerSliceGateway := workerv1alpha1.WorkerSliceGateway{}
 	existingWorkerSliceGateway.Spec.GatewayNumber = 1
 	newWorkerSliceGateway.Spec.GatewayNumber = 2
-	err := ValidateWorkerSliceGatewayUpdate(ctx, &existingWorkerSliceGateway, runtime.Object(newWorkerSliceGateway))
+	_, err := ValidateWorkerSliceGatewayUpdate(ctx, &existingWorkerSliceGateway, runtime.Object(newWorkerSliceGateway))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.GatewayNumber: Invalid value:")
 	clientMock.AssertExpectations(t)
@@ -63,7 +63,7 @@ func UpdateValidateWorkerSliceGatewayWithoutErrors(t *testing.T) {
 	name := "worker_slice_Gateway"
 	namespace := "namespace"
 	clientMock, newWorkerSliceGateway, ctx := setupWorkerSliceGatewayWebhookValidationTest(name, namespace)
-	err := ValidateWorkerSliceGatewayUpdate(ctx, newWorkerSliceGateway, runtime.Object(newWorkerSliceGateway))
+	_, err := ValidateWorkerSliceGatewayUpdate(ctx, newWorkerSliceGateway, runtime.Object(newWorkerSliceGateway))
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
