@@ -65,6 +65,9 @@ spec:
                 type: string
               gatewayType:
                 default: OpenVPN
+                enum:
+                - OpenVPN
+                - Wireguard
                 type: string
               localGatewayConfig:
                 properties:
