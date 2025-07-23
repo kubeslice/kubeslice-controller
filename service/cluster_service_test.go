@@ -331,7 +331,7 @@ func testDeleteClusterDeleteFail(t *testing.T) {
 	mMock.AssertExpectations(t)
 }
 
-func prepareTestContext(ctx context.Context, client util.Client,
+func prepareTestContext(ctx context.Context, client client.Client,
 	scheme *runtime.Scheme,
 ) context.Context {
 	if scheme == nil {
