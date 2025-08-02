@@ -57,14 +57,14 @@ const NamespaceAndClusterFormat = "namespace=%s&cluster=%s"
 func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get SliceConfig resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Started Recoincilation of SliceConfig %v", req.NamespacedName)
+	logger.Infof("Started Reconciliation of SliceConfig %v", req.NamespacedName)
 	sliceConfig := &v1alpha1.SliceConfig{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, sliceConfig)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if !found {
-		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
+		logger.Infof("sliceConfig %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 	// Load Event Recorder with project name, slice name and namespace

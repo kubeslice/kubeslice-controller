@@ -55,14 +55,14 @@ type WorkerServiceImportService struct {
 func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get WorkerServiceImport resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Started Recoincilation of WorkerServiceImport %v", req.NamespacedName)
+	logger.Infof("Started Reconciliation of WorkerServiceImport %v", req.NamespacedName)
 	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, workerServiceImport)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if !found {
-		logger.Infof("workerServiceImport %v not found, returning from  reconciler loop.", req.NamespacedName)
+		logger.Infof("workerServiceImport %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 	//Load Event Recorder with project name, slice name and namespace
@@ -157,7 +157,7 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 	}
 	found = len(serviceExportList.Items) > 0
 	if !found {
-		logger.Infof("serviceExport %v not found, returning from  reconciler loop.", req.NamespacedName)
+		logger.Infof("serviceExport %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 	//add more fields
@@ -234,8 +234,8 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 					},
 				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
-					logger.Debug("failed to create worker service import %s since it already exists, namespace - %s ",
-						expectedWorkerServiceImport.Name, namespace)
+					logger.Errorf("failed to create worker service import %s in namespace %s: %v",
+						expectedWorkerServiceImport.Name, namespace, err)
 					return err
 				}
 			}
@@ -268,8 +268,8 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 					},
 				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error (for handling parallel calls to create same resource)
-					logger.Debug("failed to create service import %s since it already exists, namespace - %s ",
-						existingWorkerServiceImport.Name, namespace)
+					logger.Errorf("failed to create service import %s in namespace %s: %v",
+						existingWorkerServiceImport.Name, namespace, err)
 					return err
 				}
 			}

@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+
 	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -44,7 +45,7 @@ type ServiceExportConfigService struct {
 func (s *ServiceExportConfigService) ReconcileServiceExportConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get project resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Starting Recoincilation of ServiceExportConfig with name %s in namespace %s",
+	logger.Infof("Starting Reconciliation of ServiceExportConfig with name %s in namespace %s",
 		req.Name, req.Namespace)
 	serviceExportConfig := &controllerv1alpha1.ServiceExportConfig{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, serviceExportConfig)

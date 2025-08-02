@@ -147,7 +147,7 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		With("name", "ReconcileVpnKeyRotation").
 		With("reconciler", "VpnKeyRotationConfig")
 
-	logger.Infof("Starting Recoincilation of VpnKeyRotation with name %s in namespace %s",
+	logger.Infof("Starting Reconciliation of VpnKeyRotation with name %s in namespace %s",
 		req.Name, req.Namespace)
 	vpnKeyRotationConfig := &controllerv1alpha1.VpnKeyRotation{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, vpnKeyRotationConfig)

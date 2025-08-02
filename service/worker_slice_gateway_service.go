@@ -71,14 +71,14 @@ type WorkerSliceGatewayService struct {
 func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get WorkerSliceGateway resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Started Recoincilation of WorkerSliceGateway %v", req.NamespacedName)
+	logger.Infof("Started Reconciliation of WorkerSliceGateway %v", req.NamespacedName)
 	workerSliceGateway := &v1alpha1.WorkerSliceGateway{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, workerSliceGateway)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if !found {
-		logger.Infof("workerSliceGateway %v not found, returning from  reconciler loop.", req.NamespacedName)
+		logger.Infof("workerSliceGateway %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
@@ -204,7 +204,7 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 		return ctrl.Result{}, err
 	}
 	if !found {
-		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
+		logger.Infof("sliceConfig %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
