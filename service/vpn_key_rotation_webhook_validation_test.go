@@ -49,7 +49,7 @@ func Test_validateVpnKeyRotationCreate(t *testing.T) {
 					SliceName: "",
 				},
 			},
-			expectedErr:        fmt.Errorf("invalid config,.spec.sliceName could not be empty"),
+			expectedErr:        fmt.Errorf("invalid config, .spec.sliceName could not be empty"),
 			sliceConfigPresent: true,
 		},
 		{

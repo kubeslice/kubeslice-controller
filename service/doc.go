@@ -14,6 +14,45 @@
  * 	limitations under the License.
  */
 
+// Package service provides the core business logic services for managing KubeSlice resources.
+//
+// This package contains service implementations that handle the lifecycle management
+// of KubeSlice custom resources including Projects, Clusters, SliceConfigs, and
+// related components. Each service encapsulates the business logic for reconciling
+// and managing specific resource types within the KubeSlice controller.
+//
+// Key Services:
+//
+//   - ProjectService: Manages KubeSlice projects and their associated namespaces,
+//     access controls, and resource cleanup.
+//
+//   - ClusterService: Handles cluster registration, deregistration, and lifecycle
+//     management within KubeSlice projects.
+//
+//   - SliceConfigService: Manages slice configurations, including network policies,
+//     QoS profiles, and inter-cluster connectivity setup.
+//
+//   - AccessControlService: Provides RBAC management for service accounts, roles,
+//     and role bindings across project namespaces.
+//
+//   - NamespaceService: Handles namespace creation, labeling, and cleanup for
+//     KubeSlice projects.
+//
+//   - SecretService: Manages secrets for cluster authentication and inter-cluster
+//     communication.
+//
+// Service Architecture:
+//
+// Services follow a dependency injection pattern where higher-level services
+// depend on lower-level services through interfaces. This promotes testability
+// and loose coupling between components.
+//
+// Most services implement a Reconcile pattern that:
+//  1. Fetches the current state of resources
+//  2. Compares with desired state
+//  3. Takes corrective actions to achieve desired state
+//  4. Updates resource status and emits events
+//
+// Error handling and metrics collection are integrated throughout the service
+// layer to provide observability and debugging capabilities.
 package service
-
-// TODO : Add package doc

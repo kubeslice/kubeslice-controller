@@ -170,6 +170,14 @@ const (
 	KubesliceWorkerDeleteRequeueTime = 3
 )
 
+// Network Configuration Constants
+const (
+	// DefaultSubnetMask is the default subnet mask used for VPN and NSM networks
+	DefaultSubnetMask = "255.255.255.0"
+	// DefaultVPNCipher is the default cipher used for VPN connections when not specified
+	DefaultVPNCipher = "AES-256-CBC"
+)
+
 // StandardQoSProfileLabel name
 const (
 	StandardQoSProfileLabel = "standard-qos-profile"

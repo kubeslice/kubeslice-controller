@@ -12,7 +12,7 @@ import (
 
 func ValidateVpnKeyRotationCreate(ctx context.Context, r *controllerv1alpha1.VpnKeyRotation) error {
 	if r.Spec.SliceName == "" {
-		return fmt.Errorf("invalid config,.spec.sliceName could not be empty")
+		return fmt.Errorf("invalid config, .spec.sliceName could not be empty")
 	}
 	if r.Name != r.Spec.SliceName {
 		return fmt.Errorf("invalid config, name should match with slice name")

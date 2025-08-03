@@ -683,7 +683,7 @@ func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName
 	environment["SLICE_NAME"] = sliceName
 	environment["CERT_GEN_REQUESTS"], _ = util.EncodeToBase64(&cpr)
 	if nil == sliceConfig.Spec.VPNConfig {
-		environment["VPN_CIPHER"] = "AES-256-CBC"
+		environment["VPN_CIPHER"] = DefaultVPNCipher
 	} else {
 		environment["VPN_CIPHER"] = sliceConfig.Spec.VPNConfig.Cipher
 	}
@@ -730,10 +730,10 @@ func (s *WorkerSliceGatewayService) buildCertPairRequest(sliceName string,
 		VpnFqdn:          vpnFqdn,
 		NsmServerNetwork: gatewayAddresses.ServerNetwork,
 		NsmClientNetwork: gatewayAddresses.ClientNetwork,
-		NsmMask:          "255.255.255.0",
+		NsmMask:          DefaultSubnetMask,
 		VpnIpToClient:    gatewayAddresses.ClientVpnAddress,
 		VpnNetwork:       gatewayAddresses.ServerVpnNetwork,
-		VpnMask:          "255.255.255.0",
+		VpnMask:          DefaultSubnetMask,
 		ClientId:         clientId,
 		ServerId:         serverId,
 	}
