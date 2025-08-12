@@ -14,38 +14,64 @@
  * 	limitations under the License.
  */
 
-// Package service provides the core business logic services for managing KubeSlice resources.
+// Package service provides the business logic layer for the KubeSlice Controller.
 //
-// This package contains service implementations that handle the lifecycle management
-// of KubeSlice custom resources including Projects, Clusters, SliceConfigs, and
-// related components. Each service encapsulates the business logic for reconciling
-// and managing specific resource types within the KubeSlice controller.
+// This package implements the core services that orchestrate the creation, management,
+// and lifecycle of KubeSlice resources across worker clusters. The service layer acts
+// as an intermediary between the Kubernetes controllers and the underlying resource
+// management operations.
 //
-// Key Services:
+// # Architecture Overview
 //
-//   - ProjectService: Manages KubeSlice projects and their associated namespaces,
-//     access controls, and resource cleanup.
+// The service package follows a modular architecture where each service is responsible
+// for managing specific aspects of the KubeSlice ecosystem:
 //
-//   - ClusterService: Handles cluster registration, deregistration, and lifecycle
-//     management within KubeSlice projects.
+//   - Project management and multi-tenancy
+//   - Cluster registration and lifecycle
+//   - Slice configuration and networking
+//   - Access control and RBAC
+//   - Service import/export across slices
+//   - VPN key rotation and security
+//   - Quality of Service (QoS) management
 //
-//   - SliceConfigService: Manages slice configurations, including network policies,
-//     QoS profiles, and inter-cluster connectivity setup.
+// # Service Dependencies
 //
-//   - AccessControlService: Provides RBAC management for service accounts, roles,
-//     and role bindings across project namespaces.
+// Services are designed with clear dependency relationships and are bootstrapped
+// through the bootstrap.go file. The dependency injection pattern ensures loose
+// coupling and facilitates testing.
 //
-//   - NamespaceService: Handles namespace creation, labeling, and cleanup for
-//     KubeSlice projects.
+// # Core Services
 //
-//   - SecretService: Manages secrets for cluster authentication and inter-cluster
-//     communication.
+// Project Services:
+//   - ProjectService: Manages project lifecycle, namespaces, and tenant isolation
+//   - NamespaceService: Handles Kubernetes namespace creation and management
+//   - AccessControlService: Manages RBAC roles, service accounts, and permissions
 //
-// Service Architecture:
+// Cluster Management Services:
+//   - ClusterService: Handles worker cluster registration and lifecycle
+//   - SliceConfigService: Manages slice configurations and networking policies
 //
-// Services follow a dependency injection pattern where higher-level services
-// depend on lower-level services through interfaces. This promotes testability
-// and loose coupling between components.
+// Network and Gateway Services:
+//   - WorkerSliceGatewayService: Manages gateway deployments and inter-cluster connectivity
+//   - WorkerSliceGatewayRecyclerService: Handles cleanup of unused gateway resources
+//   - ServiceExportConfigService: Manages service export configurations across slices
+//   - WorkerServiceImportService: Handles service import from other clusters
+//
+// Security Services:
+//   - VpnKeyRotationService: Manages VPN certificate rotation and security
+//   - SecretService: Handles secret management and distribution
+//
+// Quality and Resource Management:
+//   - SliceQoSConfigService: Manages Quality of Service configurations
+//   - JobService: Handles Kubernetes job creation and management
+//
+// # Service Interfaces
+//
+// Each service implements a well-defined interface (e.g., IProjectService, IClusterService)
+// that abstracts the implementation details and enables easy mocking for unit tests.
+// This design promotes testability and allows for alternative implementations.
+//
+// # Reconcile Pattern
 //
 // Most services implement a Reconcile pattern that:
 //  1. Fetches the current state of resources
@@ -53,6 +79,44 @@
 //  3. Takes corrective actions to achieve desired state
 //  4. Updates resource status and emits events
 //
-// Error handling and metrics collection are integrated throughout the service
-// layer to provide observability and debugging capabilities.
+// # Error Handling
+//
+// Services follow consistent error handling patterns using Go's error interface.
+// Errors are properly wrapped with context information and logged using the
+// structured logging framework.
+//
+// # Metrics and Observability
+//
+// Services integrate with the metrics package to provide observability into
+// KubeSlice operations. Key metrics include resource creation/deletion times,
+// error rates, and operational status.
+//
+// # Constants and Configuration
+//
+// Network configuration constants like DefaultSubnetMask and DefaultVPNCipher
+// are defined in kube_slice_resource_names.go to avoid magic strings and
+// improve maintainability.
+//
+// # Usage Example
+//
+//	// Bootstrap services with dependencies
+//	services := service.WithServices(
+//		workerSliceConfigService,
+//		projectService,
+//		clusterService,
+//		sliceConfigService,
+//		// ... other services
+//	)
+//
+//	// Use services in controllers
+//	result, err := services.ProjectService.ReconcileProject(ctx, request)
+//
+// # Testing
+//
+// The service package includes comprehensive test suites with mocked dependencies.
+// Each service can be tested in isolation using the generated mock interfaces
+// found in the mocks/ subdirectory.
+//
+// For more details on individual services, refer to their respective documentation
+// and the KubeSlice architecture documentation at https://kubeslice.io/documentation/
 package service
