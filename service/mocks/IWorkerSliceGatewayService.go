@@ -150,6 +150,30 @@ func (_m *IWorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.C
 	return r0, r1
 }
 
+// CreateMinimumWorkerSliceGatewaysWithTopology provides a mock function with given fields: ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, topologyConfig
+func (_m *IWorkerSliceGatewayService) CreateMinimumWorkerSliceGatewaysWithTopology(ctx context.Context, sliceName string, clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*v1alpha1.SliceGatewayServiceType, topologyConfig *v1alpha1.TopologyConfiguration) (reconcile.Result, error) {
+	ret := _m.Called(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, topologyConfig)
+
+	var r0 reconcile.Result
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, string, map[string]string, map[string]int, string, string, map[string]*v1alpha1.SliceGatewayServiceType, *v1alpha1.TopologyConfiguration) (reconcile.Result, error)); ok {
+		return rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, topologyConfig)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, string, map[string]string, map[string]int, string, string, map[string]*v1alpha1.SliceGatewayServiceType, *v1alpha1.TopologyConfiguration) reconcile.Result); ok {
+		r0 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, topologyConfig)
+	} else {
+		r0 = ret.Get(0).(reconcile.Result)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, []string, string, map[string]string, map[string]int, string, string, map[string]*v1alpha1.SliceGatewayServiceType, *v1alpha1.TopologyConfiguration) error); ok {
+		r1 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, topologyConfig)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewIWorkerSliceGatewayService interface {
 	mock.TestingT
 	Cleanup(func())

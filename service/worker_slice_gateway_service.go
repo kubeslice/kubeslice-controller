@@ -43,10 +43,18 @@ import (
 // gatewayName format string name of gateway
 const gatewayName = "%s-%s-%s"
 
+// ClusterPair represents a connection between two clusters
+type ClusterPair struct {
+	SourceCluster      string
+	DestinationCluster string
+}
+
 type IWorkerSliceGatewayService interface {
 	ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string,
 		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error)
+	CreateMinimumWorkerSliceGatewaysWithTopology(ctx context.Context, sliceName string, clusterNames []string, namespace string,
+		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, topologyConfig *controllerv1alpha1.TopologyConfiguration) (ctrl.Result, error)
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
@@ -62,6 +70,7 @@ type WorkerSliceGatewayService struct {
 	js   IJobService
 	sscs IWorkerSliceConfigService
 	sc   ISecretService
+	ts   ITopologyService
 	mf   metrics.IMetricRecorder
 }
 
@@ -350,6 +359,15 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
 	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error) {
 
+	// Maintain backward compatibility by using full-mesh topology when no topology config is provided
+	return s.CreateMinimumWorkerSliceGatewaysWithTopology(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, nil)
+}
+
+// CreateMinimumWorkerSliceGatewaysWithTopology is a function to create gateways with custom topology support
+func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGatewaysWithTopology(ctx context.Context, sliceName string,
+	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, topologyConfig *controllerv1alpha1.TopologyConfiguration) (ctrl.Result, error) {
+
 	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -358,7 +376,7 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 		return ctrl.Result{}, nil
 	}
 
-	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	_, err = s.createMinimumGatewaysWithTopologyIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, topologyConfig)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -472,6 +490,102 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 	}
 	return ctrl.Result{}, nil
 
+}
+
+// createMinimumGatewaysWithTopologyIfNotExists is a helper function to create the gateways between worker clusters based on topology configuration
+func (s *WorkerSliceGatewayService) createMinimumGatewaysWithTopologyIfNotExists(ctx context.Context, sliceName string,
+	clusterNames []string, namespace string, ownerLabel map[string]string, clusterMap map[string]int,
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, topologyConfig *controllerv1alpha1.TopologyConfiguration) (ctrl.Result, error) {
+
+	logger := util.CtxLogger(ctx)
+
+	// Validate topology configuration
+	if s.ts != nil {
+		if err := s.ts.ValidateTopologyConfiguration(topologyConfig, clusterNames); err != nil {
+			logger.Errorf("Invalid topology configuration: %v", err)
+			return ctrl.Result{}, err
+		}
+	}
+
+	clusterMapping := map[string]*controllerv1alpha1.Cluster{}
+	for _, clusterName := range clusterNames {
+		cluster := controllerv1alpha1.Cluster{}
+		found, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: namespace}, &cluster)
+		if !found || err != nil {
+			return ctrl.Result{}, err
+		}
+		clusterMapping[clusterName] = &cluster
+	}
+
+	// Get connectivity matrix based on topology configuration
+	var connectivityPairs []ClusterPair
+	var err error
+
+	if s.ts != nil {
+		connectivityPairs, err = s.ts.GetConnectivityMatrix(topologyConfig, clusterNames)
+		if err != nil {
+			logger.Errorf("Failed to get connectivity matrix: %v", err)
+			return ctrl.Result{}, err
+		}
+	} else {
+		// Fallback to full mesh if topology service is not available
+		connectivityPairs = s.getFullMeshPairs(clusterNames)
+	}
+
+	logger.Infof("Creating %d gateway pairs for slice %s based on topology configuration", len(connectivityPairs), sliceName)
+
+	// Create gateway pairs based on the connectivity matrix
+	for _, pair := range connectivityPairs {
+		sourceCluster := clusterMapping[pair.SourceCluster]
+		destinationCluster := clusterMapping[pair.DestinationCluster]
+
+		gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
+		gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
+
+		// Determine VPN deployment type for source cluster
+		var vpnDeploymentType controllerv1alpha1.VPNDeploymentType
+		if s.ts != nil {
+			vpnDeploymentType = s.ts.GetVPNDeploymentType(topologyConfig, sourceCluster.Name)
+		} else {
+			vpnDeploymentType = controllerv1alpha1.VPNAUTO
+		}
+
+		// determine the gateway svc parameters
+		sliceGwSvcType := defaultSliceGatewayServiceType
+		gwSvcProtocol := defaultSliceGatewayServiceProtocol
+		if val, exists := sliceGwSvcTypeMap[sourceCluster.Name]; exists {
+			sliceGwSvcType = val.Type
+			gwSvcProtocol = val.Protocol
+		}
+
+		logger.Debugf("Creating gateway pair between %s and %s with VPN deployment type: %s",
+			sourceCluster.Name, destinationCluster.Name, vpnDeploymentType)
+
+		err := s.createMinimumGateWayPairWithVPNTypeIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace,
+			sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses, vpnDeploymentType)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// getFullMeshPairs returns cluster pairs for full mesh topology (fallback)
+func (s *WorkerSliceGatewayService) getFullMeshPairs(clusterNames []string) []ClusterPair {
+	var pairs []ClusterPair
+	noClusters := len(clusterNames)
+
+	for i := 0; i < noClusters; i++ {
+		for j := i + 1; j < noClusters; j++ {
+			pairs = append(pairs, ClusterPair{
+				SourceCluster:      clusterNames[i],
+				DestinationCluster: clusterNames[j],
+			})
+		}
+	}
+
+	return pairs
 }
 
 // createMinimumGateWayPairIfNotExists is a function to create the pair of gatways between 2 clusters if not exists
@@ -790,5 +904,141 @@ func (s *WorkerSliceGatewayService) NodeIpReconciliationOfWorkerSliceGateways(ct
 			}
 		}
 	}
+	return nil
+}
+
+// createMinimumGateWayPairWithVPNTypeIfNotExists is a function to create the pair of gateways between 2 clusters with VPN deployment type support
+func (s *WorkerSliceGatewayService) createMinimumGateWayPairWithVPNTypeIfNotExists(ctx context.Context,
+	sourceCluster *controllerv1alpha1.Cluster, destinationCluster *controllerv1alpha1.Cluster,
+	sliceName, namespace, gatewayConnType, gatewayProtocol string, label map[string]string, gatewayNumber int,
+	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses, vpnDeploymentType controllerv1alpha1.VPNDeploymentType) error {
+
+	// Determine which cluster should act as server and which as client based on VPN deployment type
+	var serverCluster, clientCluster *controllerv1alpha1.Cluster
+	var serverHostType, clientHostType string
+
+	switch vpnDeploymentType {
+	case controllerv1alpha1.VPNSERVER:
+		// Source cluster acts as server
+		serverCluster, clientCluster = sourceCluster, destinationCluster
+		serverHostType, clientHostType = serverGateway, clientGateway
+
+	case controllerv1alpha1.VPNCLIENT:
+		// Source cluster acts as client (destination becomes server)
+		serverCluster, clientCluster = destinationCluster, sourceCluster
+		serverHostType, clientHostType = serverGateway, clientGateway
+
+	default: // VPNAUTO or fallback
+		// Use the original logic (first cluster as server)
+		serverCluster, clientCluster = sourceCluster, destinationCluster
+		serverHostType, clientHostType = serverGateway, clientGateway
+	}
+
+	serverGatewayName := fmt.Sprintf(gatewayName, sliceName, serverCluster.Name, clientCluster.Name)
+	clientGatewayName := fmt.Sprintf(gatewayName, sliceName, clientCluster.Name, serverCluster.Name)
+
+	gateway := v1alpha1.WorkerSliceGateway{}
+	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serverGatewayName, Namespace: namespace}, &gateway)
+	if err != nil {
+		return err
+	}
+	if found {
+		found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
+			Name:      clientGatewayName,
+			Namespace: namespace,
+		}, &gateway)
+		if err != nil {
+			return err
+		}
+		if found {
+			return nil
+		}
+	}
+
+	//Load Event Recorder with project name, slice name and namespace
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
+	// Load metrics with project name and namespace
+	s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
+	// Adjust gateway addresses based on server/client roles
+	var serverSubnet, serverVpnAddress, clientSubnet, clientVpnAddress string
+	if serverCluster.Name == sourceCluster.Name {
+		serverSubnet = gatewayAddresses.ServerSubnet
+		serverVpnAddress = gatewayAddresses.ServerVpnAddress
+		clientSubnet = gatewayAddresses.ClientSubnet
+		clientVpnAddress = gatewayAddresses.ClientVpnAddress
+	} else {
+		serverSubnet = gatewayAddresses.ClientSubnet
+		serverVpnAddress = gatewayAddresses.ClientVpnAddress
+		clientSubnet = gatewayAddresses.ServerSubnet
+		clientVpnAddress = gatewayAddresses.ServerVpnAddress
+	}
+
+	serverGatewayObject := s.buildMinimumGateway(serverCluster, clientCluster, sliceName, namespace,
+		serverHostType, gatewayConnType, gatewayProtocol, label, gatewayNumber,
+		serverSubnet, serverVpnAddress,
+		clientGatewayName, clientSubnet, clientVpnAddress, serverGatewayName)
+
+	err = util.CreateResource(ctx, serverGatewayObject)
+	if err != nil {
+		//Register an event for worker slice gateway creation failure
+		util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreationFailed)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "creation_failed",
+				"event":       string(events.EventWorkerSliceGatewayCreationFailed),
+				"object_name": serverGatewayObject.Name,
+				"object_kind": metricKindWorkerSliceGateway,
+			},
+		)
+		return err
+	}
+	//Register an event for worker slice gateway creation success
+	util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
+	s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+		map[string]string{
+			"action":      "created",
+			"event":       string(events.EventWorkerSliceGatewayCreated),
+			"object_name": serverGatewayObject.Name,
+			"object_kind": metricKindWorkerSliceGateway,
+		},
+	)
+
+	clientGatewayObject := s.buildMinimumGateway(clientCluster, serverCluster, sliceName, namespace,
+		clientHostType, gatewayConnType, gatewayProtocol, label, gatewayNumber,
+		clientSubnet, clientVpnAddress,
+		serverGatewayName, serverSubnet, serverVpnAddress, clientGatewayName)
+
+	err = util.CreateResource(ctx, clientGatewayObject)
+	if err != nil {
+		//Register an event for worker slice gateway creation failure
+		util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreationFailed)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "creation_failed",
+				"event":       string(events.EventWorkerSliceGatewayCreationFailed),
+				"object_name": clientGatewayObject.Name,
+				"object_kind": metricKindWorkerSliceGateway,
+			},
+		)
+		return err
+	}
+	//Register an event for worker slice gateway creation success
+	util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
+	s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+		map[string]string{
+			"action":      "created",
+			"event":       string(events.EventWorkerSliceGatewayCreated),
+			"object_name": clientGatewayObject.Name,
+			"object_kind": metricKindWorkerSliceGateway,
+		},
+	)
+
 	return nil
 }

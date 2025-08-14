@@ -155,12 +155,14 @@ func WithWorkerSliceGatewayService(
 	js IJobService,
 	sscs IWorkerSliceConfigService,
 	sc ISecretService,
+	ts ITopologyService,
 	mf metrics.IMetricRecorder,
 ) IWorkerSliceGatewayService {
 	return &WorkerSliceGatewayService{
 		js:   js,
 		sscs: sscs,
 		sc:   sc,
+		ts:   ts,
 		mf:   mf,
 	}
 }
@@ -168,6 +170,11 @@ func WithWorkerSliceGatewayService(
 // WithWorkerSliceGatewayRecyclerService bootstraps slice gateway_recycler service
 func WithWorkerSliceGatewayRecyclerService() IWorkerSliceGatewayRecyclerService {
 	return &WorkerSliceGatewayRecyclerService{}
+}
+
+// WithTopologyService bootstraps topology service
+func WithTopologyService() ITopologyService {
+	return NewTopologyService()
 }
 
 // bootstrapping job service
