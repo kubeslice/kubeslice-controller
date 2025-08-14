@@ -54,6 +54,8 @@ var _ webhook.Defaulter = &SliceConfig{}
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *SliceConfig) Default() {
 	sliceconfigurationlog.Info("default", "name", r.Name)
+
+	// Set default VPN configuration
 	if r.Spec.OverlayNetworkDeploymentMode != NONET {
 		if r.Spec.VPNConfig == nil {
 			r.Spec.VPNConfig = &VPNConfiguration{
@@ -62,6 +64,25 @@ func (r *SliceConfig) Default() {
 		}
 	} else {
 		r.Spec.VPNConfig = nil
+	}
+
+	// Set default topology configuration if not provided
+	if r.Spec.TopologyConfig == nil {
+		r.Spec.TopologyConfig = &TopologyConfiguration{
+			TopologyType: FULLMESH,
+		}
+	} else if r.Spec.TopologyConfig.TopologyType == "" {
+		r.Spec.TopologyConfig.TopologyType = FULLMESH
+	}
+
+	// Set default VPN deployment type for clusters if not provided
+	if r.Spec.TopologyConfig != nil && len(r.Spec.TopologyConfig.ClusterVPNConfig) == 0 {
+		for _, cluster := range r.Spec.Clusters {
+			r.Spec.TopologyConfig.ClusterVPNConfig = append(r.Spec.TopologyConfig.ClusterVPNConfig, ClusterVPNConfiguration{
+				ClusterName:       cluster,
+				VPNDeploymentType: VPNAUTO,
+			})
+		}
 	}
 }
 

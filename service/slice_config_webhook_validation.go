@@ -72,6 +72,10 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 		}
 	}
+	// Validate topology configuration
+	if err := validateTopologyConfiguration(sliceConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	return nil
 }
 
@@ -132,6 +136,11 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 			return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 		}
 
+	}
+
+	// Validate topology configuration for updates
+	if err := validateTopologyConfiguration(sliceConfig); err != nil {
+		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 
 	return nil
@@ -674,4 +683,137 @@ func checkIfQoSConfigExists(ctx context.Context, namespace string, qosProfileNam
 		return false
 	}
 	return found
+}
+
+// validateTopologyConfiguration validates the topology configuration
+func validateTopologyConfiguration(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if sliceConfig.Spec.TopologyConfig == nil {
+		return nil // No topology config is valid (defaults to full-mesh)
+	}
+
+	config := sliceConfig.Spec.TopologyConfig
+	clusters := sliceConfig.Spec.Clusters
+
+	if len(clusters) == 0 {
+		return field.Required(field.NewPath("spec").Child("clusters"), "at least one cluster must be specified")
+	}
+
+	// Create a set of valid cluster names for quick lookup
+	clusterSet := make(map[string]bool)
+	for _, cluster := range clusters {
+		if cluster == "" {
+			return field.Invalid(field.NewPath("spec").Child("clusters"), clusters, "cluster name cannot be empty")
+		}
+		clusterSet[cluster] = true
+	}
+
+	// Validate topology type specific requirements
+	switch config.TopologyType {
+	case controllerv1alpha1.HUBSPOKE:
+		if config.HubCluster == "" {
+			return field.Required(field.NewPath("spec").Child("topologyConfig").Child("hubCluster"), "hubCluster must be specified for hub-spoke topology")
+		}
+		if !clusterSet[config.HubCluster] {
+			return field.Invalid(field.NewPath("spec").Child("topologyConfig").Child("hubCluster"), config.HubCluster, fmt.Sprintf("hub cluster '%s' is not present in the clusters list", config.HubCluster))
+		}
+		if len(clusters) < 2 {
+			return field.Invalid(field.NewPath("spec").Child("clusters"), clusters, "hub-spoke topology requires at least 2 clusters (1 hub + 1 spoke)")
+		}
+
+	case controllerv1alpha1.CUSTOM, controllerv1alpha1.PARTIALMESH:
+		if len(config.ConnectivityMatrix) == 0 {
+			return field.Required(field.NewPath("spec").Child("topologyConfig").Child("connectivityMatrix"), fmt.Sprintf("connectivityMatrix must be specified for %s topology", config.TopologyType))
+		}
+
+		// Validate connectivity matrix
+		for i, connectivity := range config.ConnectivityMatrix {
+			if connectivity.SourceCluster == "" {
+				return field.Required(field.NewPath("spec").Child("topologyConfig").Child("connectivityMatrix").Index(i).Child("sourceCluster"), "sourceCluster cannot be empty")
+			}
+			if !clusterSet[connectivity.SourceCluster] {
+				return field.Invalid(field.NewPath("spec").Child("topologyConfig").Child("connectivityMatrix").Index(i).Child("sourceCluster"), connectivity.SourceCluster, fmt.Sprintf("source cluster '%s' is not present in clusters list", connectivity.SourceCluster))
+			}
+			if len(connectivity.TargetClusters) == 0 {
+				return field.Required(field.NewPath("spec").Child("topologyConfig").Child("connectivityMatrix").Index(i).Child("targetClusters"), "targetClusters cannot be empty")
+			}
+			for j, targetCluster := range connectivity.TargetClusters {
+				if targetCluster == "" {
+					return field.Required(field.NewPath("spec").Child("topologyConfig").Child("connectivityMatrix").Index(i).Child("targetClusters").Index(j), "target cluster cannot be empty")
+				}
+				if !clusterSet[targetCluster] {
+					return field.Invalid(field.NewPath("spec").Child("topologyConfig").Child("connectivityMatrix").Index(i).Child("targetClusters").Index(j), targetCluster, fmt.Sprintf("target cluster '%s' is not present in clusters list", targetCluster))
+				}
+				if connectivity.SourceCluster == targetCluster {
+					return field.Invalid(field.NewPath("spec").Child("topologyConfig").Child("connectivityMatrix").Index(i).Child("targetClusters").Index(j), targetCluster, fmt.Sprintf("source cluster cannot be the same as target cluster: %s", targetCluster))
+				}
+			}
+		}
+
+		// Validate that all clusters are reachable (basic connectivity check) for partial mesh
+		if config.TopologyType == controllerv1alpha1.PARTIALMESH {
+			if err := validatePartialMeshConnectivity(clusters, config.ConnectivityMatrix); err != nil {
+				return field.Invalid(field.NewPath("spec").Child("topologyConfig").Child("connectivityMatrix"), config.ConnectivityMatrix, err.Error())
+			}
+		}
+
+	case controllerv1alpha1.FULLMESH:
+		// Full mesh doesn't require additional validation
+		if len(clusters) < 2 {
+			return field.Invalid(field.NewPath("spec").Child("clusters"), clusters, "full-mesh topology requires at least 2 clusters")
+		}
+	}
+
+	// Validate cluster VPN configurations
+	for i, vpnConfig := range config.ClusterVPNConfig {
+		if vpnConfig.ClusterName == "" {
+			return field.Required(field.NewPath("spec").Child("topologyConfig").Child("clusterVpnConfig").Index(i).Child("clusterName"), "clusterName cannot be empty")
+		}
+		if !clusterSet[vpnConfig.ClusterName] {
+			return field.Invalid(field.NewPath("spec").Child("topologyConfig").Child("clusterVpnConfig").Index(i).Child("clusterName"), vpnConfig.ClusterName, fmt.Sprintf("cluster '%s' is not present in clusters list", vpnConfig.ClusterName))
+		}
+	}
+
+	return nil
+}
+
+// validatePartialMeshConnectivity performs basic reachability validation for partial mesh
+func validatePartialMeshConnectivity(clusters []string, connectivityMatrix []controllerv1alpha1.ClusterConnectivity) error {
+	// Build adjacency map
+	adjacency := make(map[string]map[string]bool)
+	for _, cluster := range clusters {
+		adjacency[cluster] = make(map[string]bool)
+	}
+
+	// Populate adjacency map with bidirectional connections
+	for _, connectivity := range connectivityMatrix {
+		for _, target := range connectivity.TargetClusters {
+			adjacency[connectivity.SourceCluster][target] = true
+			adjacency[target][connectivity.SourceCluster] = true
+		}
+	}
+
+	// Check if the graph is connected using DFS
+	visited := make(map[string]bool)
+	if len(clusters) > 0 {
+		dfsVisit(clusters[0], adjacency, visited)
+	}
+
+	// Check if all clusters were visited
+	for _, cluster := range clusters {
+		if !visited[cluster] {
+			return fmt.Errorf("cluster '%s' is not reachable in the partial mesh topology", cluster)
+		}
+	}
+
+	return nil
+}
+
+// dfsVisit performs depth-first search to check connectivity
+func dfsVisit(cluster string, adjacency map[string]map[string]bool, visited map[string]bool) {
+	visited[cluster] = true
+	for neighbor := range adjacency[cluster] {
+		if !visited[neighbor] {
+			dfsVisit(neighbor, adjacency, visited)
+		}
+	}
 }
