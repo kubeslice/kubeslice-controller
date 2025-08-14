@@ -224,6 +224,68 @@ spec:
                 type: string
               standardQosProfileName:
                 type: string
+              topologyConfig:
+                description: Custom topology configuration for defining connectivity
+                  matrix
+                properties:
+                  clusterVpnConfig:
+                    description: ClusterVPNConfig defines VPN deployment type for
+                      each cluster
+                    items:
+                      description: ClusterVPNConfiguration defines VPN deployment
+                        type for a specific cluster
+                      properties:
+                        clusterName:
+                          description: Cluster name
+                          type: string
+                        vpnDeploymentType:
+                          default: auto
+                          description: VPN deployment type for this cluster
+                          enum:
+                          - client
+                          - server
+                          - auto
+                          type: string
+                      required:
+                      - clusterName
+                      type: object
+                    type: array
+                  connectivityMatrix:
+                    description: |-
+                      ConnectivityMatrix defines which clusters should connect to which other clusters
+                      Only required when TopologyType is "custom" or "partial-mesh"
+                    items:
+                      description: ClusterConnectivity defines connectivity between
+                        clusters
+                      properties:
+                        sourceCluster:
+                          description: Source cluster name
+                          type: string
+                        targetClusters:
+                          description: Target clusters that the source cluster should
+                            connect to
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - sourceCluster
+                      - targetClusters
+                      type: object
+                    type: array
+                  hubCluster:
+                    description: |-
+                      HubCluster defines the central cluster for hub-spoke topology
+                      Only required when TopologyType is "hub-spoke"
+                    type: string
+                  topologyType:
+                    default: full-mesh
+                    enum:
+                    - full-mesh
+                    - partial-mesh
+                    - hub-spoke
+                    - custom
+                    type: string
+                type: object
               vpnConfig:
                 description: VPNConfiguration defines the additional (optional) VPN
                   Configuration to customise

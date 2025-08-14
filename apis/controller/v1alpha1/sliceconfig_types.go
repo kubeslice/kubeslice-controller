@@ -47,6 +47,61 @@ const (
 	ENVOY GatewayType = "envoy"
 )
 
+// +kubebuilder:validation:Enum:=full-mesh;partial-mesh;hub-spoke;custom
+type TopologyType string
+
+const (
+	FULLMESH    TopologyType = "full-mesh"
+	PARTIALMESH TopologyType = "partial-mesh"
+	HUBSPOKE    TopologyType = "hub-spoke"
+	CUSTOM      TopologyType = "custom"
+)
+
+// +kubebuilder:validation:Enum:=client;server;auto
+type VPNDeploymentType string
+
+const (
+	VPNCLIENT VPNDeploymentType = "client"
+	VPNSERVER VPNDeploymentType = "server"
+	VPNAUTO   VPNDeploymentType = "auto"
+)
+
+// TopologyConfiguration defines the custom topology settings for a slice
+type TopologyConfiguration struct {
+	//+kubebuilder:default:=full-mesh
+	TopologyType TopologyType `json:"topologyType,omitempty"`
+
+	// ConnectivityMatrix defines which clusters should connect to which other clusters
+	// Only required when TopologyType is "custom" or "partial-mesh"
+	ConnectivityMatrix []ClusterConnectivity `json:"connectivityMatrix,omitempty"`
+
+	// HubCluster defines the central cluster for hub-spoke topology
+	// Only required when TopologyType is "hub-spoke"
+	HubCluster string `json:"hubCluster,omitempty"`
+
+	// ClusterVPNConfig defines VPN deployment type for each cluster
+	ClusterVPNConfig []ClusterVPNConfiguration `json:"clusterVpnConfig,omitempty"`
+}
+
+// ClusterConnectivity defines connectivity between clusters
+type ClusterConnectivity struct {
+	// Source cluster name
+	SourceCluster string `json:"sourceCluster"`
+
+	// Target clusters that the source cluster should connect to
+	TargetClusters []string `json:"targetClusters"`
+}
+
+// ClusterVPNConfiguration defines VPN deployment type for a specific cluster
+type ClusterVPNConfiguration struct {
+	// Cluster name
+	ClusterName string `json:"clusterName"`
+
+	// VPN deployment type for this cluster
+	//+kubebuilder:default:=auto
+	VPNDeploymentType VPNDeploymentType `json:"vpnDeploymentType,omitempty"`
+}
+
 // SliceConfigSpec defines the desired state of SliceConfig
 type SliceConfigSpec struct {
 	//+kubebuilder:default:=single-network
@@ -56,9 +111,11 @@ type SliceConfigSpec struct {
 	SliceType            string                      `json:"sliceType,omitempty"`
 	SliceGatewayProvider *WorkerSliceGatewayProvider `json:"sliceGatewayProvider,omitempty"`
 	//+kubebuilder:default:=Local
-	SliceIpamType          string   `json:"sliceIpamType,omitempty"`
-	Clusters               []string `json:"clusters,omitempty"`
-	StandardQosProfileName string   `json:"standardQosProfileName,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
+	SliceIpamType string   `json:"sliceIpamType,omitempty"`
+	Clusters      []string `json:"clusters,omitempty"`
+	// Custom topology configuration for defining connectivity matrix
+	TopologyConfig         *TopologyConfiguration `json:"topologyConfig,omitempty"`
+	StandardQosProfileName string                 `json:"standardQosProfileName,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
 	// The custom QOS Profile Details
 	QosProfileDetails         *QOSProfile               `json:"qosProfileDetails,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
