@@ -1,0 +1,43 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: partial-mesh-slice
+spec:
+  sliceSubnet: 10.4.0.0/16
+  sliceType: Application
+  sliceGatewayProvider:
+    sliceGatewayType: OpenVPN
+    sliceCaType: Local
+  sliceIpamType: Local
+  clusters:
+    - prod-us
+    - prod-eu
+    - staging-us
+    - dev-us
+  # Partial mesh topology configuration
+  topologyConfig:
+    topologyType: partial-mesh
+    connectivityMatrix:
+      - sourceCluster: prod-us
+        targetClusters:
+          - prod-eu
+          - staging-us
+      - sourceCluster: staging-us
+        targetClusters:
+          - dev-us
+    clusterVpnConfig:
+      - clusterName: prod-us
+        vpnDeploymentType: server
+      - clusterName: prod-eu
+        vpnDeploymentType: auto
+      - clusterName: staging-us
+        vpnDeploymentType: server
+      - clusterName: dev-us
+        vpnDeploymentType: client
+  qosProfileDetails:
+    queueType: HTB
+    priority: 2
+    tcType: BANDWIDTH_CONTROL
+    bandwidthCeilingKbps: 5120
+    bandwidthGuaranteedKbps: 2560
+    dscpClass: AF31

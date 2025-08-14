@@ -1,0 +1,44 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: custom-topology-slice
+spec:
+  sliceSubnet: 10.5.0.0/16
+  sliceType: Application
+  sliceGatewayProvider:
+    sliceGatewayType: OpenVPN
+    sliceCaType: Local
+  sliceIpamType: Local
+  clusters:
+    - dmz-cluster
+    - internal-cluster-1
+    - internal-cluster-2
+    - external-partner
+  # Custom topology configuration for firewall-constrained environment
+  topologyConfig:
+    topologyType: custom
+    connectivityMatrix:
+      - sourceCluster: dmz-cluster
+        targetClusters:
+          - internal-cluster-1
+          - internal-cluster-2
+          - external-partner
+      - sourceCluster: internal-cluster-1
+        targetClusters:
+          - internal-cluster-2
+    clusterVpnConfig:
+      - clusterName: dmz-cluster
+        vpnDeploymentType: server
+      - clusterName: internal-cluster-1
+        vpnDeploymentType: client
+      - clusterName: internal-cluster-2
+        vpnDeploymentType: client
+      - clusterName: external-partner
+        vpnDeploymentType: client
+  qosProfileDetails:
+    queueType: HTB
+    priority: 3
+    tcType: BANDWIDTH_CONTROL
+    bandwidthCeilingKbps: 8192
+    bandwidthGuaranteedKbps: 4096
+    dscpClass: AF41

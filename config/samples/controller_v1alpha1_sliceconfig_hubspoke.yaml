@@ -1,0 +1,36 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: hub-spoke-slice
+spec:
+  sliceSubnet: 10.3.0.0/16
+  sliceType: Application
+  sliceGatewayProvider:
+    sliceGatewayType: OpenVPN
+    sliceCaType: Local
+  sliceIpamType: Local
+  clusters:
+    - us-west-hub
+    - us-east-spoke
+    - eu-west-spoke
+    - asia-spoke
+  # Hub-spoke topology configuration
+  topologyConfig:
+    topologyType: hub-spoke
+    hubCluster: us-west-hub
+    clusterVpnConfig:
+      - clusterName: us-west-hub
+        vpnDeploymentType: server
+      - clusterName: us-east-spoke
+        vpnDeploymentType: client
+      - clusterName: eu-west-spoke
+        vpnDeploymentType: client
+      - clusterName: asia-spoke
+        vpnDeploymentType: client
+  qosProfileDetails:
+    queueType: HTB
+    priority: 1
+    tcType: BANDWIDTH_CONTROL
+    bandwidthCeilingKbps: 10240
+    bandwidthGuaranteedKbps: 5120
+    dscpClass: AF21
