@@ -1,0 +1,27 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: dynamic-ipam-slice
+spec:
+  sliceSubnet: "10.1.0.0/16"
+  sliceType: Application
+  sliceIpamType: "Dynamic" # Enable Dynamic IPAM for efficient IP allocation
+  clusters:
+    - cluster-1
+    - cluster-2
+    - cluster-3
+  qosProfileDetails:
+    queueType: HTB
+    priority: 1
+    tcType: BANDWIDTH_CONTROL
+    classType: besteffort
+    bandwidthCeilingKbps: 5120
+    bandwidthGuaranteedKbps: 2560
+    dscpClass: AF11
+  namespaceIsolationProfile:
+    isolationEnabled: false
+  externalGatewayConfig:
+    - gatewayType: "istio"
+      clusters:
+        - cluster-1
+        - cluster-2
