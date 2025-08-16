@@ -49,6 +49,7 @@ type SliceConfigService struct {
 	wsgrs IWorkerSliceGatewayRecyclerService
 	mf    metrics.IMetricRecorder
 	vpn   IVpnKeyRotationService
+	sipam ISliceIpamService
 }
 
 const NamespaceAndClusterFormat = "namespace=%s&cluster=%s"

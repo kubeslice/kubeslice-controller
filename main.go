@@ -72,10 +72,11 @@ func main() {
 	se := service.WithServiceExportConfigService(wsi, mr)
 	wsgrs := service.WithWorkerSliceGatewayRecyclerService()
 	vpn := service.WithVpnKeyRotationService(wsgs, wscs)
-	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr, vpn)
+	sipam := service.WithSliceIpamService(mr)
+	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr, vpn, sipam)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
 	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
-	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn))
+	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn, sipam))
 }
 
 func initialize(services *service.Services) {
@@ -262,6 +263,17 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to create controller", "controller", "VpnKeyRotationConfig")
 		os.Exit(1)
 	}
+	// initialize controller with SliceIpam Kind
+	if err = (&controller.SliceIpamReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Log:              controllerLog.With("name", "SliceIpam"),
+		SliceIpamService: services.SliceIpamService,
+		EventRecorder:    &eventRecorder,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SliceIpam")
+		os.Exit(1)
+	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = (&controllerv1alpha1.Project{}).SetupWebhookWithManager(mgr, service.ValidateProjectCreate, service.ValidateProjectUpdate, service.ValidateProjectDelete); err != nil {
@@ -296,6 +308,10 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "VpnKeyRotation")
 			os.Exit(1)
 		}
+		if err = (&controllerv1alpha1.SliceIpam{}).SetupWebhookWithManager(mgr, service.ValidateSliceIpamCreate, service.ValidateSliceIpamUpdate, service.ValidateSliceIpamDelete); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "SliceIpam")
+			os.Exit(1)
+		}
 	}
 
 	//+kubebuilder:scaffold:builder
@@ -318,9 +334,9 @@ func initialize(services *service.Services) {
 
 //All Controller RBACs goes here.
 
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;sliceqosconfigs;vpnkeyrotations,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status;vpnkeyrotations/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers;vpnkeyrotations/finalizers,verbs=update
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;sliceqosconfigs;vpnkeyrotations;sliceipams,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status;vpnkeyrotations/status;sliceipams/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers;vpnkeyrotations/finalizers;sliceipams/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs;workerserviceimports;workerslicegateways;workerslicegwrecyclers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/status;workerserviceimports/status;workerslicegateways/status;workerslicegwrecyclers/status,verbs=get;update;patch
