@@ -1,0 +1,16 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: IPAMPool
+metadata:
+  name: example-slice-ipam-pool
+  namespace: default
+spec:
+  sliceSubnet: "10.1.0.0/16"
+  poolType: "Dynamic"
+  subnetSize: "/24"
+  maxClusters: 16
+  allocationStrategy: "Efficient"
+  autoReclaim: true
+  reclaimDelay: 3600
+  reservedSubnets:
+    - "10.1.0.0/24"  # Reserved for special purposes
+    - "10.1.255.0/24" # Reserved for gateway networks

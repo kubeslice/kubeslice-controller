@@ -734,6 +734,22 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Warning - Certificate Creation job Failed",
 	},
+	"IPAMPoolReconciled": {
+		Name:                "IPAMPoolReconciled",
+		Reason:              "IPAMPoolReconciled",
+		Action:              "ReconcileIPAMPool",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "IPAM pool reconciled successfully.",
+	},
+	"IPAMPoolReconciliationFailed": {
+		Name:                "IPAMPoolReconciliationFailed",
+		Reason:              "IPAMPoolReconciliationFailed",
+		Action:              "ReconcileIPAMPool",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "IPAM pool reconciliation failed.",
+	},
 }
 
 var (
@@ -826,4 +842,6 @@ var (
 	EventCertificatesRenewNow                 events.EventName = "CertificatesRenewNow"
 	EventIllegalVPNKeyRotationConfigDelete    events.EventName = "IllegalVPNKeyRotationConfigDelete"
 	EventCertificateJobFailed                 events.EventName = "CertificateJobFailed"
+	EventIPAMPoolReconciled                   events.EventName = "IPAMPoolReconciled"
+	EventIPAMPoolReconciliationFailed         events.EventName = "IPAMPoolReconciliationFailed"
 )

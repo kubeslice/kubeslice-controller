@@ -97,6 +97,18 @@ events:
     type: Normal
     reportingController: controller
     message: Default Slice QoS config created.
+  - name: IPAMPoolReconciled
+    reason: IPAMPoolReconciled
+    action: ReconcileIPAMPool
+    type: Normal
+    reportingController: controller
+    message: IPAM pool reconciled successfully.
+  - name: IPAMPoolReconciliationFailed
+    reason: IPAMPoolReconciliationFailed
+    action: ReconcileIPAMPool
+    type: Warning
+    reportingController: controller
+    message: IPAM pool reconciliation failed.
   - name: SliceQoSConfigDeleted
     reason: SliceQoSConfigDeleted
     action: DeleteSliceQoSConfig
