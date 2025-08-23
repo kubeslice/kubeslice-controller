@@ -47,6 +47,7 @@ type SliceConfigService struct {
 	si    IWorkerServiceImportService
 	se    IServiceExportConfigService
 	wsgrs IWorkerSliceGatewayRecyclerService
+	ipam  *IPAMService
 	mf    metrics.IMetricRecorder
 	vpn   IVpnKeyRotationService
 }

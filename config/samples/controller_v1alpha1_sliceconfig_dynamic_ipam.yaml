@@ -1,0 +1,26 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: example-slice-dynamic-ipam
+  namespace: default
+spec:
+  sliceName: "example-slice-dynamic-ipam"
+  sliceSubnet: "10.1.0.0/16"
+  sliceType: "Application"
+  sliceIpamType: "Dynamic"  # Enable dynamic IPAM
+  maxClusters: 8
+  rotationInterval: 30
+  clusters:
+    - "cluster-1"
+    - "cluster-2"
+  overlayNetworkDeploymentMode: "single-network"
+  sliceGatewayProvider:
+    sliceGatewayType: "OpenVPN"
+    sliceCaType: "Local"
+    sliceGatewayServiceType:
+      - cluster: "cluster-1"
+        type: "NodePort"
+        protocol: "UDP"
+      - cluster: "cluster-2"
+        type: "NodePort"
+        protocol: "UDP"

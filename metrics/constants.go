@@ -19,4 +19,9 @@ package metrics
 
 var (
 	PROMETHEUS_SERVICE_ENDPOINT = "http://kubeslice-controller-prometheus-service:9090"
+
+	// IPAM Pool Metrics
+	IPAMPoolTotalSubnets     = "kubeslice_ipam_pool_total_subnets"
+	IPAMPoolAllocatedSubnets = "kubeslice_ipam_pool_allocated_subnets"
+	IPAMPoolAvailableSubnets = "kubeslice_ipam_pool_available_subnets"
 )

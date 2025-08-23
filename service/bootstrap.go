@@ -106,6 +106,9 @@ func WithSliceConfigService(
 	mf metrics.IMetricRecorder,
 	vpn IVpnKeyRotationService,
 ) ISliceConfigService {
+	// Create IPAM service
+	ipam := NewIPAMService(nil, mf.(*metrics.MetricRecorder))
+
 	return &SliceConfigService{
 		ns:    ns,
 		acs:   acs,
@@ -114,6 +117,7 @@ func WithSliceConfigService(
 		si:    si,
 		se:    se,
 		wsgrs: wsgrs,
+		ipam:  ipam,
 		mf:    mf,
 		vpn:   vpn,
 	}
