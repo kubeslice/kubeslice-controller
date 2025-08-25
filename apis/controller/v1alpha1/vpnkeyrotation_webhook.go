@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -30,15 +31,13 @@ import (
 
 // log is for logging in this package.
 var (
-	vpnKeyRotationLog                    = util.NewLogger().With("name", "vpnkeyrotation-resource")
-	customVpnKeyRotationCreateValidation func(ctx context.Context, vpn *VpnKeyRotation) error
-	customVpnKeyRotationDeleteValidation func(ctx context.Context, vpn *VpnKeyRotation) error
-	vpnKeyRotationConfigWebhookClient    client.Client
+	customVpnKeyRotationCreateValidation func(ctx context.Context, vpn *VpnKeyRotation) (admission.Warnings, error)
+	customVpnKeyRotationDeleteValidation func(ctx context.Context, vpn *VpnKeyRotation) (admission.Warnings, error)
 	eventRecorder                        events.EventRecorder
 )
 
-func (r *VpnKeyRotation) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate func(context.Context, *VpnKeyRotation) error, validateDelete func(context.Context, *VpnKeyRotation) error) error {
-	vpnKeyRotationConfigWebhookClient = mgr.GetClient()
+func (r *VpnKeyRotation) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate func(context.Context, *VpnKeyRotation) (admission.Warnings, error), validateDelete func(context.Context, *VpnKeyRotation) (admission.Warnings, error)) error {
+	w := &vpnKeyRotationWebhook{Client: mgr.GetClient()}
 	customVpnKeyRotationCreateValidation = validateCreate
 	customVpnKeyRotationDeleteValidation = validateDelete
 	eventRecorder = events.NewEventRecorder(mgr.GetClient(), mgr.GetScheme(), ossEvents.EventsMap, events.EventRecorderOptions{
@@ -49,35 +48,32 @@ func (r *VpnKeyRotation) SetupWebhookWithManager(mgr ctrl.Manager, validateCreat
 	})
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithValidator(w).
 		Complete()
 }
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+type vpnKeyRotationWebhook struct {
+	client.Client
+}
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-vpnkeyrotation,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=vpnkeyrotations,verbs=create;update;delete,versions=v1alpha1,name=vvpnkeyrotation.kb.io,admissionReviewVersions={v1,v1beta1}
 
-var _ webhook.Validator = &VpnKeyRotation{}
+var _ webhook.CustomValidator = &vpnKeyRotationWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *VpnKeyRotation) ValidateCreate() error {
-	sliceconfigurationlog.Info("validate create", "name", r.Name)
-	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), vpnKeyRotationConfigWebhookClient, nil, "VpnKeyRotationConfigValidation", &eventRecorder)
-	return customVpnKeyRotationCreateValidation(sliceConfigCtx, r)
+func (r *vpnKeyRotationWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "VpnKeyRotationConfigValidation", &eventRecorder)
+	return customVpnKeyRotationCreateValidation(sliceConfigCtx, obj.(*VpnKeyRotation))
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *VpnKeyRotation) ValidateUpdate(old runtime.Object) error {
-	vpnKeyRotationLog.Info("validate update", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object update.
-	return nil
+func (r *vpnKeyRotationWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *VpnKeyRotation) ValidateDelete() error {
-	vpnKeyRotationLog.Info("validate delete", "name", r.Name)
-
-	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), vpnKeyRotationConfigWebhookClient, nil, "VpnKeyRotationConfigValidation", &eventRecorder)
-	return customVpnKeyRotationDeleteValidation(sliceConfigCtx, r)
+func (r *vpnKeyRotationWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	sliceConfigCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "VpnKeyRotationConfigValidation", &eventRecorder)
+	return customVpnKeyRotationDeleteValidation(sliceConfigCtx, obj.(*VpnKeyRotation))
 }

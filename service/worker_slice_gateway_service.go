@@ -227,7 +227,7 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 	logger.Debugf("setting gwConType in reconciler %s", workerSliceGateway.Spec.GatewayConnectivityType)
 	logger.Debugf("setting gwProto in reconciler %s", workerSliceGateway.Spec.GatewayProtocol)
 
-	workerSliceGateway.Spec.GatewayType = workerSliceGatewayType
+	workerSliceGateway.Spec.GatewayType = sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType
 	workerSliceGateway.UID = ""
 	err = util.UpdateResource(ctx, workerSliceGateway)
 	if err != nil {
@@ -682,6 +682,7 @@ func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName
 	environment["CLIENT_SLICEGATEWAY_NAME"] = clientGateway.Name
 	environment["SLICE_NAME"] = sliceName
 	environment["CERT_GEN_REQUESTS"], _ = util.EncodeToBase64(&cpr)
+	environment["GATEWAY_TYPE"] = string(sliceConfig.Spec.SliceGatewayProvider.SliceGatewayType)
 	if nil == sliceConfig.Spec.VPNConfig {
 		environment["VPN_CIPHER"] = "AES-256-CBC"
 	} else {

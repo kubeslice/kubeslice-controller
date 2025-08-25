@@ -47,6 +47,8 @@ type EventRecorder interface {
 	WithNamespace(string) EventRecorder
 	// WithProject returns a new recorder with project name added
 	WithProject(string) EventRecorder
+	// WithLabels returns a new recorder with additional labels added
+	WithAdditionalLabels(map[string]string) EventRecorder
 }
 
 func NewEventRecorder(c client.Writer, s *runtime.Scheme, em map[EventName]*EventSchema, o EventRecorderOptions) EventRecorder {
@@ -76,6 +78,8 @@ type EventRecorderOptions struct {
 	Namespace string
 	// Component is the component which uses the event recorder
 	Component string
+	// AdditionalLabels is a generic map of custom labels
+	AdditionalLabels map[string]string
 }
 
 type Event struct {
@@ -126,6 +130,12 @@ type eventRecorder struct {
 }
 
 func (er *eventRecorder) Copy() *eventRecorder {
+	additonalLabels := make(map[string]string)
+	if er.Options.AdditionalLabels != nil {
+		for key, value := range er.Options.AdditionalLabels {
+			additonalLabels[key] = value
+		}
+	}
 	return &eventRecorder{
 		Client:    er.Client,
 		Logger:    er.Logger,
@@ -133,12 +143,13 @@ func (er *eventRecorder) Copy() *eventRecorder {
 		EventsMap: er.EventsMap,
 		cache:     er.cache,
 		Options: EventRecorderOptions{
-			Version:   er.Options.Version,
-			Cluster:   er.Options.Cluster,
-			Project:   er.Options.Project,
-			Slice:     er.Options.Slice,
-			Namespace: er.Options.Namespace,
-			Component: er.Options.Component,
+			Version:          er.Options.Version,
+			Cluster:          er.Options.Cluster,
+			Project:          er.Options.Project,
+			Slice:            er.Options.Slice,
+			Namespace:        er.Options.Namespace,
+			Component:        er.Options.Component,
+			AdditionalLabels: additonalLabels,
 		},
 	}
 }
@@ -162,6 +173,15 @@ func (er *eventRecorder) WithNamespace(ns string) EventRecorder {
 func (er *eventRecorder) WithProject(project string) EventRecorder {
 	e := er.Copy()
 	e.Options.Project = project
+	return e
+}
+
+// WithLabels returns a new recorder with added labels
+func (er *eventRecorder) WithAdditionalLabels(labels map[string]string) EventRecorder {
+	e := er.Copy()
+	for key, value := range labels {
+		e.Options.AdditionalLabels[key] = value
+	}
 	return e
 }
 
@@ -226,6 +246,10 @@ func (er *eventRecorder) RecordEvent(ctx context.Context, e *Event) error {
 		Type:   string(event.Type),
 	}
 
+	// append additional labels
+	for key, value := range er.Options.AdditionalLabels {
+		ev.Labels[key] = value
+	}
 	if e.RelatedObject != nil {
 		related, err := reference.GetReference(er.Scheme, e.RelatedObject)
 		if err != nil {
