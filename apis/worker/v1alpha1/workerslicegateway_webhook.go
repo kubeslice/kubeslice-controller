@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,51 +27,50 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// log is for logging in this package.
-var workerslicegatewaylog = util.NewLogger().With("name", "workerslicegateway-resource")
+type customWorkerSliceGatewayValidation func(ctx context.Context, workerSliceGateway *WorkerSliceGateway, old runtime.Object) (admission.Warnings, error)
 
-type customWorkerSliceGatewayValidation func(ctx context.Context, workerSliceGateway *WorkerSliceGateway, old runtime.Object) error
-
-var customWorkerSliceGatewayUpdateValidation func(ctx context.Context, workerSliceGateway *WorkerSliceGateway, old runtime.Object) error = nil
-var workerSliceGatewayWebhookClient client.Client
+var customWorkerSliceGatewayUpdateValidation func(ctx context.Context, workerSliceGateway *WorkerSliceGateway, old runtime.Object) (admission.Warnings, error) = nil
 
 func (r *WorkerSliceGateway) SetupWebhookWithManager(mgr ctrl.Manager, validateUpdate customWorkerSliceGatewayValidation) error {
-	workerSliceGatewayWebhookClient = mgr.GetClient()
+	w := &workerSliceGatewayWebhook{Client: mgr.GetClient()}
 	customWorkerSliceGatewayUpdateValidation = validateUpdate
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(w).
+		WithValidator(w).
 		Complete()
+}
+
+type workerSliceGatewayWebhook struct {
+	client.Client
 }
 
 //+kubebuilder:webhook:path=/mutate-worker-kubeslice-io-v1alpha1-workerslicegateway,mutating=true,failurePolicy=fail,sideEffects=None,groups=worker.kubeslice.io,resources=workerslicegateways,verbs=create;update,versions=v1alpha1,name=mworkerslicegateway.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &WorkerSliceGateway{}
+var _ webhook.CustomDefaulter = &workerSliceGatewayWebhook{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *WorkerSliceGateway) Default() {
-	workerslicegatewaylog.Info("default", "name", r.Name)
+func (r *workerSliceGatewayWebhook) Default(ctx context.Context, obj runtime.Object) error {
+	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-worker-kubeslice-io-v1alpha1-workerslicegateway,mutating=false,failurePolicy=fail,sideEffects=None,groups=worker.kubeslice.io,resources=workerslicegateways,verbs=create;update,versions=v1alpha1,name=vworkerslicegateway.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &WorkerSliceGateway{}
+var _ webhook.CustomValidator = &workerSliceGatewayWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *WorkerSliceGateway) ValidateCreate() error {
-	workerslicegatewaylog.Info("validate create", "name", r.Name)
-	return nil
+func (r *workerSliceGatewayWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *WorkerSliceGateway) ValidateUpdate(old runtime.Object) error {
-	workerslicegatewaylog.Info("validate update", "name", r.Name)
-	workerSliceGatewayCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), workerSliceGatewayWebhookClient, nil, "WorkerSliceGatewayValidation", nil)
-	return customWorkerSliceGatewayUpdateValidation(workerSliceGatewayCtx, r, old)
+func (r *workerSliceGatewayWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
+	workerSliceGatewayCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "WorkerSliceGatewayValidation", nil)
+	return customWorkerSliceGatewayUpdateValidation(workerSliceGatewayCtx, newObj.(*WorkerSliceGateway), oldObj)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *WorkerSliceGateway) ValidateDelete() error {
-	workerslicegatewaylog.Info("validate delete", "name", r.Name)
-	return nil
+func (r *workerSliceGatewayWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	return nil, nil
 }

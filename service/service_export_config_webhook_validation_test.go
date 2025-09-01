@@ -64,7 +64,7 @@ func testValidateServiceExportConfigCreateDoesNotExist(t *testing.T) {
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name: namespace,
 	}, &corev1.Namespace{}).Return(notFoundError).Once()
-	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "metadata.namespace: Invalid value:")
 	require.Contains(t, err.Error(), namespace)
@@ -85,7 +85,7 @@ func testValidateServiceExportConfigCreateNotInProjectNamespace(t *testing.T) {
 		arg.Name = namespace
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "SomeOther", namespace)
 	}).Once()
-	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "metadata.namespace: Invalid value:")
 	require.Contains(t, err.Error(), namespace)
@@ -111,7 +111,7 @@ func testValidateServiceExportConfigCreateIfSliceNotExist(t *testing.T) {
 	notFoundError := k8sError.NewNotFound(util.Resource("SliceConfigWebhookValidationTest"), "isNotFound")
 	clientMock.On("Get", ctx, mock.Anything, cluster).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, sliceConfig).Return(notFoundError).Once()
-	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SliceName: Invalid value:")
 	clientMock.AssertExpectations(t)
@@ -136,7 +136,7 @@ func testValidateServiceExportConfigCreateIfClusterNotExist(t *testing.T) {
 	notFoundError := k8sError.NewNotFound(util.Resource("SliceConfigWebhookValidationTest"), "isNotFound")
 	clientMock.On("Get", ctx, mock.Anything, cluster).Return(notFoundError).Once()
 	clientMock.On("Get", ctx, mock.Anything, sliceConfig).Return(nil).Once()
-	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.SourceCluster: Invalid value:")
 	clientMock.AssertExpectations(t)
@@ -164,7 +164,7 @@ func testValidateServiceExportConfigCreateIfClusterNotPresentInSlice(t *testing.
 		agr := args.Get(2).(*controllerv1alpha1.SliceConfig)
 		agr.Spec.Clusters = []string{"cluster1", "cluster2"}
 	}).Once()
-	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Cluster: Invalid value:")
 	require.Contains(t, err.Error(), serviceExportConfig.Spec.SourceCluster)
@@ -193,7 +193,7 @@ func ValidateServiceExportConfigCreateIfClusterIsPresentInSlice(t *testing.T) {
 		agr := args.Get(2).(*controllerv1alpha1.SliceConfig)
 		agr.Spec.Clusters = []string{"cluster1", "cluster2"}
 	}).Once()
-	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -233,7 +233,7 @@ func testValidateServiceExportConfigCreateServiceEndpointInvalidSlice(t *testing
 		agr.Spec.Clusters = []string{"cluster1", "cluster2"}
 	}).Once()
 	clientMock.On("Get", ctx, mock.Anything, sliceConfig).Return(notFoundError).Once()
-	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "There is no valid slice with this name")
 	require.Contains(t, err.Error(), serviceExportConfig.Spec.SliceName)
@@ -275,7 +275,7 @@ func testValidateServiceExportConfigCreateServiceEndpointInvalidCluster(t *testi
 		agr.Spec.Clusters = []string{"cluster1", "cluster2"}
 	}).Twice()
 	clientMock.On("Get", ctx, mock.Anything, cluster).Return(notFoundError).Once()
-	err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigCreate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ServiceDiscoveryEndpoints.Cluster: Invalid value:")
 	require.Contains(t, err.Error(), "Cluster is not registered")
@@ -308,7 +308,7 @@ func testValidateServiceExportConfigUpdateServiceEndpointInvalidCluster(t *testi
 		agr.Spec.Clusters = []string{"cluster1", "cluster2"}
 	}).Twice()
 	clientMock.On("Get", ctx, mock.Anything, cluster).Return(notFoundError).Once()
-	err := ValidateServiceExportConfigUpdate(ctx, serviceExportConfig)
+	_, err := ValidateServiceExportConfigUpdate(ctx, serviceExportConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.ServiceDiscoveryEndpoints.Cluster: Invalid value:")
 	require.Contains(t, err.Error(), serviceExportConfig.Spec.ServiceDiscoveryEndpoints[0].Cluster)

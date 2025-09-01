@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 
 	"github.com/dailymotion/allure-go"
@@ -67,7 +68,7 @@ func TestValidateProjectCreate_Applied_Namespace_Error(t *testing.T) {
 	namespace := "avesha-controller"
 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
-	err := ValidateProjectCreate(ctx, project)
+	_, err := ValidateProjectCreate(ctx, project)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid", os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"), worngNamespace)
 	clientMock.AssertExpectations(t)
@@ -82,7 +83,7 @@ func TestValidateProjectCreate_FailsIfNameContainsDot(t *testing.T) { //todo
 	project.ObjectMeta.Namespace = namespace
 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
-	err := ValidateProjectCreate(ctx, project)
+	_, err := ValidateProjectCreate(ctx, project)
 	require.Contains(t, err.Error(), "cannot contain dot")
 	clientMock.AssertExpectations(t)
 }
@@ -96,7 +97,7 @@ func TestValidateProjectCreate_FailsIfNameContainsGreaterThan30Characters(t *tes
 	project.ObjectMeta.Namespace = namespace
 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
-	err := ValidateProjectCreate(ctx, project)
+	_, err := ValidateProjectCreate(ctx, project)
 	require.Contains(t, err.Error(), "cannot contain more than")
 	clientMock.AssertExpectations(t)
 }
@@ -134,7 +135,7 @@ func TestValidateProjectCreate_FailsIf_Sa_Name_Not_DNS_Compliant(t *testing.T) {
 	// notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
 	// clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Once()
-	err := ValidateProjectCreate(ctx, project)
+	_, err := ValidateProjectCreate(ctx, project)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Invalid value", invalidName1, invalidName2)
 	require.Contains(t, err.Error(), "Invalid value", invalidNameRw1, invalidNameRw2)
@@ -158,7 +159,7 @@ func TestValidateProjectCreate_HappyPath(t *testing.T) { //todo
 	// notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
 	// clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Once()
-	err := ValidateProjectCreate(ctx, project)
+	_, err := ValidateProjectCreate(ctx, project)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -179,7 +180,7 @@ func Test_ValidateProjectUpdate_ThrowsErrorIf_SA_Readonly_already_exist(t *testi
 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
-	err := ValidateProjectUpdate(ctx, project)
+	_, err := ValidateProjectUpdate(ctx, project)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "already exists", alreadyExistName1)
 	clientMock.AssertExpectations(t)
@@ -199,7 +200,7 @@ func Test_ValidateProjectUpdate_ThrowsErrorIf_SA_ReadWrite_already_exist(t *test
 	os.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", namespace)
 	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Times(1)
-	err := ValidateProjectUpdate(ctx, project)
+	_, err := ValidateProjectUpdate(ctx, project)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "already exists", alreadyExistNameRw1)
 	clientMock.AssertExpectations(t)
@@ -224,7 +225,7 @@ func Test_ValidateProjectUpdate_ThrowsErrorIf_SA_DNS_Invalid_throws_error(t *tes
 	// clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Times(4)
 	//calls rolebinding next
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Times(1)
-	err := ValidateProjectUpdate(ctx, project)
+	_, err := ValidateProjectUpdate(ctx, project)
 	require.Contains(t, err.Error(), "Invalid value", invalidName1, invalidName2)
 	require.Contains(t, err.Error(), "Invalid value", invalidNameRw1, invalidNameRw2)
 	clientMock.AssertExpectations(t)
@@ -248,7 +249,7 @@ func Test_ValidateProjectUpdate_ThrowsErrorIf_RoleBinding_Readonly_exists_throws
 	notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Times(4)
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Times(1)
-	err := ValidateProjectUpdate(ctx, project)
+	_, err := ValidateProjectUpdate(ctx, project)
 	require.Contains(t, err.Error(), "spec.roleBinding.readOnly", existsReadonlyName)
 	clientMock.AssertExpectations(t)
 }
@@ -272,7 +273,7 @@ func Test_ValidateProjectUpdate_ThrowsErrorIf_RoleBinding_ReadWrite_exists_throw
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Times(4)
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Times(2)
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Times(1)
-	err := ValidateProjectUpdate(ctx, project)
+	_, err := ValidateProjectUpdate(ctx, project)
 	require.Contains(t, err.Error(), "spec.roleBinding.readWrite", existsReadWriteName)
 	clientMock.AssertExpectations(t)
 }
@@ -295,7 +296,7 @@ func Test_ValidateProjectUpdate_Happy(t *testing.T) {
 	notFoundError := k8sError.NewNotFound(util.Resource("projecttest"), "isnotFound")
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Times(4)
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(notFoundError).Times(4)
-	err := ValidateProjectUpdate(ctx, project)
+	_, err := ValidateProjectUpdate(ctx, project)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -312,12 +313,12 @@ func Test_ValidateProjectDelete_FailsIfSliceConfigExists(t *testing.T) {
 			arg.Items[0].Name = "sliceConfig1"
 		}
 	}).Once()
-	err := ValidateProjectDelete(ctx, project)
+	_, err := ValidateProjectDelete(ctx, project)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
 
-func prepareProjectWebhookTestContext(ctx context.Context, client util.Client,
+func prepareProjectWebhookTestContext(ctx context.Context, client client.Client,
 	scheme *runtime.Scheme) context.Context {
 	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectWebhookTestController", nil)
 	return preparedCtx

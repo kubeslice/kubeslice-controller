@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -34,36 +35,36 @@ import (
 )
 
 // ValidateClusterCreate is a function to validate the creation of cluster
-func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) error {
+func ValidateClusterCreate(ctx context.Context, c *controllerv1alpha1.Cluster) (warnings admission.Warnings, err error) {
 	if err := validateAppliedInProjectNamespace(ctx, c); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
 	if err := validateGeolocation(c); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
 	if errs := validateNodeIPs(c); len(errs) != 0 {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, errs)
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, errs)
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateClusterUpdate is a function to validate to the update of specification of cluster
-func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) error {
+func ValidateClusterUpdate(ctx context.Context, c *controllerv1alpha1.Cluster, old runtime.Object) (warnings admission.Warnings, err error) {
 	if err := validateGeolocation(c); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
 	if errs := validateNodeIPs(c); len(errs) != 0 {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, errs)
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, errs)
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateClusterDelete is a function to validate the deletion of cluster
-func ValidateClusterDelete(ctx context.Context, c *controllerv1alpha1.Cluster) error {
+func ValidateClusterDelete(ctx context.Context, c *controllerv1alpha1.Cluster) (warnings admission.Warnings, err error) {
 	if err := validateClusterInAnySlice(ctx, c); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Cluster"}, c.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 // validateAppliedInProjectNamespace is a function to validate the if the cluster is applied in project namespace or not
@@ -122,11 +123,10 @@ func validateNodeIPs(c *controllerv1alpha1.Cluster) field.ErrorList {
 		return nil
 	}
 	var errors field.ErrorList
-	var isValid []string
 	for _, ip := range c.Spec.NodeIPs {
-		isValid = validation.IsValidIP(ip)
-		if isValid != nil {
-			errors = append(errors, field.Invalid(field.NewPath("spec").Child("nodeIPs"), ip, isValid[0]))
+		ipErrs := validation.IsValidIP(field.NewPath("spec").Child("nodeIPs"), ip)
+		if len(ipErrs) > 0 {
+			errors = append(errors, ipErrs...)
 		}
 	}
 	return errors

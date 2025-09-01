@@ -23,61 +23,59 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// log is for logging in this package.
-var projectlog = util.NewLogger().With("name", "project-resource")
+type customProjectValidation func(ctx context.Context, project *Project) (admission.Warnings, error)
 
-type customProjectValidation func(ctx context.Context, project *Project) error
-
-var customProjectCreateValidation func(ctx context.Context, project *Project) error = nil
-var customProjectUpdateValidation func(ctx context.Context, project *Project) error = nil
-var customProjectDeleteValidation func(ctx context.Context, project *Project) error = nil
-var projectWebhookClient client.Client
+var customProjectCreateValidation func(ctx context.Context, project *Project) (admission.Warnings, error) = nil
+var customProjectUpdateValidation func(ctx context.Context, project *Project) (admission.Warnings, error) = nil
+var customProjectDeleteValidation func(ctx context.Context, project *Project) (admission.Warnings, error) = nil
 
 func (r *Project) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate customProjectValidation, validateUpdate customProjectValidation, validateDelete customProjectValidation) error {
-	projectWebhookClient = mgr.GetClient()
+	w := &projectWebhook{Client: mgr.GetClient()}
 	customProjectCreateValidation = validateCreate
 	customProjectUpdateValidation = validateUpdate
 	customProjectDeleteValidation = validateDelete
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(w).
+		WithValidator(w).
 		Complete()
+}
+
+type projectWebhook struct {
+	client.Client
 }
 
 //+kubebuilder:webhook:path=/mutate-controller-kubeslice-io-v1alpha1-project,mutating=true,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=projects,verbs=create;update,versions=v1alpha1,name=mproject.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &Project{}
+var _ webhook.CustomDefaulter = &projectWebhook{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *Project) Default() {
-	projectlog.Info("default", "name", r.Name)
-
-	// TODO(user): fill in your defaulting logic.
+func (r *projectWebhook) Default(ctx context.Context, obj runtime.Object) error {
+	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-project,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=projects,verbs=create;update;delete,versions=v1alpha1,name=vproject.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &Project{}
+var _ webhook.CustomValidator = &projectWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Project) ValidateCreate() error {
-	projectlog.Info("validate create", "name", r.Name)
-	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), projectWebhookClient, nil, "ProjectValidation", nil)
-	return customProjectCreateValidation(projectCtx, r)
+func (r *projectWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ProjectValidation", nil)
+	return customProjectCreateValidation(projectCtx, obj.(*Project))
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Project) ValidateUpdate(old runtime.Object) error {
-	projectlog.Info("validate update", "name", r.Name)
-	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), projectWebhookClient, nil, "ProjectValidation", nil)
-	return customProjectUpdateValidation(projectCtx, r)
+func (r *projectWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
+	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ProjectValidation", nil)
+	return customProjectUpdateValidation(projectCtx, newObj.(*Project))
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *Project) ValidateDelete() error {
-	projectlog.Info("validate delete", "name", r.Name)
-	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), projectWebhookClient, nil, "ProjectValidation", nil)
-	return customProjectDeleteValidation(projectCtx, r)
+func (r *projectWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	projectCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ProjectValidation", nil)
+	return customProjectDeleteValidation(projectCtx, obj.(*Project))
 }

@@ -17,6 +17,7 @@
 package v1alpha1
 
 import (
+	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,7 +28,7 @@ import (
 type WorkerSliceGatewaySpec struct {
 	SliceName string `json:"sliceName,omitempty"`
 	//+kubebuilder:default:=OpenVPN
-	GatewayType string `json:"gatewayType,omitempty"`
+	GatewayType controllerv1alpha1.SliceGatewayType `json:"gatewayType,omitempty"`
 	//+kubebuilder:validation:Enum:=Client;Server
 	GatewayHostType string `json:"gatewayHostType,omitempty"`
 	//+kubebuilder:default:=NodePort

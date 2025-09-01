@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/util"
@@ -30,33 +31,33 @@ import (
 )
 
 // ValidateServiceExportConfigCreate is a function to validate the create process of service export config
-func ValidateServiceExportConfigCreate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
+func ValidateServiceExportConfigCreate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) (admission.Warnings, error) {
 	if err := validateServiceExportConfigNamespace(ctx, serviceExportConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
 	}
 	if err := validateServiceExportClusterAndSlice(ctx, serviceExportConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
 	}
 	if err := validateServiceEndpoint(ctx, serviceExportConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateServiceExportConfigUpdate is a function to validate the update process of service export config
-func ValidateServiceExportConfigUpdate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
+func ValidateServiceExportConfigUpdate(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) (admission.Warnings, error) {
 	if err := validateServiceExportClusterAndSlice(ctx, serviceExportConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
 	}
 	if err := validateServiceEndpoint(ctx, serviceExportConfig); err != nil {
-		return apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "ServiceExportConfig"}, serviceExportConfig.Name, field.ErrorList{err})
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateServiceExportConfigDelete is a function to validate the delete process of service export config
-func ValidateServiceExportConfigDelete(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) error {
-	return nil
+func ValidateServiceExportConfigDelete(ctx context.Context, serviceExportConfig *controllerv1alpha1.ServiceExportConfig) (admission.Warnings, error) {
+	return nil, nil
 }
 
 func validateServiceExportClusterAndSlice(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
