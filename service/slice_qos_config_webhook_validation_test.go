@@ -70,7 +70,7 @@ func ValidateSliceQoSConfigCreatePass(t *testing.T) {
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 		arg.Name = "kubeslice-cisco"
 	}).Once()
-	err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
+	_, err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -84,7 +84,7 @@ func ValidateSliceQoSConfigCreateFailWithInvalidNamespace(t *testing.T) {
 	clientMock.On("Get", ctx, client.ObjectKey{
 		Name: namespace,
 	}, &v1.Namespace{}).Return(nil).Once()
-	err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
+	_, err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "SliceQosConfig must be applied on project namespace")
 	clientMock.AssertExpectations(t)
@@ -106,7 +106,7 @@ func ValidateSliceQoSConfigCreateFailWithBandwidthCeilingIsLessThanBandwidthGuar
 		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
 		arg.Name = "kubeslice-cisco"
 	}).Once()
-	err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
+	_, err := ValidateSliceQosConfigCreate(ctx, sliceQosConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
 	clientMock.AssertExpectations(t)
@@ -118,7 +118,7 @@ func ValidateSliceQoSConfigUpdatePass(t *testing.T) {
 	clientMock, sliceQosConfig, ctx := setupSliceqosConfigWebhookValidationTest(name, namespace)
 	sliceQosConfig.Spec.BandwidthCeilingKbps = 1000
 	sliceQosConfig.Spec.BandwidthGuaranteedKbps = 500
-	err := ValidateSliceQosConfigUpdate(ctx, sliceQosConfig)
+	_, err := ValidateSliceQosConfigUpdate(ctx, sliceQosConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -129,7 +129,7 @@ func ValidateSliceQoSConfigUpdateFailWithBandwidthCeilingIsLessThanBandwidthGuar
 	clientMock, sliceQosConfig, ctx := setupSliceqosConfigWebhookValidationTest(name, namespace)
 	sliceQosConfig.Spec.BandwidthCeilingKbps = 1000
 	sliceQosConfig.Spec.BandwidthGuaranteedKbps = 1005
-	err := ValidateSliceQosConfigUpdate(ctx, sliceQosConfig)
+	_, err := ValidateSliceQosConfigUpdate(ctx, sliceQosConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "BandwidthGuaranteedKbps cannot be greater than BandwidthCeilingKbps")
 	clientMock.AssertExpectations(t)
@@ -148,7 +148,7 @@ func ValidateSliceQoSConfigDeleteFail(t *testing.T) {
 			arg.Items[0].Spec.SliceName = "red"
 		}
 	}).Once()
-	err := ValidateSliceQosConfigDelete(ctx, sliceQosConfig)
+	_, err := ValidateSliceQosConfigDelete(ctx, sliceQosConfig)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 }
@@ -159,7 +159,7 @@ func ValidateSliceQoSConfigDeletePass(t *testing.T) {
 	clientMock, sliceQosConfig, ctx := setupSliceqosConfigWebhookValidationTest(name, namespace)
 	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
 	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Once()
-	err := ValidateSliceQosConfigDelete(ctx, sliceQosConfig)
+	_, err := ValidateSliceQosConfigDelete(ctx, sliceQosConfig)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }

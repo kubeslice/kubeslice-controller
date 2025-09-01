@@ -23,66 +23,62 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// log is for logging in this package.
-var clusterlog = util.NewLogger().With("name", "cluster-resource")
+type clusterValidation func(ctx context.Context, cluster *Cluster) (warnings admission.Warnings, err error)
+type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) (warnings admission.Warnings, err error)
 
-type clusterValidation func(ctx context.Context, cluster *Cluster) error
-type clusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error
-
-var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) error = nil
-var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) error = nil
-var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) error = nil
-var clusterWebhookClient client.Client
+var customClusterCreateValidation func(ctx context.Context, cluster *Cluster) (warnings admission.Warnings, err error) = nil
+var customClusterUpdateValidation func(ctx context.Context, cluster *Cluster, old runtime.Object) (warnings admission.Warnings, err error) = nil
+var customClusterDeleteValidation func(ctx context.Context, cluster *Cluster) (warnings admission.Warnings, err error) = nil
 
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager, validateCreate clusterValidation, validateUpdate clusterUpdateValidation, validateDelete clusterValidation) error {
 	customClusterCreateValidation = validateCreate
 	customClusterUpdateValidation = validateUpdate
 	customClusterDeleteValidation = validateDelete
-	clusterWebhookClient = mgr.GetClient()
+	w := &clusterWebhook{Client: mgr.GetClient()}
 
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(w).
+		WithValidator(w).
 		Complete()
+}
+
+type clusterWebhook struct {
+	client.Client
 }
 
 //+kubebuilder:webhook:path=/mutate-controller-kubeslice-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &Cluster{}
+var _ webhook.CustomDefaulter = &clusterWebhook{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *Cluster) Default() {
-	clusterlog.Info("default", "name", r.Name)
-
-	// TODO(user): fill in your defaulting logic.
+func (r *clusterWebhook) Default(ctx context.Context, obj runtime.Object) error {
+	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-controller-kubeslice-io-v1alpha1-cluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=controller.kubeslice.io,resources=clusters,verbs=create;update;delete,versions=v1alpha1,name=vcluster.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &Cluster{}
+var _ webhook.CustomValidator = &clusterWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateCreate() error {
-	clusterlog.Info("validate create", "name", r.Name)
-	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation", nil)
-
-	return customClusterCreateValidation(clusterCtx, r)
+func (r *clusterWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ClusterValidation", nil)
+	return customClusterCreateValidation(clusterCtx, obj.(*Cluster))
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateUpdate(old runtime.Object) error {
-	clusterlog.Info("validate update", "name", r.Name)
-	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation", nil)
-
-	return customClusterUpdateValidation(clusterCtx, r, old)
+func (r *clusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
+	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ClusterValidation", nil)
+	return customClusterUpdateValidation(clusterCtx, newObj.(*Cluster), oldObj)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateDelete() error {
-	clusterlog.Info("validate delete", "name", r.Name)
-	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clusterWebhookClient, nil, "ClusterValidation", nil)
+func (r *clusterWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	clusterCtx := util.PrepareKubeSliceControllersRequestContext(context.Background(), r.Client, nil, "ClusterValidation", nil)
 
-	return customClusterDeleteValidation(clusterCtx, r)
+	return customClusterDeleteValidation(clusterCtx, obj.(*Cluster))
 }

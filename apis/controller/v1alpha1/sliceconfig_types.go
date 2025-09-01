@@ -99,7 +99,7 @@ type ExternalGatewayConfigOptions struct {
 type WorkerSliceGatewayProvider struct {
 	//+kubebuilder:default:=OpenVPN
 	// +kubebuilder:validation:Required
-	SliceGatewayType string `json:"sliceGatewayType"`
+	SliceGatewayType SliceGatewayType `json:"sliceGatewayType"`
 
 	//+kubebuilder:default:=Local
 	// +kubebuilder:validation:Required
@@ -107,6 +107,14 @@ type WorkerSliceGatewayProvider struct {
 
 	SliceGatewayServiceType []SliceGatewayServiceType `json:"sliceGatewayServiceType,omitempty"`
 }
+
+// +kubebuilder:validation:Enum=OpenVPN;Wireguard
+type SliceGatewayType string
+
+const (
+	SliceGatewayTypeOpenVPN   SliceGatewayType = "OpenVPN"
+	SliceGatewayTypeWireguard SliceGatewayType = "Wireguard"
+)
 
 type SliceGatewayServiceType struct {
 	// +kubebuilder:validation:Required

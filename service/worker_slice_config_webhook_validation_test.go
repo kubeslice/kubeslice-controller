@@ -55,7 +55,7 @@ func UpdateValidateWorkerSliceConfigUpdatingOctet(t *testing.T) {
 	existingWorkerSliceConfig.Spec.Octet = &a1
 	a2 := 2
 	newWorkerSliceConfig.Spec.Octet = &a2
-	err := ValidateWorkerSliceConfigUpdate(ctx, &existingWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
+	_, err := ValidateWorkerSliceConfigUpdate(ctx, &existingWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Spec.Octet: Invalid value:")
 	clientMock.AssertExpectations(t)
@@ -67,7 +67,7 @@ func UpdateValidateWorkerSliceConfigWithoutErrors(t *testing.T) {
 	clientMock, newWorkerSliceConfig, ctx := setupWorkerSliceConfigWebhookValidationTest(name, namespace)
 	a1 := 1
 	newWorkerSliceConfig.Spec.Octet = &a1
-	err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
+	_, err := ValidateWorkerSliceConfigUpdate(ctx, newWorkerSliceConfig, runtime.Object(newWorkerSliceConfig))
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
