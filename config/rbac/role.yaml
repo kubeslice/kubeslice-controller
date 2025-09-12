@@ -73,7 +73,6 @@ rules:
   - projects
   - serviceexportconfigs
   - sliceconfigs
-  - sliceipams
   - sliceqosconfigs
   - vpnkeyrotations
   verbs:
@@ -91,7 +90,6 @@ rules:
   - projects/finalizers
   - serviceexportconfigs/finalizers
   - sliceconfigs/finalizers
-  - sliceipams/finalizers
   - sliceqosconfigs/finalizers
   - vpnkeyrotations/finalizers
   verbs:
@@ -103,7 +101,6 @@ rules:
   - projects/status
   - serviceexportconfigs/status
   - sliceconfigs/status
-  - sliceipams/status
   - sliceqosconfigs/status
   - vpnkeyrotations/status
   verbs:
