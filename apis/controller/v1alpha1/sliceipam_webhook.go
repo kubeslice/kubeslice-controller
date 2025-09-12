@@ -57,7 +57,7 @@ type sliceIpamWebhook struct {
 var _ webhook.CustomDefaulter = &sliceIpamWebhook{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (_ *sliceIpamWebhook) Default(ctx context.Context, obj runtime.Object) error {
+func (*sliceIpamWebhook) Default(ctx context.Context, obj runtime.Object) error {
 	r := obj.(*SliceIpam)
 
 	// Set default subnet size if not specified
