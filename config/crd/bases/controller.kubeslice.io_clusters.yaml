@@ -96,6 +96,13 @@ spec:
                       endpoint:
                         description: Endpoint is the Telemetry Endpoint
                         type: string
+                      metricSource:
+                        default: dcgm
+                        description: metric source
+                        enum:
+                        - dcgm
+                        - jetson
+                        type: string
                       telemetryProvider:
                         description: TelemetryProvider is the Telemetry Provider information
                         type: string
