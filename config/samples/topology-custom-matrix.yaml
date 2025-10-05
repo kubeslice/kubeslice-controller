@@ -1,0 +1,22 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: demo-custom-matrix
+  namespace: kubeslice-avesha
+spec:
+  sliceSubnet: "10.3.0.0/16"
+  clusters: ["dmz", "gateway", "internal", "database"]
+  topologyConfig:
+    topologyType: custom
+    connectivityMatrix:
+      - sourceCluster: dmz
+        targetClusters: ["gateway"]
+      - sourceCluster: gateway
+        targetClusters: ["internal", "dmz"]
+      - sourceCluster: internal
+        targetClusters: ["database", "gateway"]
+    clusterRoles:
+      - clusterName: gateway
+        vpnRole: server
+      - clusterName: internal
+        vpnRole: server

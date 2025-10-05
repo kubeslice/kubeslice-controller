@@ -1,0 +1,16 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: demo-auto-secure
+  namespace: kubeslice-avesha
+spec:
+  sliceSubnet: "10.2.0.0/16"
+  clusters: ["dmz", "gateway", "internal", "analytics"]
+  topologyConfig:
+    topologyType: auto
+    policyNodes: ["gateway"]
+    clusterRoles:
+      - clusterName: gateway
+        vpnRole: server
+      - clusterName: dmz
+        vpnRole: client
