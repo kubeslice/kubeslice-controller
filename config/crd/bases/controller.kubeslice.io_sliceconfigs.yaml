@@ -227,6 +227,68 @@ spec:
                 type: string
               standardQosProfileName:
                 type: string
+              topologyConfig:
+                description: TopologyConfig defines cluster connectivity patterns
+                properties:
+                  clusterRoles:
+                    items:
+                      properties:
+                        clusterName:
+                          type: string
+                        vpnRole:
+                          default: auto
+                          enum:
+                          - auto
+                          - server
+                          - client
+                          type: string
+                      required:
+                      - clusterName
+                      type: object
+                    type: array
+                  connectivityMatrix:
+                    items:
+                      properties:
+                        sourceCluster:
+                          type: string
+                        targetClusters:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - sourceCluster
+                      - targetClusters
+                      type: object
+                    type: array
+                  hubSpoke:
+                    properties:
+                      allowSpokeToSpoke:
+                        type: boolean
+                      hubClusters:
+                        items:
+                          type: string
+                        type: array
+                      spokeClusters:
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - hubClusters
+                    type: object
+                  policyNodes:
+                    items:
+                      type: string
+                    type: array
+                  topologyType:
+                    default: auto
+                    enum:
+                    - auto
+                    - full-mesh
+                    - hub-spoke
+                    - partial-mesh
+                    - custom
+                    type: string
+                type: object
               vpnConfig:
                 description: VPNConfiguration defines the additional (optional) VPN
                   Configuration to customise
