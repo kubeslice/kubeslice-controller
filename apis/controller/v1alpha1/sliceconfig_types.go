@@ -74,6 +74,8 @@ type SliceConfigSpec struct {
 	// RenewBefore is used for renew now!
 	RenewBefore *metav1.Time      `json:"renewBefore,omitempty"`
 	VPNConfig   *VPNConfiguration `json:"vpnConfig,omitempty"`
+	// TopologyConfig defines cluster connectivity patterns
+	TopologyConfig *TopologyConfig `json:"topologyConfig,omitempty"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/
@@ -172,6 +174,48 @@ type VPNConfiguration struct {
 	//+kubebuilder:validation:Required
 	//+kubebuilder:validation:Enum:=AES-256-CBC;AES-128-CBC
 	Cipher string `json:"cipher"`
+}
+
+// +kubebuilder:validation:Enum:=auto;full-mesh;hub-spoke;partial-mesh;custom
+type TopologyType string
+
+const (
+	TopologyAuto        TopologyType = "auto"
+	TopologyFullMesh    TopologyType = "full-mesh"
+	TopologyHubSpoke    TopologyType = "hub-spoke"
+	TopologyPartialMesh TopologyType = "partial-mesh"
+	TopologyCustom      TopologyType = "custom"
+)
+
+type TopologyConfig struct {
+	//+kubebuilder:default:=auto
+	TopologyType       TopologyType        `json:"topologyType,omitempty"`
+	HubSpoke           *HubSpokeConfig     `json:"hubSpoke,omitempty"`
+	ConnectivityMatrix []ConnectivityEntry `json:"connectivityMatrix,omitempty"`
+	ClusterRoles       []ClusterRole       `json:"clusterRoles,omitempty"`
+	PolicyNodes        []string            `json:"policyNodes,omitempty"`
+}
+
+type HubSpokeConfig struct {
+	//+kubebuilder:validation:Required
+	HubClusters       []string `json:"hubClusters"`
+	SpokeClusters     []string `json:"spokeClusters,omitempty"`
+	AllowSpokeToSpoke bool     `json:"allowSpokeToSpoke,omitempty"`
+}
+
+type ConnectivityEntry struct {
+	//+kubebuilder:validation:Required
+	SourceCluster   string   `json:"sourceCluster"`
+	//+kubebuilder:validation:Required
+	TargetClusters  []string `json:"targetClusters"`
+}
+
+type ClusterRole struct {
+	//+kubebuilder:validation:Required
+	ClusterName string `json:"clusterName"`
+	//+kubebuilder:default:=auto
+	//+kubebuilder:validation:Enum:=auto;server;client
+	VPNRole     string `json:"vpnRole,omitempty"`
 }
 
 type KubesliceEvent struct {
