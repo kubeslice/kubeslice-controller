@@ -428,9 +428,9 @@ func initialize(services *service.Services) {
 
 //All Controller RBACs goes here.
 
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;sliceqosconfigs;vpnkeyrotations,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status;vpnkeyrotations/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers;vpnkeyrotations/finalizers,verbs=update
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects;clusters;sliceconfigs;serviceexportconfigs;sliceqosconfigs;vpnkeyrotations;sliceipams,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/status;clusters/status;sliceconfigs/status;serviceexportconfigs/status;sliceqosconfigs/status;vpnkeyrotations/status;sliceipams/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=controller.kubeslice.io,resources=projects/finalizers;clusters/finalizers;sliceconfigs/finalizers;serviceexportconfigs/finalizers;sliceqosconfigs/finalizers;vpnkeyrotations/finalizers;sliceipams/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs;workerserviceimports;workerslicegateways;workerslicegwrecyclers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=worker.kubeslice.io,resources=workersliceconfigs/status;workerserviceimports/status;workerslicegateways/status;workerslicegwrecyclers/status,verbs=get;update;patch
