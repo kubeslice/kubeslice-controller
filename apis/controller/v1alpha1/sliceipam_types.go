@@ -33,6 +33,7 @@ const (
 type SliceIpamSpec struct {
 	// SliceName is the name of the slice for which IPAM is being managed
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	SliceName string `json:"sliceName"`
 
 	// SliceSubnet is the CIDR block allocated to the slice

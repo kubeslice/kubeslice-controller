@@ -61,6 +61,7 @@ spec:
               sliceName:
                 description: SliceName is the name of the slice for which IPAM is
                   being managed
+                minLength: 1
                 type: string
               sliceSubnet:
                 description: SliceSubnet is the CIDR block allocated to the slice
