@@ -116,6 +116,7 @@ func WithSliceConfigService(
 		wsgrs: wsgrs,
 		mf:    mf,
 		vpn:   vpn,
+		sipam: nil, // Phase 6 will properly initialize this
 	}
 }
 
