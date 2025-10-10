@@ -105,6 +105,7 @@ func WithSliceConfigService(
 	wsgrs IWorkerSliceGatewayRecyclerService,
 	mf metrics.IMetricRecorder,
 	vpn IVpnKeyRotationService,
+	sipam ISliceIpamService,
 ) ISliceConfigService {
 	return &SliceConfigService{
 		ns:    ns,
@@ -116,7 +117,7 @@ func WithSliceConfigService(
 		wsgrs: wsgrs,
 		mf:    mf,
 		vpn:   vpn,
-		sipam: nil, // Phase 6 will properly initialize this
+		sipam: sipam,
 	}
 }
 
@@ -211,5 +212,12 @@ func WithVpnKeyRotationService(w IWorkerSliceGatewayService, ws IWorkerSliceConf
 	return &VpnKeyRotationService{
 		wsgs: w,
 		wscs: ws,
+	}
+}
+
+// bootstrapping Slice IPAM service (Phase 6 implementation)
+func WithSliceIpamService(mf metrics.IMetricRecorder) ISliceIpamService {
+	return &SliceIpamService{
+		mf: mf,
 	}
 }
