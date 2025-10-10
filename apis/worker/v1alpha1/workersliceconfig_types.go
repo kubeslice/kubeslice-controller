@@ -43,7 +43,8 @@ type WorkerSliceConfigSpec struct {
 	//+kubebuilder:default:=Application
 	SliceType            string                     `json:"sliceType,omitempty"`
 	SliceGatewayProvider WorkerSliceGatewayProvider `json:"sliceGatewayProvider,omitempty"`
-	//+kubebuilder:default:=Local
+	//+kubebuilder:validation:Enum:=Static;Dynamic
+	//+kubebuilder:default:=Static
 	SliceIpamType             string                    `json:"sliceIpamType,omitempty"`
 	QosProfileDetails         QOSProfile                `json:"qosProfileDetails,omitempty"`
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
