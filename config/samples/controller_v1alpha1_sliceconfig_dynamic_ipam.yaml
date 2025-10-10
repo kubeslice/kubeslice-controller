@@ -1,0 +1,16 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: dynamic-ipam-test-slice
+  namespace: kubeslice-demo
+spec:
+  sliceSubnet: "10.1.0.0/16"
+  sliceType: Application
+  sliceIpamType: "Dynamic"
+  maxClusters: 4
+  clusters:
+    - cluster-1
+    - cluster-2
+  sliceGatewayProvider:
+    sliceGatewayType: OpenVPN
+    sliceCaType: Local

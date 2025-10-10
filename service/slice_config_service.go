@@ -49,6 +49,7 @@ type SliceConfigService struct {
 	wsgrs IWorkerSliceGatewayRecyclerService
 	mf    metrics.IMetricRecorder
 	vpn   IVpnKeyRotationService
+	sipam ISliceIpamService
 }
 
 const NamespaceAndClusterFormat = "namespace=%s&cluster=%s"
@@ -190,6 +191,22 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
+	// Step 3.5: Handle Dynamic IPAM if enabled (Phase 5 implementation)
+	if sliceConfig.Spec.SliceIpamType == "Dynamic" {
+		logger.Infof("Dynamic IPAM enabled for slice %s", sliceConfig.Name)
+		
+		// Create SliceIpam resource if service is available (Phase 6 will properly wire this)
+		if s.sipam != nil {
+			if err := s.sipam.CreateSliceIpam(ctx, sliceConfig); err != nil {
+				logger.Errorf("Failed to create SliceIpam for slice %s: %v", sliceConfig.Name, err)
+				return ctrl.Result{}, err
+			}
+			logger.Infof("SliceIpam successfully created/updated for slice %s", sliceConfig.Name)
+		} else {
+			logger.Warnf("SliceIpam service not available, Phase 6 will complete integration for slice %s", sliceConfig.Name)
+		}
+	}
+
 	// Step 4: Creation of worker slice Objects and Cluster Labels
 	// get cluster cidr from maxClusters of slice config
 	clusterCidr := ""
@@ -267,6 +284,24 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	
+	// Clean up SliceIpam resource if it exists (Phase 5 implementation)
+	if slice.Spec.SliceIpamType == "Dynamic" {
+		logger := util.CtxLogger(ctx)
+		logger.Infof("Cleaning up SliceIpam for slice %s", slice.Name)
+		
+		// Delete SliceIpam resource if service is available (Phase 6 will properly wire this)
+		if s.sipam != nil {
+			if err := s.sipam.DeleteSliceIpam(ctx, slice.Name, namespace); err != nil {
+				logger.Errorf("Failed to delete SliceIpam for slice %s: %v", slice.Name, err)
+				return ctrl.Result{}, err
+			}
+			logger.Infof("SliceIpam successfully deleted for slice %s", slice.Name)
+		} else {
+			logger.Warnf("SliceIpam service not available, Phase 6 will complete integration for slice %s", slice.Name)
+		}
+	}
+	
 	return ctrl.Result{}, nil
 }
 
