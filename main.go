@@ -82,7 +82,7 @@ func main() {
 	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr, vpn, sipam)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
 	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
-	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn))
+	initialize(service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn, sipam))
 }
 
 func initialize(services *service.Services) {
@@ -374,6 +374,16 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to create controller", "controller", "VpnKeyRotationConfig")
 		os.Exit(1)
 	}
+	if err = (&controller.SliceIpamReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Log:              controllerLog.With("name", "SliceIpam"),
+		SliceIpamService: services.SliceIpamService,
+		EventRecorder:    &eventRecorder,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SliceIpam")
+		os.Exit(1)
+	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = (&controllerv1alpha1.Project{}).SetupWebhookWithManager(mgr, service.ValidateProjectCreate, service.ValidateProjectUpdate, service.ValidateProjectDelete); err != nil {
@@ -406,6 +416,10 @@ func initialize(services *service.Services) {
 		}
 		if err = (&controllerv1alpha1.VpnKeyRotation{}).SetupWebhookWithManager(mgr, service.ValidateVpnKeyRotationCreate, service.ValidateVpnKeyRotationDelete); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "VpnKeyRotation")
+			os.Exit(1)
+		}
+		if err = (&controllerv1alpha1.SliceIpam{}).SetupWebhookWithManager(mgr, nil, nil, nil); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "SliceIpam")
 			os.Exit(1)
 		}
 	}

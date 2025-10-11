@@ -52,24 +52,24 @@ func TestSliceIpamSuite(t *testing.T) {
 }
 
 var SliceIpamTestbed = map[string]func(*testing.T){
-	"TestReconcileSliceIpamNotFound":              testReconcileSliceIpamNotFound,
-	"TestReconcileSliceIpamSuccessful":            testReconcileSliceIpamSuccessful,
-	"TestReconcileSliceIpamDeletion":              testReconcileSliceIpamDeletion,
-	"TestAllocateSubnetForClusterSuccess":         testAllocateSubnetForClusterSuccess,
-	"TestAllocateSubnetForClusterNotFound":        testAllocateSubnetForClusterNotFound,
+	"TestReconcileSliceIpamNotFound":               testReconcileSliceIpamNotFound,
+	"TestReconcileSliceIpamSuccessful":             testReconcileSliceIpamSuccessful,
+	"TestReconcileSliceIpamDeletion":               testReconcileSliceIpamDeletion,
+	"TestAllocateSubnetForClusterSuccess":          testAllocateSubnetForClusterSuccess,
+	"TestAllocateSubnetForClusterNotFound":         testAllocateSubnetForClusterNotFound,
 	"TestAllocateSubnetForClusterAlreadyAllocated": testAllocateSubnetForClusterAlreadyAllocated,
-	"TestReleaseSubnetForClusterSuccess":          testReleaseSubnetForClusterSuccess,
-	"TestReleaseSubnetForClusterNotFound":         testReleaseSubnetForClusterNotFound,
-	"TestGetClusterSubnetSuccess":                 testGetClusterSubnetSuccess,
-	"TestGetClusterSubnetNotFound":                testGetClusterSubnetNotFound,
-	"TestCreateSliceIpamSuccess":                  testCreateSliceIpamSuccess,
-	"TestDeleteSliceIpamSuccess":                  testDeleteSliceIpamSuccess,
-	"TestHandleSliceIpamDeletionWithActiveAllocs": testHandleSliceIpamDeletionWithActiveAllocs,
-	"TestHandleSliceIpamDeletionNoActiveAllocs":   testHandleSliceIpamDeletionNoActiveAllocs,
-	"TestReconcileSliceIpamStateNewResource":      testReconcileSliceIpamStateNewResource,
-	"TestReconcileSliceIpamStateExistingResource": testReconcileSliceIpamStateExistingResource,
-	"TestCleanupExpiredAllocations":               testCleanupExpiredAllocations,
-	"TestCleanupExpiredAllocationsNoExpired":     testCleanupExpiredAllocationsNoExpired,
+	"TestReleaseSubnetForClusterSuccess":           testReleaseSubnetForClusterSuccess,
+	"TestReleaseSubnetForClusterNotFound":          testReleaseSubnetForClusterNotFound,
+	"TestGetClusterSubnetSuccess":                  testGetClusterSubnetSuccess,
+	"TestGetClusterSubnetNotFound":                 testGetClusterSubnetNotFound,
+	"TestCreateSliceIpamSuccess":                   testCreateSliceIpamSuccess,
+	"TestDeleteSliceIpamSuccess":                   testDeleteSliceIpamSuccess,
+	"TestHandleSliceIpamDeletionWithActiveAllocs":  testHandleSliceIpamDeletionWithActiveAllocs,
+	"TestHandleSliceIpamDeletionNoActiveAllocs":    testHandleSliceIpamDeletionNoActiveAllocs,
+	"TestReconcileSliceIpamStateNewResource":       testReconcileSliceIpamStateNewResource,
+	"TestReconcileSliceIpamStateExistingResource":  testReconcileSliceIpamStateExistingResource,
+	"TestCleanupExpiredAllocations":                testCleanupExpiredAllocations,
+	"TestCleanupExpiredAllocationsNoExpired":       testCleanupExpiredAllocationsNoExpired,
 }
 
 func testReconcileSliceIpamNotFound(t *testing.T) {
@@ -87,11 +87,11 @@ func testReconcileSliceIpamNotFound(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	sliceIpam := &v1alpha1.SliceIpam{}
 	ctx := prepareSliceIpamTestContext(context.Background(), clientMock, nil)
-	
+
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceIpam).Return(kubeerrors.NewNotFound(util.Resource("SliceIpamTest"), "slice ipam not found"))
-	
+
 	result, err := sliceIpamService.ReconcileSliceIpam(ctx, requestObj)
-	
+
 	require.False(t, result.Requeue)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -102,7 +102,7 @@ func testReconcileSliceIpamSuccessful(t *testing.T) {
 	sliceIpamService := NewSliceIpamService(mMock)
 
 	sliceIpamName := types.NamespacedName{
-		Namespace: "test-namespace", 
+		Namespace: "test-namespace",
 		Name:      "test-slice-ipam",
 	}
 	requestObj := ctrl.Request{
@@ -524,15 +524,15 @@ func testHandleSliceIpamDeletionWithActiveAllocs(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	mMock := &metricMock.IMetricRecorder{}
 	scheme := runtime.NewScheme()
-	
+
 	sliceIpamService := NewSliceIpamService(mMock)
 	ctx = prepareSliceIpamTestContext(ctx, clientMock, scheme)
-	
+
 	// Create SliceIpam with active allocations
 	sliceIpam := &v1alpha1.SliceIpam{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-slice",
-			Namespace: "test-namespace",
+			Name:       "test-slice",
+			Namespace:  "test-namespace",
 			Finalizers: []string{SliceIpamFinalizer},
 		},
 		Spec: v1alpha1.SliceIpamSpec{
@@ -547,16 +547,16 @@ func testHandleSliceIpamDeletionWithActiveAllocs(t *testing.T) {
 					Status:      "Allocated",
 				},
 				{
-					ClusterName: "cluster2", 
+					ClusterName: "cluster2",
 					Subnet:      "192.168.2.0/24",
 					Status:      "InUse",
 				},
 			},
 		},
 	}
-	
+
 	result, err := sliceIpamService.handleSliceIpamDeletion(ctx, sliceIpam)
-	
+
 	require.NoError(t, err)
 	require.Equal(t, time.Minute*5, result.RequeueAfter)
 	require.True(t, result.Requeue || result.RequeueAfter > 0)
@@ -568,15 +568,15 @@ func testHandleSliceIpamDeletionNoActiveAllocs(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	mMock := &metricMock.IMetricRecorder{}
 	scheme := runtime.NewScheme()
-	
+
 	sliceIpamService := NewSliceIpamService(mMock)
 	ctx = prepareSliceIpamTestContext(ctx, clientMock, scheme)
-	
+
 	// Create SliceIpam with only released allocations
 	sliceIpam := &v1alpha1.SliceIpam{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-slice",
-			Namespace: "test-namespace", 
+			Name:       "test-slice",
+			Namespace:  "test-namespace",
 			Finalizers: []string{SliceIpamFinalizer},
 		},
 		Spec: v1alpha1.SliceIpamSpec{
@@ -587,17 +587,17 @@ func testHandleSliceIpamDeletionNoActiveAllocs(t *testing.T) {
 			AllocatedSubnets: []v1alpha1.ClusterSubnetAllocation{
 				{
 					ClusterName: "cluster1",
-					Subnet:      "192.168.1.0/24", 
+					Subnet:      "192.168.1.0/24",
 					Status:      "Released",
 				},
 			},
 		},
 	}
-	
+
 	clientMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
-	
+
 	result, err := sliceIpamService.handleSliceIpamDeletion(ctx, sliceIpam)
-	
+
 	require.NoError(t, err)
 	require.Equal(t, ctrl.Result{}, result)
 	require.NotContains(t, sliceIpam.Finalizers, SliceIpamFinalizer)
@@ -610,28 +610,28 @@ func testReconcileSliceIpamStateNewResource(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	mMock := &metricMock.IMetricRecorder{}
 	scheme := runtime.NewScheme()
-	
+
 	sliceIpamService := NewSliceIpamService(mMock)
 	ctx = prepareSliceIpamTestContext(ctx, clientMock, scheme)
-	
+
 	sliceIpam := &v1alpha1.SliceIpam{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-slice",
 			Namespace: "test-namespace",
 		},
 		Spec: v1alpha1.SliceIpamSpec{
-			SliceSubnet: "192.168.0.0/16", 
+			SliceSubnet: "192.168.0.0/16",
 			SubnetSize:  24,
 		},
 		Status: v1alpha1.SliceIpamStatus{
 			TotalSubnets: 0, // New resource
 		},
 	}
-	
+
 	clientMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
-	
+
 	result, err := sliceIpamService.reconcileSliceIpamState(ctx, sliceIpam)
-	
+
 	require.NoError(t, err)
 	require.Equal(t, time.Hour, result.RequeueAfter)
 	require.Greater(t, sliceIpam.Status.TotalSubnets, 0)
@@ -645,10 +645,10 @@ func testReconcileSliceIpamStateExistingResource(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	mMock := &metricMock.IMetricRecorder{}
 	scheme := runtime.NewScheme()
-	
+
 	sliceIpamService := NewSliceIpamService(mMock)
 	ctx = prepareSliceIpamTestContext(ctx, clientMock, scheme)
-	
+
 	sliceIpam := &v1alpha1.SliceIpam{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-slice",
@@ -662,9 +662,9 @@ func testReconcileSliceIpamStateExistingResource(t *testing.T) {
 			TotalSubnets: 256, // Existing resource
 		},
 	}
-	
+
 	result, err := sliceIpamService.reconcileSliceIpamState(ctx, sliceIpam)
-	
+
 	require.NoError(t, err)
 	require.Equal(t, time.Hour, result.RequeueAfter)
 	require.Equal(t, 256, sliceIpam.Status.TotalSubnets) // Should remain unchanged
@@ -676,14 +676,14 @@ func testCleanupExpiredAllocations(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	mMock := &metricMock.IMetricRecorder{}
 	scheme := runtime.NewScheme()
-	
+
 	sliceIpamService := NewSliceIpamService(mMock)
 	ctx = prepareSliceIpamTestContext(ctx, clientMock, scheme)
-	
+
 	// Create time 25 hours ago (expired)
 	expiredTime := metav1.NewTime(time.Now().Add(-25 * time.Hour))
 	recentTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
-	
+
 	sliceIpam := &v1alpha1.SliceIpam{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-slice",
@@ -699,7 +699,7 @@ func testCleanupExpiredAllocations(t *testing.T) {
 				},
 				{
 					ClusterName: "recent-cluster",
-					Subnet:      "192.168.2.0/24", 
+					Subnet:      "192.168.2.0/24",
 					Status:      "Released",
 					ReleasedAt:  &recentTime, // Not expired
 				},
@@ -711,11 +711,11 @@ func testCleanupExpiredAllocations(t *testing.T) {
 			},
 		},
 	}
-	
+
 	clientMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
-	
+
 	sliceIpamService.cleanupExpiredAllocations(ctx, sliceIpam)
-	
+
 	require.Len(t, sliceIpam.Status.AllocatedSubnets, 2)
 	require.Equal(t, "recent-cluster", sliceIpam.Status.AllocatedSubnets[0].ClusterName)
 	require.Equal(t, "active-cluster", sliceIpam.Status.AllocatedSubnets[1].ClusterName)
@@ -728,12 +728,12 @@ func testCleanupExpiredAllocationsNoExpired(t *testing.T) {
 	clientMock := &utilmock.Client{}
 	mMock := &metricMock.IMetricRecorder{}
 	scheme := runtime.NewScheme()
-	
+
 	sliceIpamService := NewSliceIpamService(mMock)
 	ctx = prepareSliceIpamTestContext(ctx, clientMock, scheme)
-	
+
 	recentTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
-	
+
 	sliceIpam := &v1alpha1.SliceIpam{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-slice",
@@ -755,15 +755,15 @@ func testCleanupExpiredAllocationsNoExpired(t *testing.T) {
 			},
 		},
 	}
-	
+
 	originalLen := len(sliceIpam.Status.AllocatedSubnets)
-	
+
 	sliceIpamService.cleanupExpiredAllocations(ctx, sliceIpam)
-	
+
 	// No cleanup should occur - no expired allocations
 	require.Len(t, sliceIpam.Status.AllocatedSubnets, originalLen)
 	require.Equal(t, "cluster1", sliceIpam.Status.AllocatedSubnets[0].ClusterName)
 	require.Equal(t, "cluster2", sliceIpam.Status.AllocatedSubnets[1].ClusterName)
-	
+
 	// clientMock should not be called for Update since no cleanup happened
 }

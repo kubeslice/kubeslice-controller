@@ -133,7 +133,7 @@ var _ = BeforeSuite(func() {
 	sc := service.WithSliceConfigService(ns, acs, wsgs, wscs, wsi, se, wsgrs, mr, vpn, sipam)
 	sqcs := service.WithSliceQoSConfigService(wscs, mr)
 	p := service.WithProjectService(ns, acs, c, sc, se, sqcs, mr)
-	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn)
+	svc = service.WithServices(wscs, p, c, sc, se, wsgs, wsi, sqcs, wsgrs, vpn, sipam)
 
 	service.ProjectNamespacePrefix = util.AppendHyphenAndPercentageSToString("kubeslice")
 	rbacResourcePrefix := util.AppendHyphenToString("kubeslice-rbac")

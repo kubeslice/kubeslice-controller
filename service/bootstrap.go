@@ -29,6 +29,7 @@ type Services struct {
 	SliceQoSConfigService             ISliceQoSConfigService
 	WorkerSliceGatewayRecyclerService IWorkerSliceGatewayRecyclerService
 	VpnKeyRotationService             IVpnKeyRotationService
+	SliceIpamService                  ISliceIpamService
 }
 
 // bootstrapping Services
@@ -43,6 +44,7 @@ func WithServices(
 	sqcs ISliceQoSConfigService,
 	wsgrs IWorkerSliceGatewayRecyclerService,
 	vpn IVpnKeyRotationService,
+	sipam ISliceIpamService,
 ) *Services {
 	return &Services{
 		ProjectService:                    ps,
@@ -55,6 +57,7 @@ func WithServices(
 		SliceQoSConfigService:             sqcs,
 		WorkerSliceGatewayRecyclerService: wsgrs,
 		VpnKeyRotationService:             vpn,
+		SliceIpamService:                  sipam,
 	}
 }
 
