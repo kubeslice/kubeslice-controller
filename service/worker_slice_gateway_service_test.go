@@ -551,7 +551,6 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 			Annotations:                nil,
 			OwnerReferences:            nil,
 			Finalizers:                 nil,
-			ClusterName:                "",
 			ManagedFields:              nil,
 		},
 		Spec:   controllerv1alpha1.ClusterSpec{},

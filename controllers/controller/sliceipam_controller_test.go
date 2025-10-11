@@ -52,9 +52,9 @@ var _ = Describe("SliceIpam Controller Tests", Ordered, func() {
 					Namespace: sliceIpamNamespace,
 				},
 				Spec: v1alpha1.SliceIpamSpec{
-					SliceName:    sliceIpamName,
-					SliceSubnet:  sliceSubnet,
-					SubnetSize:   subnetSize,
+					SliceName:   sliceIpamName,
+					SliceSubnet: sliceSubnet,
+					SubnetSize:  subnetSize,
 				},
 			}
 		})
@@ -164,9 +164,9 @@ var _ = Describe("SliceIpam Controller Tests", Ordered, func() {
 					Namespace: sliceIpamNamespace,
 				},
 				Spec: v1alpha1.SliceIpamSpec{
-					SliceName:    sliceIpamName + "-status",
-					SliceSubnet:  "10.2.0.0/16",
-					SubnetSize:   24,
+					SliceName:   sliceIpamName + "-status",
+					SliceSubnet: "10.2.0.0/16",
+					SubnetSize:  24,
 				},
 			}
 		})
@@ -221,9 +221,9 @@ var _ = Describe("SliceIpam Controller Tests", Ordered, func() {
 					Namespace: sliceIpamNamespace,
 				},
 				Spec: v1alpha1.SliceIpamSpec{
-					SliceName:    sliceIpamName + "-finalizer",
-					SliceSubnet:  "10.3.0.0/16",
-					SubnetSize:   24,
+					SliceName:   sliceIpamName + "-finalizer",
+					SliceSubnet: "10.3.0.0/16",
+					SubnetSize:  24,
 				},
 			}
 		})

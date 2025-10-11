@@ -194,7 +194,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	// Step 3.5: Handle Dynamic IPAM if enabled (Phase 5 implementation)
 	if sliceConfig.Spec.SliceIpamType == "Dynamic" {
 		logger.Infof("Dynamic IPAM enabled for slice %s", sliceConfig.Name)
-		
+
 		// Create SliceIpam resource if service is available (Phase 6 will properly wire this)
 		if s.sipam != nil {
 			if err := s.sipam.CreateSliceIpam(ctx, sliceConfig); err != nil {
@@ -284,12 +284,12 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	
+
 	// Clean up SliceIpam resource if it exists (Phase 5 implementation)
 	if slice.Spec.SliceIpamType == "Dynamic" {
 		logger := util.CtxLogger(ctx)
 		logger.Infof("Cleaning up SliceIpam for slice %s", slice.Name)
-		
+
 		// Delete SliceIpam resource if service is available (Phase 6 will properly wire this)
 		if s.sipam != nil {
 			if err := s.sipam.DeleteSliceIpam(ctx, slice.Name, namespace); err != nil {
@@ -301,7 +301,7 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 			logger.Warnf("SliceIpam service not available, Phase 6 will complete integration for slice %s", slice.Name)
 		}
 	}
-	
+
 	return ctrl.Result{}, nil
 }
 

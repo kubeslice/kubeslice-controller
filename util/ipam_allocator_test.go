@@ -175,12 +175,12 @@ func TestCalculateMaxClusters(t *testing.T) {
 	allocator := NewIpamAllocator()
 
 	tests := []struct {
-		name         string
-		sliceSubnet  string
-		subnetSize   int
-		expectError  bool
-		expectedMax  int
-		expectedErr  error
+		name        string
+		sliceSubnet string
+		subnetSize  int
+		expectError bool
+		expectedMax int
+		expectedErr error
 	}{
 		{
 			name:        "valid-16-to-24",
@@ -337,12 +337,12 @@ func TestFindNextAvailableSubnet(t *testing.T) {
 	allocator := NewIpamAllocator()
 
 	tests := []struct {
-		name              string
-		sliceSubnet       string
-		subnetSize        int
-		allocatedSubnets  []string
-		expectError       bool
-		expectedSubnet    string
+		name             string
+		sliceSubnet      string
+		subnetSize       int
+		allocatedSubnets []string
+		expectError      bool
+		expectedSubnet   string
 	}{
 		{
 			name:             "first-available",
@@ -418,13 +418,13 @@ func TestFindNextAvailableSubnetWithReclamation(t *testing.T) {
 		expectedReclaim bool
 	}{
 		{
-			name:        "new-allocation",
-			sliceSubnet: "10.1.0.0/16",
-			subnetSize:  24,
-			allocations: []ClusterSubnetAllocation{},
-			reclaimAfter: time.Hour,
-			expectError: false,
-			expectedSubnet: "10.1.0.0/24",
+			name:            "new-allocation",
+			sliceSubnet:     "10.1.0.0/16",
+			subnetSize:      24,
+			allocations:     []ClusterSubnetAllocation{},
+			reclaimAfter:    time.Hour,
+			expectError:     false,
+			expectedSubnet:  "10.1.0.0/24",
 			expectedReclaim: false,
 		},
 		{
@@ -439,9 +439,9 @@ func TestFindNextAvailableSubnetWithReclamation(t *testing.T) {
 					ReleasedAt:  &[]time.Time{now.Add(-2 * time.Hour)}[0],
 				},
 			},
-			reclaimAfter: time.Hour,
-			expectError: false,
-			expectedSubnet: "10.1.0.0/24",
+			reclaimAfter:    time.Hour,
+			expectError:     false,
+			expectedSubnet:  "10.1.0.0/24",
 			expectedReclaim: true,
 		},
 		{
@@ -456,9 +456,9 @@ func TestFindNextAvailableSubnetWithReclamation(t *testing.T) {
 					ReleasedAt:  &[]time.Time{now.Add(-30 * time.Minute)}[0],
 				},
 			},
-			reclaimAfter: time.Hour,
-			expectError: false,
-			expectedSubnet: "10.1.1.0/24",
+			reclaimAfter:    time.Hour,
+			expectError:     false,
+			expectedSubnet:  "10.1.1.0/24",
 			expectedReclaim: false,
 		},
 		{
@@ -472,9 +472,9 @@ func TestFindNextAvailableSubnetWithReclamation(t *testing.T) {
 					Status:      "Allocated",
 				},
 			},
-			reclaimAfter: time.Hour,
-			expectError: false,
-			expectedSubnet: "10.1.1.0/24",
+			reclaimAfter:    time.Hour,
+			expectError:     false,
+			expectedSubnet:  "10.1.1.0/24",
 			expectedReclaim: false,
 		},
 		{
@@ -488,9 +488,9 @@ func TestFindNextAvailableSubnetWithReclamation(t *testing.T) {
 					Status:      "InUse",
 				},
 			},
-			reclaimAfter: time.Hour,
-			expectError: false,
-			expectedSubnet: "10.1.1.0/24",
+			reclaimAfter:    time.Hour,
+			expectError:     false,
+			expectedSubnet:  "10.1.1.0/24",
 			expectedReclaim: false,
 		},
 		{
@@ -505,18 +505,18 @@ func TestFindNextAvailableSubnetWithReclamation(t *testing.T) {
 					ReleasedAt:  nil, // Edge case
 				},
 			},
-			reclaimAfter: time.Hour,
-			expectError: false,
-			expectedSubnet: "10.1.0.0/24",
+			reclaimAfter:    time.Hour,
+			expectError:     false,
+			expectedSubnet:  "10.1.0.0/24",
 			expectedReclaim: true,
 		},
 		{
-			name:        "invalid-slice-subnet",
-			sliceSubnet: "invalid",
-			subnetSize:  24,
-			allocations: []ClusterSubnetAllocation{},
+			name:         "invalid-slice-subnet",
+			sliceSubnet:  "invalid",
+			subnetSize:   24,
+			allocations:  []ClusterSubnetAllocation{},
 			reclaimAfter: time.Hour,
-			expectError: true,
+			expectError:  true,
 		},
 	}
 
@@ -556,30 +556,30 @@ func TestFindOptimalSubnet(t *testing.T) {
 		expectedSubnet   string
 	}{
 		{
-			name:           "no-hint-first-available",
-			sliceSubnet:    "10.1.0.0/16",
-			subnetSize:     24,
+			name:             "no-hint-first-available",
+			sliceSubnet:      "10.1.0.0/16",
+			subnetSize:       24,
 			allocatedSubnets: []string{},
-			clusterHint:    "",
-			expectError:    false,
-			expectedSubnet: "10.1.0.0/24",
+			clusterHint:      "",
+			expectError:      false,
+			expectedSubnet:   "10.1.0.0/24",
 		},
 		{
-			name:           "with-hint",
-			sliceSubnet:    "10.1.0.0/16",
-			subnetSize:     24,
+			name:             "with-hint",
+			sliceSubnet:      "10.1.0.0/16",
+			subnetSize:       24,
 			allocatedSubnets: []string{},
-			clusterHint:    "cluster-a",
-			expectError:    false,
+			clusterHint:      "cluster-a",
+			expectError:      false,
 			// Result will depend on hash function
 		},
 		{
-			name:           "hint-with-conflicts",
-			sliceSubnet:    "10.1.0.0/16",
-			subnetSize:     24,
+			name:             "hint-with-conflicts",
+			sliceSubnet:      "10.1.0.0/16",
+			subnetSize:       24,
 			allocatedSubnets: []string{"10.1.0.0/24", "10.1.1.0/24"},
-			clusterHint:    "cluster-b",
-			expectError:    false,
+			clusterHint:      "cluster-b",
+			expectError:      false,
 			// Should fallback to available subnet
 		},
 		{
@@ -691,12 +691,12 @@ func TestGetSubnetUtilization(t *testing.T) {
 	allocator := NewIpamAllocator()
 
 	tests := []struct {
-		name            string
-		sliceSubnet     string
-		subnetSize      int
-		allocatedCount  int
-		expectError     bool
-		expectedUtil    float64
+		name           string
+		sliceSubnet    string
+		subnetSize     int
+		allocatedCount int
+		expectError    bool
+		expectedUtil   float64
 	}{
 		{
 			name:           "zero-allocation",
@@ -795,12 +795,12 @@ func TestCompactAllocations(t *testing.T) {
 	allocator := NewIpamAllocator()
 
 	tests := []struct {
-		name            string
-		sliceSubnet     string
-		subnetSize      int
-		activeSubnets   []string
-		expectError     bool
-		expectedCount   int
+		name          string
+		sliceSubnet   string
+		subnetSize    int
+		activeSubnets []string
+		expectError   bool
+		expectedCount int
 	}{
 		{
 			name:          "empty-allocations",
@@ -1510,7 +1510,7 @@ func TestCalculatePreferredIndex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			index := allocator.calculatePreferredIndex(tt.clusterHint, tt.totalSubnets)
-			
+
 			// Verify index is within bounds
 			if index < 0 || index >= tt.totalSubnets {
 				t.Errorf("Index %d out of bounds [0, %d)", index, tt.totalSubnets)
@@ -1694,7 +1694,7 @@ func TestErrorConditions(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error for invalid subnet size")
 		}
-		
+
 		// Test private IP validation edge case
 		result := isPrivateIPAMSubnet("192.168.0.0/16") // class C network in correct range
 		if !result {
@@ -1708,7 +1708,7 @@ func TestErrorConditions(t *testing.T) {
 			{ClusterName: "cluster1", Subnet: "192.168.0.0/24"},
 			{ClusterName: "cluster2", Subnet: "192.168.0.0/25"}, // Overlaps with first
 		}
-		
+
 		err := allocator.ValidateAllocationConsistency(allocations)
 		if err == nil {
 			t.Error("Expected error for overlapping subnets")
