@@ -218,7 +218,7 @@ func WithVpnKeyRotationService(w IWorkerSliceGatewayService, ws IWorkerSliceConf
 	}
 }
 
-// bootstrapping Slice IPAM service (Phase 6 implementation)
+// bootstrapping Slice IPAM service
 func WithSliceIpamService(mf metrics.IMetricRecorder) ISliceIpamService {
 	return &SliceIpamService{
 		mf: mf,

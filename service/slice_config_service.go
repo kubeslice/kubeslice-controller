@@ -191,11 +191,11 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Step 3.5: Handle Dynamic IPAM if enabled (Phase 5 implementation)
+	// Step 3.5: Handle Dynamic IPAM if enabled
 	if sliceConfig.Spec.SliceIpamType == "Dynamic" {
 		logger.Infof("Dynamic IPAM enabled for slice %s", sliceConfig.Name)
 
-		// Create SliceIpam resource if service is available (Phase 6 will properly wire this)
+		// Create SliceIpam resource if service is available
 		if s.sipam != nil {
 			if err := s.sipam.CreateSliceIpam(ctx, sliceConfig); err != nil {
 				logger.Errorf("Failed to create SliceIpam for slice %s: %v", sliceConfig.Name, err)
@@ -203,7 +203,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 			}
 			logger.Infof("SliceIpam successfully created/updated for slice %s", sliceConfig.Name)
 		} else {
-			logger.Warnf("SliceIpam service not available, Phase 6 will complete integration for slice %s", sliceConfig.Name)
+			logger.Warnf("SliceIpam service not available for slice %s", sliceConfig.Name)
 		}
 	}
 
@@ -285,12 +285,12 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 
-	// Clean up SliceIpam resource if it exists (Phase 5 implementation)
+	// Clean up SliceIpam resource if it exists
 	if slice.Spec.SliceIpamType == "Dynamic" {
 		logger := util.CtxLogger(ctx)
 		logger.Infof("Cleaning up SliceIpam for slice %s", slice.Name)
 
-		// Delete SliceIpam resource if service is available (Phase 6 will properly wire this)
+		// Delete SliceIpam resource if service is available
 		if s.sipam != nil {
 			if err := s.sipam.DeleteSliceIpam(ctx, slice.Name, namespace); err != nil {
 				logger.Errorf("Failed to delete SliceIpam for slice %s: %v", slice.Name, err)
@@ -298,7 +298,7 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 			}
 			logger.Infof("SliceIpam successfully deleted for slice %s", slice.Name)
 		} else {
-			logger.Warnf("SliceIpam service not available, Phase 6 will complete integration for slice %s", slice.Name)
+			logger.Warnf("SliceIpam service not available for slice %s", slice.Name)
 		}
 	}
 
