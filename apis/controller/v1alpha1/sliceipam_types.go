@@ -77,7 +77,8 @@ type SliceIpamStatus struct {
 	AllocatedSubnets []ClusterSubnetAllocation `json:"allocatedSubnets,omitempty"`
 
 	// AvailableSubnets is the number of available subnets that can be allocated
-	AvailableSubnets int `json:"availableSubnets,omitempty"`
+	// Note: omitempty removed to ensure 0 is displayed when pool is exhausted
+	AvailableSubnets int `json:"availableSubnets"`
 
 	// TotalSubnets is the total number of subnets that can be created from the slice subnet
 	TotalSubnets int `json:"totalSubnets,omitempty"`
