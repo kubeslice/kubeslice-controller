@@ -106,6 +106,17 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 		return "", fmt.Errorf("SliceIpam %s not found", sliceName)
 	}
 
+	// Initialize status counters if not set (for backward compatibility or if status update failed)
+	if sliceIpam.Status.TotalSubnets == 0 {
+		totalSubnets, err := s.allocator.CalculateMaxClusters(sliceIpam.Spec.SliceSubnet, sliceIpam.Spec.SubnetSize)
+		if err != nil {
+			logger.Errorf("Failed to calculate total subnets: %v", err)
+		} else {
+			sliceIpam.Status.TotalSubnets = totalSubnets
+			sliceIpam.Status.AvailableSubnets = totalSubnets - len(sliceIpam.Status.AllocatedSubnets)
+		}
+	}
+
 	// Check if cluster already has allocation
 	for _, allocation := range sliceIpam.Status.AllocatedSubnets {
 		if allocation.ClusterName == clusterName {
@@ -148,9 +159,9 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 	}
 	sliceIpam.Status.LastUpdated = metav1.Now()
 
-	// Update resource
-	if err := util.UpdateResource(ctx, sliceIpam); err != nil {
-		return "", fmt.Errorf("failed to update SliceIpam: %v", err)
+	// Update status subresource (use UpdateStatus instead of UpdateResource)
+	if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
+		return "", fmt.Errorf("failed to update SliceIpam status: %v", err)
 	}
 
 	logger.Infof("Allocated subnet %s to cluster %s", subnet, clusterName)
@@ -195,9 +206,9 @@ func (s *SliceIpamService) ReleaseSubnetForCluster(ctx context.Context, sliceNam
 
 	sliceIpam.Status.LastUpdated = metav1.Now()
 
-	// Update resource
-	if err := util.UpdateResource(ctx, sliceIpam); err != nil {
-		return fmt.Errorf("failed to update SliceIpam: %v", err)
+	// Update status subresource (use UpdateStatus instead of UpdateResource)
+	if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
+		return fmt.Errorf("failed to update SliceIpam status: %v", err)
 	}
 
 	return nil
@@ -284,6 +295,13 @@ func (s *SliceIpamService) CreateSliceIpam(ctx context.Context, sliceConfig *v1a
 		return fmt.Errorf("failed to create SliceIpam: %v", err)
 	}
 
+	// Initialize status subresource after creation
+	// Note: In Kubernetes, status subresources are not set during create, must update separately
+	if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
+		logger.Errorf("Failed to initialize SliceIpam status: %v, will retry on next reconciliation", err)
+		// Don't fail the entire create if status update fails - it will be retried
+	}
+
 	logger.Infof("Created SliceIpam %s with %d total subnets", sliceConfig.Name, totalSubnets)
 	return nil
 }
@@ -368,9 +386,15 @@ func (s *SliceIpamService) reconcileSliceIpamState(ctx context.Context, sliceIpa
 		sliceIpam.Status.AvailableSubnets = totalSubnets - len(sliceIpam.Status.AllocatedSubnets)
 		sliceIpam.Status.LastUpdated = metav1.Now()
 
-		if err := util.UpdateResource(ctx, sliceIpam); err != nil {
+		if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update SliceIpam status: %v", err)
 		}
+	}
+
+	// Sync with SliceConfig to ensure consistency (Issue 3 & 4 fix)
+	if err := s.syncWithSliceConfig(ctx, sliceIpam); err != nil {
+		logger.Errorf("Failed to sync with SliceConfig: %v", err)
+		// Don't fail reconciliation, just log and continue
 	}
 
 	// Cleanup expired allocations (older than 24 hours)
@@ -378,6 +402,78 @@ func (s *SliceIpamService) reconcileSliceIpamState(ctx context.Context, sliceIpa
 
 	logger.Infof("Successfully reconciled SliceIpam %s", sliceIpam.Name)
 	return ctrl.Result{RequeueAfter: time.Hour}, nil
+}
+
+// syncWithSliceConfig syncs SliceIpam status with the corresponding SliceConfig
+// This implements bidirectional sync (Issue 3) and automatic status population (Issue 4)
+func (s *SliceIpamService) syncWithSliceConfig(ctx context.Context, sliceIpam *v1alpha1.SliceIpam) error {
+	logger := util.CtxLogger(ctx)
+	logger.Infof("Syncing SliceIpam %s with SliceConfig", sliceIpam.Name)
+
+	// Get the corresponding SliceConfig
+	sliceConfig := &v1alpha1.SliceConfig{}
+	key := types.NamespacedName{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}
+	found, err := util.GetResourceIfExist(ctx, key, sliceConfig)
+	if err != nil {
+		return fmt.Errorf("failed to get SliceConfig: %v", err)
+	}
+	if !found {
+		logger.Warnf("SliceConfig %s not found, skipping sync", sliceIpam.Name)
+		return nil
+	}
+
+	// Verify SliceIpamType is Dynamic
+	if sliceConfig.Spec.SliceIpamType != "Dynamic" {
+		logger.Warnf("SliceConfig %s is not using Dynamic IPAM, skipping sync", sliceIpam.Name)
+		return nil
+	}
+
+	// Get current cluster list from SliceConfig
+	configClusters := make(map[string]bool)
+	for _, cluster := range sliceConfig.Spec.Clusters {
+		configClusters[cluster] = true
+	}
+
+	// Get allocated clusters from SliceIpam status
+	allocatedClusters := make(map[string]bool)
+	for _, allocation := range sliceIpam.Status.AllocatedSubnets {
+		if allocation.Status == "Allocated" || allocation.Status == "InUse" {
+			allocatedClusters[allocation.ClusterName] = true
+		}
+	}
+
+	needsUpdate := false
+
+	// Check for clusters removed from SliceConfig
+	for clusterName := range allocatedClusters {
+		if !configClusters[clusterName] {
+			logger.Infof("Cluster %s removed from SliceConfig, releasing subnet", clusterName)
+			// Mark allocation as released
+			for i, allocation := range sliceIpam.Status.AllocatedSubnets {
+				if allocation.ClusterName == clusterName &&
+					(allocation.Status == "Allocated" || allocation.Status == "InUse") {
+					now := metav1.Now()
+					sliceIpam.Status.AllocatedSubnets[i].Status = "Released"
+					sliceIpam.Status.AllocatedSubnets[i].ReleasedAt = &now
+					sliceIpam.Status.AvailableSubnets++
+					needsUpdate = true
+					logger.Infof("Released subnet %s for removed cluster %s", allocation.Subnet, clusterName)
+					break
+				}
+			}
+		}
+	}
+
+	// Update status counters
+	if needsUpdate {
+		sliceIpam.Status.LastUpdated = metav1.Now()
+		if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
+			return fmt.Errorf("failed to update SliceIpam after sync: %v", err)
+		}
+		logger.Infof("Successfully synced SliceIpam %s with SliceConfig changes", sliceIpam.Name)
+	}
+
+	return nil
 }
 
 // cleanupExpiredAllocations removes old released allocations
@@ -403,7 +499,7 @@ func (s *SliceIpamService) cleanupExpiredAllocations(ctx context.Context, sliceI
 		sliceIpam.Status.AllocatedSubnets = keepAllocations
 		sliceIpam.Status.LastUpdated = metav1.Now()
 
-		if err := util.UpdateResource(ctx, sliceIpam); err != nil {
+		if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
 			logger.Errorf("Failed to cleanup expired allocations: %v", err)
 		} else {
 			logger.Infof("Cleaned up %d expired allocations for SliceIpam %s", cleaned, sliceIpam.Name)

@@ -24,6 +24,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
+	"github.com/kubeslice/kubeslice-controller/metrics"
 	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
 	utilmock "github.com/kubeslice/kubeslice-controller/util/mocks"
@@ -115,8 +116,9 @@ func testReconcileSliceIpamSuccessful(t *testing.T) {
 
 	sliceIpam := &v1alpha1.SliceIpam{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-slice-ipam",
-			Namespace: "test-namespace",
+			Name:       "test-slice-ipam",
+			Namespace:  "test-namespace",
+			Finalizers: []string{SliceIpamFinalizer},
 		},
 		Spec: v1alpha1.SliceIpamSpec{
 			SliceName:   "test-slice",
@@ -128,12 +130,14 @@ func testReconcileSliceIpamSuccessful(t *testing.T) {
 		},
 	}
 
-	mMock.On("WithProject", mock.AnythingOfType("string")).Return(mMock).Once()
-	mMock.On("WithNamespace", mock.AnythingOfType("string")).Return(mMock).Once()
+	// Metrics chaining: WithProject returns a MetricRecorder, not the mock
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*v1alpha1.SliceIpam)
 		*arg = *sliceIpam
 	})
+	// syncWithSliceConfig will attempt to Get the corresponding SliceConfig; return NotFound to skip sync
+	clientMock.On("Get", ctx, types.NamespacedName{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}, mock.AnythingOfType("*v1alpha1.SliceConfig")).Return(kubeerrors.NewNotFound(util.Resource("SliceConfig"), "sliceconfig not found"))
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil)
 
 	result, err := sliceIpamService.ReconcileSliceIpam(ctx, requestObj)
@@ -178,12 +182,13 @@ func testReconcileSliceIpamDeletion(t *testing.T) {
 		},
 	}
 
-	mMock.On("WithProject", mock.AnythingOfType("string")).Return(mMock).Once()
-	mMock.On("WithNamespace", mock.AnythingOfType("string")).Return(mMock).Once()
+	// Metrics chaining: WithProject returns a MetricRecorder, not the mock
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*v1alpha1.SliceIpam)
 		*arg = *sliceIpam
 	})
+	// syncWithSliceConfig is not called when DeletionTimestamp is set, so no SliceConfig Get needed
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil)
 
 	result, err := sliceIpamService.ReconcileSliceIpam(ctx, requestObj)
@@ -467,7 +472,8 @@ func testCreateSliceIpamSuccess(t *testing.T) {
 			SliceSubnet: "10.0.0.0/16",
 		},
 	}
-
+	// CreateSliceIpam first checks if SliceIpam exists; return not found
+	clientMock.On("Get", ctx, types.NamespacedName{Name: sliceConfig.Name, Namespace: sliceConfig.Namespace}, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(kubeerrors.NewNotFound(util.Resource("SliceIpam"), "not found"))
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil)
 
 	err := sliceIpamService.CreateSliceIpam(ctx, sliceConfig)
@@ -628,6 +634,8 @@ func testReconcileSliceIpamStateNewResource(t *testing.T) {
 		},
 	}
 
+	// syncWithSliceConfig will attempt to Get the corresponding SliceConfig; return NotFound to skip sync
+	clientMock.On("Get", ctx, types.NamespacedName{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}, mock.AnythingOfType("*v1alpha1.SliceConfig")).Return(kubeerrors.NewNotFound(util.Resource("SliceConfig"), "sliceconfig not found"))
 	clientMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
 
 	result, err := sliceIpamService.reconcileSliceIpamState(ctx, sliceIpam)
@@ -662,6 +670,9 @@ func testReconcileSliceIpamStateExistingResource(t *testing.T) {
 			TotalSubnets: 256, // Existing resource
 		},
 	}
+
+	// syncWithSliceConfig will attempt to Get the corresponding SliceConfig; return NotFound to skip sync
+	clientMock.On("Get", ctx, types.NamespacedName{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}, mock.AnythingOfType("*v1alpha1.SliceConfig")).Return(kubeerrors.NewNotFound(util.Resource("SliceConfig"), "sliceconfig not found"))
 
 	result, err := sliceIpamService.reconcileSliceIpamState(ctx, sliceIpam)
 
@@ -712,6 +723,7 @@ func testCleanupExpiredAllocations(t *testing.T) {
 		},
 	}
 
+	// cleanupExpiredAllocations is called from reconcile but here we call it directly; no SliceConfig Get needed
 	clientMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
 
 	sliceIpamService.cleanupExpiredAllocations(ctx, sliceIpam)
