@@ -42,7 +42,7 @@ type IWorkerSliceConfigService interface {
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
 	ListWorkerSliceConfigs(ctx context.Context, ownerLabel map[string]string, namespace string) ([]workerv1alpha1.WorkerSliceConfig, error)
 	ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int
-	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error)
+	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceConfig *controllerv1alpha1.SliceConfig, sipam interface{}) (map[string]int, error)
 	CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx context.Context, clusters []string, namespace string, label map[string]string, name string) error
 }
 
@@ -288,7 +288,7 @@ outer:
 
 // CreateMinimalWorkerSliceConfig CreateWorkerSliceConfig is a function to create the worker slice configs with minimum number of fields.
 // More fields are added in reconciliation loop.
-func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (map[string]int, error) {
+func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceConfig *controllerv1alpha1.SliceConfig, sipam interface{}) (map[string]int, error) {
 	logger := util.CtxLogger(ctx)
 
 	//Load Event Recorder with project name, slice name and namespace
@@ -311,6 +311,17 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		return nil, err
 	}
 	clusterMap := s.ComputeClusterMap(clusters, workerSliceConfigs)
+
+	// Check if we're using Dynamic IPAM and convert sipam to proper type
+	var sliceIpamService ISliceIpamService
+	useDynamicIPAM := false
+	if sliceConfig != nil && sliceConfig.Spec.SliceIpamType == "Dynamic" && sipam != nil {
+		if svc, ok := sipam.(ISliceIpamService); ok {
+			sliceIpamService = svc
+			useDynamicIPAM = true
+		}
+	}
+
 	for _, cluster := range clusters {
 		logger.Debugf("Cluster Object %s", cluster)
 		workerSliceConfigName := fmt.Sprintf(workerSliceConfigNameFormat, name, cluster)
@@ -323,8 +334,27 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		if err != nil {
 			return clusterMap, err
 		}
+
+		// Determine cluster subnet based on IPAM type
+		var clusterSubnetCIDR string
 		ipamOctet := clusterMap[cluster]
-		clusterSubnetCIDR := util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr)
+
+		if useDynamicIPAM {
+			// Use Dynamic IPAM to allocate subnet for this cluster
+			logger.Infof("Allocating subnet for cluster %s using Dynamic IPAM", cluster)
+			subnet, allocErr := sliceIpamService.AllocateSubnetForCluster(ctx, name, cluster, namespace)
+			if allocErr != nil {
+				logger.Errorf("Failed to allocate subnet for cluster %s: %v", cluster, allocErr)
+				return clusterMap, fmt.Errorf("dynamic IPAM allocation failed for cluster %s: %v", cluster, allocErr)
+			}
+			clusterSubnetCIDR = subnet
+			logger.Infof("Allocated subnet %s to cluster %s via Dynamic IPAM", subnet, cluster)
+		} else {
+			// Use Static IPAM (traditional approach)
+			clusterSubnetCIDR = util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr)
+			logger.Debugf("Using Static IPAM: subnet %s for cluster %s", clusterSubnetCIDR, cluster)
+		}
+
 		// determine gw svc type
 		sliceGwSvcType := defaultSliceGatewayServiceType
 		sliceGwSvcProtocol := defaultSliceGatewayServiceProtocol
