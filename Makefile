@@ -206,6 +206,34 @@ unit-test: ## Run local unit tests.
 unit-test-docker: ## Run local unit tests in a docker container.
 	docker build -f unit_tests.dockerfile -o . .
 
+##@ E2E Tests
+
+E2E_DIR := ./e2e
+E2E_CLUSTER_NAME ?= kubeslice-e2e
+GINKGO ?= $(LOCALBIN)/ginkgo
+KIND ?= $(LOCALBIN)/kind
+
+.PHONY: e2e-setup
+e2e-setup: $(GINKGO) $(KIND) ## Install dependencies for E2E tests (ginkgo, kind)
+$(GINKGO): $(LOCALBIN)
+	@test -s $(LOCALBIN)/ginkgo || GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+$(KIND): $(LOCALBIN)
+	@test -s $(LOCALBIN)/kind || GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@latest
+
+.PHONY: e2e-test
+e2e-test: e2e-setup ## Run all E2E tests using Ginkgo on Kind cluster
+	@echo " Creating Kind cluster: $(E2E_CLUSTER_NAME)"
+	$(KIND) create cluster --name $(E2E_CLUSTER_NAME) || true
+	@echo " Running Ginkgo tests..."
+	$(GINKGO) -v -r $(E2E_DIR)
+	@echo " E2E tests completed successfully."
+
+.PHONY: e2e-clean
+e2e-clean: ## Delete Kind cluster used for E2E tests
+	@echo " Cleaning up Kind cluster: $(E2E_CLUSTER_NAME)"
+	$(KIND) delete cluster --name $(E2E_CLUSTER_NAME) || true
+
 .PHONY: chart-deploy
 chart-deploy:
 	## Deploy the artifacts using helm
