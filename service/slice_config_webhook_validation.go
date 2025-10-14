@@ -59,6 +59,14 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateMaxClusterCount(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if sliceConfig.Spec.TopologyConfig != nil {
+		validator := NewTopologyValidator()
+		if err := validator.ValidateTopologyConfig(sliceConfig.Spec.TopologyConfig, sliceConfig.Spec.Clusters); err != nil {
+			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("topologyConfig"), sliceConfig.Spec.TopologyConfig, err.Error()),
+			})
+		}
+	}
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		if err := validateSliceSubnet(sliceConfig); err != nil {
 			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
@@ -105,6 +113,14 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	}
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
+	if sliceConfig.Spec.TopologyConfig != nil {
+		validator := NewTopologyValidator()
+		if err := validator.ValidateTopologyConfig(sliceConfig.Spec.TopologyConfig, sliceConfig.Spec.Clusters); err != nil {
+			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("topologyConfig"), sliceConfig.Spec.TopologyConfig, err.Error()),
+			})
+		}
 	}
 	// Validate single/multi overlay network deployment mode specific fields
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {

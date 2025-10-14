@@ -189,25 +189,27 @@ const (
 
 type TopologyConfig struct {
 	//+kubebuilder:default:=auto
-	TopologyType       TopologyType        `json:"topologyType,omitempty"`
-	HubSpoke           *HubSpokeConfig     `json:"hubSpoke,omitempty"`
-	ConnectivityMatrix []ConnectivityEntry `json:"connectivityMatrix,omitempty"`
-	ClusterRoles       []ClusterRole       `json:"clusterRoles,omitempty"`
-	PolicyNodes        []string            `json:"policyNodes,omitempty"`
+	TopologyType       TopologyType         `json:"topologyType,omitempty"`
+	HubSpoke           *HubSpokeConfig      `json:"hubSpoke,omitempty"`
+	ConnectivityMatrix []ConnectivityEntry  `json:"connectivityMatrix,omitempty"`
+	ClusterRoles       []ClusterRole        `json:"clusterRoles,omitempty"`
+	PolicyNodes        []string             `json:"policyNodes,omitempty"`
+	AutoOptions        *AutoTopologyOptions `json:"autoOptions,omitempty"`
 }
 
 type HubSpokeConfig struct {
 	//+kubebuilder:validation:Required
-	HubClusters       []string `json:"hubClusters"`
-	SpokeClusters     []string `json:"spokeClusters,omitempty"`
-	AllowSpokeToSpoke bool     `json:"allowSpokeToSpoke,omitempty"`
+	HubClusters       []string            `json:"hubClusters"`
+	SpokeClusters     []string            `json:"spokeClusters,omitempty"`
+	AllowSpokeToSpoke bool                `json:"allowSpokeToSpoke,omitempty"`
+	SpokeConnectivity []ConnectivityEntry `json:"spokeConnectivity,omitempty"`
 }
 
 type ConnectivityEntry struct {
 	//+kubebuilder:validation:Required
-	SourceCluster   string   `json:"sourceCluster"`
+	SourceCluster string `json:"sourceCluster"`
 	//+kubebuilder:validation:Required
-	TargetClusters  []string `json:"targetClusters"`
+	TargetClusters []string `json:"targetClusters"`
 }
 
 type ClusterRole struct {
@@ -215,7 +217,25 @@ type ClusterRole struct {
 	ClusterName string `json:"clusterName"`
 	//+kubebuilder:default:=auto
 	//+kubebuilder:validation:Enum:=auto;server;client
-	VPNRole     string `json:"vpnRole,omitempty"`
+	VPNRole string `json:"vpnRole,omitempty"`
+}
+
+type AutoTopologyOptions struct {
+	//+kubebuilder:default:=false
+	EnableShortcuts bool `json:"enableShortcuts,omitempty"`
+	//+kubebuilder:default:=20
+	//+kubebuilder:validation:Minimum=1
+	//+kubebuilder:validation:Maximum=500
+	RelativeThresholdPercent int `json:"relativeThresholdPercent,omitempty"`
+	//+kubebuilder:default:=3
+	//+kubebuilder:validation:Minimum=1
+	PersistenceWindows int `json:"persistenceWindows,omitempty"`
+	//+kubebuilder:default:=10
+	//+kubebuilder:validation:Minimum=1
+	//+kubebuilder:validation:Maximum=50
+	MaxShortcuts int `json:"maxShortcuts,omitempty"`
+	//+kubebuilder:default:="5m"
+	TelemetryWindow string `json:"telemetryWindow,omitempty"`
 }
 
 type KubesliceEvent struct {
