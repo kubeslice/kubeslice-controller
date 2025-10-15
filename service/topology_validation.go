@@ -31,7 +31,7 @@ func (v *TopologyValidator) ValidateTopologyConfig(topology *controllerv1alpha1.
 		if err := v.validateAuto(topology, clusterSet); err != nil {
 			return err
 		}
-	case controllerv1alpha1.TopologyFullMesh, controllerv1alpha1.TopologyPartialMesh:
+	case controllerv1alpha1.TopologyFullMesh:
 	case "":
 	default:
 		return fmt.Errorf("invalid topology type: %s", topology.TopologyType)
