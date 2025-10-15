@@ -227,3 +227,88 @@ func assertNotContainsPair(t *testing.T, pairs []GatewayPair, source, target str
 		}
 	}
 }
+
+func TestResolveTopology_UnknownType(t *testing.T) {
+	svc := NewTopologyService()
+	sc := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"c1", "c2"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: "invalid-topology-type",
+			},
+		},
+	}
+
+	_, err := svc.ResolveTopology(sc)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown topology type")
+}
+
+func TestResolveTopology_EmptyClusters(t *testing.T) {
+	svc := NewTopologyService()
+	sc := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{},
+		},
+	}
+
+	pairs, err := svc.ResolveTopology(sc)
+	require.NoError(t, err)
+	assert.Empty(t, pairs)
+}
+
+func TestResolveTopology_SingleCluster(t *testing.T) {
+	svc := NewTopologyService()
+	sc := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"only-cluster"},
+		},
+	}
+
+	pairs, err := svc.ResolveTopology(sc)
+	require.NoError(t, err)
+	assert.Empty(t, pairs)
+}
+
+func TestResolveCustom_EmptyMatrix(t *testing.T) {
+	svc := &DefaultTopologyService{}
+	clusters := []string{"c1", "c2"}
+	matrix := []controllerv1alpha1.ConnectivityEntry{}
+
+	_, err := svc.resolveCustom(clusters, matrix)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "connectivity matrix required")
+}
+
+func TestResolveHubSpoke_NilConfig(t *testing.T) {
+	svc := &DefaultTopologyService{}
+	clusters := []string{"c1", "c2"}
+
+	_, err := svc.resolveHubSpoke(clusters, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "hub-spoke config required")
+}
+
+func TestResolveAuto_AllPolicyNodes(t *testing.T) {
+	svc := &DefaultTopologyService{}
+	clusters := []string{"c1", "c2", "c3"}
+	policyNodes := []string{"c1", "c2", "c3"}
+
+	pairs, err := svc.resolveAuto(clusters, policyNodes)
+	require.NoError(t, err)
+	assert.Empty(t, pairs, "All edges should be forbidden when all clusters are policy nodes")
+}
+
+func TestResolveCustom_DuplicateConnections(t *testing.T) {
+	svc := &DefaultTopologyService{}
+	clusters := []string{"c1", "c2", "c3"}
+	matrix := []controllerv1alpha1.ConnectivityEntry{
+		{SourceCluster: "c1", TargetClusters: []string{"c2"}},
+		{SourceCluster: "c2", TargetClusters: []string{"c1"}},
+	}
+
+	pairs, err := svc.resolveCustom(clusters, matrix)
+	require.NoError(t, err)
+	assert.Len(t, pairs, 2, "Should allow bidirectional explicit connections")
+}
+

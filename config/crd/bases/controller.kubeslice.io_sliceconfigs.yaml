@@ -322,7 +322,6 @@ spec:
                     - auto
                     - full-mesh
                     - hub-spoke
-                    - partial-mesh
                     - custom
                     type: string
                 type: object
