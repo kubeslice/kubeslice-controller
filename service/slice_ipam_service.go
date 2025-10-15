@@ -118,11 +118,19 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 	}
 
 	// Check if cluster already has allocation
-	for _, allocation := range sliceIpam.Status.AllocatedSubnets {
+	var releasedIndex = -1
+	var releasedSubnet string
+	for i, allocation := range sliceIpam.Status.AllocatedSubnets {
 		if allocation.ClusterName == clusterName {
 			if allocation.Status == "Allocated" || allocation.Status == "InUse" {
 				logger.Infof("Cluster %s already has subnet %s allocated", clusterName, allocation.Subnet)
 				return allocation.Subnet, nil
+			}
+			// Track if there's a Released entry for this cluster
+			if allocation.Status == "Released" {
+				releasedIndex = i
+				releasedSubnet = allocation.Subnet
+				logger.Infof("Found released subnet %s for cluster %s at index %d", releasedSubnet, clusterName, releasedIndex)
 			}
 		}
 	}
@@ -144,14 +152,23 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 		return "", fmt.Errorf("failed to find available subnet: %v", err)
 	}
 
-	// Add allocation to status
-	allocation := v1alpha1.ClusterSubnetAllocation{
-		ClusterName: clusterName,
-		Subnet:      subnet,
-		AllocatedAt: metav1.Now(),
-		Status:      "Allocated",
+	// If we found a Released entry and we're allocating the same subnet, update it in place
+	if releasedIndex >= 0 && releasedSubnet == subnet {
+		logger.Infof("Reusing released subnet %s for cluster %s - updating existing entry", subnet, clusterName)
+		sliceIpam.Status.AllocatedSubnets[releasedIndex].Status = "Allocated"
+		sliceIpam.Status.AllocatedSubnets[releasedIndex].AllocatedAt = metav1.Now()
+		sliceIpam.Status.AllocatedSubnets[releasedIndex].ReleasedAt = nil
+	} else {
+		// Add new allocation to status
+		logger.Infof("Allocating new subnet %s for cluster %s - appending new entry", subnet, clusterName)
+		allocation := v1alpha1.ClusterSubnetAllocation{
+			ClusterName: clusterName,
+			Subnet:      subnet,
+			AllocatedAt: metav1.Now(),
+			Status:      "Allocated",
+		}
+		sliceIpam.Status.AllocatedSubnets = append(sliceIpam.Status.AllocatedSubnets, allocation)
 	}
-	sliceIpam.Status.AllocatedSubnets = append(sliceIpam.Status.AllocatedSubnets, allocation)
 
 	// Update counters
 	if sliceIpam.Status.AvailableSubnets > 0 {

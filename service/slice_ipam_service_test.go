@@ -59,6 +59,7 @@ var SliceIpamTestbed = map[string]func(*testing.T){
 	"TestAllocateSubnetForClusterSuccess":          testAllocateSubnetForClusterSuccess,
 	"TestAllocateSubnetForClusterNotFound":         testAllocateSubnetForClusterNotFound,
 	"TestAllocateSubnetForClusterAlreadyAllocated": testAllocateSubnetForClusterAlreadyAllocated,
+	"TestAllocateSubnetReusesReleasedEntry":        testAllocateSubnetReusesReleasedEntry,
 	"TestReleaseSubnetForClusterSuccess":           testReleaseSubnetForClusterSuccess,
 	"TestReleaseSubnetForClusterNotFound":          testReleaseSubnetForClusterNotFound,
 	"TestGetClusterSubnetSuccess":                  testGetClusterSubnetSuccess,
@@ -138,7 +139,11 @@ func testReconcileSliceIpamSuccessful(t *testing.T) {
 	})
 	// syncWithSliceConfig will attempt to Get the corresponding SliceConfig; return NotFound to skip sync
 	clientMock.On("Get", ctx, types.NamespacedName{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}, mock.AnythingOfType("*v1alpha1.SliceConfig")).Return(kubeerrors.NewNotFound(util.Resource("SliceConfig"), "sliceconfig not found"))
-	clientMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil)
+
+	// Mock Status().Update() for UpdateStatus call in reconcileSliceIpamState
+	statusMock := &utilmock.StatusWriter{}
+	clientMock.On("Status").Return(statusMock)
+	statusMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam"), mock.Anything).Return(nil)
 
 	result, err := sliceIpamService.ReconcileSliceIpam(ctx, requestObj)
 
@@ -205,6 +210,7 @@ func testAllocateSubnetForClusterSuccess(t *testing.T) {
 
 	clientMock := &utilmock.Client{}
 	scheme := runtime.NewScheme()
+	v1alpha1.AddToScheme(scheme)
 	ctx := prepareSliceIpamTestContext(context.Background(), clientMock, scheme)
 
 	sliceIpam := &v1alpha1.SliceIpam{
@@ -229,7 +235,17 @@ func testAllocateSubnetForClusterSuccess(t *testing.T) {
 		arg := args.Get(2).(*v1alpha1.SliceIpam)
 		*arg = *sliceIpam
 	})
-	clientMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil)
+
+	// Mock Get again for UpdateStatus (it fetches current state)
+	clientMock.On("Get", ctx, mock.Anything, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*v1alpha1.SliceIpam)
+		*arg = *sliceIpam
+	})
+
+	// Mock Status().Update()
+	statusMock := &utilmock.StatusWriter{}
+	clientMock.On("Status").Return(statusMock)
+	statusMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam"), mock.Anything).Return(nil)
 
 	subnet, err := sliceIpamService.AllocateSubnetForCluster(ctx, "test-slice", "test-cluster", "test-namespace")
 
@@ -237,6 +253,7 @@ func testAllocateSubnetForClusterSuccess(t *testing.T) {
 	require.NotEmpty(t, subnet)
 	require.Contains(t, subnet, "10.0.") // Should be from the slice subnet
 	clientMock.AssertExpectations(t)
+	statusMock.AssertExpectations(t)
 }
 
 func testAllocateSubnetForClusterNotFound(t *testing.T) {
@@ -303,12 +320,117 @@ func testAllocateSubnetForClusterAlreadyAllocated(t *testing.T) {
 	clientMock.AssertExpectations(t)
 }
 
+// TestAllocateSubnetReusesReleasedEntry verifies that when a cluster that previously had a subnet
+// is re-added, the existing Released entry is updated instead of creating a duplicate
+func testAllocateSubnetReusesReleasedEntry(t *testing.T) {
+	mMock := &metricMock.IMetricRecorder{}
+	sliceIpamService := NewSliceIpamService(mMock)
+
+	clientMock := &utilmock.Client{}
+	scheme := runtime.NewScheme()
+	v1alpha1.AddToScheme(scheme)
+	ctx := prepareSliceIpamTestContext(context.Background(), clientMock, scheme)
+
+	releasedTime := metav1.Now()
+	releasedSubnet := "10.0.1.0/24"
+
+	sliceIpam := &v1alpha1.SliceIpam{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-slice",
+			Namespace: "test-namespace",
+		},
+		Spec: v1alpha1.SliceIpamSpec{
+			SliceName:   "test-slice",
+			SliceSubnet: "10.0.0.0/16",
+			SubnetSize:  24,
+		},
+		Status: v1alpha1.SliceIpamStatus{
+			AllocatedSubnets: []v1alpha1.ClusterSubnetAllocation{
+				{
+					ClusterName: "cluster-1",
+					Subnet:      "10.0.0.0/24",
+					AllocatedAt: metav1.Now(),
+					Status:      "Allocated",
+				},
+				{
+					ClusterName: "cluster-2",
+					Subnet:      releasedSubnet,
+					AllocatedAt: metav1.Time{Time: releasedTime.Add(-1 * time.Hour)},
+					Status:      "Released",
+					ReleasedAt:  &releasedTime,
+				},
+			},
+			AvailableSubnets: 255, // 256 total - 1 allocated (cluster-1) = 255
+			TotalSubnets:     256,
+		},
+	}
+
+	key := types.NamespacedName{Name: "test-slice", Namespace: "test-namespace"}
+
+	// Mock Get to return the SliceIpam with Released entry
+	clientMock.On("Get", ctx, key, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*v1alpha1.SliceIpam)
+		*arg = *sliceIpam
+	})
+
+	// Mock Get again for UpdateStatus (it fetches current state)
+	clientMock.On("Get", ctx, mock.Anything, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*v1alpha1.SliceIpam)
+		*arg = *sliceIpam
+	})
+
+	// Mock Status().Update to capture the updated SliceIpam
+	var updatedSliceIpam *v1alpha1.SliceIpam
+	statusMock := &utilmock.StatusWriter{}
+	clientMock.On("Status").Return(statusMock)
+	statusMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		original := args.Get(1).(*v1alpha1.SliceIpam)
+		// Make a deep copy to avoid pointer issues
+		updatedSliceIpam = original.DeepCopy()
+	})
+
+	// Allocate subnet for cluster-2 (which has a Released entry)
+	subnet, err := sliceIpamService.AllocateSubnetForCluster(ctx, "test-slice", "cluster-2", "test-namespace")
+
+	// Verify the allocation succeeded
+	require.NoError(t, err)
+	require.Equal(t, releasedSubnet, subnet, "Should reuse the released subnet")
+
+	// Verify the status was updated
+	require.NotNil(t, updatedSliceIpam, "Status should be updated")
+
+	// Verify there are still only 2 entries (not 3 - no duplicate created)
+	require.Len(t, updatedSliceIpam.Status.AllocatedSubnets, 2, "Should not create duplicate entry")
+
+	// Find the cluster-2 entry
+	var cluster2Entry *v1alpha1.ClusterSubnetAllocation
+	for i := range updatedSliceIpam.Status.AllocatedSubnets {
+		if updatedSliceIpam.Status.AllocatedSubnets[i].ClusterName == "cluster-2" {
+			cluster2Entry = &updatedSliceIpam.Status.AllocatedSubnets[i]
+			break
+		}
+	}
+
+	require.NotNil(t, cluster2Entry, "cluster-2 entry should exist")
+	require.Equal(t, v1alpha1.SubnetAllocationStatus("Allocated"), cluster2Entry.Status, "Status should be updated to Allocated")
+	require.Nil(t, cluster2Entry.ReleasedAt, "ReleasedAt should be cleared")
+	require.Equal(t, releasedSubnet, cluster2Entry.Subnet, "Subnet should remain the same")
+	require.True(t, cluster2Entry.AllocatedAt.After(releasedTime.Time), "AllocatedAt should be updated to new time")
+
+	// Verify counter was decremented
+	require.Equal(t, 254, updatedSliceIpam.Status.AvailableSubnets, "Available subnets should be decremented")
+
+	clientMock.AssertExpectations(t)
+	statusMock.AssertExpectations(t)
+}
+
 func testReleaseSubnetForClusterSuccess(t *testing.T) {
 	mMock := &metricMock.IMetricRecorder{}
 	sliceIpamService := NewSliceIpamService(mMock)
 
 	clientMock := &utilmock.Client{}
 	scheme := runtime.NewScheme()
+	v1alpha1.AddToScheme(scheme)
 	ctx := prepareSliceIpamTestContext(context.Background(), clientMock, scheme)
 
 	sliceIpam := &v1alpha1.SliceIpam{
@@ -340,12 +462,23 @@ func testReleaseSubnetForClusterSuccess(t *testing.T) {
 		arg := args.Get(2).(*v1alpha1.SliceIpam)
 		*arg = *sliceIpam
 	})
-	clientMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil)
+
+	// Mock Get again for UpdateStatus (it fetches current state)
+	clientMock.On("Get", ctx, mock.Anything, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*v1alpha1.SliceIpam)
+		*arg = *sliceIpam
+	})
+
+	// Mock Status().Update()
+	statusMock := &utilmock.StatusWriter{}
+	clientMock.On("Status").Return(statusMock)
+	statusMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.SliceIpam"), mock.Anything).Return(nil)
 
 	err := sliceIpamService.ReleaseSubnetForCluster(ctx, "test-slice", "test-cluster", "test-namespace")
 
 	require.NoError(t, err)
 	clientMock.AssertExpectations(t)
+	statusMock.AssertExpectations(t)
 }
 
 func testReleaseSubnetForClusterNotFound(t *testing.T) {
@@ -600,6 +733,13 @@ func testHandleSliceIpamDeletionNoActiveAllocs(t *testing.T) {
 		},
 	}
 
+	// Mock Get for UpdateResource internal call (to fetch latest resourceVersion)
+	clientMock.On("Get", ctx, client.ObjectKey{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*v1alpha1.SliceIpam)
+		*arg = *sliceIpam
+	})
+
+	// Mock Update for finalizer removal
 	clientMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
 
 	result, err := sliceIpamService.handleSliceIpamDeletion(ctx, sliceIpam)
@@ -636,7 +776,17 @@ func testReconcileSliceIpamStateNewResource(t *testing.T) {
 
 	// syncWithSliceConfig will attempt to Get the corresponding SliceConfig; return NotFound to skip sync
 	clientMock.On("Get", ctx, types.NamespacedName{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}, mock.AnythingOfType("*v1alpha1.SliceConfig")).Return(kubeerrors.NewNotFound(util.Resource("SliceConfig"), "sliceconfig not found"))
-	clientMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
+
+	// Mock Get for UpdateStatus internal call (to fetch latest resourceVersion)
+	clientMock.On("Get", ctx, client.ObjectKey{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*v1alpha1.SliceIpam)
+		*arg = *sliceIpam
+	})
+
+	// Mock Status().Update() for UpdateStatus call
+	statusMock := &utilmock.StatusWriter{}
+	clientMock.On("Status").Return(statusMock)
+	statusMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
 
 	result, err := sliceIpamService.reconcileSliceIpamState(ctx, sliceIpam)
 
@@ -723,8 +873,16 @@ func testCleanupExpiredAllocations(t *testing.T) {
 		},
 	}
 
-	// cleanupExpiredAllocations is called from reconcile but here we call it directly; no SliceConfig Get needed
-	clientMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
+	// Mock Get for UpdateStatus internal call (to fetch latest resourceVersion)
+	clientMock.On("Get", ctx, client.ObjectKey{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}, mock.AnythingOfType("*v1alpha1.SliceIpam")).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*v1alpha1.SliceIpam)
+		*arg = *sliceIpam
+	})
+
+	// cleanupExpiredAllocations calls UpdateStatus internally
+	statusMock := &utilmock.StatusWriter{}
+	clientMock.On("Status").Return(statusMock)
+	statusMock.On("Update", ctx, sliceIpam, mock.Anything).Return(nil).Once()
 
 	sliceIpamService.cleanupExpiredAllocations(ctx, sliceIpam)
 
