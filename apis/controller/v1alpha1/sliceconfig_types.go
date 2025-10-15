@@ -176,15 +176,14 @@ type VPNConfiguration struct {
 	Cipher string `json:"cipher"`
 }
 
-// +kubebuilder:validation:Enum:=auto;full-mesh;hub-spoke;partial-mesh;custom
+// +kubebuilder:validation:Enum:=auto;full-mesh;hub-spoke;custom
 type TopologyType string
 
 const (
-	TopologyAuto        TopologyType = "auto"
-	TopologyFullMesh    TopologyType = "full-mesh"
-	TopologyHubSpoke    TopologyType = "hub-spoke"
-	TopologyPartialMesh TopologyType = "partial-mesh"
-	TopologyCustom      TopologyType = "custom"
+	TopologyAuto     TopologyType = "auto"
+	TopologyFullMesh TopologyType = "full-mesh"
+	TopologyHubSpoke TopologyType = "hub-spoke"
+	TopologyCustom   TopologyType = "custom"
 )
 
 type TopologyConfig struct {
