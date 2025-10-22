@@ -133,6 +133,8 @@ spec:
                 description: TotalSubnets is the total number of subnets that can
                   be created from the slice subnet
                 type: integer
+            required:
+            - availableSubnets
             type: object
         type: object
     served: true
