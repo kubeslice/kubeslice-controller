@@ -283,35 +283,6 @@ spec:
                       - targetClusters
                       type: object
                     type: array
-                  hubSpoke:
-                    properties:
-                      allowSpokeToSpoke:
-                        type: boolean
-                      hubClusters:
-                        items:
-                          type: string
-                        type: array
-                      spokeClusters:
-                        items:
-                          type: string
-                        type: array
-                      spokeConnectivity:
-                        items:
-                          properties:
-                            sourceCluster:
-                              type: string
-                            targetClusters:
-                              items:
-                                type: string
-                              type: array
-                          required:
-                          - sourceCluster
-                          - targetClusters
-                          type: object
-                        type: array
-                    required:
-                    - hubClusters
-                    type: object
                   policyNodes:
                     items:
                       type: string
@@ -321,7 +292,6 @@ spec:
                     enum:
                     - auto
                     - full-mesh
-                    - hub-spoke
                     - custom
                     type: string
                 type: object
