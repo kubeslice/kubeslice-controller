@@ -176,32 +176,22 @@ type VPNConfiguration struct {
 	Cipher string `json:"cipher"`
 }
 
-// +kubebuilder:validation:Enum:=auto;full-mesh;hub-spoke;custom
+// +kubebuilder:validation:Enum:=auto;full-mesh;custom
 type TopologyType string
 
 const (
 	TopologyAuto     TopologyType = "auto"
 	TopologyFullMesh TopologyType = "full-mesh"
-	TopologyHubSpoke TopologyType = "hub-spoke"
 	TopologyCustom   TopologyType = "custom"
 )
 
 type TopologyConfig struct {
 	//+kubebuilder:default:=auto
 	TopologyType       TopologyType         `json:"topologyType,omitempty"`
-	HubSpoke           *HubSpokeConfig      `json:"hubSpoke,omitempty"`
 	ConnectivityMatrix []ConnectivityEntry  `json:"connectivityMatrix,omitempty"`
 	ClusterRoles       []ClusterRole        `json:"clusterRoles,omitempty"`
 	PolicyNodes        []string             `json:"policyNodes,omitempty"`
 	AutoOptions        *AutoTopologyOptions `json:"autoOptions,omitempty"`
-}
-
-type HubSpokeConfig struct {
-	//+kubebuilder:validation:Required
-	HubClusters       []string            `json:"hubClusters"`
-	SpokeClusters     []string            `json:"spokeClusters,omitempty"`
-	AllowSpokeToSpoke bool                `json:"allowSpokeToSpoke,omitempty"`
-	SpokeConnectivity []ConnectivityEntry `json:"spokeConnectivity,omitempty"`
 }
 
 type ConnectivityEntry struct {

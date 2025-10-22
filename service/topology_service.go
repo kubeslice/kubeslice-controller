@@ -29,8 +29,6 @@ func (s *DefaultTopologyService) ResolveTopology(sc *controllerv1alpha1.SliceCon
 	switch sc.Spec.TopologyConfig.TopologyType {
 	case controllerv1alpha1.TopologyFullMesh, "":
 		return s.resolveFullMesh(sc.Spec.Clusters)
-	case controllerv1alpha1.TopologyHubSpoke:
-		return s.resolveHubSpoke(sc.Spec.Clusters, sc.Spec.TopologyConfig.HubSpoke)
 	case controllerv1alpha1.TopologyCustom:
 		return s.resolveCustom(sc.Spec.Clusters, sc.Spec.TopologyConfig.ConnectivityMatrix)
 	case controllerv1alpha1.TopologyAuto:
@@ -58,85 +56,9 @@ func (s *DefaultTopologyService) resolveFullMesh(clusters []string) ([]GatewayPa
 	return pairs, nil
 }
 
-func (s *DefaultTopologyService) resolveHubSpoke(clusters []string, cfg *controllerv1alpha1.HubSpokeConfig) ([]GatewayPair, error) {
-	if cfg == nil {
-		return nil, fmt.Errorf("hub-spoke config required")
-	}
-
-	hubs := cfg.HubClusters
-	spokes := cfg.SpokeClusters
-	if len(spokes) == 0 {
-		spokes = s.getSpokes(clusters, hubs)
-	}
-
-	if len(hubs) == 0 {
-		return nil, fmt.Errorf("at least one hub required")
-	}
-
-	pairs := make([]GatewayPair, 0, len(hubs)*len(spokes))
-	for _, hub := range hubs {
-		for _, spoke := range spokes {
-			pairs = append(pairs, GatewayPair{
-				Source:        hub,
-				Target:        spoke,
-				Bidirectional: true,
-			})
-		}
-	}
-
-	if cfg.AllowSpokeToSpoke {
-		pairs = append(pairs, s.resolveSpokePairs(spokes, cfg.SpokeConnectivity)...)
-	}
-
-	return pairs, nil
-}
-
-func (s *DefaultTopologyService) getSpokes(clusters []string, hubs []string) []string {
-	hubSet := s.toSet(hubs)
-	spokes := make([]string, 0, len(clusters))
-	for _, cluster := range clusters {
-		if !hubSet[cluster] {
-			spokes = append(spokes, cluster)
-		}
-	}
-	return spokes
-}
-
-func (s *DefaultTopologyService) resolveSpokePairs(spokes []string, connectivity []controllerv1alpha1.ConnectivityEntry) []GatewayPair {
-	if len(connectivity) > 0 {
-		return s.resolveSelectiveSpokes(connectivity)
-	}
-
-	pairs := make([]GatewayPair, 0, len(spokes)*(len(spokes)-1)/2)
-	for i := 0; i < len(spokes); i++ {
-		for j := i + 1; j < len(spokes); j++ {
-			pairs = append(pairs, GatewayPair{
-				Source:        spokes[i],
-				Target:        spokes[j],
-				Bidirectional: true,
-			})
-		}
-	}
-	return pairs
-}
-
-func (s *DefaultTopologyService) resolveSelectiveSpokes(entries []controllerv1alpha1.ConnectivityEntry) []GatewayPair {
-	pairs := make([]GatewayPair, 0)
-	for _, entry := range entries {
-		for _, target := range entry.TargetClusters {
-			pairs = append(pairs, GatewayPair{
-				Source:        entry.SourceCluster,
-				Target:        target,
-				Bidirectional: true,
-			})
-		}
-	}
-	return pairs
-}
-
 func (s *DefaultTopologyService) resolveCustom(clusters []string, matrix []controllerv1alpha1.ConnectivityEntry) ([]GatewayPair, error) {
 	if len(matrix) == 0 {
-		return nil, fmt.Errorf("custom config with connectivity matrix required")
+		return nil, fmt.Errorf("custom topology requires connectivity matrix")
 	}
 
 	clusterSet := s.toSet(clusters)
@@ -169,7 +91,106 @@ func (s *DefaultTopologyService) resolveAuto(clusters []string, policyNodes []st
 	}
 
 	forbidden := s.buildForbiddenSet(clusters, policyNodes)
-	return s.filterPairs(allPairs, forbidden), nil
+	filtered := s.filterPairs(allPairs, forbidden)
+	
+	preservedPairs, err := s.ensureConnectivity(clusters, filtered, forbidden)
+	if err != nil {
+		return nil, err
+	}
+
+	return preservedPairs, nil
+}
+
+func (s *DefaultTopologyService) ensureConnectivity(clusters []string, pairs []GatewayPair, forbidden map[string]bool) ([]GatewayPair, error) {
+	graph := s.buildGraph(pairs)
+	components := s.findComponents(clusters, graph)
+
+	if len(components) <= 1 {
+		return pairs, nil
+	}
+
+	bridgeEdges := s.findBridges(clusters, components, forbidden)
+	if len(bridgeEdges) == 0 {
+		return nil, fmt.Errorf("policy nodes create partitioned topology with no safe bridge edges available")
+	}
+
+	for _, bridge := range bridgeEdges {
+		pairs = append(pairs, bridge)
+	}
+
+	return pairs, nil
+}
+
+func (s *DefaultTopologyService) buildGraph(pairs []GatewayPair) map[string][]string {
+	graph := make(map[string][]string)
+	for _, p := range pairs {
+		graph[p.Source] = append(graph[p.Source], p.Target)
+		graph[p.Target] = append(graph[p.Target], p.Source)
+	}
+	return graph
+}
+
+func (s *DefaultTopologyService) findComponents(clusters []string, graph map[string][]string) [][]string {
+	visited := make(map[string]bool)
+	components := make([][]string, 0)
+
+	for _, cluster := range clusters {
+		if !visited[cluster] {
+			component := s.dfs(cluster, graph, visited)
+			components = append(components, component)
+		}
+	}
+
+	return components
+}
+
+func (s *DefaultTopologyService) dfs(node string, graph map[string][]string, visited map[string]bool) []string {
+	visited[node] = true
+	component := []string{node}
+
+	for _, neighbor := range graph[node] {
+		if !visited[neighbor] {
+			component = append(component, s.dfs(neighbor, graph, visited)...)
+		}
+	}
+
+	return component
+}
+
+func (s *DefaultTopologyService) findBridges(clusters []string, components [][]string, forbidden map[string]bool) []GatewayPair {
+	bridges := make([]GatewayPair, 0)
+	componentMap := make(map[string]int)
+
+	for i, comp := range components {
+		for _, node := range comp {
+			componentMap[node] = i
+		}
+	}
+
+	for i := 0; i < len(components); i++ {
+		for j := i + 1; j < len(components); j++ {
+			added := false
+			for _, ni := range components[i] {
+				if added {
+					break
+				}
+				for _, nj := range components[j] {
+					key := s.pairKey(ni, nj)
+					if !forbidden[key] {
+						bridges = append(bridges, GatewayPair{
+							Source:        ni,
+							Target:        nj,
+							Bidirectional: true,
+						})
+						added = true
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return bridges
 }
 
 func (s *DefaultTopologyService) buildForbiddenSet(clusters []string, policyNodes []string) map[string]bool {
