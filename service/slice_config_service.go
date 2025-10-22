@@ -192,7 +192,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Step 3.5: Handle Dynamic IPAM if enabled
+	// Handle Dynamic IPAM if enabled
 	if sliceConfig.Spec.SliceIpamType == "Dynamic" {
 		logger.Infof("Dynamic IPAM enabled for slice %s", sliceConfig.Name)
 
@@ -208,8 +208,8 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		}
 	}
 
-	// Step 4: Creation of worker slice Objects and Cluster Labels
-	// get cluster cidr from maxClusters of slice config
+	// Create worker slice objects and cluster labels
+	// Get cluster CIDR from maxClusters of slice config
 	clusterCidr := ""
 
 	// Use Dynamic IPAM or Static IPAM based on SliceIpamType
@@ -233,14 +233,14 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Step 5: Create gateways with minimum specification
+	// Create gateways with minimum specification
 	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
 
-	// Step 5.5: Trigger SliceIpam reconciliation to ensure status is synced
+	// Trigger SliceIpam reconciliation to ensure status is synced
 	if sliceConfig.Spec.SliceIpamType == "Dynamic" && s.sipam != nil {
 		logger.Infof("Triggering SliceIpam reconciliation for slice %s", sliceConfig.Name)
 		// Get SliceIpam and trigger status update
@@ -256,19 +256,19 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		}
 	}
 
-	// Step 6: Create VPNKeyRotation CR
+	// Create VPNKeyRotation CR
 	// TODO(rahul): handle change in rotation interval
 	if err := s.vpn.CreateMinimalVpnKeyRotationConfig(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.RotationInterval); err != nil {
 		// register an event
 		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventVPNKeyRotationConfigCreationFailed)
 		return ctrl.Result{}, err
 	}
-	// Step 7: update cluster info into vpnkeyrotation Cconfig
+	// Update cluster info into VPN key rotation config
 	if _, err := s.vpn.ReconcileClusters(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.Clusters); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Step 8: Create ServiceImport Objects
+	// Create ServiceImport objects
 	serviceExports := &v1alpha1.ServiceExportConfigList{}
 	_, err = s.getServiceExportBySliceName(ctx, req.Namespace, sliceConfig.Name, serviceExports)
 	if err != nil {
