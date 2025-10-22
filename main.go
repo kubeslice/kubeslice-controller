@@ -418,7 +418,7 @@ func initialize(services *service.Services) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "VpnKeyRotation")
 			os.Exit(1)
 		}
-		if err = (&controllerv1alpha1.SliceIpam{}).SetupWebhookWithManager(mgr, nil, nil, nil); err != nil {
+		if err = (&controllerv1alpha1.SliceIpam{}).SetupWebhookWithManager(mgr, service.ValidateSliceIpamCreate, service.ValidateSliceIpamUpdate, service.ValidateSliceIpamDelete); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SliceIpam")
 			os.Exit(1)
 		}
