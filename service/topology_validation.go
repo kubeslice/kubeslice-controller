@@ -19,10 +19,6 @@ func (v *TopologyValidator) ValidateTopologyConfig(topology *controllerv1alpha1.
 	clusterSet := toSet(clusters)
 
 	switch topology.TopologyType {
-	case controllerv1alpha1.TopologyHubSpoke:
-		if err := v.validateHubSpoke(topology.HubSpoke, clusterSet); err != nil {
-			return err
-		}
 	case controllerv1alpha1.TopologyCustom:
 		if err := v.validateCustom(topology.ConnectivityMatrix, clusterSet); err != nil {
 			return err
@@ -42,48 +38,6 @@ func (v *TopologyValidator) ValidateTopologyConfig(topology *controllerv1alpha1.
 	}
 
 	return v.validatePolicyNodes(topology.PolicyNodes, clusterSet)
-}
-
-func (v *TopologyValidator) validateHubSpoke(config *controllerv1alpha1.HubSpokeConfig, clusterSet map[string]struct{}) error {
-	if config == nil {
-		return fmt.Errorf("hubSpoke config required for hub-spoke topology")
-	}
-
-	if len(config.HubClusters) == 0 {
-		return fmt.Errorf("at least one hub cluster required")
-	}
-
-	for _, hub := range config.HubClusters {
-		if _, exists := clusterSet[hub]; !exists {
-			return fmt.Errorf("hub cluster %s not in spec.clusters", hub)
-		}
-	}
-
-	hubSet := toSet(config.HubClusters)
-	for _, spoke := range config.SpokeClusters {
-		if _, exists := clusterSet[spoke]; !exists {
-			return fmt.Errorf("spoke cluster %s not in spec.clusters", spoke)
-		}
-		if _, isHub := hubSet[spoke]; isHub {
-			return fmt.Errorf("cluster %s cannot be both hub and spoke", spoke)
-		}
-	}
-
-	if config.SpokeConnectivity != nil {
-		spokeSet := toSet(config.SpokeClusters)
-		for _, entry := range config.SpokeConnectivity {
-			if _, exists := spokeSet[entry.SourceCluster]; !exists {
-				return fmt.Errorf("spokeConnectivity source %s not a spoke cluster", entry.SourceCluster)
-			}
-			for _, target := range entry.TargetClusters {
-				if _, exists := spokeSet[target]; !exists {
-					return fmt.Errorf("spokeConnectivity target %s not a spoke cluster", target)
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 func (v *TopologyValidator) validateCustom(matrix []controllerv1alpha1.ConnectivityEntry, clusterSet map[string]struct{}) error {

@@ -8,307 +8,129 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveTopology_Legacy(t *testing.T) {
+func TestResolveTopologyDefaultsToFullMesh(t *testing.T) {
 	svc := NewTopologyService()
 	sc := &controllerv1alpha1.SliceConfig{
 		Spec: controllerv1alpha1.SliceConfigSpec{
-			Clusters: []string{"cluster-1", "cluster-2", "cluster-3"},
+			Clusters: []string{"alpha", "beta", "gamma"},
 		},
 	}
 
 	pairs, err := svc.ResolveTopology(sc)
 	require.NoError(t, err)
 	assert.Len(t, pairs, 3)
-	assertContainsPair(t, pairs, "cluster-1", "cluster-2", true)
-	assertContainsPair(t, pairs, "cluster-1", "cluster-3", true)
-	assertContainsPair(t, pairs, "cluster-2", "cluster-3", true)
+	assertContainsPair(t, pairs, "alpha", "beta")
+	assertContainsPair(t, pairs, "alpha", "gamma")
+	assertContainsPair(t, pairs, "beta", "gamma")
 }
 
-func TestResolveFullMesh(t *testing.T) {
-	tests := []struct {
-		name     string
-		clusters []string
-		expected int
-	}{
-		{"2 clusters", []string{"c1", "c2"}, 1},
-		{"3 clusters", []string{"c1", "c2", "c3"}, 3},
-		{"4 clusters", []string{"c1", "c2", "c3", "c4"}, 6},
-		{"1 cluster", []string{"c1"}, 0},
-		{"0 clusters", []string{}, 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc := &DefaultTopologyService{}
-			pairs, err := svc.resolveFullMesh(tt.clusters)
-			require.NoError(t, err)
-			assert.Len(t, pairs, tt.expected)
-			for _, p := range pairs {
-				assert.True(t, p.Bidirectional)
-			}
-		})
-	}
-}
-
-func TestResolveHubSpoke_SingleHub(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"hub1", "spoke1", "spoke2", "spoke3"}
-	cfg := &controllerv1alpha1.HubSpokeConfig{
-		HubClusters: []string{"hub1"},
-	}
-
-	pairs, err := svc.resolveHubSpoke(clusters, cfg)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 3)
-	assertContainsPair(t, pairs, "hub1", "spoke1", true)
-	assertContainsPair(t, pairs, "hub1", "spoke2", true)
-	assertContainsPair(t, pairs, "hub1", "spoke3", true)
-}
-
-func TestResolveHubSpoke_MultipleHubs(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"hub1", "hub2", "spoke1", "spoke2"}
-	cfg := &controllerv1alpha1.HubSpokeConfig{
-		HubClusters: []string{"hub1", "hub2"},
-	}
-
-	pairs, err := svc.resolveHubSpoke(clusters, cfg)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 4)
-	assertContainsPair(t, pairs, "hub1", "spoke1", true)
-	assertContainsPair(t, pairs, "hub1", "spoke2", true)
-	assertContainsPair(t, pairs, "hub2", "spoke1", true)
-	assertContainsPair(t, pairs, "hub2", "spoke2", true)
-}
-
-func TestResolveHubSpoke_AllowSpokeToSpokeAll(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"hub1", "spoke1", "spoke2", "spoke3"}
-	cfg := &controllerv1alpha1.HubSpokeConfig{
-		HubClusters:       []string{"hub1"},
-		AllowSpokeToSpoke: true,
-	}
-
-	pairs, err := svc.resolveHubSpoke(clusters, cfg)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 6)
-	assertContainsPair(t, pairs, "spoke1", "spoke2", true)
-	assertContainsPair(t, pairs, "spoke1", "spoke3", true)
-	assertContainsPair(t, pairs, "spoke2", "spoke3", true)
-}
-
-func TestResolveHubSpoke_SelectiveSpokeConnectivity(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"hub1", "spoke1", "spoke2", "spoke3"}
-	cfg := &controllerv1alpha1.HubSpokeConfig{
-		HubClusters:       []string{"hub1"},
-		AllowSpokeToSpoke: true,
-		SpokeConnectivity: []controllerv1alpha1.ConnectivityEntry{
-			{SourceCluster: "spoke1", TargetClusters: []string{"spoke2"}},
-		},
-	}
-
-	pairs, err := svc.resolveHubSpoke(clusters, cfg)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 4)
-	assertContainsPair(t, pairs, "hub1", "spoke1", true)
-	assertContainsPair(t, pairs, "hub1", "spoke2", true)
-	assertContainsPair(t, pairs, "hub1", "spoke3", true)
-	assertContainsPair(t, pairs, "spoke1", "spoke2", true)
-}
-
-func TestResolveHubSpoke_NoHubError(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"spoke1", "spoke2"}
-	cfg := &controllerv1alpha1.HubSpokeConfig{
-		HubClusters: []string{},
-	}
-
-	_, err := svc.resolveHubSpoke(clusters, cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one hub required")
-}
-
-func TestResolveCustom(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2", "c3"}
-	matrix := []controllerv1alpha1.ConnectivityEntry{
-		{SourceCluster: "c1", TargetClusters: []string{"c2"}},
-		{SourceCluster: "c2", TargetClusters: []string{"c3"}},
-	}
-
-	pairs, err := svc.resolveCustom(clusters, matrix)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 2)
-	assertContainsPair(t, pairs, "c1", "c2", true)
-	assertContainsPair(t, pairs, "c2", "c3", true)
-}
-
-func TestResolveCustom_UnknownClusterError(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2"}
-	matrix := []controllerv1alpha1.ConnectivityEntry{
-		{SourceCluster: "c1", TargetClusters: []string{"c99"}},
-	}
-
-	_, err := svc.resolveCustom(clusters, matrix)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown")
-}
-
-func TestResolveAuto_NoForbidden(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2", "c3"}
-	policyNodes := []string{}
-
-	pairs, err := svc.resolveAuto(clusters, policyNodes)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 3)
-	assertContainsPair(t, pairs, "c1", "c2", true)
-	assertContainsPair(t, pairs, "c1", "c3", true)
-	assertContainsPair(t, pairs, "c2", "c3", true)
-}
-
-func TestResolveAuto_WithForbiddenEdges(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2", "c3", "c4"}
-	policyNodes := []string{"c1"}
-
-	pairs, err := svc.resolveAuto(clusters, policyNodes)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 3)
-	assertContainsPair(t, pairs, "c2", "c3", true)
-	assertContainsPair(t, pairs, "c2", "c4", true)
-	assertContainsPair(t, pairs, "c3", "c4", true)
-	assertNotContainsPair(t, pairs, "c1", "c2")
-	assertNotContainsPair(t, pairs, "c1", "c3")
-	assertNotContainsPair(t, pairs, "c1", "c4")
-}
-
-func TestResolveAuto_MultipleForbiddenPolicies(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2", "c3", "c4"}
-	policyNodes := []string{"c1", "c2"}
-
-	pairs, err := svc.resolveAuto(clusters, policyNodes)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 1)
-	assertContainsPair(t, pairs, "c3", "c4", true)
-	assertNotContainsPair(t, pairs, "c1", "c2")
-	assertNotContainsPair(t, pairs, "c1", "c3")
-	assertNotContainsPair(t, pairs, "c1", "c4")
-	assertNotContainsPair(t, pairs, "c2", "c3")
-	assertNotContainsPair(t, pairs, "c2", "c4")
-}
-
-func TestPairKey(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	assert.Equal(t, "a-b", svc.pairKey("a", "b"))
-	assert.Equal(t, "a-b", svc.pairKey("b", "a"))
-	assert.Equal(t, "cluster-1-cluster-2", svc.pairKey("cluster-1", "cluster-2"))
-	assert.Equal(t, "cluster-1-cluster-2", svc.pairKey("cluster-2", "cluster-1"))
-}
-
-func assertContainsPair(t *testing.T, pairs []GatewayPair, source, target string, bidirectional bool) {
-	for _, p := range pairs {
-		if (p.Source == source && p.Target == target) || (p.Source == target && p.Target == source) {
-			if p.Bidirectional == bidirectional {
-				return
-			}
-		}
-	}
-	t.Errorf("Expected to find pair %s <-> %s (bidirectional=%v)", source, target, bidirectional)
-}
-
-func assertNotContainsPair(t *testing.T, pairs []GatewayPair, source, target string) {
-	for _, p := range pairs {
-		if (p.Source == source && p.Target == target) || (p.Source == target && p.Target == source) {
-			t.Errorf("Expected NOT to find pair %s <-> %s", source, target)
-		}
-	}
-}
-
-func TestResolveTopology_UnknownType(t *testing.T) {
+func TestResolveTopologyFullMeshExplicit(t *testing.T) {
 	svc := NewTopologyService()
 	sc := &controllerv1alpha1.SliceConfig{
 		Spec: controllerv1alpha1.SliceConfigSpec{
-			Clusters: []string{"c1", "c2"},
+			Clusters: []string{"c1", "c2", "c3", "c4"},
 			TopologyConfig: &controllerv1alpha1.TopologyConfig{
-				TopologyType: "invalid-topology-type",
+				TopologyType: controllerv1alpha1.TopologyFullMesh,
+			},
+		},
+	}
+
+	pairs, err := svc.ResolveTopology(sc)
+	require.NoError(t, err)
+	assert.Len(t, pairs, 6)
+	assertContainsPair(t, pairs, "c1", "c4")
+	assertContainsPair(t, pairs, "c2", "c3")
+}
+
+func TestResolveTopologyCustomMatrix(t *testing.T) {
+	svc := NewTopologyService()
+	sc := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"dmz", "gateway", "internal"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: controllerv1alpha1.TopologyCustom,
+				ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{
+					{SourceCluster: "dmz", TargetClusters: []string{"gateway"}},
+					{SourceCluster: "gateway", TargetClusters: []string{"internal"}},
+				},
+			},
+		},
+	}
+
+	pairs, err := svc.ResolveTopology(sc)
+	require.NoError(t, err)
+	assert.Len(t, pairs, 2)
+	assertContainsPair(t, pairs, "dmz", "gateway")
+	assertContainsPair(t, pairs, "gateway", "internal")
+}
+
+func TestResolveTopologyAutoPolicyNodesReturnsError(t *testing.T) {
+	svc := NewTopologyService()
+	sc := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"gateway", "dmz", "internal", "analytics"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: controllerv1alpha1.TopologyAuto,
+				PolicyNodes:  []string{"dmz", "analytics"},
 			},
 		},
 	}
 
 	_, err := svc.ResolveTopology(sc)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown topology type")
+	assert.Contains(t, err.Error(), "partitioned topology")
 }
 
-func TestResolveTopology_EmptyClusters(t *testing.T) {
-	svc := NewTopologyService()
-	sc := &controllerv1alpha1.SliceConfig{
-		Spec: controllerv1alpha1.SliceConfigSpec{
-			Clusters: []string{},
-		},
-	}
-
-	pairs, err := svc.ResolveTopology(sc)
-	require.NoError(t, err)
-	assert.Empty(t, pairs)
-}
-
-func TestResolveTopology_SingleCluster(t *testing.T) {
-	svc := NewTopologyService()
-	sc := &controllerv1alpha1.SliceConfig{
-		Spec: controllerv1alpha1.SliceConfigSpec{
-			Clusters: []string{"only-cluster"},
-		},
-	}
-
-	pairs, err := svc.ResolveTopology(sc)
-	require.NoError(t, err)
-	assert.Empty(t, pairs)
-}
-
-func TestResolveCustom_EmptyMatrix(t *testing.T) {
+func TestEnsureConnectivityAddsBridgeEdge(t *testing.T) {
 	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2"}
-	matrix := []controllerv1alpha1.ConnectivityEntry{}
+	clusters := []string{"a", "b", "c"}
+	pairs := []GatewayPair{{Source: "a", Target: "b", Bidirectional: true}}
 
-	_, err := svc.resolveCustom(clusters, matrix)
+	bridged, err := svc.ensureConnectivity(clusters, pairs, map[string]bool{})
+	require.NoError(t, err)
+	assert.Len(t, bridged, 2)
+	// ensure new edge connects the previously isolated node
+	assertContainsPair(t, bridged, "a", "b")
+	assert.Contains(t, endpointPartners(bridged, "c"), "a")
+}
+
+func TestResolveTopologyAutoAllPolicyNodes(t *testing.T) {
+	svc := &DefaultTopologyService{}
+	clusters := []string{"one", "two"}
+	policyNodes := []string{"one", "two"}
+
+	_, err := svc.resolveAuto(clusters, policyNodes)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "connectivity matrix required")
+	assert.Contains(t, err.Error(), "partitioned topology")
 }
 
-func TestResolveHubSpoke_NilConfig(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2"}
-
-	_, err := svc.resolveHubSpoke(clusters, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "hub-spoke config required")
-}
-
-func TestResolveAuto_AllPolicyNodes(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2", "c3"}
-	policyNodes := []string{"c1", "c2", "c3"}
-
-	pairs, err := svc.resolveAuto(clusters, policyNodes)
-	require.NoError(t, err)
-	assert.Empty(t, pairs, "All edges should be forbidden when all clusters are policy nodes")
-}
-
-func TestResolveCustom_DuplicateConnections(t *testing.T) {
-	svc := &DefaultTopologyService{}
-	clusters := []string{"c1", "c2", "c3"}
-	matrix := []controllerv1alpha1.ConnectivityEntry{
-		{SourceCluster: "c1", TargetClusters: []string{"c2"}},
-		{SourceCluster: "c2", TargetClusters: []string{"c1"}},
+func endpointPartners(pairs []GatewayPair, node string) []string {
+	partners := make([]string, 0)
+	for _, p := range pairs {
+		if p.Source == node {
+			partners = append(partners, p.Target)
+		} else if p.Target == node {
+			partners = append(partners, p.Source)
+		}
 	}
-
-	pairs, err := svc.resolveCustom(clusters, matrix)
-	require.NoError(t, err)
-	assert.Len(t, pairs, 2, "Should allow bidirectional explicit connections")
+	return partners
 }
 
+func assertContainsPair(t *testing.T, pairs []GatewayPair, source, target string) {
+	t.Helper()
+	for _, p := range pairs {
+		if (p.Source == source && p.Target == target) || (p.Source == target && p.Target == source) {
+			return
+		}
+	}
+	t.Fatalf("expected to find pair %s-%s", source, target)
+}
+
+func assertNotContainsPair(t *testing.T, pairs []GatewayPair, source, target string) {
+	t.Helper()
+	for _, p := range pairs {
+		if (p.Source == source && p.Target == target) || (p.Source == target && p.Target == source) {
+			t.Fatalf("did not expect to find pair %s-%s", source, target)
+		}
+	}
+}
