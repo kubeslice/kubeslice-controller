@@ -189,8 +189,7 @@ type TopologyConfig struct {
 	//+kubebuilder:default:=auto
 	TopologyType       TopologyType         `json:"topologyType,omitempty"`
 	ConnectivityMatrix []ConnectivityEntry  `json:"connectivityMatrix,omitempty"`
-	ClusterRoles       []ClusterRole        `json:"clusterRoles,omitempty"`
-	PolicyNodes        []string             `json:"policyNodes,omitempty"`
+	ForbiddenEdges     []ForbiddenEdge      `json:"forbiddenEdges,omitempty"`
 	AutoOptions        *AutoTopologyOptions `json:"autoOptions,omitempty"`
 }
 
@@ -201,12 +200,11 @@ type ConnectivityEntry struct {
 	TargetClusters []string `json:"targetClusters"`
 }
 
-type ClusterRole struct {
+type ForbiddenEdge struct {
 	//+kubebuilder:validation:Required
-	ClusterName string `json:"clusterName"`
-	//+kubebuilder:default:=auto
-	//+kubebuilder:validation:Enum:=auto;server;client
-	VPNRole string `json:"vpnRole,omitempty"`
+	SourceCluster string `json:"sourceCluster"`
+	//+kubebuilder:validation:Required
+	TargetClusters []string `json:"targetClusters"`
 }
 
 type AutoTopologyOptions struct {
