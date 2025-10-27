@@ -253,22 +253,6 @@ spec:
                         default: 5m
                         type: string
                     type: object
-                  clusterRoles:
-                    items:
-                      properties:
-                        clusterName:
-                          type: string
-                        vpnRole:
-                          default: auto
-                          enum:
-                          - auto
-                          - server
-                          - client
-                          type: string
-                      required:
-                      - clusterName
-                      type: object
-                    type: array
                   connectivityMatrix:
                     items:
                       properties:
@@ -283,9 +267,19 @@ spec:
                       - targetClusters
                       type: object
                     type: array
-                  policyNodes:
+                  forbiddenEdges:
                     items:
-                      type: string
+                      properties:
+                        sourceCluster:
+                          type: string
+                        targetClusters:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - sourceCluster
+                      - targetClusters
+                      type: object
                     type: array
                   topologyType:
                     default: auto
