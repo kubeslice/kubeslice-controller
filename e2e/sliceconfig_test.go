@@ -74,7 +74,15 @@ var _ = Describe("SliceConfig E2E tests", func() {
 		}, timeout, interval).Should(Succeed())
 
 		updatedSC.Spec.MaxClusters = 4
-		Expect(k8sClient.Update(ctx, updatedSC)).Should(Succeed())
+		Eventually(func() error {
+			// Always get the latest version before updating
+			latest := &controllerv1alpha1.SliceConfig{}
+			if err := k8sClient.Get(ctx, ObjectKey(namespace, sliceConfigName), latest); err != nil {
+				return err
+			}
+			latest.Spec.MaxClusters = 4
+			return k8sClient.Update(ctx, latest)
+		}, timeout, interval).Should(Succeed())
 
 		By("verifying the updated MaxClusters field")
 		Eventually(func() int {

@@ -50,7 +50,7 @@ all: build
 
 .PHONY: help
 help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
@@ -214,7 +214,7 @@ GINKGO ?= $(LOCALBIN)/ginkgo
 KIND ?= $(LOCALBIN)/kind
 
 .PHONY: e2e-setup
-e2e-setup: $(GINKGO) $(KIND) ## Install dependencies for E2E tests (ginkgo, kind)
+e2e-setup: $(GINKGO) $(KIND)
 $(GINKGO): $(LOCALBIN)
 	@test -s $(LOCALBIN)/ginkgo || GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
@@ -222,16 +222,27 @@ $(KIND): $(LOCALBIN)
 	@test -s $(LOCALBIN)/kind || GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@latest
 
 .PHONY: e2e-test
-e2e-test: e2e-setup ## Run all E2E tests using Ginkgo on Kind cluster
-	@echo " Creating Kind cluster: $(E2E_CLUSTER_NAME)"
-	$(KIND) create cluster --name $(E2E_CLUSTER_NAME) || true
-	@echo " Running Ginkgo tests..."
+e2e-test: e2e-setup
+	@echo "Using existing Kind cluster: $(E2E_CLUSTER_NAME)"
+	@if ! $(KIND) get clusters | grep -q $(E2E_CLUSTER_NAME); then \
+		echo "Cluster $(E2E_CLUSTER_NAME) not found! Please create it first."; \
+		exit 1; \
+	fi
+
+	@echo "Checking manager pod status..."
+	kubectl -n system get pods -l app=manager || true
+
+	@echo "Ensuring CRDs are applied..."
+	kubectl apply -f config/crd/bases || true
+
+	@echo "Running Ginkgo E2E tests..."
 	$(GINKGO) -v -r $(E2E_DIR)
-	@echo " E2E tests completed successfully."
+
+	@echo "E2E tests completed successfully."
 
 .PHONY: e2e-clean
-e2e-clean: ## Delete Kind cluster used for E2E tests
-	@echo " Cleaning up Kind cluster: $(E2E_CLUSTER_NAME)"
+e2e-clean: 
+	@echo "Cleaning up Kind cluster: $(E2E_CLUSTER_NAME)"
 	$(KIND) delete cluster --name $(E2E_CLUSTER_NAME) || true
 
 .PHONY: chart-deploy

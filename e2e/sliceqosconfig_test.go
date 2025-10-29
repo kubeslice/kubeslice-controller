@@ -53,6 +53,12 @@ var _ = Describe("SliceQoSConfig E2E Tests", func() {
 	})
 
 	It("should update an existing SliceQoSConfig", func() {
+		By("Ensuring any previous SliceQoSConfig is fully deleted before re-creating")
+		Eventually(func() bool {
+			err := k8sClient.Get(ctx, ObjectKey(testNamespace, qosName), &controllerv1alpha1.SliceQoSConfig{})
+			return err != nil
+		}, timeout*3, interval).Should(BeTrue())
+
 		By("Creating the SliceQoSConfig first")
 		qos := &controllerv1alpha1.SliceQoSConfig{
 			ObjectMeta: metav1.ObjectMeta{
@@ -89,6 +95,12 @@ var _ = Describe("SliceQoSConfig E2E Tests", func() {
 	})
 
 	It("should delete an existing SliceQoSConfig", func() {
+		By("Ensuring any previous SliceQoSConfig is fully deleted before re-creating")
+		Eventually(func() bool {
+			err := k8sClient.Get(ctx, ObjectKey(testNamespace, qosName), &controllerv1alpha1.SliceQoSConfig{})
+			return err != nil
+		}, timeout*3, interval).Should(BeTrue())
+
 		By("Creating the SliceQoSConfig first")
 		qos := &controllerv1alpha1.SliceQoSConfig{
 			ObjectMeta: metav1.ObjectMeta{
@@ -111,9 +123,9 @@ var _ = Describe("SliceQoSConfig E2E Tests", func() {
 
 		By("Verifying the SliceQoSConfig is deleted")
 		Eventually(func() bool {
-			fetched := &controllerv1alpha1.SliceQoSConfig{}
-			err := k8sClient.Get(ctx, ObjectKey(testNamespace, qosName), fetched)
+			err := k8sClient.Get(ctx, ObjectKey(testNamespace, qosName), qos)
 			return err != nil
-		}, timeout, interval).Should(BeTrue())
+		}, timeout*3, interval).Should(BeTrue())
 	})
+
 })

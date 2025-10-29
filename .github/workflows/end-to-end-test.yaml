@@ -87,6 +87,14 @@ jobs:
       env: 
          GITHUB_HEAD_COMMIT: ${{ steps.vars.outputs.sha_commit }}
 
+    - name: Run E2E Tests
+      run: |
+        echo "Running E2E Tests..."
+        make e2e-test
+      env:
+        KUBECONFIG: /home/runner/.kube/config
+        GITHUB_HEAD_COMMIT: ${{ steps.vars.outputs.sha_commit }}
+
     - name: Docker Run Action
       uses: addnab/docker-run-action@v3
       with:
@@ -181,4 +189,5 @@ jobs:
              for downloading the logs zip file in your local use this API url in curl command https://api.github.com/repos/kubeslice/kubeslice-controller/actions/runs/${{ github.run_id }}/logs
              the report url is https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html. 
              for looking all the allure reports (including old ones ) please visit at https://kubeslice.github.io/e2e-allure-reports/ .
-             please look result-summary.txt file for more info regarding test cases ( please note you will get result-summary.txt file only if your quality gate check steps ran successfully ). 
+             please look result-summary.txt file for more info regarding test cases ( please note you will get result-summary.txt file only if your quality gate check steps ran successfully ).
+             

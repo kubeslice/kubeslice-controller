@@ -8,6 +8,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -57,6 +60,15 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	ctx = context.Background()
+
+	namespaces := []string{"kubeslice-controller", "system"}
+	for _, ns := range namespaces {
+		nsObj := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}
+		err := k8sClient.Create(ctx, nsObj)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			Fail("Failed to create namespace " + ns + ": " + err.Error())
+		}
+	}
 })
 
 var _ = AfterSuite(func() {

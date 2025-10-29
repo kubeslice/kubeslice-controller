@@ -23,11 +23,17 @@ var _ = Describe("Project E2E", func() {
 	ctx := context.Background()
 
 	AfterEach(func() {
-		// cleanup project after each test
+		By("🧹 Cleaning up Project after each test")
 		project := &controllerv1alpha1.Project{}
 		err := k8sClient.Get(ctx, types.NamespacedName{Name: ProjectName, Namespace: ProjectNamespace}, project)
 		if err == nil {
-			Expect(k8sClient.Delete(ctx, project)).To(Succeed())
+			// Attempt delete
+			_ = k8sClient.Delete(ctx, project)
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: ProjectName, Namespace: ProjectNamespace}, project)
+				return err != nil
+			}, timeout*2, interval).Should(BeTrue(), "Project should be fully deleted before next test starts")
 		}
 	})
 
