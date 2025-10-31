@@ -578,3 +578,115 @@ func isPrivateIPAMSubnet(cidr string) bool {
 
 	return false
 }
+
+// CalculateFragmentation calculates the fragmentation percentage of allocated subnets
+// Fragmentation is measured as the ratio of gaps between allocated subnets to total available space
+func (ia *IpamAllocator) CalculateFragmentation(sliceSubnet string, subnetSize int, allocations []ClusterSubnetAllocation) (float64, error) {
+	// Validate inputs
+	if err := ia.ValidateSliceSubnet(sliceSubnet); err != nil {
+		return 0, err
+	}
+
+	// Validate subnet size
+	if subnetSize < MinSubnetSize || subnetSize > MaxSubnetSize {
+		return 0, ErrInvalidSubnetSize
+	}
+
+	// Calculate total possible subnets
+	totalSubnets, err := ia.CalculateMaxClusters(sliceSubnet, subnetSize)
+	if err != nil {
+		return 0, err
+	}
+
+	if totalSubnets == 0 || len(allocations) == 0 {
+		return 0.0, nil
+	}
+
+	// Parse slice subnet
+	_, sliceNet, err := net.ParseCIDR(sliceSubnet)
+	if err != nil {
+		return 0, err
+	}
+
+	// Extract and sort subnet indices for active allocations
+	indices := make([]int, 0, len(allocations))
+	for _, allocation := range allocations {
+		// Only consider active allocations
+		if allocation.Status != "Allocated" && allocation.Status != "InUse" {
+			continue
+		}
+
+		_, allocNet, err := net.ParseCIDR(allocation.Subnet)
+		if err != nil {
+			continue
+		}
+
+		// Calculate index within slice subnet
+		index := calculateSubnetIndex(sliceNet, allocNet, subnetSize)
+		if index >= 0 && index < totalSubnets {
+			indices = append(indices, index)
+		}
+	}
+
+	if len(indices) == 0 {
+		return 0.0, nil
+	}
+
+	sort.Ints(indices)
+
+	// Calculate fragmentation
+	// Method: Count gap regions (discontinuities in allocated subnets)
+	gapRegions := 0
+	if indices[0] > 0 {
+		gapRegions++ // Gap at start
+	}
+	for i := 1; i < len(indices); i++ {
+		if indices[i]-indices[i-1] > 1 {
+			gapRegions++ // Gap between allocations
+		}
+	}
+	if indices[len(indices)-1] < totalSubnets-1 {
+		gapRegions++ // Gap at end
+	}
+
+	// Calculate available space
+	availableSpace := totalSubnets - len(indices)
+	if availableSpace == 0 {
+		return 0.0, nil // Fully allocated, no fragmentation possible
+	}
+
+	// Fragmentation percentage: more regions = more fragmented
+	// Ideal: 1 continuous region = low fragmentation
+	// Worst: many small gaps = high fragmentation
+	fragmentation := float64(gapRegions) / float64(availableSpace) * 100
+
+	// Cap at 100%
+	if fragmentation > 100 {
+		fragmentation = 100
+	}
+
+	return fragmentation, nil
+}
+
+// calculateSubnetIndex calculates the index of a subnet within a parent subnet
+func calculateSubnetIndex(parentNet, subNet *net.IPNet, subnetSize int) int {
+	parentIP := ipToUint32(parentNet.IP)
+	subIP := ipToUint32(subNet.IP)
+
+	// Calculate the number of host bits in the subnet
+	hostBits := 32 - subnetSize
+
+	// Calculate index
+	index := int((subIP - parentIP) >> uint(hostBits))
+
+	return index
+}
+
+// ipToUint32 converts an IP address to a uint32
+func ipToUint32(ip net.IP) uint32 {
+	ip = ip.To4()
+	if ip == nil {
+		return 0
+	}
+	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
+}
