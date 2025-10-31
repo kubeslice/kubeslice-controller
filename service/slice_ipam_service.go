@@ -24,6 +24,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/metrics"
 	"github.com/kubeslice/kubeslice-controller/util"
+	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -93,6 +94,8 @@ func (s *SliceIpamService) ReconcileSliceIpam(ctx context.Context, req ctrl.Requ
 // AllocateSubnetForCluster allocates a subnet for a specific cluster in a slice
 func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceName, clusterName, namespace string) (string, error) {
 	logger := util.CtxLogger(ctx)
+	startTime := time.Now()
+
 	logger.Infof("Allocating subnet for cluster %s in slice %s", clusterName, sliceName)
 
 	// Get SliceIpam resource
@@ -152,9 +155,11 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 		return "", fmt.Errorf("failed to find available subnet: %v", err)
 	}
 
-	// If we found a Released entry and we're allocating the same subnet, update it in place
-	if releasedIndex >= 0 && releasedSubnet == subnet {
-		logger.Infof("Reusing released subnet %s for cluster %s - updating existing entry", subnet, clusterName)
+	// If we found a Released entry for this cluster, update it (regardless of subnet match)
+	// This prevents duplicate entries for the same cluster
+	if releasedIndex >= 0 {
+		logger.Infof("Reusing released entry for cluster %s - updating from %s to %s", clusterName, releasedSubnet, subnet)
+		sliceIpam.Status.AllocatedSubnets[releasedIndex].Subnet = subnet
 		sliceIpam.Status.AllocatedSubnets[releasedIndex].Status = "Allocated"
 		sliceIpam.Status.AllocatedSubnets[releasedIndex].AllocatedAt = metav1.Now()
 		sliceIpam.Status.AllocatedSubnets[releasedIndex].ReleasedAt = nil
@@ -178,8 +183,13 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 
 	// Update status subresource (use UpdateStatus instead of UpdateResource)
 	if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
+		// Record failure metric
+		s.recordAllocationMetrics(sliceName, clusterName, namespace, time.Since(startTime), "failure")
 		return "", fmt.Errorf("failed to update SliceIpam status: %v", err)
 	}
+
+	// Record success metrics
+	s.recordAllocationMetrics(sliceName, clusterName, namespace, time.Since(startTime), "success")
 
 	logger.Infof("Allocated subnet %s to cluster %s", subnet, clusterName)
 	return subnet, nil
@@ -227,6 +237,9 @@ func (s *SliceIpamService) ReleaseSubnetForCluster(ctx context.Context, sliceNam
 	if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
 		return fmt.Errorf("failed to update SliceIpam status: %v", err)
 	}
+
+	// Record release metrics
+	s.recordReleaseMetrics(sliceName, clusterName, namespace)
 
 	return nil
 }
@@ -417,6 +430,9 @@ func (s *SliceIpamService) reconcileSliceIpamState(ctx context.Context, sliceIpa
 	// Cleanup expired allocations (older than 24 hours)
 	s.cleanupExpiredAllocations(ctx, sliceIpam)
 
+	// Record current IPAM state metrics
+	s.recordIPAMStateMetrics(sliceIpam)
+
 	logger.Infof("Successfully reconciled SliceIpam %s", sliceIpam.Name)
 	return ctrl.Result{RequeueAfter: time.Hour}, nil
 }
@@ -520,6 +536,119 @@ func (s *SliceIpamService) cleanupExpiredAllocations(ctx context.Context, sliceI
 			logger.Errorf("Failed to cleanup expired allocations: %v", err)
 		} else {
 			logger.Infof("Cleaned up %d expired allocations for SliceIpam %s", cleaned, sliceIpam.Name)
+			// Record cleanup metric
+			s.recordCleanupMetrics(sliceIpam.Name, sliceIpam.Namespace, cleaned)
 		}
+	}
+}
+
+// recordAllocationMetrics records metrics for subnet allocation operations
+func (s *SliceIpamService) recordAllocationMetrics(sliceName, clusterName, namespace string, duration time.Duration, status string) {
+	// Set context for metrics
+	mr := s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
+	// Record allocation latency using prometheus labels directly
+	if metrics.IPAMAllocationLatency != nil {
+		labels := prometheus.Labels{
+			"cluster":                    clusterName,
+			"slice_name":                 sliceName,
+			"slice_project":              util.GetProjectName(namespace),
+			"slice_cluster":              util.ClusterController,
+			"slice_namespace":            namespace,
+			"slice_reporting_controller": util.InstanceController,
+		}
+		metrics.IPAMAllocationLatency.With(labels).Observe(duration.Seconds())
+	}
+
+	// Record allocation counter
+	mr.RecordCounterMetric(metrics.IPAMAllocationsTotal, map[string]string{
+		"cluster": clusterName,
+		"status":  status,
+	})
+}
+
+// recordReleaseMetrics records metrics for subnet release operations
+func (s *SliceIpamService) recordReleaseMetrics(sliceName, clusterName, namespace string) {
+	// Set context for metrics
+	mr := s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
+	// Record release counter
+	mr.RecordCounterMetric(metrics.IPAMReleasesTotal, map[string]string{
+		"cluster": clusterName,
+	})
+}
+
+// recordCleanupMetrics records metrics for cleanup operations
+func (s *SliceIpamService) recordCleanupMetrics(sliceName, namespace string, count int) {
+	// Set context for metrics
+	mr := s.mf.WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceName)
+
+	// Record cleanup counter
+	// Note: In Prometheus, counters can only be incremented by 1, so we increment multiple times
+	for i := 0; i < count; i++ {
+		mr.RecordCounterMetric(metrics.IPAMCleanupsTotal, map[string]string{})
+	}
+}
+
+// recordIPAMStateMetrics records gauge metrics for IPAM state
+func (s *SliceIpamService) recordIPAMStateMetrics(sliceIpam *v1alpha1.SliceIpam) {
+	// Set context for metrics
+	mr := s.mf.WithProject(util.GetProjectName(sliceIpam.Namespace)).
+		WithNamespace(sliceIpam.Namespace).
+		WithSlice(sliceIpam.Name)
+
+	// Count allocated subnets
+	allocatedCount := 0
+	for _, allocation := range sliceIpam.Status.AllocatedSubnets {
+		if allocation.Status == "Allocated" || allocation.Status == "InUse" {
+			allocatedCount++
+		}
+	}
+
+	// Record total subnets
+	mr.RecordGaugeMetric(metrics.IPAMTotalSubnets, map[string]string{}, float64(sliceIpam.Status.TotalSubnets))
+
+	// Record available subnets
+	mr.RecordGaugeMetric(metrics.IPAMAvailableSubnets, map[string]string{}, float64(sliceIpam.Status.AvailableSubnets))
+
+	// Record allocated subnets
+	mr.RecordGaugeMetric(metrics.IPAMAllocatedSubnets, map[string]string{}, float64(allocatedCount))
+
+	// Calculate and record utilization rate
+	var utilizationRate float64
+	if sliceIpam.Status.TotalSubnets > 0 {
+		utilizationRate = (float64(allocatedCount) / float64(sliceIpam.Status.TotalSubnets)) * 100
+	}
+	mr.RecordGaugeMetric(metrics.IPAMUtilizationRate, map[string]string{}, utilizationRate)
+
+	// Calculate and record fragmentation rate
+	// Convert allocations to util type
+	utilAllocations := make([]util.ClusterSubnetAllocation, len(sliceIpam.Status.AllocatedSubnets))
+	for i, allocation := range sliceIpam.Status.AllocatedSubnets {
+		utilAllocations[i] = util.ClusterSubnetAllocation{
+			ClusterName: allocation.ClusterName,
+			Subnet:      allocation.Subnet,
+			AllocatedAt: allocation.AllocatedAt.Time,
+			Status:      string(allocation.Status),
+		}
+		if allocation.ReleasedAt != nil {
+			releasedAt := allocation.ReleasedAt.Time
+			utilAllocations[i].ReleasedAt = &releasedAt
+		}
+	}
+
+	fragmentation, err := s.allocator.CalculateFragmentation(
+		sliceIpam.Spec.SliceSubnet,
+		sliceIpam.Spec.SubnetSize,
+		utilAllocations,
+	)
+	if err == nil {
+		mr.RecordGaugeMetric(metrics.IPAMFragmentationRate, map[string]string{}, fragmentation)
 	}
 }
