@@ -282,7 +282,7 @@ spec:
                       type: object
                     type: array
                   topologyType:
-                    default: auto
+                    default: full-mesh
                     enum:
                     - auto
                     - full-mesh
