@@ -1,0 +1,18 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: demo-full-mesh
+  namespace: kubeslice-avesha
+spec:
+  sliceSubnet: "10.1.0.0/16"
+  clusters: ["cluster-1", "cluster-2", "cluster-3", "cluster-4"]
+  topologyConfig:
+    topologyType: full-mesh
+  # Full-mesh creates all possible connections between clusters
+  # For 4 clusters: 6 gateway pairs (n*(n-1)/2)
+  # cluster-1 <-> cluster-2
+  # cluster-1 <-> cluster-3
+  # cluster-1 <-> cluster-4
+  # cluster-2 <-> cluster-3
+  # cluster-2 <-> cluster-4
+  # cluster-3 <-> cluster-4
