@@ -737,3 +737,4 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceConfigServiceTest", &eventRecorder)
 	return workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, workerServiceImportMock, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock
 }
+
