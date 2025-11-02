@@ -59,13 +59,8 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateMaxClusterCount(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	if sliceConfig.Spec.TopologyConfig != nil {
-		validator := NewTopologyValidator()
-		if err := validator.ValidateTopologyConfig(sliceConfig.Spec.TopologyConfig, sliceConfig.Spec.Clusters); err != nil {
-			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("topologyConfig"), sliceConfig.Spec.TopologyConfig, err.Error()),
-			})
-		}
+	if err := validateTopologyConfig(sliceConfig.Spec.TopologyConfig, sliceConfig.Spec.Clusters); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		if err := validateSliceSubnet(sliceConfig); err != nil {
@@ -114,15 +109,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	if sliceConfig.Spec.TopologyConfig != nil {
-		validator := NewTopologyValidator()
-		if err := validator.ValidateTopologyConfig(sliceConfig.Spec.TopologyConfig, sliceConfig.Spec.Clusters); err != nil {
-			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("topologyConfig"), sliceConfig.Spec.TopologyConfig, err.Error()),
-			})
-		}
+	if err := validateTopologyConfig(sliceConfig.Spec.TopologyConfig, sliceConfig.Spec.Clusters); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	// Validate single/multi overlay network deployment mode specific fields
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		if err := validateSliceSubnet(sliceConfig); err != nil {
 			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
@@ -691,4 +680,70 @@ func checkIfQoSConfigExists(ctx context.Context, namespace string, qosProfileNam
 		return false
 	}
 	return found
+}
+
+func validateTopologyConfig(topology *controllerv1alpha1.TopologyConfig, clusters []string) *field.Error {
+	if topology == nil {
+		return nil
+	}
+	clusterSet := make(map[string]struct{}, len(clusters))
+	for _, c := range clusters {
+		clusterSet[c] = struct{}{}
+	}
+	topologyPath := field.NewPath("spec", "topologyConfig")
+	switch topology.TopologyType {
+	case controllerv1alpha1.TopologyCustom:
+		if err := validateCustomTopology(topology.ConnectivityMatrix, clusterSet, topologyPath); err != nil {
+			return err
+		}
+	case controllerv1alpha1.TopologyAuto:
+		if err := validateAutoTopology(topology, clusterSet, topologyPath); err != nil {
+			return err
+		}
+	case controllerv1alpha1.TopologyFullMesh, "":
+	default:
+		return field.Invalid(topologyPath.Child("topologyType"), topology.TopologyType, "must be one of: auto, full-mesh, custom")
+	}
+	return validateForbiddenEdges(topology.ForbiddenEdges, clusterSet, topologyPath)
+}
+
+func validateCustomTopology(matrix []controllerv1alpha1.ConnectivityEntry, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
+	matrixPath := basePath.Child("connectivityMatrix")
+	if len(matrix) == 0 {
+		return field.Required(matrixPath, "required for custom topology")
+	}
+	for i, entry := range matrix {
+		entryPath := matrixPath.Index(i)
+		if _, exists := clusterSet[entry.SourceCluster]; !exists {
+			return field.Invalid(entryPath.Child("sourceCluster"), entry.SourceCluster, "not in spec.clusters")
+		}
+		for j, target := range entry.TargetClusters {
+			if _, exists := clusterSet[target]; !exists {
+				return field.Invalid(entryPath.Child("targetClusters").Index(j), target, "not in spec.clusters")
+			}
+		}
+	}
+	return nil
+}
+
+func validateAutoTopology(topology *controllerv1alpha1.TopologyConfig, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
+	// Soft removal: ignore autoOptions fields entirely at webhook layer
+	// Controller will not act on these fields and webhook will not validate them
+	return nil
+}
+
+func validateForbiddenEdges(edges []controllerv1alpha1.ForbiddenEdge, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
+	edgesPath := basePath.Child("forbiddenEdges")
+	for i, edge := range edges {
+		entryPath := edgesPath.Index(i)
+		if _, exists := clusterSet[edge.SourceCluster]; !exists {
+			return field.Invalid(entryPath.Child("sourceCluster"), edge.SourceCluster, "not in spec.clusters")
+		}
+		for j, target := range edge.TargetClusters {
+			if _, exists := clusterSet[target]; !exists {
+				return field.Invalid(entryPath.Child("targetClusters").Index(j), target, "not in spec.clusters")
+			}
+		}
+	}
+	return nil
 }
