@@ -8,9 +8,6 @@ spec:
   clusters: ["dmz", "gateway", "internal", "analytics"]
   topologyConfig:
     topologyType: auto
-    policyNodes: ["gateway"]
-    clusterRoles:
-      - clusterName: gateway
-        vpnRole: server
-      - clusterName: dmz
-        vpnRole: client
+    forbiddenEdges:
+      - sourceCluster: gateway
+        targetClusters: ["dmz", "analytics"]
