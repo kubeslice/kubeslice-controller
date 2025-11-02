@@ -2316,3 +2316,107 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest", nil)
 	return clientMock, sliceConfig, ctx
 }
+
+func TestValidateTopologyConfig_FullMesh(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyFullMesh,
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.Nil(t, err)
+}
+
+func TestValidateTopologyConfig_CustomMatrix(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyCustom,
+		ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{
+			{SourceCluster: "c1", TargetClusters: []string{"c2", "c3"}},
+		},
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.Nil(t, err)
+}
+
+func TestValidateTopologyConfig_CustomEmptyMatrix(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType:       controllerv1alpha1.TopologyCustom,
+		ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{},
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "required for custom topology")
+}
+
+func TestValidateTopologyConfig_InvalidClusterInMatrix(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyCustom,
+		ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{
+			{SourceCluster: "invalid", TargetClusters: []string{"c2"}},
+		},
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateTopologyConfig_AutoWithOptions(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyAuto,
+		AutoOptions: &controllerv1alpha1.AutoTopologyOptions{
+			EnableShortcuts:          true,
+			RelativeThresholdPercent: 20,
+			PersistenceWindows:       3,
+			MaxShortcuts:             5,
+		},
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.Nil(t, err)
+}
+
+func TestValidateTopologyConfig_AutoInvalidThreshold(t *testing.T) {
+	// Soft removal: invalid values should no longer trigger webhook validation errors
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyAuto,
+		AutoOptions: &controllerv1alpha1.AutoTopologyOptions{
+			RelativeThresholdPercent: 600,
+		},
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.Nil(t, err)
+}
+
+func TestValidateTopologyConfig_InvalidForbiddenEdge(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyAuto,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "invalid", TargetClusters: []string{"c1"}},
+		},
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateTopologyConfig_InvalidType(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: "invalid-type",
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "must be one of")
+}
