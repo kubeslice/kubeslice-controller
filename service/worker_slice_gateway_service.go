@@ -46,7 +46,8 @@ const gatewayName = "%s-%s-%s"
 type IWorkerSliceGatewayService interface {
 	ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string,
-		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error)
+		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string,
+		sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []GatewayPair) (ctrl.Result, error)
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
@@ -348,7 +349,7 @@ type IndividualCertPairRequest struct {
 // CreateMinimumWorkerSliceGateways is a function to create gateways with minimum specification
 func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error) {
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []GatewayPair) (ctrl.Result, error) {
 
 	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
 	if err != nil {
@@ -358,7 +359,7 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 		return ctrl.Result{}, nil
 	}
 
-	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, gatewayPairs)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -438,9 +439,10 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 // createMinimumGatewaysIfNotExists is a helper function to create the gateways between worker clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, ownerLabel map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error) {
-	noClusters := len(clusterNames)
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []GatewayPair) (ctrl.Result, error) {
 	logger := util.CtxLogger(ctx)
+
+	// Build cluster mapping
 	clusterMapping := map[string]*controllerv1alpha1.Cluster{}
 	for _, clusterName := range clusterNames {
 		cluster := controllerv1alpha1.Cluster{}
@@ -450,28 +452,42 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		}
 		clusterMapping[clusterName] = &cluster
 	}
-	for i := 0; i < noClusters; i++ {
-		for j := i + 1; j < noClusters; j++ {
-			sourceCluster, destinationCluster := clusterMapping[clusterNames[i]], clusterMapping[clusterNames[j]]
-			gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
-			gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
-			// determine the gateway svc parameters
-			sliceGwSvcType := defaultSliceGatewayServiceType
-			gwSvcProtocol := defaultSliceGatewayServiceProtocol
-			if val, exists := sliceGwSvcTypeMap[sourceCluster.Name]; exists {
-				sliceGwSvcType = val.Type
-				gwSvcProtocol = val.Protocol
-			}
-			logger.Debugf("setting gwConType in create_minwsg %s", sliceGwSvcType)
-			logger.Debugf("setting gwProto in create_minwsg %s", gwSvcProtocol)
-			err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
+
+	logger.Infof("Creating %d gateway pairs for slice %s", len(gatewayPairs), sliceName)
+
+	// Create gateways for each resolved pair
+	for _, pair := range gatewayPairs {
+		sourceCluster := clusterMapping[pair.Source]
+		destinationCluster := clusterMapping[pair.Target]
+
+		if sourceCluster == nil || destinationCluster == nil {
+			logger.Errorf("Cluster not found in mapping: source=%s, dest=%s", pair.Source, pair.Target)
+			continue
+		}
+
+		gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
+		gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
+
+		// Determine the gateway svc parameters
+		sliceGwSvcType := defaultSliceGatewayServiceType
+		gwSvcProtocol := defaultSliceGatewayServiceProtocol
+		if val, exists := sliceGwSvcTypeMap[sourceCluster.Name]; exists {
+			sliceGwSvcType = val.Type
+			gwSvcProtocol = val.Protocol
+		}
+
+		logger.Debugf("Creating gateway pair: %s <-> %s (type=%s, proto=%s)",
+			sourceCluster.Name, destinationCluster.Name, sliceGwSvcType, gwSvcProtocol)
+
+		err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace,
+			sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses)
+		if err != nil {
+			return ctrl.Result{}, err
 		}
 	}
-	return ctrl.Result{}, nil
 
+	logger.Infof("Successfully created %d gateway pairs for slice %s", len(gatewayPairs), sliceName)
+	return ctrl.Result{}, nil
 }
 
 // createMinimumGateWayPairIfNotExists is a function to create the pair of gatways between 2 clusters if not exists
