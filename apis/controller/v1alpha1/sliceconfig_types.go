@@ -186,7 +186,7 @@ const (
 )
 
 type TopologyConfig struct {
-	//+kubebuilder:default:=auto
+	//+kubebuilder:default:=full-mesh
 	TopologyType       TopologyType         `json:"topologyType,omitempty"`
 	ConnectivityMatrix []ConnectivityEntry  `json:"connectivityMatrix,omitempty"`
 	ForbiddenEdges     []ForbiddenEdge      `json:"forbiddenEdges,omitempty"`

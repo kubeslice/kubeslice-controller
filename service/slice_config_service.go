@@ -204,7 +204,6 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 
 	// Step 5: Resolve topology to get gateway pairs
-	// Following pattern: calculate data in SliceConfigService before delegating to sub-services
 	gatewayPairs, err := s.resolveTopologyPairs(sliceConfig)
 	if err != nil {
 		logger.Errorf("Failed to resolve topology for slice %s: %v", sliceConfig.Name, err)
@@ -449,7 +448,6 @@ type GatewayPair struct {
 }
 
 // resolveTopologyPairs calculates gateway pairs based on topology configuration
-// Following pattern: direct usage from sliceConfig.Spec (like QOSProfile)
 func (s *SliceConfigService) resolveTopologyPairs(sliceConfig *v1alpha1.SliceConfig) ([]GatewayPair, error) {
 	clusters := sliceConfig.Spec.Clusters
 
