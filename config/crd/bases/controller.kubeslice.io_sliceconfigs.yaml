@@ -230,29 +230,6 @@ spec:
               topologyConfig:
                 description: TopologyConfig defines cluster connectivity patterns
                 properties:
-                  autoOptions:
-                    properties:
-                      enableShortcuts:
-                        default: false
-                        type: boolean
-                      maxShortcuts:
-                        default: 10
-                        maximum: 50
-                        minimum: 1
-                        type: integer
-                      persistenceWindows:
-                        default: 3
-                        minimum: 1
-                        type: integer
-                      relativeThresholdPercent:
-                        default: 20
-                        maximum: 500
-                        minimum: 1
-                        type: integer
-                      telemetryWindow:
-                        default: 5m
-                        type: string
-                    type: object
                   connectivityMatrix:
                     items:
                       properties:
