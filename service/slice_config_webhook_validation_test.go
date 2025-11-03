@@ -2369,12 +2369,6 @@ func TestValidateTopologyConfig_InvalidClusterInMatrix(t *testing.T) {
 func TestValidateTopologyConfig_AutoWithOptions(t *testing.T) {
 	topology := &controllerv1alpha1.TopologyConfig{
 		TopologyType: controllerv1alpha1.TopologyAuto,
-		AutoOptions: &controllerv1alpha1.AutoTopologyOptions{
-			EnableShortcuts:          true,
-			RelativeThresholdPercent: 20,
-			PersistenceWindows:       3,
-			MaxShortcuts:             5,
-		},
 	}
 	clusters := []string{"c1", "c2", "c3"}
 
@@ -2383,12 +2377,8 @@ func TestValidateTopologyConfig_AutoWithOptions(t *testing.T) {
 }
 
 func TestValidateTopologyConfig_AutoInvalidThreshold(t *testing.T) {
-	// Soft removal: invalid values should no longer trigger webhook validation errors
 	topology := &controllerv1alpha1.TopologyConfig{
 		TopologyType: controllerv1alpha1.TopologyAuto,
-		AutoOptions: &controllerv1alpha1.AutoTopologyOptions{
-			RelativeThresholdPercent: 600,
-		},
 	}
 	clusters := []string{"c1", "c2"}
 
