@@ -187,10 +187,9 @@ const (
 
 type TopologyConfig struct {
 	//+kubebuilder:default:=full-mesh
-	TopologyType       TopologyType         `json:"topologyType,omitempty"`
-	ConnectivityMatrix []ConnectivityEntry  `json:"connectivityMatrix,omitempty"`
-	ForbiddenEdges     []ForbiddenEdge      `json:"forbiddenEdges,omitempty"`
-	AutoOptions        *AutoTopologyOptions `json:"autoOptions,omitempty"`
+	TopologyType       TopologyType        `json:"topologyType,omitempty"`
+	ConnectivityMatrix []ConnectivityEntry `json:"connectivityMatrix,omitempty"`
+	ForbiddenEdges     []ForbiddenEdge     `json:"forbiddenEdges,omitempty"`
 }
 
 type ConnectivityEntry struct {
@@ -207,23 +206,6 @@ type ForbiddenEdge struct {
 	TargetClusters []string `json:"targetClusters"`
 }
 
-type AutoTopologyOptions struct {
-	//+kubebuilder:default:=false
-	EnableShortcuts bool `json:"enableShortcuts,omitempty"`
-	//+kubebuilder:default:=20
-	//+kubebuilder:validation:Minimum=1
-	//+kubebuilder:validation:Maximum=500
-	RelativeThresholdPercent int `json:"relativeThresholdPercent,omitempty"`
-	//+kubebuilder:default:=3
-	//+kubebuilder:validation:Minimum=1
-	PersistenceWindows int `json:"persistenceWindows,omitempty"`
-	//+kubebuilder:default:=10
-	//+kubebuilder:validation:Minimum=1
-	//+kubebuilder:validation:Maximum=50
-	MaxShortcuts int `json:"maxShortcuts,omitempty"`
-	//+kubebuilder:default:="5m"
-	TelemetryWindow string `json:"telemetryWindow,omitempty"`
-}
 
 type KubesliceEvent struct {
 	// Type of the event. Can be one of Error, Success or InProgress
