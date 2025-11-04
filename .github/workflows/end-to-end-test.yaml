@@ -20,20 +20,20 @@ jobs:
     if: ${{ github.event.label.name == 'ready-to-test' }}
     steps:
     - name: checkout the repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         ref: ${{ github.event.pull_request.head.sha }}
-    
+
     - name: Get branch name
       id: branch-name
-      uses: tj-actions/branch-names@v7.0.7
-      
+      uses: tj-actions/branch-names@v9
+
     - name: Set outputs
       id: vars
       run: echo "sha_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
     - name: build the kubeslice controller
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v6
       with:
         tags: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
         build-args: |
@@ -104,7 +104,7 @@ jobs:
           bash run.sh kind
 
     - name: Checkout gh-pages repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: kubeslice/e2e-allure-reports
         path: gh-pages
@@ -143,7 +143,7 @@ jobs:
         SSH_AUTH_SOCK: /tmp/ssh_agent.sock
           
     - name: Deploy report to Github Pages
-      uses: peaceiris/actions-gh-pages@v3
+      uses: peaceiris/actions-gh-pages@v4
       with:
         publish_branch: gh-pages
         deploy_key: ${{ secrets.E2E_ALLURE_REPORTS_PRIVATE_KEY }}
@@ -172,7 +172,7 @@ jobs:
     
     - name: Send mail
       if: always()
-      uses: dawidd6/action-send-mail@v3
+      uses: dawidd6/action-send-mail@v6
       with:
        server_address: smtp.gmail.com
        server_port: 465
