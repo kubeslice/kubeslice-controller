@@ -453,8 +453,8 @@ func (s *SliceConfigService) resolveTopologyPairs(sliceConfig *v1alpha1.SliceCon
 		return s.resolveFullMeshTopology(clusters), nil
 	case v1alpha1.TopologyCustom:
 		return s.resolveCustomTopology(clusters, sliceConfig.Spec.TopologyConfig.ConnectivityMatrix)
-	case v1alpha1.TopologyAuto:
-		return s.resolveAutoTopology(clusters, sliceConfig.Spec.TopologyConfig.ForbiddenEdges)
+	case v1alpha1.TopologyRestricted:
+		return s.resolveRestrictedTopology(clusters, sliceConfig.Spec.TopologyConfig.ForbiddenEdges)
 	default:
 		return nil, fmt.Errorf("unknown topology type: %s", sliceConfig.Spec.TopologyConfig.TopologyType)
 	}
@@ -507,8 +507,8 @@ func (s *SliceConfigService) resolveCustomTopology(clusters []string, matrix []v
 	return pairs, nil
 }
 
-// resolveAutoTopology creates full-mesh and removes forbidden edges
-func (s *SliceConfigService) resolveAutoTopology(clusters []string, forbiddenEdges []v1alpha1.ForbiddenEdge) ([]util.GatewayPair, error) {
+// resolveRestrictedTopology creates full-mesh and removes forbidden edges
+func (s *SliceConfigService) resolveRestrictedTopology(clusters []string, forbiddenEdges []v1alpha1.ForbiddenEdge) ([]util.GatewayPair, error) {
 	// Start with full mesh
 	allPairs := s.resolveFullMeshTopology(clusters)
 

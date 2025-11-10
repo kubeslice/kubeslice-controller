@@ -696,13 +696,13 @@ func validateTopologyConfig(topology *controllerv1alpha1.TopologyConfig, cluster
 		if err := validateCustomTopology(topology.ConnectivityMatrix, clusterSet, topologyPath); err != nil {
 			return err
 		}
-	case controllerv1alpha1.TopologyAuto:
-		if err := validateAutoTopology(topology, clusterSet, topologyPath); err != nil {
+	case controllerv1alpha1.TopologyRestricted:
+		if err := validateRestrictedTopology(topology, clusterSet, topologyPath); err != nil {
 			return err
 		}
 	case controllerv1alpha1.TopologyFullMesh, "":
 	default:
-		return field.Invalid(topologyPath.Child("topologyType"), topology.TopologyType, "must be one of: auto, full-mesh, custom")
+		return field.Invalid(topologyPath.Child("topologyType"), topology.TopologyType, "must be one of: restricted, full-mesh, custom")
 	}
 	return validateForbiddenEdges(topology.ForbiddenEdges, clusterSet, topologyPath)
 }
@@ -726,7 +726,7 @@ func validateCustomTopology(matrix []controllerv1alpha1.ConnectivityEntry, clust
 	return nil
 }
 
-func validateAutoTopology(topology *controllerv1alpha1.TopologyConfig, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
+func validateRestrictedTopology(topology *controllerv1alpha1.TopologyConfig, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
 	// Soft removal: ignore autoOptions fields entirely at webhook layer
 	// Controller will not act on these fields and webhook will not validate them
 	return nil
