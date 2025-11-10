@@ -440,15 +440,7 @@ func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, 
 	return ctrl.Result{}, nil
 }
 
-// GatewayPair represents a bidirectional connection between two clusters
-type GatewayPair struct {
-	Source        string
-	Target        string
-	Bidirectional bool
-}
-
-// resolveTopologyPairs calculates gateway pairs based on topology configuration
-func (s *SliceConfigService) resolveTopologyPairs(sliceConfig *v1alpha1.SliceConfig) ([]GatewayPair, error) {
+func (s *SliceConfigService) resolveTopologyPairs(sliceConfig *v1alpha1.SliceConfig) ([]util.GatewayPair, error) {
 	clusters := sliceConfig.Spec.Clusters
 
 	// Default to full-mesh if no topology config
@@ -469,15 +461,15 @@ func (s *SliceConfigService) resolveTopologyPairs(sliceConfig *v1alpha1.SliceCon
 }
 
 // resolveFullMeshTopology creates bidirectional pairs for all cluster combinations
-func (s *SliceConfigService) resolveFullMeshTopology(clusters []string) []GatewayPair {
+func (s *SliceConfigService) resolveFullMeshTopology(clusters []string) []util.GatewayPair {
 	if len(clusters) < 2 {
-		return []GatewayPair{}
+		return []util.GatewayPair{}
 	}
 
-	pairs := make([]GatewayPair, 0, len(clusters)*(len(clusters)-1)/2)
+	pairs := make([]util.GatewayPair, 0, len(clusters)*(len(clusters)-1)/2)
 	for i := 0; i < len(clusters); i++ {
 		for j := i + 1; j < len(clusters); j++ {
-			pairs = append(pairs, GatewayPair{
+			pairs = append(pairs, util.GatewayPair{
 				Source:        clusters[i],
 				Target:        clusters[j],
 				Bidirectional: true,
@@ -488,13 +480,13 @@ func (s *SliceConfigService) resolveFullMeshTopology(clusters []string) []Gatewa
 }
 
 // resolveCustomTopology creates pairs based on explicit connectivity matrix
-func (s *SliceConfigService) resolveCustomTopology(clusters []string, matrix []v1alpha1.ConnectivityEntry) ([]GatewayPair, error) {
+func (s *SliceConfigService) resolveCustomTopology(clusters []string, matrix []v1alpha1.ConnectivityEntry) ([]util.GatewayPair, error) {
 	if len(matrix) == 0 {
 		return nil, fmt.Errorf("custom topology requires connectivity matrix")
 	}
 
 	clusterSet := s.makeClusterSet(clusters)
-	pairs := make([]GatewayPair, 0)
+	pairs := make([]util.GatewayPair, 0)
 
 	for _, entry := range matrix {
 		if !clusterSet[entry.SourceCluster] {
@@ -504,7 +496,7 @@ func (s *SliceConfigService) resolveCustomTopology(clusters []string, matrix []v
 			if !clusterSet[target] {
 				return nil, fmt.Errorf("connectivity entry references unknown target cluster: %s", target)
 			}
-			pairs = append(pairs, GatewayPair{
+			pairs = append(pairs, util.GatewayPair{
 				Source:        entry.SourceCluster,
 				Target:        target,
 				Bidirectional: true,
@@ -516,7 +508,7 @@ func (s *SliceConfigService) resolveCustomTopology(clusters []string, matrix []v
 }
 
 // resolveAutoTopology creates full-mesh and removes forbidden edges
-func (s *SliceConfigService) resolveAutoTopology(clusters []string, forbiddenEdges []v1alpha1.ForbiddenEdge) ([]GatewayPair, error) {
+func (s *SliceConfigService) resolveAutoTopology(clusters []string, forbiddenEdges []v1alpha1.ForbiddenEdge) ([]util.GatewayPair, error) {
 	// Start with full mesh
 	allPairs := s.resolveFullMeshTopology(clusters)
 
@@ -551,8 +543,8 @@ func (s *SliceConfigService) buildForbiddenSet(forbiddenEdges []v1alpha1.Forbidd
 }
 
 // filterForbiddenPairs removes pairs that are in the forbidden set
-func (s *SliceConfigService) filterForbiddenPairs(pairs []GatewayPair, forbidden map[string]bool) []GatewayPair {
-	filtered := make([]GatewayPair, 0, len(pairs))
+func (s *SliceConfigService) filterForbiddenPairs(pairs []util.GatewayPair, forbidden map[string]bool) []util.GatewayPair {
+	filtered := make([]util.GatewayPair, 0, len(pairs))
 	for _, p := range pairs {
 		if !forbidden[s.pairKey(p.Source, p.Target)] {
 			filtered = append(filtered, p)
@@ -562,7 +554,7 @@ func (s *SliceConfigService) filterForbiddenPairs(pairs []GatewayPair, forbidden
 }
 
 // ensureConnectivity adds bridge edges if forbidden edges create partitions
-func (s *SliceConfigService) ensureConnectivity(clusters []string, pairs []GatewayPair, forbidden map[string]bool) ([]GatewayPair, error) {
+func (s *SliceConfigService) ensureConnectivity(clusters []string, pairs []util.GatewayPair, forbidden map[string]bool) ([]util.GatewayPair, error) {
 	graph := s.buildGraph(pairs)
 	components := s.findConnectedComponents(clusters, graph)
 
@@ -585,7 +577,7 @@ func (s *SliceConfigService) ensureConnectivity(clusters []string, pairs []Gatew
 }
 
 // buildGraph creates adjacency list from gateway pairs
-func (s *SliceConfigService) buildGraph(pairs []GatewayPair) map[string][]string {
+func (s *SliceConfigService) buildGraph(pairs []util.GatewayPair) map[string][]string {
 	graph := make(map[string][]string)
 	for _, p := range pairs {
 		graph[p.Source] = append(graph[p.Source], p.Target)
@@ -624,8 +616,8 @@ func (s *SliceConfigService) dfsComponent(node string, graph map[string][]string
 }
 
 // findBridgeEdges finds edges to connect partitioned components
-func (s *SliceConfigService) findBridgeEdges(components [][]string, forbidden map[string]bool) []GatewayPair {
-	bridges := make([]GatewayPair, 0)
+func (s *SliceConfigService) findBridgeEdges(components [][]string, forbidden map[string]bool) []util.GatewayPair {
+	bridges := make([]util.GatewayPair, 0)
 
 	// Connect each component to the next
 	for i := 0; i < len(components); i++ {
@@ -638,7 +630,7 @@ func (s *SliceConfigService) findBridgeEdges(components [][]string, forbidden ma
 				for _, nj := range components[j] {
 					key := s.pairKey(ni, nj)
 					if !forbidden[key] {
-						bridges = append(bridges, GatewayPair{
+						bridges = append(bridges, util.GatewayPair{
 							Source:        ni,
 							Target:        nj,
 							Bidirectional: true,

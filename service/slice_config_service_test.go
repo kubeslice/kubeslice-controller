@@ -750,7 +750,7 @@ func TestResolveTopologyPairs_DefaultFullMesh(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, pairs, 3)
 	
-	expectedPairs := []GatewayPair{
+	expectedPairs := []util.GatewayPair{
 		{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 		{Source: "cluster1", Target: "cluster3", Bidirectional: true},
 		{Source: "cluster2", Target: "cluster3", Bidirectional: true},
@@ -796,7 +796,7 @@ func TestResolveTopologyPairs_CustomTopology(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, pairs, 2)
 	
-	expectedPairs := []GatewayPair{
+	expectedPairs := []util.GatewayPair{
 		{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 		{Source: "cluster2", Target: "cluster3", Bidirectional: true},
 	}
@@ -839,7 +839,7 @@ func TestResolveTopologyPairs_AutoTopology(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, pairs, 2)
 	
-	expectedPairs := []GatewayPair{
+	expectedPairs := []util.GatewayPair{
 		{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 		{Source: "cluster2", Target: "cluster3", Bidirectional: true},
 	}
@@ -901,7 +901,7 @@ func TestResolveFullMeshTopology(t *testing.T) {
 		pairs := service.resolveFullMeshTopology([]string{"cluster1", "cluster2", "cluster3"})
 		require.Len(t, pairs, 3)
 		
-		expectedPairs := []GatewayPair{
+		expectedPairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 			{Source: "cluster1", Target: "cluster3", Bidirectional: true},
 			{Source: "cluster2", Target: "cluster3", Bidirectional: true},
@@ -928,7 +928,7 @@ func TestResolveCustomTopology(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, pairs, 2)
 		
-		expectedPairs := []GatewayPair{
+		expectedPairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 			{Source: "cluster1", Target: "cluster3", Bidirectional: true},
 		}
@@ -949,7 +949,7 @@ func TestResolveCustomTopology(t *testing.T) {
 			{SourceCluster: "invalid", TargetClusters: []string{"cluster2"}},
 		}
 		
-		pairs, err := service.resolveCustomTopology(clusters, matrix)
+		_, err := service.resolveCustomTopology(clusters, matrix)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unknown source cluster: invalid")
 	})
@@ -959,7 +959,7 @@ func TestResolveCustomTopology(t *testing.T) {
 			{SourceCluster: "cluster1", TargetClusters: []string{"invalid"}},
 		}
 		
-		pairs, err := service.resolveCustomTopology(clusters, matrix)
+		_, err := service.resolveCustomTopology(clusters, matrix)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unknown target cluster: invalid")
 	})
@@ -986,7 +986,7 @@ func TestResolveAutoTopology(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, pairs, 3)
 		
-		expectedPairs := []GatewayPair{
+		expectedPairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 			{Source: "cluster1", Target: "cluster3", Bidirectional: true},
 			{Source: "cluster2", Target: "cluster3", Bidirectional: true},
@@ -1003,7 +1003,7 @@ func TestResolveAutoTopology(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, pairs, 2)
 		
-		expectedPairs := []GatewayPair{
+		expectedPairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 			{Source: "cluster2", Target: "cluster3", Bidirectional: true},
 		}
@@ -1016,7 +1016,7 @@ func TestResolveAutoTopology(t *testing.T) {
 			{SourceCluster: "cluster2", TargetClusters: []string{"cluster3"}},
 		}
 		
-		pairs, err := service.resolveAutoTopology(clusters, forbiddenEdges)
+		_, err := service.resolveAutoTopology(clusters, forbiddenEdges)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "partitioned topology with no safe bridge edges available")
 	})
@@ -1070,7 +1070,7 @@ func TestFilterForbiddenPairs(t *testing.T) {
 	service := &SliceConfigService{}
 	
 	t.Run("FilterSomePairs", func(t *testing.T) {
-		pairs := []GatewayPair{
+		pairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 			{Source: "cluster1", Target: "cluster3", Bidirectional: true},
 			{Source: "cluster2", Target: "cluster3", Bidirectional: true},
@@ -1083,7 +1083,7 @@ func TestFilterForbiddenPairs(t *testing.T) {
 		filtered := service.filterForbiddenPairs(pairs, forbidden)
 		require.Len(t, filtered, 2)
 		
-		expectedPairs := []GatewayPair{
+		expectedPairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 			{Source: "cluster2", Target: "cluster3", Bidirectional: true},
 		}
@@ -1091,7 +1091,7 @@ func TestFilterForbiddenPairs(t *testing.T) {
 	})
 	
 	t.Run("NoForbiddenPairs", func(t *testing.T) {
-		pairs := []GatewayPair{
+		pairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 		}
 		
@@ -1102,7 +1102,7 @@ func TestFilterForbiddenPairs(t *testing.T) {
 	})
 	
 	t.Run("AllPairsForbidden", func(t *testing.T) {
-		pairs := []GatewayPair{
+		pairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 		}
 		
@@ -1138,7 +1138,7 @@ func TestEnsureConnectivity(t *testing.T) {
 	
 	t.Run("AlreadyConnected", func(t *testing.T) {
 		clusters := []string{"cluster1", "cluster2", "cluster3"}
-		pairs := []GatewayPair{
+		pairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 			{Source: "cluster2", Target: "cluster3", Bidirectional: true},
 		}
@@ -1151,7 +1151,7 @@ func TestEnsureConnectivity(t *testing.T) {
 	
 	t.Run("DisconnectedWithBridge", func(t *testing.T) {
 		clusters := []string{"cluster1", "cluster2", "cluster3"}
-		pairs := []GatewayPair{
+		pairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
 		}
 		forbidden := map[string]bool{
@@ -1161,12 +1161,12 @@ func TestEnsureConnectivity(t *testing.T) {
 		result, err := service.ensureConnectivity(clusters, pairs, forbidden)
 		require.NoError(t, err)
 		require.Len(t, result, 2)
-		require.Contains(t, result, GatewayPair{Source: "cluster2", Target: "cluster3", Bidirectional: true})
+		require.Contains(t, result, util.GatewayPair{Source: "cluster2", Target: "cluster3", Bidirectional: true})
 	})
 	
 	t.Run("CompletelyDisconnected", func(t *testing.T) {
 		clusters := []string{"cluster1", "cluster2", "cluster3"}
-		pairs := []GatewayPair{}
+		pairs := []util.GatewayPair{}
 		forbidden := map[string]bool{
 			"cluster1-cluster2": true,
 			"cluster1-cluster3": true,

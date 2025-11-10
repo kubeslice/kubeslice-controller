@@ -47,7 +47,7 @@ type IWorkerSliceGatewayService interface {
 	ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string,
 		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string,
-		sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []GatewayPair) (ctrl.Result, error)
+		sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []util.GatewayPair) (ctrl.Result, error)
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
@@ -349,7 +349,7 @@ type IndividualCertPairRequest struct {
 // CreateMinimumWorkerSliceGateways is a function to create gateways with minimum specification
 func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []GatewayPair) (ctrl.Result, error) {
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []util.GatewayPair) (ctrl.Result, error) {
 
 	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
 	if err != nil {
@@ -439,7 +439,7 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 // createMinimumGatewaysIfNotExists is a helper function to create the gateways between worker clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, ownerLabel map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []GatewayPair) (ctrl.Result, error) {
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []util.GatewayPair) (ctrl.Result, error) {
 	logger := util.CtxLogger(ctx)
 
 	// Build cluster mapping
