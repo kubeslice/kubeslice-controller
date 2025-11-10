@@ -827,7 +827,7 @@ func TestResolveTopologyPairs_AutoTopology(t *testing.T) {
 		Spec: controllerv1alpha1.SliceConfigSpec{
 			Clusters: []string{"cluster1", "cluster2", "cluster3"},
 			TopologyConfig: &controllerv1alpha1.TopologyConfig{
-				TopologyType: controllerv1alpha1.TopologyAuto,
+				TopologyType: controllerv1alpha1.TopologyRestricted,
 				ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
 					{SourceCluster: "cluster1", TargetClusters: []string{"cluster3"}},
 				},
@@ -852,7 +852,7 @@ func TestResolveTopologyPairs_AutoTopologyNoForbidden(t *testing.T) {
 		Spec: controllerv1alpha1.SliceConfigSpec{
 			Clusters: []string{"cluster1", "cluster2"},
 			TopologyConfig: &controllerv1alpha1.TopologyConfig{
-				TopologyType: controllerv1alpha1.TopologyAuto,
+				TopologyType: controllerv1alpha1.TopologyRestricted,
 			},
 		},
 	}
@@ -982,7 +982,7 @@ func TestResolveAutoTopology(t *testing.T) {
 	clusters := []string{"cluster1", "cluster2", "cluster3"}
 	
 	t.Run("NoForbiddenEdges", func(t *testing.T) {
-		pairs, err := service.resolveAutoTopology(clusters, []controllerv1alpha1.ForbiddenEdge{})
+		pairs, err := service.resolveRestrictedTopology(clusters, []controllerv1alpha1.ForbiddenEdge{})
 		require.NoError(t, err)
 		require.Len(t, pairs, 3)
 		
@@ -999,7 +999,7 @@ func TestResolveAutoTopology(t *testing.T) {
 			{SourceCluster: "cluster1", TargetClusters: []string{"cluster3"}},
 		}
 		
-		pairs, err := service.resolveAutoTopology(clusters, forbiddenEdges)
+		pairs, err := service.resolveRestrictedTopology(clusters, forbiddenEdges)
 		require.NoError(t, err)
 		require.Len(t, pairs, 2)
 		
@@ -1016,7 +1016,7 @@ func TestResolveAutoTopology(t *testing.T) {
 			{SourceCluster: "cluster2", TargetClusters: []string{"cluster3"}},
 		}
 		
-		_, err := service.resolveAutoTopology(clusters, forbiddenEdges)
+		_, err := service.resolveRestrictedTopology(clusters, forbiddenEdges)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "partitioned topology with no safe bridge edges available")
 	})
@@ -1028,7 +1028,7 @@ func TestResolveAutoTopology(t *testing.T) {
 			{SourceCluster: "cluster2", TargetClusters: []string{"cluster4"}},
 		}
 		
-		pairs, err := service.resolveAutoTopology(clusters4, forbiddenEdges)
+		pairs, err := service.resolveRestrictedTopology(clusters4, forbiddenEdges)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(pairs), 3)
 	})

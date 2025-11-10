@@ -2368,7 +2368,7 @@ func TestValidateTopologyConfig_InvalidClusterInMatrix(t *testing.T) {
 
 func TestValidateTopologyConfig_AutoWithOptions(t *testing.T) {
 	topology := &controllerv1alpha1.TopologyConfig{
-		TopologyType: controllerv1alpha1.TopologyAuto,
+		TopologyType: controllerv1alpha1.TopologyRestricted,
 	}
 	clusters := []string{"c1", "c2", "c3"}
 
@@ -2378,7 +2378,7 @@ func TestValidateTopologyConfig_AutoWithOptions(t *testing.T) {
 
 func TestValidateTopologyConfig_AutoInvalidThreshold(t *testing.T) {
 	topology := &controllerv1alpha1.TopologyConfig{
-		TopologyType: controllerv1alpha1.TopologyAuto,
+		TopologyType: controllerv1alpha1.TopologyRestricted,
 	}
 	clusters := []string{"c1", "c2"}
 
@@ -2388,7 +2388,7 @@ func TestValidateTopologyConfig_AutoInvalidThreshold(t *testing.T) {
 
 func TestValidateTopologyConfig_InvalidForbiddenEdge(t *testing.T) {
 	topology := &controllerv1alpha1.TopologyConfig{
-		TopologyType: controllerv1alpha1.TopologyAuto,
+		TopologyType: controllerv1alpha1.TopologyRestricted,
 		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
 			{SourceCluster: "invalid", TargetClusters: []string{"c1"}},
 		},
