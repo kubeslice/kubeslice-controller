@@ -38,6 +38,7 @@ import (
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	k8sapimachinery "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -276,14 +277,14 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 	return nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, clusterServiceMock, sliceConfigServiceMock, serviceExportConfigServiceMock, sliceQoSConfigServiceMock, mMock
 }
 
-func prepareProjectTestContext(ctx context.Context, client util.Client,
+func prepareProjectTestContext(ctx context.Context, c client.Client,
 	scheme *runtime.Scheme) context.Context {
-	eventRecorder := events.NewEventRecorder(client, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
+	eventRecorder := events.NewEventRecorder(c, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
 		Component: util.ComponentController,
 		Slice:     util.NotApplicable,
 	})
-	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, client, scheme, "ProjectTestController", &eventRecorder)
+	preparedCtx := util.PrepareKubeSliceControllersRequestContext(ctx, c, scheme, "ProjectTestController", &eventRecorder)
 	return preparedCtx
 }
