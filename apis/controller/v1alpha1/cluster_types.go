@@ -78,6 +78,9 @@ type Telemetry struct {
 	TelemetryProvider string `json:"telemetryProvider,omitempty"`
 	// Endpoint is the Telemetry Endpoint
 	Endpoint string `json:"endpoint,omitempty"`
+	// MetricsEnabled enables EGS metrics pipeline. When false (default), uses DCGM metrics. When true, uses EGS_* metrics.
+	//+kubebuilder:default:=false
+	MetricsEnabled bool `json:"metricsEnabled,omitempty"`
 }
 
 // GeoLocation defines the field of ClusterSpec
