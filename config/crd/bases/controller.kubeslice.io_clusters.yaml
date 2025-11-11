@@ -96,6 +96,12 @@ spec:
                       endpoint:
                         description: Endpoint is the Telemetry Endpoint
                         type: string
+                      metricsEnabled:
+                        default: false
+                        description: MetricsEnabled enables EGS metrics pipeline.
+                          When false (default), uses DCGM metrics. When true, uses
+                          EGS_* metrics.
+                        type: boolean
                       telemetryProvider:
                         description: TelemetryProvider is the Telemetry Provider information
                         type: string
