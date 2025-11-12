@@ -261,11 +261,12 @@ spec:
                   topologyType:
                     default: full-mesh
                     enum:
-                    - auto
+                    - restricted
                     - full-mesh
                     - custom
                     type: string
                 type: object
+                
               vpnConfig:
                 description: VPNConfiguration defines the additional (optional) VPN
                   Configuration to customise
