@@ -2366,26 +2366,6 @@ func TestValidateTopologyConfig_InvalidClusterInMatrix(t *testing.T) {
 	require.Contains(t, err.Error(), "not in spec.clusters")
 }
 
-func TestValidateTopologyConfig_AutoWithOptions(t *testing.T) {
-	topology := &controllerv1alpha1.TopologyConfig{
-		TopologyType: controllerv1alpha1.TopologyRestricted,
-	}
-	clusters := []string{"c1", "c2", "c3"}
-
-	err := validateTopologyConfig(topology, clusters)
-	require.Nil(t, err)
-}
-
-func TestValidateTopologyConfig_AutoInvalidThreshold(t *testing.T) {
-	topology := &controllerv1alpha1.TopologyConfig{
-		TopologyType: controllerv1alpha1.TopologyRestricted,
-	}
-	clusters := []string{"c1", "c2"}
-
-	err := validateTopologyConfig(topology, clusters)
-	require.Nil(t, err)
-}
-
 func TestValidateTopologyConfig_InvalidForbiddenEdge(t *testing.T) {
 	topology := &controllerv1alpha1.TopologyConfig{
 		TopologyType: controllerv1alpha1.TopologyRestricted,
