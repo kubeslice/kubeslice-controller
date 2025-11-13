@@ -39,9 +39,8 @@ type WorkerSliceGatewayNetworkAddresses struct {
 }
 
 type GatewayPair struct {
-	Source        string
-	Target        string
-	Bidirectional bool
+	Source string
+	Target string
 }
 
 // AppendHyphenToString is a function add hyphen at the end of string

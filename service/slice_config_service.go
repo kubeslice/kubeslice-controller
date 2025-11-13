@@ -460,26 +460,25 @@ func (s *SliceConfigService) resolveTopologyPairs(sliceConfig *v1alpha1.SliceCon
 	}
 }
 
-// resolveFullMeshTopology creates bidirectional pairs for all cluster combinations
 func (s *SliceConfigService) resolveFullMeshTopology(clusters []string) []util.GatewayPair {
 	if len(clusters) < 2 {
 		return []util.GatewayPair{}
 	}
 
-	pairs := make([]util.GatewayPair, 0, len(clusters)*(len(clusters)-1)/2)
+	pairs := make([]util.GatewayPair, 0, len(clusters)*(len(clusters)-1))
 	for i := 0; i < len(clusters); i++ {
-		for j := i + 1; j < len(clusters); j++ {
-			pairs = append(pairs, util.GatewayPair{
-				Source:        clusters[i],
-				Target:        clusters[j],
-				Bidirectional: true,
-			})
+		for j := 0; j < len(clusters); j++ {
+			if i != j {
+				pairs = append(pairs, util.GatewayPair{
+					Source: clusters[i],
+					Target: clusters[j],
+				})
+			}
 		}
 	}
 	return pairs
 }
 
-// resolveCustomTopology creates pairs based on explicit connectivity matrix
 func (s *SliceConfigService) resolveCustomTopology(clusters []string, matrix []v1alpha1.ConnectivityEntry) ([]util.GatewayPair, error) {
 	if len(matrix) == 0 {
 		return nil, fmt.Errorf("custom topology requires connectivity matrix")
@@ -497,9 +496,8 @@ func (s *SliceConfigService) resolveCustomTopology(clusters []string, matrix []v
 				return nil, fmt.Errorf("connectivity entry references unknown target cluster: %s", target)
 			}
 			pairs = append(pairs, util.GatewayPair{
-				Source:        entry.SourceCluster,
-				Target:        target,
-				Bidirectional: true,
+				Source: entry.SourceCluster,
+				Target: target,
 			})
 		}
 	}
@@ -530,7 +528,8 @@ func (s *SliceConfigService) buildForbiddenSet(forbiddenEdges []v1alpha1.Forbidd
 	forbidden := make(map[string]bool)
 	for _, edge := range forbiddenEdges {
 		for _, target := range edge.TargetClusters {
-			forbidden[s.pairKey(edge.SourceCluster, target)] = true
+			key := edge.SourceCluster + "-" + target
+			forbidden[key] = true
 		}
 	}
 	return forbidden
@@ -540,7 +539,8 @@ func (s *SliceConfigService) buildForbiddenSet(forbiddenEdges []v1alpha1.Forbidd
 func (s *SliceConfigService) filterForbiddenPairs(pairs []util.GatewayPair, forbidden map[string]bool) []util.GatewayPair {
 	filtered := make([]util.GatewayPair, 0, len(pairs))
 	for _, p := range pairs {
-		if !forbidden[s.pairKey(p.Source, p.Target)] {
+		key := p.Source + "-" + p.Target
+		if !forbidden[key] {
 			filtered = append(filtered, p)
 		}
 	}

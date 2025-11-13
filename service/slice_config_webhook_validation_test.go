@@ -2410,3 +2410,33 @@ func TestValidateTopologyConfig_InvalidType(t *testing.T) {
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "must be one of")
 }
+
+func TestValidateTopologyConfig_RestrictedIsolatedClusters(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "c1", TargetClusters: []string{"c2", "c3"}},
+			{SourceCluster: "c2", TargetClusters: []string{"c1", "c3"}},
+			{SourceCluster: "c3", TargetClusters: []string{"c1", "c2"}},
+		},
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "isolated clusters")
+}
+
+func TestValidateTopologyConfig_RestrictedPartiallyConnected(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "c1", TargetClusters: []string{"c3"}},
+		},
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.Nil(t, err)
+}
+
