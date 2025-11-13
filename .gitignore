@@ -33,7 +33,3 @@ work
 cover.out
 coverage.out
 .vscode
-*.md 
-demo/
-scripts/
-tests/
