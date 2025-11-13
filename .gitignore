@@ -33,8 +33,4 @@ work
 cover.out
 coverage.out
 .vscode
-demo/
-tests/
-scripts/
-docs/
-copilot*
+
