@@ -727,9 +727,56 @@ func validateCustomTopology(matrix []controllerv1alpha1.ConnectivityEntry, clust
 }
 
 func validateRestrictedTopology(topology *controllerv1alpha1.TopologyConfig, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
-	// Soft removal: ignore autoOptions fields entirely at webhook layer
-	// Controller will not act on these fields and webhook will not validate them
+	if len(topology.ForbiddenEdges) == 0 {
+		return nil
+	}
+
+	clusters := make([]string, 0, len(clusterSet))
+	for c := range clusterSet {
+		clusters = append(clusters, c)
+	}
+
+	forbidden := buildForbiddenSetStatic(topology.ForbiddenEdges)
+
+	reachable := make(map[string]struct{})
+	if len(clusters) > 0 {
+		queue := []string{clusters[0]}
+		reachable[clusters[0]] = struct{}{}
+		for len(queue) > 0 {
+			current := queue[0]
+			queue = queue[1:]
+
+			for _, next := range clusters {
+				if next == current {
+					continue
+				}
+				if _, exists := reachable[next]; exists {
+					continue
+				}
+				key := current + "-" + next
+				if !forbidden[key] {
+					reachable[next] = struct{}{}
+					queue = append(queue, next)
+				}
+			}
+		}
+	}
+
+	if len(reachable) != len(clusterSet) {
+		return field.Invalid(basePath, topology, "forbidden edges create isolated clusters")
+	}
+
 	return nil
+}
+
+func buildForbiddenSetStatic(forbiddenEdges []controllerv1alpha1.ForbiddenEdge) map[string]bool {
+	forbidden := make(map[string]bool)
+	for _, edge := range forbiddenEdges {
+		for _, target := range edge.TargetClusters {
+			forbidden[edge.SourceCluster+"-"+target] = true
+		}
+	}
+	return forbidden
 }
 
 func validateForbiddenEdges(edges []controllerv1alpha1.ForbiddenEdge, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
