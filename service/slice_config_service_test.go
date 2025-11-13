@@ -841,13 +841,13 @@ func TestResolveTopologyPairs_RestrictedTopology(t *testing.T) {
 
 	pairs, err := service.resolveTopologyPairs(sliceConfig)
 	require.NoError(t, err)
-	require.Len(t, pairs, 5)
+	// Forbidding 1→3 also removes 3→1 (bidirectional gateway)
+	require.Len(t, pairs, 4)
 	
 	expectedPairs := []util.GatewayPair{
 		{Source: "cluster1", Target: "cluster2"},
 		{Source: "cluster2", Target: "cluster1"},
 		{Source: "cluster2", Target: "cluster3"},
-		{Source: "cluster3", Target: "cluster1"},
 		{Source: "cluster3", Target: "cluster2"},
 	}
 	require.ElementsMatch(t, expectedPairs, pairs)
@@ -1017,13 +1017,13 @@ func TestResolveRestrictedTopology(t *testing.T) {
 		
 		pairs, err := service.resolveRestrictedTopology(clusters, forbiddenEdges)
 		require.NoError(t, err)
-		require.Len(t, pairs, 5)
+		// Forbidding 1→3 also removes 3→1 (bidirectional gateway)
+		require.Len(t, pairs, 4)
 		
 		expectedPairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2"},
 			{Source: "cluster2", Target: "cluster1"},
 			{Source: "cluster2", Target: "cluster3"},
-			{Source: "cluster3", Target: "cluster1"},
 			{Source: "cluster3", Target: "cluster2"},
 		}
 		require.ElementsMatch(t, expectedPairs, pairs)

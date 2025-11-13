@@ -740,7 +740,7 @@ var _ = Describe("Slice Config controller - Topology Tests", Ordered, func() {
 
 		Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
 
-		By("Verifying 4 gateway objects are created (2 pairs remaining after forbidding 1→3, 4 gateway objects)")
+		By("Verifying 4 gateway objects are created (forbidding 1↔3 removes both directions due to bidirectional tunnels, leaving 2 pairs * 2 objects = 4 gateways)")
 		Eventually(func() bool {
 			gatewayList := workerv1alpha1.WorkerSliceGatewayList{}
 			err := k8sClient.List(ctx, &gatewayList,
