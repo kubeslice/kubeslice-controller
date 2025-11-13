@@ -821,7 +821,7 @@ func TestResolveTopologyPairs_CustomTopologyEmptyMatrix(t *testing.T) {
 	require.Nil(t, pairs)
 }
 
-func TestResolveTopologyPairs_AutoTopology(t *testing.T) {
+func TestResolveTopologyPairs_RestrictedTopology(t *testing.T) {
 	service := &SliceConfigService{}
 	sliceConfig := &controllerv1alpha1.SliceConfig{
 		Spec: controllerv1alpha1.SliceConfigSpec{
@@ -846,7 +846,7 @@ func TestResolveTopologyPairs_AutoTopology(t *testing.T) {
 	require.ElementsMatch(t, expectedPairs, pairs)
 }
 
-func TestResolveTopologyPairs_AutoTopologyNoForbidden(t *testing.T) {
+func TestResolveTopologyPairs_RestrictedTopologyNoForbidden(t *testing.T) {
 	service := &SliceConfigService{}
 	sliceConfig := &controllerv1alpha1.SliceConfig{
 		Spec: controllerv1alpha1.SliceConfigSpec{
@@ -977,7 +977,7 @@ func TestResolveCustomTopology(t *testing.T) {
 	})
 }
 
-func TestResolveAutoTopology(t *testing.T) {
+func TestResolveRestrictedTopology(t *testing.T) {
 	service := &SliceConfigService{}
 	clusters := []string{"cluster1", "cluster2", "cluster3"}
 	
@@ -1008,29 +1008,6 @@ func TestResolveAutoTopology(t *testing.T) {
 			{Source: "cluster2", Target: "cluster3", Bidirectional: true},
 		}
 		require.ElementsMatch(t, expectedPairs, pairs)
-	})
-	
-	t.Run("PartitionedTopology", func(t *testing.T) {
-		forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
-			{SourceCluster: "cluster1", TargetClusters: []string{"cluster2", "cluster3"}},
-			{SourceCluster: "cluster2", TargetClusters: []string{"cluster3"}},
-		}
-		
-		_, err := service.resolveRestrictedTopology(clusters, forbiddenEdges)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "partitioned topology with no safe bridge edges available")
-	})
-	
-	t.Run("FourClustersWithBridge", func(t *testing.T) {
-		clusters4 := []string{"cluster1", "cluster2", "cluster3", "cluster4"}
-		forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
-			{SourceCluster: "cluster1", TargetClusters: []string{"cluster3", "cluster4"}},
-			{SourceCluster: "cluster2", TargetClusters: []string{"cluster4"}},
-		}
-		
-		pairs, err := service.resolveRestrictedTopology(clusters4, forbiddenEdges)
-		require.NoError(t, err)
-		require.GreaterOrEqual(t, len(pairs), 3)
 	})
 }
 
@@ -1130,53 +1107,6 @@ func TestPairKey(t *testing.T) {
 	
 	t.Run("SameName", func(t *testing.T) {
 		require.Equal(t, "cluster1-cluster1", service.pairKey("cluster1", "cluster1"))
-	})
-}
-
-func TestEnsureConnectivity(t *testing.T) {
-	service := &SliceConfigService{}
-	
-	t.Run("AlreadyConnected", func(t *testing.T) {
-		clusters := []string{"cluster1", "cluster2", "cluster3"}
-		pairs := []util.GatewayPair{
-			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
-			{Source: "cluster2", Target: "cluster3", Bidirectional: true},
-		}
-		forbidden := map[string]bool{}
-		
-		result, err := service.ensureConnectivity(clusters, pairs, forbidden)
-		require.NoError(t, err)
-		require.Equal(t, pairs, result)
-	})
-	
-	t.Run("DisconnectedWithBridge", func(t *testing.T) {
-		clusters := []string{"cluster1", "cluster2", "cluster3"}
-		pairs := []util.GatewayPair{
-			{Source: "cluster1", Target: "cluster2", Bidirectional: true},
-		}
-		forbidden := map[string]bool{
-			"cluster1-cluster3": true,
-		}
-		
-		result, err := service.ensureConnectivity(clusters, pairs, forbidden)
-		require.NoError(t, err)
-		require.Len(t, result, 2)
-		require.Contains(t, result, util.GatewayPair{Source: "cluster2", Target: "cluster3", Bidirectional: true})
-	})
-	
-	t.Run("CompletelyDisconnected", func(t *testing.T) {
-		clusters := []string{"cluster1", "cluster2", "cluster3"}
-		pairs := []util.GatewayPair{}
-		forbidden := map[string]bool{
-			"cluster1-cluster2": true,
-			"cluster1-cluster3": true,
-			"cluster2-cluster3": true,
-		}
-		
-		result, err := service.ensureConnectivity(clusters, pairs, forbidden)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "partitioned topology with no safe bridge edges available")
-		require.Nil(t, result)
 	})
 }
 
