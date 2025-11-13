@@ -522,13 +522,7 @@ func (s *SliceConfigService) resolveRestrictedTopology(clusters []string, forbid
 	// Filter out forbidden pairs
 	filtered := s.filterForbiddenPairs(allPairs, forbidden)
 
-	// Ensure connectivity (add bridge edges if partitioned)
-	preservedPairs, err := s.ensureConnectivity(clusters, filtered, forbidden)
-	if err != nil {
-		return nil, err
-	}
-
-	return preservedPairs, nil
+	return filtered, nil
 }
 
 // buildForbiddenSet creates a map of forbidden edges
@@ -551,99 +545,6 @@ func (s *SliceConfigService) filterForbiddenPairs(pairs []util.GatewayPair, forb
 		}
 	}
 	return filtered
-}
-
-// ensureConnectivity adds bridge edges if forbidden edges create partitions
-func (s *SliceConfigService) ensureConnectivity(clusters []string, pairs []util.GatewayPair, forbidden map[string]bool) ([]util.GatewayPair, error) {
-	graph := s.buildGraph(pairs)
-	components := s.findConnectedComponents(clusters, graph)
-
-	if len(components) <= 1 {
-		return pairs, nil
-	}
-
-	// Find bridge edges between components
-	bridgeEdges := s.findBridgeEdges(components, forbidden)
-	if len(bridgeEdges) == 0 {
-		return nil, fmt.Errorf("forbidden edges create partitioned topology with no safe bridge edges available")
-	}
-
-	// Add bridge edges to reconnect components
-	for _, bridge := range bridgeEdges {
-		pairs = append(pairs, bridge)
-	}
-
-	return pairs, nil
-}
-
-// buildGraph creates adjacency list from gateway pairs
-func (s *SliceConfigService) buildGraph(pairs []util.GatewayPair) map[string][]string {
-	graph := make(map[string][]string)
-	for _, p := range pairs {
-		graph[p.Source] = append(graph[p.Source], p.Target)
-		graph[p.Target] = append(graph[p.Target], p.Source)
-	}
-	return graph
-}
-
-// findConnectedComponents uses DFS to find all connected components
-func (s *SliceConfigService) findConnectedComponents(clusters []string, graph map[string][]string) [][]string {
-	visited := make(map[string]bool)
-	components := make([][]string, 0)
-
-	for _, cluster := range clusters {
-		if !visited[cluster] {
-			component := s.dfsComponent(cluster, graph, visited)
-			components = append(components, component)
-		}
-	}
-
-	return components
-}
-
-// dfsComponent performs depth-first search to find a component
-func (s *SliceConfigService) dfsComponent(node string, graph map[string][]string, visited map[string]bool) []string {
-	visited[node] = true
-	component := []string{node}
-
-	for _, neighbor := range graph[node] {
-		if !visited[neighbor] {
-			component = append(component, s.dfsComponent(neighbor, graph, visited)...)
-		}
-	}
-
-	return component
-}
-
-// findBridgeEdges finds edges to connect partitioned components
-func (s *SliceConfigService) findBridgeEdges(components [][]string, forbidden map[string]bool) []util.GatewayPair {
-	bridges := make([]util.GatewayPair, 0)
-
-	// Connect each component to the next
-	for i := 0; i < len(components); i++ {
-		for j := i + 1; j < len(components); j++ {
-			added := false
-			for _, ni := range components[i] {
-				if added {
-					break
-				}
-				for _, nj := range components[j] {
-					key := s.pairKey(ni, nj)
-					if !forbidden[key] {
-						bridges = append(bridges, util.GatewayPair{
-							Source:        ni,
-							Target:        nj,
-							Bidirectional: true,
-						})
-						added = true
-						break
-					}
-				}
-			}
-		}
-	}
-
-	return bridges
 }
 
 // makeClusterSet creates a set from cluster list
