@@ -536,11 +536,16 @@ func (s *SliceConfigService) buildForbiddenSet(forbiddenEdges []v1alpha1.Forbidd
 }
 
 // filterForbiddenPairs removes pairs that are in the forbidden set
+// Since gateway creation is bidirectional (creates both server and client),
+// we must filter out BOTH directions if either is forbidden
 func (s *SliceConfigService) filterForbiddenPairs(pairs []util.GatewayPair, forbidden map[string]bool) []util.GatewayPair {
 	filtered := make([]util.GatewayPair, 0, len(pairs))
 	for _, p := range pairs {
-		key := p.Source + "-" + p.Target
-		if !forbidden[key] {
+		forwardKey := p.Source + "-" + p.Target
+		reverseKey := p.Target + "-" + p.Source
+		
+		// Skip if EITHER direction is forbidden (because gateway is bidirectional)
+		if !forbidden[forwardKey] && !forbidden[reverseKey] {
 			filtered = append(filtered, p)
 		}
 	}
@@ -554,12 +559,4 @@ func (s *SliceConfigService) makeClusterSet(clusters []string) map[string]bool {
 		set[cluster] = true
 	}
 	return set
-}
-
-// pairKey creates a normalized key for a cluster pair
-func (s *SliceConfigService) pairKey(a, b string) string {
-	if a < b {
-		return a + "-" + b
-	}
-	return b + "-" + a
 }
