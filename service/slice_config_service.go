@@ -560,11 +560,3 @@ func (s *SliceConfigService) makeClusterSet(clusters []string) map[string]bool {
 	}
 	return set
 }
-
-// pairKey creates a normalized key for a cluster pair
-func (s *SliceConfigService) pairKey(a, b string) string {
-	if a < b {
-		return a + "-" + b
-	}
-	return b + "-" + a
-}
