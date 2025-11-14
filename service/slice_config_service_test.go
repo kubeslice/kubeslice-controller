@@ -841,13 +841,13 @@ func TestResolveTopologyPairs_RestrictedTopology(t *testing.T) {
 
 	pairs, err := service.resolveTopologyPairs(sliceConfig)
 	require.NoError(t, err)
-	require.Len(t, pairs, 5)
+	// Forbidding 1→3 also removes 3→1 (bidirectional gateway)
+	require.Len(t, pairs, 4)
 	
 	expectedPairs := []util.GatewayPair{
 		{Source: "cluster1", Target: "cluster2"},
 		{Source: "cluster2", Target: "cluster1"},
 		{Source: "cluster2", Target: "cluster3"},
-		{Source: "cluster3", Target: "cluster1"},
 		{Source: "cluster3", Target: "cluster2"},
 	}
 	require.ElementsMatch(t, expectedPairs, pairs)
@@ -1017,13 +1017,13 @@ func TestResolveRestrictedTopology(t *testing.T) {
 		
 		pairs, err := service.resolveRestrictedTopology(clusters, forbiddenEdges)
 		require.NoError(t, err)
-		require.Len(t, pairs, 5)
+		// Forbidding 1→3 also removes 3→1 (bidirectional gateway)
+		require.Len(t, pairs, 4)
 		
 		expectedPairs := []util.GatewayPair{
 			{Source: "cluster1", Target: "cluster2"},
 			{Source: "cluster2", Target: "cluster1"},
 			{Source: "cluster2", Target: "cluster3"},
-			{Source: "cluster3", Target: "cluster1"},
 			{Source: "cluster3", Target: "cluster2"},
 		}
 		require.ElementsMatch(t, expectedPairs, pairs)
@@ -1111,24 +1111,6 @@ func TestFilterForbiddenPairs(t *testing.T) {
 	})
 }
 
-func TestPairKey(t *testing.T) {
-	service := &SliceConfigService{}
-	
-	t.Run("OrderIndependent", func(t *testing.T) {
-		require.Equal(t, "a-b", service.pairKey("a", "b"))
-		require.Equal(t, "a-b", service.pairKey("b", "a"))
-	})
-	
-	t.Run("ClusterNames", func(t *testing.T) {
-		require.Equal(t, "cluster1-cluster2", service.pairKey("cluster1", "cluster2"))
-		require.Equal(t, "cluster1-cluster2", service.pairKey("cluster2", "cluster1"))
-	})
-	
-	t.Run("SameName", func(t *testing.T) {
-		require.Equal(t, "cluster1-cluster1", service.pairKey("cluster1", "cluster1"))
-	})
-}
-
 func TestMakeClusterSet(t *testing.T) {
 	service := &SliceConfigService{}
 	
@@ -1147,5 +1129,154 @@ func TestMakeClusterSet(t *testing.T) {
 		set := service.makeClusterSet([]string{})
 		require.Empty(t, set)
 	})
+	
+	t.Run("SingleCluster", func(t *testing.T) {
+		set := service.makeClusterSet([]string{"only"})
+		require.Len(t, set, 1)
+		require.True(t, set["only"])
+	})
+	
+	t.Run("DuplicateClusters", func(t *testing.T) {
+		clusters := []string{"c1", "c2", "c1"}
+		set := service.makeClusterSet(clusters)
+		require.Len(t, set, 2)
+		require.True(t, set["c1"])
+		require.True(t, set["c2"])
+	})
 }
 
+func TestResolveTopologyPairs_NilTopology(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters:       []string{"c1", "c2"},
+			TopologyConfig: nil,
+		},
+	}
+	
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+}
+
+func TestResolveTopologyPairs_EmptyTopologyType(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"c1", "c2"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: "",
+			},
+		},
+	}
+	
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+}
+
+func TestResolveFullMeshTopology_ZeroClusters(t *testing.T) {
+	service := &SliceConfigService{}
+	pairs := service.resolveFullMeshTopology([]string{})
+	require.Empty(t, pairs)
+}
+
+func TestResolveFullMeshTopology_FiveClusters(t *testing.T) {
+	service := &SliceConfigService{}
+	clusters := []string{"c1", "c2", "c3", "c4", "c5"}
+	pairs := service.resolveFullMeshTopology(clusters)
+	require.Len(t, pairs, 20)
+}
+
+func TestResolveCustomTopology_MultipleTargets(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	clusters := []string{"c1", "c2", "c3", "c4"}
+	matrix := []controllerv1alpha1.ConnectivityEntry{
+		{SourceCluster: "c1", TargetClusters: []string{"c2", "c3", "c4"}},
+	}
+	
+	pairs, err := service.resolveCustomTopology(clusters, matrix)
+	require.NoError(t, err)
+	require.Len(t, pairs, 3)
+}
+
+func TestResolveCustomTopology_AllPossiblePairs(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	clusters := []string{"c1", "c2"}
+	matrix := []controllerv1alpha1.ConnectivityEntry{
+		{SourceCluster: "c1", TargetClusters: []string{"c2"}},
+		{SourceCluster: "c2", TargetClusters: []string{"c1"}},
+	}
+	
+	pairs, err := service.resolveCustomTopology(clusters, matrix)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+}
+
+func TestResolveRestrictedTopology_MultipleForbiddenEdges(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	clusters := []string{"c1", "c2", "c3"}
+	forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "c1", TargetClusters: []string{"c2"}},
+		{SourceCluster: "c2", TargetClusters: []string{"c3"}},
+	}
+	
+	pairs, err := service.resolveRestrictedTopology(clusters, forbiddenEdges)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+}
+
+func TestBuildForbiddenSet_MultipleTargets(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "c1", TargetClusters: []string{"c2", "c3"}},
+	}
+	
+	forbidden := service.buildForbiddenSet(forbiddenEdges)
+	require.Len(t, forbidden, 2)
+	require.True(t, forbidden["c1-c2"])
+	require.True(t, forbidden["c1-c3"])
+}
+
+func TestFilterForbiddenPairs_BidirectionalFiltering(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	pairs := []util.GatewayPair{
+		{Source: "c1", Target: "c2"},
+		{Source: "c2", Target: "c1"},
+		{Source: "c1", Target: "c3"},
+		{Source: "c3", Target: "c1"},
+	}
+	
+	forbidden := map[string]bool{
+		"c1-c3": true,
+	}
+	
+	filtered := service.filterForbiddenPairs(pairs, forbidden)
+	require.Len(t, filtered, 2)
+	
+	for _, p := range filtered {
+		require.False(t, (p.Source == "c1" && p.Target == "c3") || (p.Source == "c3" && p.Target == "c1"))
+	}
+}
+
+func TestFilterForbiddenPairs_ReverseForbidden(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	pairs := []util.GatewayPair{
+		{Source: "c1", Target: "c2"},
+	}
+	
+	forbidden := map[string]bool{
+		"c2-c1": true,
+	}
+	
+	filtered := service.filterForbiddenPairs(pairs, forbidden)
+	require.Empty(t, filtered)
+}
