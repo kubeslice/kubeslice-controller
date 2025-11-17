@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"strconv"
 	"strings"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,6 +62,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	}
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		if err := validateSliceSubnet(sliceConfig); err != nil {
+			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+		}
+		if err := validateSliceSubnetUniqueness(ctx, sliceConfig); err != nil {
 			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 		}
 		if err := validateSlicegatewayServiceType(ctx, sliceConfig); err != nil {
@@ -270,6 +274,45 @@ func validateSliceSubnet(sliceConfig *controllerv1alpha1.SliceConfig) *field.Err
 	if !util.HasLastTwoOctetsZero(sliceConfig.Spec.SliceSubnet) {
 		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), sliceConfig.Spec.SliceSubnet, "third and fourth octets must be 0")
 	}
+	return nil
+}
+
+// validateSliceSubnetUniqueness validates that the CIDR pool is unique across slices when using Dynamic IPAM
+func validateSliceSubnetUniqueness(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	// Only validate for Dynamic IPAM slices
+	if sliceConfig.Spec.SliceIpamType != "Dynamic" {
+		return nil
+	}
+
+	// List all SliceConfigs in the same namespace
+	sliceConfigs := &controllerv1alpha1.SliceConfigList{}
+	err := util.ListResources(ctx, sliceConfigs, client.InNamespace(sliceConfig.Namespace))
+	if err != nil {
+		return field.InternalError(field.NewPath("Spec").Child("SliceSubnet"), fmt.Errorf("failed to list existing slices: %v", err))
+	}
+
+	// Check for duplicate CIDR pools across other Dynamic IPAM slices
+	for _, existingSlice := range sliceConfigs.Items {
+		// Skip self-check
+		if existingSlice.Name == sliceConfig.Name {
+			continue
+		}
+
+		// Only check other Dynamic IPAM slices
+		if existingSlice.Spec.SliceIpamType != "Dynamic" {
+			continue
+		}
+
+		// Check if CIDR pools match
+		if existingSlice.Spec.SliceSubnet == sliceConfig.Spec.SliceSubnet {
+			return field.Invalid(
+				field.NewPath("Spec").Child("SliceSubnet"),
+				sliceConfig.Spec.SliceSubnet,
+				fmt.Sprintf("CIDR pool conflicts with existing slice '%s'. Each Dynamic IPAM slice must have a unique sliceSubnet to prevent overlapping IP allocations", existingSlice.Name),
+			)
+		}
+	}
+
 	return nil
 }
 
