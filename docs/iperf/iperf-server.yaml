@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iperf-server
+  namespace: iperf
+  labels:
+    app: iperf-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iperf-server
+  template:
+    metadata:
+      labels:
+        app: iperf-server
+    spec:
+      containers:
+      - name: iperf
+        image: mlabbe/iperf
+        imagePullPolicy: IfNotPresent
+        args:
+          - '-s'
+          - '-p'
+          - '5201'
+        ports:
+        - containerPort: 5201
+          name: server
+      - name: sidecar
+        image: nicolaka/netshoot
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sleep", "3650d"]
+        securityContext:
+          capabilities:
+            add: ["NET_ADMIN"]
+          allowPrivilegeEscalation: true
+          privileged: true
+---
+apiVersion: networking.kubeslice.io/v1beta1
+kind: ServiceExport
+metadata:
+  name: iperf-server
+  namespace: iperf
+spec:
+  slice: <slice-name>
+  selector:
+    matchLabels:
+      app: iperf-server
+  ingressEnabled: false
+  ports:
+  - name: tcp
+    containerPort: 5201
+    protocol: TCP
