@@ -87,6 +87,12 @@ jobs:
       env: 
          GITHUB_HEAD_COMMIT: ${{ steps.vars.outputs.sha_commit }}
 
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DUSERNAME }}
+        password: ${{ secrets.DPASSWORD }}
+
     - name: Docker Run Action
       uses: addnab/docker-run-action@v3
       with:
