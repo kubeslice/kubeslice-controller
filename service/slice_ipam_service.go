@@ -134,10 +134,39 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 				releasedIndex = i
 				releasedSubnet = allocation.Subnet
 				logger.Infof("Found released subnet %s for cluster %s at index %d", releasedSubnet, clusterName, releasedIndex)
+				// When a cluster rejoins, it should get back its original subnet
+				// This prevents IP conflicts and maintains consistency
+				break
 			}
 		}
 	}
 
+	// This ensures cluster gets the same subnet when it rejoins
+	if releasedIndex >= 0 {
+		logger.Infof("Reallocating same subnet %s to cluster %s (cluster rejoined)", releasedSubnet, clusterName)
+		sliceIpam.Status.AllocatedSubnets[releasedIndex].Status = "Allocated"
+		sliceIpam.Status.AllocatedSubnets[releasedIndex].AllocatedAt = metav1.Now()
+		sliceIpam.Status.AllocatedSubnets[releasedIndex].ReleasedAt = nil
+
+		// Update counters - decrement available since we're using a released subnet
+		if sliceIpam.Status.AvailableSubnets > 0 {
+			sliceIpam.Status.AvailableSubnets--
+		}
+		sliceIpam.Status.LastUpdated = metav1.Now()
+
+		// Update status subresource
+		if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
+			s.recordAllocationMetrics(sliceName, clusterName, namespace, time.Since(startTime), "failure")
+			return "", fmt.Errorf("failed to update SliceIpam status: %v", err)
+		}
+
+		// Record success metrics
+		s.recordAllocationMetrics(sliceName, clusterName, namespace, time.Since(startTime), "success")
+		logger.Infof("Successfully reallocated subnet %s to cluster %s", releasedSubnet, clusterName)
+		return releasedSubnet, nil
+	}
+
+	// Only allocate new subnet if no Released entry exists for this cluster
 	// Find next available subnet
 	allocatedSubnets := make([]string, 0, len(sliceIpam.Status.AllocatedSubnets))
 	for _, allocation := range sliceIpam.Status.AllocatedSubnets {
@@ -155,25 +184,15 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 		return "", fmt.Errorf("failed to find available subnet: %v", err)
 	}
 
-	// If we found a Released entry for this cluster, update it (regardless of subnet match)
-	// This prevents duplicate entries for the same cluster
-	if releasedIndex >= 0 {
-		logger.Infof("Reusing released entry for cluster %s - updating from %s to %s", clusterName, releasedSubnet, subnet)
-		sliceIpam.Status.AllocatedSubnets[releasedIndex].Subnet = subnet
-		sliceIpam.Status.AllocatedSubnets[releasedIndex].Status = "Allocated"
-		sliceIpam.Status.AllocatedSubnets[releasedIndex].AllocatedAt = metav1.Now()
-		sliceIpam.Status.AllocatedSubnets[releasedIndex].ReleasedAt = nil
-	} else {
-		// Add new allocation to status
-		logger.Infof("Allocating new subnet %s for cluster %s - appending new entry", subnet, clusterName)
-		allocation := v1alpha1.ClusterSubnetAllocation{
-			ClusterName: clusterName,
-			Subnet:      subnet,
-			AllocatedAt: metav1.Now(),
-			Status:      "Allocated",
-		}
-		sliceIpam.Status.AllocatedSubnets = append(sliceIpam.Status.AllocatedSubnets, allocation)
+	// Add new allocation to status (this is a brand new cluster)
+	logger.Infof("Allocating new subnet %s for cluster %s (first time allocation)", subnet, clusterName)
+	allocation := v1alpha1.ClusterSubnetAllocation{
+		ClusterName: clusterName,
+		Subnet:      subnet,
+		AllocatedAt: metav1.Now(),
+		Status:      "Allocated",
 	}
+	sliceIpam.Status.AllocatedSubnets = append(sliceIpam.Status.AllocatedSubnets, allocation)
 
 	// Update counters
 	if sliceIpam.Status.AvailableSubnets > 0 {
