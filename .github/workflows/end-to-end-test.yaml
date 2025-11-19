@@ -119,6 +119,7 @@ jobs:
         workflow_name: ${{ github.event.repository.name }}
         env: ${{ github.base_ref || github.ref_name }}
         order: descending
+        report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
         token: ${{ secrets.TOKEN }}
 
     - name: Set central report folder name
