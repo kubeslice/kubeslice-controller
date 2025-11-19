@@ -59,6 +59,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateMaxClusterCount(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if err := validateTopologyConfig(sliceConfig.Spec.TopologyConfig, sliceConfig.Spec.Clusters); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		if err := validateSliceSubnet(sliceConfig); err != nil {
 			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
@@ -106,7 +109,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
-	// Validate single/multi overlay network deployment mode specific fields
+	if err := validateTopologyConfig(sliceConfig.Spec.TopologyConfig, sliceConfig.Spec.Clusters); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		if err := validateSliceSubnet(sliceConfig); err != nil {
 			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
@@ -675,4 +680,117 @@ func checkIfQoSConfigExists(ctx context.Context, namespace string, qosProfileNam
 		return false
 	}
 	return found
+}
+
+func validateTopologyConfig(topology *controllerv1alpha1.TopologyConfig, clusters []string) *field.Error {
+	if topology == nil {
+		return nil
+	}
+	clusterSet := make(map[string]struct{}, len(clusters))
+	for _, c := range clusters {
+		clusterSet[c] = struct{}{}
+	}
+	topologyPath := field.NewPath("spec", "topologyConfig")
+	switch topology.TopologyType {
+	case controllerv1alpha1.TopologyCustom:
+		if err := validateCustomTopology(topology.ConnectivityMatrix, clusterSet, topologyPath); err != nil {
+			return err
+		}
+	case controllerv1alpha1.TopologyRestricted:
+		if err := validateRestrictedTopology(topology, clusterSet, topologyPath); err != nil {
+			return err
+		}
+	case controllerv1alpha1.TopologyFullMesh, "":
+	default:
+		return field.Invalid(topologyPath.Child("topologyType"), topology.TopologyType, "must be one of: restricted, full-mesh, custom")
+	}
+	return validateForbiddenEdges(topology.ForbiddenEdges, clusterSet, topologyPath)
+}
+
+func validateCustomTopology(matrix []controllerv1alpha1.ConnectivityEntry, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
+	matrixPath := basePath.Child("connectivityMatrix")
+	if len(matrix) == 0 {
+		return field.Required(matrixPath, "required for custom topology")
+	}
+	for i, entry := range matrix {
+		entryPath := matrixPath.Index(i)
+		if _, exists := clusterSet[entry.SourceCluster]; !exists {
+			return field.Invalid(entryPath.Child("sourceCluster"), entry.SourceCluster, "not in spec.clusters")
+		}
+		for j, target := range entry.TargetClusters {
+			if _, exists := clusterSet[target]; !exists {
+				return field.Invalid(entryPath.Child("targetClusters").Index(j), target, "not in spec.clusters")
+			}
+		}
+	}
+	return nil
+}
+
+func validateRestrictedTopology(topology *controllerv1alpha1.TopologyConfig, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
+	if len(topology.ForbiddenEdges) == 0 {
+		return nil
+	}
+
+	clusters := make([]string, 0, len(clusterSet))
+	for c := range clusterSet {
+		clusters = append(clusters, c)
+	}
+
+	forbidden := buildForbiddenSetStatic(topology.ForbiddenEdges)
+
+	reachable := make(map[string]struct{})
+	if len(clusters) > 0 {
+		queue := []string{clusters[0]}
+		reachable[clusters[0]] = struct{}{}
+		for len(queue) > 0 {
+			current := queue[0]
+			queue = queue[1:]
+
+			for _, next := range clusters {
+				if next == current {
+					continue
+				}
+				if _, exists := reachable[next]; exists {
+					continue
+				}
+				key := current + "-" + next
+				if !forbidden[key] {
+					reachable[next] = struct{}{}
+					queue = append(queue, next)
+				}
+			}
+		}
+	}
+
+	if len(reachable) != len(clusterSet) {
+		return field.Invalid(basePath, topology, "forbidden edges create isolated clusters")
+	}
+
+	return nil
+}
+
+func buildForbiddenSetStatic(forbiddenEdges []controllerv1alpha1.ForbiddenEdge) map[string]bool {
+	forbidden := make(map[string]bool)
+	for _, edge := range forbiddenEdges {
+		for _, target := range edge.TargetClusters {
+			forbidden[edge.SourceCluster+"-"+target] = true
+		}
+	}
+	return forbidden
+}
+
+func validateForbiddenEdges(edges []controllerv1alpha1.ForbiddenEdge, clusterSet map[string]struct{}, basePath *field.Path) *field.Error {
+	edgesPath := basePath.Child("forbiddenEdges")
+	for i, edge := range edges {
+		entryPath := edgesPath.Index(i)
+		if _, exists := clusterSet[edge.SourceCluster]; !exists {
+			return field.Invalid(entryPath.Child("sourceCluster"), edge.SourceCluster, "not in spec.clusters")
+		}
+		for j, target := range edge.TargetClusters {
+			if _, exists := clusterSet[target]; !exists {
+				return field.Invalid(entryPath.Child("targetClusters").Index(j), target, "not in spec.clusters")
+			}
+		}
+	}
+	return nil
 }

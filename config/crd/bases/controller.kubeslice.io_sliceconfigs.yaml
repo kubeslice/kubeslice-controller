@@ -227,6 +227,46 @@ spec:
                 type: string
               standardQosProfileName:
                 type: string
+              topologyConfig:
+                description: TopologyConfig defines cluster connectivity patterns
+                properties:
+                  connectivityMatrix:
+                    items:
+                      properties:
+                        sourceCluster:
+                          type: string
+                        targetClusters:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - sourceCluster
+                      - targetClusters
+                      type: object
+                    type: array
+                  forbiddenEdges:
+                    items:
+                      properties:
+                        sourceCluster:
+                          type: string
+                        targetClusters:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - sourceCluster
+                      - targetClusters
+                      type: object
+                    type: array
+                  topologyType:
+                    default: full-mesh
+                    enum:
+                    - restricted
+                    - full-mesh
+                    - custom
+                    type: string
+                type: object
+                
               vpnConfig:
                 description: VPNConfiguration defines the additional (optional) VPN
                   Configuration to customise

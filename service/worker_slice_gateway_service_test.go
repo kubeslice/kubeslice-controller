@@ -320,7 +320,7 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 	//environment := make(map[string]string, 5)
 	//jobMock.On("CreateJob", ctx, requestObj.Namespace, "image", environment).Return(ctrl.Result{}, nil).Once()
 
-	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil)
+	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil, nil)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
@@ -407,7 +407,7 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
-	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil)
+	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil, nil)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
@@ -551,7 +551,6 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 			Annotations:                nil,
 			OwnerReferences:            nil,
 			Finalizers:                 nil,
-			ClusterName:                "",
 			ManagedFields:              nil,
 		},
 		Spec:   controllerv1alpha1.ClusterSpec{},

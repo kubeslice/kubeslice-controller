@@ -2316,3 +2316,289 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest", nil)
 	return clientMock, sliceConfig, ctx
 }
+
+func TestValidateTopologyConfig_FullMesh(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyFullMesh,
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.Nil(t, err)
+}
+
+func TestValidateTopologyConfig_CustomMatrix(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyCustom,
+		ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{
+			{SourceCluster: "c1", TargetClusters: []string{"c2", "c3"}},
+		},
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.Nil(t, err)
+}
+
+func TestValidateTopologyConfig_CustomEmptyMatrix(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType:       controllerv1alpha1.TopologyCustom,
+		ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{},
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "required for custom topology")
+}
+
+func TestValidateTopologyConfig_InvalidClusterInMatrix(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyCustom,
+		ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{
+			{SourceCluster: "invalid", TargetClusters: []string{"c2"}},
+		},
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateTopologyConfig_InvalidForbiddenEdge(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "invalid", TargetClusters: []string{"c1"}},
+		},
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateTopologyConfig_InvalidType(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: "invalid-type",
+	}
+	clusters := []string{"c1", "c2"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "must be one of")
+}
+
+func TestValidateTopologyConfig_RestrictedIsolatedClusters(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "c1", TargetClusters: []string{"c2", "c3"}},
+			{SourceCluster: "c2", TargetClusters: []string{"c1", "c3"}},
+			{SourceCluster: "c3", TargetClusters: []string{"c1", "c2"}},
+		},
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "isolated clusters")
+}
+
+func TestValidateTopologyConfig_RestrictedPartiallyConnected(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "c1", TargetClusters: []string{"c3"}},
+		},
+	}
+	clusters := []string{"c1", "c2", "c3"}
+
+	err := validateTopologyConfig(topology, clusters)
+	require.Nil(t, err)
+}
+
+func TestValidateTopologyConfig_NilTopology(t *testing.T) {
+	err := validateTopologyConfig(nil, []string{"c1", "c2"})
+	require.Nil(t, err)
+}
+
+func TestValidateTopologyConfig_EmptyTopologyType(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: "",
+	}
+	err := validateTopologyConfig(topology, []string{"c1", "c2"})
+	require.Nil(t, err)
+}
+
+func TestValidateCustomTopology_InvalidTargetCluster(t *testing.T) {
+	matrix := []controllerv1alpha1.ConnectivityEntry{
+		{SourceCluster: "c1", TargetClusters: []string{"invalid"}},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateCustomTopology(matrix, clusterSet, basePath)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateCustomTopology_InvalidSourceCluster(t *testing.T) {
+	matrix := []controllerv1alpha1.ConnectivityEntry{
+		{SourceCluster: "invalid", TargetClusters: []string{"c2"}},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateCustomTopology(matrix, clusterSet, basePath)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateCustomTopology_MultipleInvalidTargets(t *testing.T) {
+	matrix := []controllerv1alpha1.ConnectivityEntry{
+		{SourceCluster: "c1", TargetClusters: []string{"c2", "invalid1", "invalid2"}},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateCustomTopology(matrix, clusterSet, basePath)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateRestrictedTopology_EmptyForbiddenEdges(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType:   controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateRestrictedTopology(topology, clusterSet, basePath)
+	require.Nil(t, err)
+}
+
+func TestValidateRestrictedTopology_SingleCluster(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType:   controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{},
+	}
+	clusterSet := map[string]struct{}{"c1": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateRestrictedTopology(topology, clusterSet, basePath)
+	require.Nil(t, err)
+}
+
+func TestValidateRestrictedTopology_FullyDisconnected(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "c1", TargetClusters: []string{"c2"}},
+			{SourceCluster: "c2", TargetClusters: []string{"c1"}},
+		},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateRestrictedTopology(topology, clusterSet, basePath)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "isolated clusters")
+}
+
+func TestValidateRestrictedTopology_FourClustersOneIsolated(t *testing.T) {
+	topology := &controllerv1alpha1.TopologyConfig{
+		TopologyType: controllerv1alpha1.TopologyRestricted,
+		ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "c1", TargetClusters: []string{"c4"}},
+			{SourceCluster: "c2", TargetClusters: []string{"c4"}},
+			{SourceCluster: "c3", TargetClusters: []string{"c4"}},
+			{SourceCluster: "c4", TargetClusters: []string{"c1", "c2", "c3"}},
+		},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}, "c3": {}, "c4": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateRestrictedTopology(topology, clusterSet, basePath)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "isolated clusters")
+}
+
+func TestValidateForbiddenEdges_EmptyEdges(t *testing.T) {
+	edges := []controllerv1alpha1.ForbiddenEdge{}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateForbiddenEdges(edges, clusterSet, basePath)
+	require.Nil(t, err)
+}
+
+func TestValidateForbiddenEdges_MultipleTargets(t *testing.T) {
+	edges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "c1", TargetClusters: []string{"c2", "c3"}},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}, "c3": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateForbiddenEdges(edges, clusterSet, basePath)
+	require.Nil(t, err)
+}
+
+func TestValidateForbiddenEdges_InvalidSourceCluster(t *testing.T) {
+	edges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "invalid", TargetClusters: []string{"c2"}},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateForbiddenEdges(edges, clusterSet, basePath)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateForbiddenEdges_InvalidTargetCluster(t *testing.T) {
+	edges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "c1", TargetClusters: []string{"invalid"}},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateForbiddenEdges(edges, clusterSet, basePath)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+}
+
+func TestValidateForbiddenEdges_InvalidTargetInList(t *testing.T) {
+	edges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "c1", TargetClusters: []string{"c2", "invalid", "c3"}},
+	}
+	clusterSet := map[string]struct{}{"c1": {}, "c2": {}, "c3": {}}
+	basePath := field.NewPath("spec", "topologyConfig")
+
+	err := validateForbiddenEdges(edges, clusterSet, basePath)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "not in spec.clusters")
+	require.Contains(t, err.Error(), "targetClusters[1]")
+}
+
+func TestBuildForbiddenSetStatic_MultipleEdgesMultipleTargets(t *testing.T) {
+	edges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "c1", TargetClusters: []string{"c2", "c3"}},
+		{SourceCluster: "c2", TargetClusters: []string{"c4"}},
+	}
+
+	forbidden := buildForbiddenSetStatic(edges)
+	require.Len(t, forbidden, 3)
+	require.True(t, forbidden["c1-c2"])
+	require.True(t, forbidden["c1-c3"])
+	require.True(t, forbidden["c2-c4"])
+}
+
+func TestBuildForbiddenSetStatic_Empty(t *testing.T) {
+	forbidden := buildForbiddenSetStatic([]controllerv1alpha1.ForbiddenEdge{})
+	require.Empty(t, forbidden)
+}
+

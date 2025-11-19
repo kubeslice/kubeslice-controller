@@ -203,26 +203,34 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Step 5: Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	// Step 5: Resolve topology to get gateway pairs
+	gatewayPairs, err := s.resolveTopologyPairs(sliceConfig)
+	if err != nil {
+		logger.Errorf("Failed to resolve topology for slice %s: %v", sliceConfig.Name, err)
+		return ctrl.Result{}, err
+	}
+	logger.Infof("Resolved %d gateway pairs for slice %s", len(gatewayPairs), sliceConfig.Name)
+
+	// Step 6: Create gateways with minimum specification
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap, gatewayPairs)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
 
-	// Step 6: Create VPNKeyRotation CR
+	// Step 7: Create VPNKeyRotation CR
 	// TODO(rahul): handle change in rotation interval
 	if err := s.vpn.CreateMinimalVpnKeyRotationConfig(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.RotationInterval); err != nil {
 		// register an event
 		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventVPNKeyRotationConfigCreationFailed)
 		return ctrl.Result{}, err
 	}
-	// Step 7: update cluster info into vpnkeyrotation Cconfig
+	// Step 8: update cluster info into vpnkeyrotation Config
 	if _, err := s.vpn.ReconcileClusters(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.Clusters); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Step 8: Create ServiceImport Objects
+	// Step 9: Create ServiceImport Objects
 	serviceExports := &v1alpha1.ServiceExportConfigList{}
 	_, err = s.getServiceExportBySliceName(ctx, req.Namespace, sliceConfig.Name, serviceExports)
 	if err != nil {
@@ -430,4 +438,125 @@ func (s *SliceConfigService) handleDefaultSliceConfigAppns(ctx context.Context, 
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+func (s *SliceConfigService) resolveTopologyPairs(sliceConfig *v1alpha1.SliceConfig) ([]util.GatewayPair, error) {
+	clusters := sliceConfig.Spec.Clusters
+
+	// Default to full-mesh if no topology config
+	if sliceConfig.Spec.TopologyConfig == nil {
+		return s.resolveFullMeshTopology(clusters), nil
+	}
+
+	switch sliceConfig.Spec.TopologyConfig.TopologyType {
+	case v1alpha1.TopologyFullMesh, "":
+		return s.resolveFullMeshTopology(clusters), nil
+	case v1alpha1.TopologyCustom:
+		return s.resolveCustomTopology(clusters, sliceConfig.Spec.TopologyConfig.ConnectivityMatrix)
+	case v1alpha1.TopologyRestricted:
+		return s.resolveRestrictedTopology(clusters, sliceConfig.Spec.TopologyConfig.ForbiddenEdges)
+	default:
+		return nil, fmt.Errorf("unknown topology type: %s", sliceConfig.Spec.TopologyConfig.TopologyType)
+	}
+}
+
+func (s *SliceConfigService) resolveFullMeshTopology(clusters []string) []util.GatewayPair {
+	if len(clusters) < 2 {
+		return []util.GatewayPair{}
+	}
+
+	pairs := make([]util.GatewayPair, 0, len(clusters)*(len(clusters)-1))
+	for i := 0; i < len(clusters); i++ {
+		for j := 0; j < len(clusters); j++ {
+			if i != j {
+				pairs = append(pairs, util.GatewayPair{
+					Source: clusters[i],
+					Target: clusters[j],
+				})
+			}
+		}
+	}
+	return pairs
+}
+
+func (s *SliceConfigService) resolveCustomTopology(clusters []string, matrix []v1alpha1.ConnectivityEntry) ([]util.GatewayPair, error) {
+	if len(matrix) == 0 {
+		return nil, fmt.Errorf("custom topology requires connectivity matrix")
+	}
+
+	clusterSet := s.makeClusterSet(clusters)
+	pairs := make([]util.GatewayPair, 0)
+
+	for _, entry := range matrix {
+		if !clusterSet[entry.SourceCluster] {
+			return nil, fmt.Errorf("connectivity entry references unknown source cluster: %s", entry.SourceCluster)
+		}
+		for _, target := range entry.TargetClusters {
+			if !clusterSet[target] {
+				return nil, fmt.Errorf("connectivity entry references unknown target cluster: %s", target)
+			}
+			pairs = append(pairs, util.GatewayPair{
+				Source: entry.SourceCluster,
+				Target: target,
+			})
+		}
+	}
+
+	return pairs, nil
+}
+
+// resolveRestrictedTopology creates full-mesh and removes forbidden edges
+func (s *SliceConfigService) resolveRestrictedTopology(clusters []string, forbiddenEdges []v1alpha1.ForbiddenEdge) ([]util.GatewayPair, error) {
+	// Start with full mesh
+	allPairs := s.resolveFullMeshTopology(clusters)
+
+	if len(forbiddenEdges) == 0 {
+		return allPairs, nil
+	}
+
+	// Build forbidden set
+	forbidden := s.buildForbiddenSet(forbiddenEdges)
+
+	// Filter out forbidden pairs
+	filtered := s.filterForbiddenPairs(allPairs, forbidden)
+
+	return filtered, nil
+}
+
+// buildForbiddenSet creates a map of forbidden edges
+func (s *SliceConfigService) buildForbiddenSet(forbiddenEdges []v1alpha1.ForbiddenEdge) map[string]bool {
+	forbidden := make(map[string]bool)
+	for _, edge := range forbiddenEdges {
+		for _, target := range edge.TargetClusters {
+			key := edge.SourceCluster + "-" + target
+			forbidden[key] = true
+		}
+	}
+	return forbidden
+}
+
+// filterForbiddenPairs removes pairs that are in the forbidden set
+// Since gateway creation is bidirectional (creates both server and client),
+// we must filter out BOTH directions if either is forbidden
+func (s *SliceConfigService) filterForbiddenPairs(pairs []util.GatewayPair, forbidden map[string]bool) []util.GatewayPair {
+	filtered := make([]util.GatewayPair, 0, len(pairs))
+	for _, p := range pairs {
+		forwardKey := p.Source + "-" + p.Target
+		reverseKey := p.Target + "-" + p.Source
+		
+		// Skip if EITHER direction is forbidden (because gateway is bidirectional)
+		if !forbidden[forwardKey] && !forbidden[reverseKey] {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
+}
+
+// makeClusterSet creates a set from cluster list
+func (s *SliceConfigService) makeClusterSet(clusters []string) map[string]bool {
+	set := make(map[string]bool, len(clusters))
+	for _, cluster := range clusters {
+		set[cluster] = true
+	}
+	return set
 }

@@ -1,0 +1,13 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: demo-restricted-secure
+  namespace: kubeslice-avesha
+spec:
+  sliceSubnet: "10.2.0.0/16"
+  clusters: ["dmz", "gateway", "internal", "analytics"]
+  topologyConfig:
+    topologyType: restricted
+    forbiddenEdges:
+      - sourceCluster: gateway
+        targetClusters: ["dmz", "analytics"]
