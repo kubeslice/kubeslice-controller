@@ -121,6 +121,7 @@ jobs:
         env: ${{ github.base_ref || github.ref_name }}
         order: descending
         report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
+        results_history: allure-history
         token: ${{ secrets.TOKEN }}
 
     - name: Set central report folder name
@@ -147,13 +148,13 @@ jobs:
     - name: wait for report deploy on site ( you can check report here also )
       run: |
          sleep 200
-         echo "${{ env.GITHUB_PAGES_WEBSITE_URL }}/${{ github.run_number }}/index.html"
+         echo "${{ env.CENTRAL_REPORT_URL }}"
       
     - name: Report link on Pull Request comment
       uses: thollander/actions-comment-pull-request@v2
       with:
         message: |
-                 report link  '${{ env.GITHUB_PAGES_WEBSITE_URL }}/${{ github.run_number }}/index.html'
+                 report link  '${{ env.CENTRAL_REPORT_URL }}'
         GITHUB_TOKEN: ${{ secrets.TOKEN }}
     
     - name: Run Quality Gate Check
@@ -161,7 +162,7 @@ jobs:
       with:
          ENABLE_QUALITY_GATE: true
          MINIMUM_PASS_PERCENTAGE: 75 
-         ALLURE_BEHAVIORS_CSV: '/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}/allure-history/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/data/behaviors.csv'
+         ALLURE_BEHAVIORS_CSV: '/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}/allure-history/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ env.BRANCH_NAME }}-${{ github.run_number }}/data/behaviors.csv'
     
     - name: Send mail
       if: always()
@@ -180,6 +181,6 @@ jobs:
              Run id for the pipeline is ${{ github.run_id }} .
              Check your logs in github action here https://github.com/kubeslice/kubeslice-controller/actions/runs/${{ github.run_id }} .
              for downloading the logs zip file in your local use this API url in curl command https://api.github.com/repos/kubeslice/kubeslice-controller/actions/runs/${{ github.run_id }}/logs
-             the report url is https://kubeslice.github.io/e2e-allure-reports/Kind-${{ github.event.repository.name }}-${{ steps.date.outputs.date }}-${{ github.base_ref }}-${{ github.run_number }}/index.html. 
+             the report url is ${{ env.CENTRAL_REPORT_URL }}. 
              for looking all the allure reports (including old ones ) please visit at https://kubeslice.github.io/e2e-allure-reports/ .
              please look result-summary.txt file for more info regarding test cases ( please note you will get result-summary.txt file only if your quality gate check steps ran successfully ). 
