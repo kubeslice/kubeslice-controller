@@ -47,14 +47,14 @@ type SliceQoSConfigService struct {
 func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get SliceQoSConfig resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Started Recoincilation of SliceQoSConfig %v", req.NamespacedName)
+	logger.Infof("Started Reconciliation of SliceQoSConfig %v", req.NamespacedName)
 	sliceQosConfig := &v1alpha1.SliceQoSConfig{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, sliceQosConfig)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if !found {
-		logger.Infof("QoS Profile %v not found, returning from  reconciler loop.", req.NamespacedName)
+		logger.Infof("QoS Profile %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 

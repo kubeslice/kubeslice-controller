@@ -52,7 +52,7 @@ type ProjectService struct {
 func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get project resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Starting Recoincilation of Project with name %s in namespace %s",
+	logger.Infof("Starting Reconciliation of Project with name %s in namespace %s",
 		req.Name, req.Namespace)
 	project := &controllerv1alpha1.Project{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, project)

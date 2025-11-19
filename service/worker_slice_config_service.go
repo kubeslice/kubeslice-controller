@@ -55,7 +55,7 @@ type WorkerSliceConfigService struct {
 func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get WorkerSliceConfig resource
 	logger := util.CtxLogger(ctx)
-	logger.Infof("Starting Recoincilation of WorkerSliceConfig with name %s in namespace %s",
+	logger.Infof("Starting Reconciliation of WorkerSliceConfig with name %s in namespace %s",
 		req.Name, req.Namespace)
 	workerSliceConfig := &workerv1alpha1.WorkerSliceConfig{}
 	found, err := util.GetResourceIfExist(ctx, req.NamespacedName, workerSliceConfig)
@@ -157,7 +157,7 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 		return ctrl.Result{}, err
 	}
 	if !found {
-		logger.Infof("sliceConfig %v not found, returning from  reconciler loop.", req.NamespacedName)
+		logger.Infof("sliceConfig %v not found, returning from reconciler loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 	octet := workerSliceConfig.Spec.Octet
@@ -197,7 +197,7 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 			return ctrl.Result{}, err
 		}
 		if !found {
-			logger.Infof("QOS profile %v not found, returning from  reconciler loop.", sliceConfig.Spec.StandardQosProfileName)
+			logger.Infof("QOS profile %v not found, returning from reconciler loop.", sliceConfig.Spec.StandardQosProfileName)
 			return ctrl.Result{}, nil
 		}
 		workerSliceConfig.Spec.QosProfileDetails = workerv1alpha1.QOSProfile{
@@ -368,8 +368,8 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 					},
 				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
-					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
-						expectedSlice.Name, namespace)
+					logger.Errorf("failed to create worker slice %s in namespace %s: %v",
+						expectedSlice.Name, namespace, err)
 					return clusterMap, err
 				}
 			}
@@ -407,8 +407,8 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 					},
 				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
-					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
-						workerSliceConfigName, namespace)
+					logger.Errorf("failed to create worker slice %s in namespace %s: %v",
+						workerSliceConfigName, namespace, err)
 					return clusterMap, err
 				}
 			}
@@ -486,8 +486,8 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfigForNoNetworkSli
 					},
 				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
-					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
-						expectedSlice.Name, namespace)
+					logger.Errorf("failed to create worker slice %s in namespace %s: %v",
+						expectedSlice.Name, namespace, err)
 					return err
 				}
 			}
@@ -520,8 +520,8 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfigForNoNetworkSli
 					},
 				)
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
-					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
-						workerSliceConfigName, namespace)
+					logger.Errorf("failed to create worker slice %s in namespace %s: %v",
+						workerSliceConfigName, namespace, err)
 					return err
 				}
 			}
