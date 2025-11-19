@@ -105,13 +105,6 @@ jobs:
       id: date
       run: echo "date=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_OUTPUT
 
-    - name: Checkout external reports repo into gh-pages
-      uses: actions/checkout@v5
-      with:
-        repository: kubeslice/e2e-allure-reports
-        path: gh-pages
-        token: ${{ secrets.TOKEN }}
-
     - name: Allure Report with history
       uses: PavanMudigonda/html-reporter-github-pages@v1.5
       id: Allure_report_with_history
@@ -119,16 +112,36 @@ jobs:
         test_results: reports
         allure_report_generate_flag: true
         gh_pages: gh-pages
-        external_repository: kubeslice/e2e-allure-reports
+        external_repository: ''
         keep_reports: 500
         subfolder: Kind
         tool_name: allure
         workflow_name: ${{ github.event.repository.name }}
-        env: ${{ github.base_ref }}
+        env: ${{ github.base_ref || github.ref_name }}
         order: descending
-        report_url: 'https://kubeslice.github.io/e2e-allure-reports/'
         token: ${{ secrets.TOKEN }}
-    
+
+    - name: Set central report folder name
+      id: report-folder
+      run: |
+        BRANCH="${GITHUB_BASE_REF:-$GITHUB_REF_NAME}"
+        DATE="${{ steps.date.outputs.date }}"
+        FOLDER="Kind-${GITHUB_REPOSITORY#*/}-${DATE}-${BRANCH}-${GITHUB_RUN_NUMBER}"
+        echo "BRANCH_NAME=${BRANCH}" >> $GITHUB_ENV
+        echo "REPORT_FOLDER=${FOLDER}" >> $GITHUB_ENV
+        echo "CENTRAL_REPORT_URL=https://kubeslice.github.io/e2e-allure-reports/${FOLDER}/index.html" >> $GITHUB_ENV
+
+    - name: Push Allure to central e2e-allure-reports repo
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        personal_token: ${{ secrets.TOKEN }}
+        external_repository: kubeslice/e2e-allure-reports
+        publish_branch: gh-pages
+        publish_dir: gh-pages/Kind/allure/${{ github.event.repository.name }}/${{ env.BRANCH_NAME }}/${{ github.run_number }}
+        destination_dir: ${{ env.REPORT_FOLDER }}
+        keep_files: true
+        allow_empty_commit: true
+
     - name: wait for report deploy on site ( you can check report here also )
       run: |
          sleep 200
