@@ -28,6 +28,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +50,7 @@ type SliceConfigService struct {
 	wsgrs IWorkerSliceGatewayRecyclerService
 	mf    metrics.IMetricRecorder
 	vpn   IVpnKeyRotationService
+	sipam ISliceIpamService
 }
 
 const NamespaceAndClusterFormat = "namespace=%s&cluster=%s"
@@ -190,39 +192,83 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Step 4: Creation of worker slice Objects and Cluster Labels
-	// get cluster cidr from maxClusters of slice config
+	// Handle Dynamic IPAM if enabled
+	if sliceConfig.Spec.SliceIpamType == "Dynamic" {
+		logger.Infof("Dynamic IPAM enabled for slice %s", sliceConfig.Name)
+
+		// Create SliceIpam resource if service is available
+		if s.sipam != nil {
+			if err := s.sipam.CreateSliceIpam(ctx, sliceConfig); err != nil {
+				logger.Errorf("Failed to create SliceIpam for slice %s: %v", sliceConfig.Name, err)
+				return ctrl.Result{}, err
+			}
+			logger.Infof("SliceIpam successfully created/updated for slice %s", sliceConfig.Name)
+		} else {
+			logger.Warnf("SliceIpam service not available for slice %s", sliceConfig.Name)
+		}
+	}
+
+	// Create worker slice objects and cluster labels
+	// Get cluster CIDR from maxClusters of slice config
 	clusterCidr := ""
-	clusterCidr = util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
+
+	// Use Dynamic IPAM or Static IPAM based on SliceIpamType
+	if sliceConfig.Spec.SliceIpamType == "Dynamic" {
+		// For Dynamic IPAM, we don't pre-calculate clusterCidr
+		// Each cluster gets its subnet allocated dynamically from SliceIpam
+		logger.Infof("Using Dynamic IPAM for slice %s", sliceConfig.Name)
+		clusterCidr = "" // Will be determined per-cluster by SliceIpam service
+	} else {
+		// Static IPAM: Use traditional maxClusters approach
+		clusterCidr = util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
+		logger.Infof("Using Static IPAM for slice %s with clusterCidr %s", sliceConfig.Name, clusterCidr)
+	}
 
 	// collect slice gw svc info for given clusters
 	sliceGwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
 
-	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	// Pass sliceConfig and sipam service to enable Dynamic IPAM in worker slice config creation
+	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig, s.sipam)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Step 5: Create gateways with minimum specification
+	// Create gateways with minimum specification
 	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
 
-	// Step 6: Create VPNKeyRotation CR
+	// Trigger SliceIpam reconciliation to ensure status is synced
+	if sliceConfig.Spec.SliceIpamType == "Dynamic" && s.sipam != nil {
+		logger.Infof("Triggering SliceIpam reconciliation for slice %s", sliceConfig.Name)
+		// Get SliceIpam and trigger status update
+		sliceIpam := &v1alpha1.SliceIpam{}
+		ipamKey := types.NamespacedName{Name: sliceConfig.Name, Namespace: sliceConfig.Namespace}
+		foundIpam, ipamErr := util.GetResourceIfExist(ctx, ipamKey, sliceIpam)
+		if ipamErr == nil && foundIpam {
+			// Update LastUpdated to trigger reconciliation via status subresource
+			sliceIpam.Status.LastUpdated = metav1.Now()
+			if updateErr := util.UpdateStatus(ctx, sliceIpam); updateErr != nil {
+				logger.Warnf("Failed to trigger SliceIpam reconciliation: %v", updateErr)
+			}
+		}
+	}
+
+	// Create VPNKeyRotation CR
 	// TODO(rahul): handle change in rotation interval
 	if err := s.vpn.CreateMinimalVpnKeyRotationConfig(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.RotationInterval); err != nil {
 		// register an event
 		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventVPNKeyRotationConfigCreationFailed)
 		return ctrl.Result{}, err
 	}
-	// Step 7: update cluster info into vpnkeyrotation Cconfig
+	// Update cluster info into VPN key rotation config
 	if _, err := s.vpn.ReconcileClusters(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.Clusters); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Step 8: Create ServiceImport Objects
+	// Create ServiceImport objects
 	serviceExports := &v1alpha1.ServiceExportConfigList{}
 	_, err = s.getServiceExportBySliceName(ctx, req.Namespace, sliceConfig.Name, serviceExports)
 	if err != nil {
@@ -267,6 +313,24 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
+	// Clean up SliceIpam resource if it exists
+	if slice.Spec.SliceIpamType == "Dynamic" {
+		logger := util.CtxLogger(ctx)
+		logger.Infof("Cleaning up SliceIpam for slice %s", slice.Name)
+
+		// Delete SliceIpam resource if service is available
+		if s.sipam != nil {
+			if err := s.sipam.DeleteSliceIpam(ctx, slice.Name, namespace); err != nil {
+				logger.Errorf("Failed to delete SliceIpam for slice %s: %v", slice.Name, err)
+				return ctrl.Result{}, err
+			}
+			logger.Infof("SliceIpam successfully deleted for slice %s", slice.Name)
+		} else {
+			logger.Warnf("SliceIpam service not available for slice %s", slice.Name)
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 

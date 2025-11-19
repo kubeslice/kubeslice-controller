@@ -119,6 +119,9 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
 	"Test_validateSlicegatewayServiceType":                                                                                     test_validateSlicegatewayServiceType,
+	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithDuplicateCIDRPoolForDynamicIPAM":                                CreateValidateSliceConfigWithDuplicateCIDRPoolForDynamicIPAM,
+	"SliceConfigWebhookValidation_CreateValidateSliceConfigWithUniqueCIDRPoolForDynamicIPAM":                                   CreateValidateSliceConfigWithUniqueCIDRPoolForDynamicIPAM,
+	"SliceConfigWebhookValidation_CreateValidateSliceConfigStaticIPAMAllowsDuplicateCIDR":                                      CreateValidateSliceConfigStaticIPAMAllowsDuplicateCIDR,
 }
 
 func test_validateSlicegatewayServiceType(t *testing.T) {
@@ -2315,4 +2318,197 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest", nil)
 	return clientMock, sliceConfig, ctx
+}
+
+func CreateValidateSliceConfigWithDuplicateCIDRPoolForDynamicIPAM(t *testing.T) {
+	name := "slice-pool-b"
+	namespace := "test-namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	// Setup new slice with Dynamic IPAM
+	newSliceConfig.Spec.SliceIpamType = "Dynamic"
+	newSliceConfig.Spec.SliceSubnet = "10.100.0.0/16"
+	newSliceConfig.Spec.Clusters = []string{"cluster-3", "cluster-4"}
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{
+		SliceGatewayType: "OpenVPN",
+		SliceCaType:      "Local",
+	}
+
+	// Mock namespace exists and is a project namespace
+	ns := &corev1.Namespace{}
+	ns.Labels = make(map[string]string)
+	ns.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, ns).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		arg.Labels = ns.Labels
+	}).Once()
+
+	// Mock existing slice with same CIDR pool
+	existingSlices := &controllerv1alpha1.SliceConfigList{
+		Items: []controllerv1alpha1.SliceConfig{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "slice-pool-a",
+					Namespace: namespace,
+				},
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					SliceIpamType: "Dynamic",
+					SliceSubnet:   "10.100.0.0/16", // Same CIDR!
+					Clusters:      []string{"cluster-1", "cluster-2"},
+				},
+			},
+		},
+	}
+
+	clientMock.On("List", ctx, mock.AnythingOfType("*v1alpha1.SliceConfigList"), client.InNamespace(namespace)).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*controllerv1alpha1.SliceConfigList)
+		arg.Items = existingSlices.Items
+	}).Once()
+
+	// Validation should fail due to duplicate CIDR
+	_, err := ValidateSliceConfigCreate(ctx, newSliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "CIDR pool conflicts with existing slice 'slice-pool-a'")
+	require.Contains(t, err.Error(), "Each Dynamic IPAM slice must have a unique sliceSubnet")
+	clientMock.AssertExpectations(t)
+}
+
+func CreateValidateSliceConfigWithUniqueCIDRPoolForDynamicIPAM(t *testing.T) {
+	name := "slice-pool-b"
+	namespace := "test-namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	// Setup new slice with Dynamic IPAM and unique CIDR
+	newSliceConfig.Spec.SliceIpamType = "Dynamic"
+	newSliceConfig.Spec.SliceSubnet = "10.101.0.0/16" // Different CIDR
+	newSliceConfig.Spec.Clusters = []string{"cluster-3"}
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{
+		SliceGatewayType: "OpenVPN",
+		SliceCaType:      "Local",
+	}
+
+	// Mock namespace exists and is a project namespace
+	ns := &corev1.Namespace{}
+	ns.Labels = make(map[string]string)
+	ns.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, ns).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		arg.Labels = ns.Labels
+	}).Once()
+
+	// Mock existing slice with different CIDR
+	existingSlices := &controllerv1alpha1.SliceConfigList{
+		Items: []controllerv1alpha1.SliceConfig{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "slice-pool-a",
+					Namespace: namespace,
+				},
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					SliceIpamType: "Dynamic",
+					SliceSubnet:   "10.100.0.0/16", // Different CIDR
+					Clusters:      []string{"cluster-1"},
+				},
+			},
+		},
+	}
+
+	clientMock.On("List", ctx, mock.AnythingOfType("*v1alpha1.SliceConfigList"), client.InNamespace(namespace)).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*controllerv1alpha1.SliceConfigList)
+		arg.Items = existingSlices.Items
+	}).Once()
+
+	// Mock cluster validation
+	cluster := &controllerv1alpha1.Cluster{}
+	cluster.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+	cluster.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+		ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+	}
+	cluster.Status.NetworkPresent = true
+	cluster.Status.NodeIPs = []string{"10.0.0.1"}
+	cluster.Status.CniSubnet = []string{"192.168.0.0/16"}
+
+	clientMock.On("Get", ctx, mock.Anything, cluster).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		*arg = *cluster
+	}).Once()
+
+	// Validation should succeed with unique CIDR
+	_, err := ValidateSliceConfigCreate(ctx, newSliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func CreateValidateSliceConfigStaticIPAMAllowsDuplicateCIDR(t *testing.T) {
+	name := "static-slice-2"
+	namespace := "test-namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	// Setup new slice with Static IPAM (default)
+	newSliceConfig.Spec.SliceIpamType = "Static"
+	newSliceConfig.Spec.SliceSubnet = "10.200.0.0/16" // Same CIDR as another static slice
+	newSliceConfig.Spec.MaxClusters = 5
+	newSliceConfig.Spec.Clusters = []string{"cluster-3"}
+	newSliceConfig.Spec.SliceGatewayProvider = &controllerv1alpha1.WorkerSliceGatewayProvider{
+		SliceGatewayType: "OpenVPN",
+		SliceCaType:      "Local",
+	}
+
+	// Mock namespace exists and is a project namespace
+	ns := &corev1.Namespace{}
+	ns.Labels = make(map[string]string)
+	ns.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: namespace,
+	}, ns).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		arg.Labels = ns.Labels
+	}).Once()
+
+	// Mock existing slice with same CIDR but Static IPAM
+	existingSlices := &controllerv1alpha1.SliceConfigList{
+		Items: []controllerv1alpha1.SliceConfig{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "static-slice-1",
+					Namespace: namespace,
+				},
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					SliceIpamType: "Static",
+					SliceSubnet:   "10.200.0.0/16", // Same CIDR - should be allowed for Static
+					MaxClusters:   5,
+					Clusters:      []string{"cluster-1"},
+				},
+			},
+		},
+	}
+
+	clientMock.On("List", ctx, mock.AnythingOfType("*v1alpha1.SliceConfigList"), client.InNamespace(namespace)).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*controllerv1alpha1.SliceConfigList)
+		arg.Items = existingSlices.Items
+	}).Once()
+
+	// Mock cluster validation
+	cluster := &controllerv1alpha1.Cluster{}
+	cluster.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+	cluster.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+		ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+	}
+	cluster.Status.NetworkPresent = true
+	cluster.Status.NodeIPs = []string{"10.0.0.1"}
+	cluster.Status.CniSubnet = []string{"192.168.0.0/16"}
+
+	clientMock.On("Get", ctx, mock.Anything, cluster).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		*arg = *cluster
+	}).Once()
+
+	// Validation should succeed - Static IPAM allows duplicate CIDRs
+	_, err := ValidateSliceConfigCreate(ctx, newSliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
 }
