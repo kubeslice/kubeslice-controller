@@ -108,6 +108,7 @@ jobs:
     - name: Allure Report with history
       uses: PavanMudigonda/html-reporter-github-pages@v1.5
       id: Allure_report_with_history
+      continue-on-error: true
       with:
         test_results: reports
         allure_report_generate_flag: true
