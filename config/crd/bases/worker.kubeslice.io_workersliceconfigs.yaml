@@ -168,6 +168,45 @@ spec:
               sliceType:
                 default: Application
                 type: string
+              topologyConfig:
+                description: Topology configuration for flexible topology support
+                properties:
+                  connectivityMatrix:
+                    items:
+                      properties:
+                        sourceCluster:
+                          type: string
+                        targetClusters:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - sourceCluster
+                      - targetClusters
+                      type: object
+                    type: array
+                  forbiddenEdges:
+                    items:
+                      properties:
+                        sourceCluster:
+                          type: string
+                        targetClusters:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - sourceCluster
+                      - targetClusters
+                      type: object
+                    type: array
+                  topologyType:
+                    default: full-mesh
+                    enum:
+                    - restricted
+                    - full-mesh
+                    - custom
+                    type: string
+                type: object
             type: object
           status:
             description: WorkerSliceConfigStatus defines the observed state of Slice
