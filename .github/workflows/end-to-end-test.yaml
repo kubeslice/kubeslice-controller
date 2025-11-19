@@ -105,6 +105,13 @@ jobs:
       id: date
       run: echo "date=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_OUTPUT
 
+    - name: Checkout external reports repo into gh-pages
+      uses: actions/checkout@v5
+      with:
+        repository: kubeslice/e2e-allure-reports
+        path: gh-pages
+        token: ${{ secrets.TOKEN }}
+
     - name: Allure Report with history
       uses: PavanMudigonda/html-reporter-github-pages@v1.5
       id: Allure_report_with_history
