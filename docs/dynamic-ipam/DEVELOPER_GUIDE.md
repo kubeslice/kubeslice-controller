@@ -1,7 +1,5 @@
 # Dynamic IPAM - Developer Guide
 
-**For contributors working on Dynamic IPAM implementation**
-
 ---
 
 ## Quick Reference
@@ -10,11 +8,11 @@
 
 | File                                             | Purpose         | Tests                                          |
 | ------------------------------------------------ | --------------- | ---------------------------------------------- |
-| `util/ipam_allocator.go`                         | Pure algorithms | `util/ipam_allocator_test.go` (1,844)          |
-| `service/slice_ipam_service.go`                  | Business logic  | `service/slice_ipam_service_test.go` (1,301)   |
+| `util/ipam_allocator.go`                         | Pure algorithms | `util/ipam_allocator_test.go`                  |
+| `service/slice_ipam_service.go`                  | Business logic  | `service/slice_ipam_service_test.go`           |
 | `controllers/controller/sliceipam_controller.go` | Reconciliation  | `controllers/.../sliceipam_controller_test.go` |
 | `apis/.../sliceipam_types.go`                    | CRD schema      | -                                              |
-| `apis/.../sliceipam_webhook.go`                  | Validation      | `apis/.../sliceipam_webhook_test.go` (418)     |
+| `apis/.../sliceipam_webhook.go`                  | Validation      | `apis/.../sliceipam_webhook_test.go`           |
 
 ### Common Operations
 
@@ -2122,5 +2120,3 @@ curl http://localhost:18080/metrics | grep ipam_
 - 20GB disk space
 
 ---
-
-**Last Updated:** November 20, 2025

@@ -1145,5 +1145,3 @@ A: No. Existing slices continue with Static IPAM (backward compatible).
 A: 24 hours grace period before cleanup (allows cluster rejoin).
 
 ---
-
-**Last Updated:** November 19, 2025
