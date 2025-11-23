@@ -214,10 +214,26 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 
 	// Use Dynamic IPAM or Static IPAM based on SliceIpamType
 	if sliceConfig.Spec.SliceIpamType == "Dynamic" {
-		// For Dynamic IPAM, we don't pre-calculate clusterCidr
-		// Each cluster gets its subnet allocated dynamically from SliceIpam
+		// For Dynamic IPAM, get the subnet size from SliceIpam resource
 		logger.Infof("Using Dynamic IPAM for slice %s", sliceConfig.Name)
-		clusterCidr = "" // Will be determined per-cluster by SliceIpam service
+
+		// Get the SliceIpam resource to determine subnet size
+		if s.sipam != nil {
+			sliceIpam := &v1alpha1.SliceIpam{}
+			ipamKey := types.NamespacedName{Name: sliceConfig.Name, Namespace: sliceConfig.Namespace}
+			foundIpam, ipamErr := util.GetResourceIfExist(ctx, ipamKey, sliceIpam)
+			if ipamErr == nil && foundIpam && sliceIpam.Spec.SubnetSize > 0 {
+				clusterCidr = fmt.Sprintf("/%d", sliceIpam.Spec.SubnetSize)
+				logger.Infof("Using subnet size /%d from SliceIpam for gateway creation", sliceIpam.Spec.SubnetSize)
+			} else {
+				// Default to /24 if SliceIpam not found or subnet size not specified
+				clusterCidr = "/24"
+				logger.Warnf("Could not get subnet size from SliceIpam, defaulting to /24 for gateway creation")
+			}
+		} else {
+			clusterCidr = "/24"
+			logger.Warnf("SliceIpam service not available, defaulting to /24 for gateway creation")
+		}
 	} else {
 		// Static IPAM: Use traditional maxClusters approach
 		clusterCidr = util.FindCIDRByMaxClusters(sliceConfig.Spec.MaxClusters)
