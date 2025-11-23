@@ -280,9 +280,9 @@ func (ia *IpamAllocator) FindNextAvailableSubnet(
 ```go
 // Scenario: 3 subnets already allocated
 allocatedSubnets := []string{
-    "10.1.0.0/24",  // cluster-1
-    "10.1.1.0/24",  // cluster-2
-    "10.1.2.0/24",  // cluster-3
+    "10.1.0.0/24",  // worker-1
+    "10.1.1.0/24",  // worker-2
+    "10.1.2.0/24",  // worker-3
 }
 
 FindNextAvailableSubnet("10.1.0.0/16", 24, allocatedSubnets)
@@ -466,8 +466,8 @@ func ValidateAllocationConsistency(
 
 // Example:
 allocations := []ClusterSubnetAllocation{
-    {ClusterName: "cluster-1", Subnet: "10.1.0.0/24"},
-    {ClusterName: "cluster-1", Subnet: "10.1.1.0/24"},  // ❌ Duplicate!
+    {ClusterName: "worker-1", Subnet: "10.1.0.0/24"},
+    {ClusterName: "worker-1", Subnet: "10.1.1.0/24"},  // ❌ Duplicate!
 }
 ValidateAllocationConsistency(allocations)  // Returns error
 ```
@@ -663,8 +663,8 @@ spec:
   sliceIpamType: "Dynamic"
   subnetSize: 24
   clusters:
-    - test-cluster-1
-    - test-cluster-2
+    - test-worker-1
+    - test-worker-2
 EOF
 
 # Verify SliceIpam created
@@ -866,7 +866,7 @@ func TestAllocateSubnetForCluster(t *testing.T) {
 
     // Test allocation
     subnet, err := service.AllocateSubnetForCluster(
-        context.Background(), "test-slice", "cluster-1", "default")
+        context.Background(), "test-slice", "worker-1", "default")
 
     assert.NoError(t, err)
     assert.Equal(t, "10.1.0.0/24", subnet)
@@ -878,7 +878,7 @@ func TestAllocateSubnetForCluster(t *testing.T) {
         &updated)
 
     assert.Len(t, updated.Status.AllocatedSubnets, 1)
-    assert.Equal(t, "cluster-1", updated.Status.AllocatedSubnets[0].ClusterName)
+    assert.Equal(t, "worker-1", updated.Status.AllocatedSubnets[0].ClusterName)
     assert.Equal(t, "10.1.0.0/24", updated.Status.AllocatedSubnets[0].Subnet)
 }
 ```
@@ -1362,8 +1362,8 @@ spec:
   sliceIpamType: "Dynamic"
   sliceSubnet: "10.100.0.0/16"
   clusters:
-    - cluster-1
-    - cluster-2
+    - worker-1
+    - worker-2
 ```
 
 **Result:**
@@ -1390,7 +1390,7 @@ spec:
   sliceIpamType: "Dynamic"
   sliceSubnet: "10.100.0.0/16" # ⚠️ Same CIDR as slice-pool-a
   clusters:
-    - cluster-3
+    - worker-3
 ```
 
 **Result:**
@@ -1413,7 +1413,7 @@ spec:
   sliceIpamType: "Dynamic"
   sliceSubnet: "10.101.0.0/16" # ✅ Different CIDR
   clusters:
-    - cluster-3
+    - worker-3
 ```
 
 **Result:**
@@ -1836,8 +1836,8 @@ spec:
   sliceSubnet: "10.200.0.0/16"
   maxClusters: 10
   clusters:
-    - cluster-1
-    - cluster-2
+    - worker-1
+    - worker-2
   # Note: sliceIpamType NOT specified → defaults to Static
 ```
 
@@ -1853,8 +1853,8 @@ spec:
   sliceIpamType: "Dynamic"  ← Explicitly enabled
   sliceSubnet: "10.1.0.0/16"
   clusters:
-    - cluster-1
-    - cluster-2
+    - worker-1
+    - worker-2
 ```
 
 #### Test Steps
@@ -1924,8 +1924,8 @@ kubectl get workersliceconfig -n kubeslice-cisco -l original-slice-name=static-s
 
 ```
 CLUSTER     SUBNET
-cluster-1   10.200.0.0/20    ← /20 subnets (4,096 IPs)
-cluster-2   10.200.16.0/20   ← Calculated from maxClusters=10
+worker-1   10.200.0.0/20    ← /20 subnets (4,096 IPs)
+worker-2   10.200.16.0/20   ← Calculated from maxClusters=10
 ```
 
 **Dynamic IPAM (new):**
@@ -1939,8 +1939,8 @@ kubectl get workersliceconfig -n kubeslice-cisco -l original-slice-name=dynamic-
 
 ```
 CLUSTER     SUBNET
-cluster-1   10.1.0.0/24      ← /24 subnets (256 IPs)
-cluster-2   10.1.1.0/24      ← Sequential allocation
+worker-1   10.1.0.0/24      ← /24 subnets (256 IPs)
+worker-2   10.1.1.0/24      ← Sequential allocation
 ```
 
 #### Coexistence Verification
@@ -1974,12 +1974,12 @@ sliceipam.controller.kubeslice.io/dynamic-slice   10.1.0.0/16    254         256
 **Test 1: Static slice cluster operations**
 
 ```bash
-# Add cluster-3 to static slice
+# Add worker-3 to static slice
 kubectl patch sliceconfig static-slice -n kubeslice-cisco --type=json \
-  -p='[{"op": "add", "path": "/spec/clusters/-", "value": "cluster-3"}]'
+  -p='[{"op": "add", "path": "/spec/clusters/-", "value": "worker-3"}]'
 
 # Verify subnet allocated using traditional formula
-kubectl get workersliceconfig static-slice-cluster-3 -n kubeslice-cisco \
+kubectl get workersliceconfig static-slice-worker-3 -n kubeslice-cisco \
   -o jsonpath='{.spec.clusterSubnetCIDR}'
 ```
 
@@ -1988,12 +1988,12 @@ kubectl get workersliceconfig static-slice-cluster-3 -n kubeslice-cisco \
 **Test 2: Dynamic slice cluster operations**
 
 ```bash
-# Add cluster-3 to dynamic slice
+# Add worker-3 to dynamic slice
 kubectl patch sliceconfig dynamic-slice -n kubeslice-cisco --type=json \
-  -p='[{"op": "add", "path": "/spec/clusters/-", "value": "cluster-3"}]'
+  -p='[{"op": "add", "path": "/spec/clusters/-", "value": "worker-3"}]'
 
 # Verify subnet allocated using Dynamic IPAM
-kubectl get workersliceconfig dynamic-slice-cluster-3 -n kubeslice-cisco \
+kubectl get workersliceconfig dynamic-slice-worker-3 -n kubeslice-cisco \
   -o jsonpath='{.spec.clusterSubnetCIDR}'
 ```
 

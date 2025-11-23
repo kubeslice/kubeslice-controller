@@ -150,18 +150,18 @@ SliceIpam CRD created with:
 **2. Cluster Join**
 
 ```
-User adds cluster-1 to SliceConfig.spec.clusters
+User adds worker-1 to SliceConfig.spec.clusters
   ↓
 WorkerSliceConfigController reconciles
   ↓
-SliceIpamService.AllocateSubnetForCluster("cluster-1")
+SliceIpamService.AllocateSubnetForCluster("worker-1")
   ↓
 IpamAllocator.FindNextAvailableSubnet()
   → Generates pool: [10.1.0.0/24, 10.1.1.0/24, ..., 10.1.255.0/24]
   → Finds first unallocated: 10.1.0.0/24
   ↓
 SliceIpam.status.allocatedSubnets updated:
-  - clusterName: "cluster-1"
+  - clusterName: "worker-1"
   - subnet: "10.1.0.0/24"
   - status: "Allocated"
   - allocatedAt: "2025-11-19T10:00:00Z"
@@ -172,9 +172,9 @@ WorkerSliceConfig.spec.ipamClusterOctet = "10.1.0.0/24"
 **3. Cluster Leave**
 
 ```
-User removes cluster-1 from SliceConfig.spec.clusters
+User removes worker-1 from SliceConfig.spec.clusters
   ↓
-SliceIpamService.ReleaseSubnetForCluster("cluster-1")
+SliceIpamService.ReleaseSubnetForCluster("worker-1")
   ↓
 SliceIpam.status.allocatedSubnets[0] updated:
   - status: "Allocated" → "Released"
@@ -186,11 +186,11 @@ Subnet NOT deleted (persistence for 24 hours)
 **4. Cluster Rejoin**
 
 ```
-User re-adds cluster-1 to SliceConfig.spec.clusters
+User re-adds worker-1 to SliceConfig.spec.clusters
   ↓
-SliceIpamService.AllocateSubnetForCluster("cluster-1")
+SliceIpamService.AllocateSubnetForCluster("worker-1")
   ↓
-Finds existing allocation for cluster-1 in Released state
+Finds existing allocation for worker-1 in Released state
   ↓
 Reuses same subnet: 10.1.0.0/24 (no reallocation!)
   ↓
@@ -251,8 +251,8 @@ spec:
   sliceIpamType: "Dynamic" # Enable dynamic allocation
   subnetSize: 24 # Optional: default is 24
   clusters:
-    - cluster-1
-    - cluster-2
+    - worker-1
+    - worker-2
 ```
 
 **Field Descriptions:**
@@ -308,7 +308,7 @@ metadata:
 spec:
   sliceSubnet: "10.2.0.0/16"  # Must use different subnet
   sliceIpamType: "Dynamic"
-  clusters: [cluster-1, cluster-2]
+  clusters: [worker-1, worker-2]
 EOF
 
 # 2. Verify new slice is ready
@@ -363,17 +363,17 @@ The status field tracks all allocations and provides capacity metrics:
 ```yaml
 status:
   allocatedSubnets:
-    - clusterName: cluster-1
+    - clusterName: worker-1
       subnet: "10.1.0.0/24"
       allocatedAt: "2025-11-19T10:00:00Z"
       status: Allocated # Current state: Allocated | InUse | Released
       releasedAt: null
-    - clusterName: cluster-2
+    - clusterName: worker-2
       subnet: "10.1.1.0/24"
       allocatedAt: "2025-11-19T10:05:00Z"
       status: Released
       releasedAt: "2025-11-19T14:00:00Z"
-    - clusterName: cluster-3
+    - clusterName: worker-3
       subnet: "10.1.2.0/24"
       allocatedAt: "2025-11-19T11:00:00Z"
       status: InUse
@@ -473,13 +473,13 @@ kubectl get sliceipam my-slice -n kubeslice-cisco \
 # Output:
 [
   {
-    "clusterName": "cluster-1",
+    "clusterName": "worker-1",
     "subnet": "10.1.0.0/24",
     "allocatedAt": "2025-11-19T10:00:00Z",
     "status": "Allocated"
   },
   {
-    "clusterName": "cluster-2",
+    "clusterName": "worker-2",
     "subnet": "10.1.1.0/24",
     "allocatedAt": "2025-11-19T10:05:00Z",
     "status": "Released",
@@ -492,7 +492,7 @@ kubectl get sliceipam my-slice -n kubeslice-cisco \
 
 ```bash
 kubectl get sliceipam my-slice -n kubeslice-cisco \
-  -o jsonpath='{.status.allocatedSubnets[?(@.clusterName=="cluster-1")]}'
+  -o jsonpath='{.status.allocatedSubnets[?(@.clusterName=="worker-1")]}'
 ```
 
 **Monitor Capacity:**
@@ -550,11 +550,11 @@ kubectl patch sliceconfig my-slice -n kubeslice-cisco --type=json \
 
 # Verify subnet marked as Released (not deleted)
 kubectl get sliceipam my-slice -n kubeslice-cisco \
-  -o jsonpath='{.status.allocatedSubnets[?(@.clusterName=="cluster-2")]}'
+  -o jsonpath='{.status.allocatedSubnets[?(@.clusterName=="worker-2")]}'
 
 # Output shows:
 # {
-#   "clusterName": "cluster-2",
+#   "clusterName": "worker-2",
 #   "subnet": "10.1.1.0/24",
 #   "status": "Released",
 #   "releasedAt": "2025-11-19T15:30:00Z"
@@ -857,7 +857,7 @@ Dynamic IPAM emits structured logs at key points:
   "level": "info",
   "msg": "Allocated subnet for cluster",
   "slice": "my-slice",
-  "cluster": "cluster-1",
+  "cluster": "worker-1",
   "subnet": "10.1.0.0/24",
   "duration_ms": 5.2
 }
@@ -867,7 +867,7 @@ Dynamic IPAM emits structured logs at key points:
   "level": "info",
   "msg": "Reused existing subnet for cluster",
   "slice": "my-slice",
-  "cluster": "cluster-1",
+  "cluster": "worker-1",
   "subnet": "10.1.0.0/24",
   "previously_released_at": "2025-11-19T14:00:00Z"
 }
@@ -957,10 +957,10 @@ Slice red allocations:
 **Test Steps:**
 
 ```bash
-1. Create slice with cluster-1 → Allocated 10.2.0.0/24
-2. Remove cluster-1 → Subnet marked Released
+1. Create slice with worker-1 → Allocated 10.2.0.0/24
+2. Remove worker-1 → Subnet marked Released
 3. Wait 5 minutes
-4. Re-add cluster-1 → Reused 10.2.0.0/24 (same subnet!)
+4. Re-add worker-1 → Reused 10.2.0.0/24 (same subnet!)
 5. Verify network connectivity → ✅ No reconfiguration needed
 ```
 

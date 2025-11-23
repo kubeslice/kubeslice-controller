@@ -9,8 +9,8 @@ spec:
   sliceIpamType: "Dynamic"
   maxClusters: 4
   clusters:
-    - cluster-1
-    - cluster-2
+    - worker-1
+    - worker-2
   sliceGatewayProvider:
     sliceGatewayType: OpenVPN
     sliceCaType: Local
