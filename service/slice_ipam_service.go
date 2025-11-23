@@ -167,24 +167,59 @@ func (s *SliceIpamService) AllocateSubnetForCluster(ctx context.Context, sliceNa
 	}
 
 	// Only allocate new subnet if no Released entry exists for this cluster
-	// Find next available subnet
-	allocatedSubnets := make([]string, 0, len(sliceIpam.Status.AllocatedSubnets))
-	for _, allocation := range sliceIpam.Status.AllocatedSubnets {
-		if allocation.Status == "Allocated" || allocation.Status == "InUse" {
-			allocatedSubnets = append(allocatedSubnets, allocation.Subnet)
+	// Convert to util.ClusterSubnetAllocation for the allocator
+	utilAllocations := make([]util.ClusterSubnetAllocation, len(sliceIpam.Status.AllocatedSubnets))
+	for i, allocation := range sliceIpam.Status.AllocatedSubnets {
+		utilAllocations[i] = util.ClusterSubnetAllocation{
+			ClusterName: allocation.ClusterName,
+			Subnet:      allocation.Subnet,
+			AllocatedAt: allocation.AllocatedAt.Time,
+			Status:      string(allocation.Status),
+		}
+		if allocation.ReleasedAt != nil {
+			releasedAt := allocation.ReleasedAt.Time
+			utilAllocations[i].ReleasedAt = &releasedAt
 		}
 	}
 
-	subnet, err := s.allocator.FindNextAvailableSubnet(
+	// Use FindNextAvailableSubnetWithReclamation to respect grace periods (24h)
+	subnet, isReclaimed, err := s.allocator.FindNextAvailableSubnetWithReclamation(
 		sliceIpam.Spec.SliceSubnet,
 		sliceIpam.Spec.SubnetSize,
-		allocatedSubnets,
+		utilAllocations,
+		24*time.Hour,
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to find available subnet: %v", err)
 	}
 
-	// Add new allocation to status (this is a brand new cluster)
+	// If we found a reclaimable subnet (expired released subnet), reuse the slot
+	if isReclaimed {
+		for i, allocation := range sliceIpam.Status.AllocatedSubnets {
+			if allocation.Subnet == subnet {
+				logger.Infof("Reclaiming expired subnet %s from cluster %s for new cluster %s", subnet, allocation.ClusterName, clusterName)
+				sliceIpam.Status.AllocatedSubnets[i].ClusterName = clusterName
+				sliceIpam.Status.AllocatedSubnets[i].Status = "Allocated"
+				sliceIpam.Status.AllocatedSubnets[i].AllocatedAt = metav1.Now()
+				sliceIpam.Status.AllocatedSubnets[i].ReleasedAt = nil
+
+				// Update counters
+				if sliceIpam.Status.AvailableSubnets > 0 {
+					sliceIpam.Status.AvailableSubnets--
+				}
+				sliceIpam.Status.LastUpdated = metav1.Now()
+
+				if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
+					s.recordAllocationMetrics(sliceName, clusterName, namespace, time.Since(startTime), "failure")
+					return "", fmt.Errorf("failed to update SliceIpam status: %v", err)
+				}
+				s.recordAllocationMetrics(sliceName, clusterName, namespace, time.Since(startTime), "success")
+				return subnet, nil
+			}
+		}
+	}
+
+	// Add new allocation to status (this is a brand new cluster and new subnet)
 	logger.Infof("Allocating new subnet %s for cluster %s (first time allocation)", subnet, clusterName)
 	allocation := v1alpha1.ClusterSubnetAllocation{
 		ClusterName: clusterName,
