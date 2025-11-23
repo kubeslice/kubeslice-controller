@@ -351,7 +351,7 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
 	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, gatewayPairs []util.GatewayPair) (ctrl.Result, error) {
 
-	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
+	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap, gatewayPairs)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -379,7 +379,7 @@ func (s *WorkerSliceGatewayService) ListWorkerSliceGateways(ctx context.Context,
 
 // cleanupObsoleteGateways is a function delete outdated gateways
 func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context, namespace string, ownerLabel map[string]string,
-	clusters []string, clusterMap map[string]int) error {
+	clusters []string, clusterMap map[string]int, gatewayPairs []util.GatewayPair) error {
 
 	gateways, err := s.ListWorkerSliceGateways(ctx, ownerLabel, namespace)
 	if err != nil {
@@ -402,11 +402,21 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 		clusterExistMap[cluster] = true
 	}
 
+	// Create a map of valid gateway pairs
+	validPairs := make(map[string]bool)
+	for _, pair := range gatewayPairs {
+		validPairs[pair.Source+"-"+pair.Target] = true
+	}
+
 	for _, gateway := range gateways {
 		clusterSource := gateway.Spec.LocalGatewayConfig.ClusterName
 		clusterDestination := gateway.Spec.RemoteGatewayConfig.ClusterName
 		gatewayExpectedNumber := s.calculateGatewayNumber(clusterMap[clusterSource], clusterMap[clusterDestination])
-		if !clusterExistMap[clusterSource] || !clusterExistMap[clusterDestination] || gatewayExpectedNumber != gateway.Spec.GatewayNumber {
+		
+		// Check if the pair is valid in the current topology
+		isValidPair := validPairs[clusterSource+"-"+clusterDestination]
+
+		if !clusterExistMap[clusterSource] || !clusterExistMap[clusterDestination] || gatewayExpectedNumber != gateway.Spec.GatewayNumber || !isValidPair {
 			err = util.DeleteResource(ctx, &gateway)
 			if err != nil {
 				//Register an event for worker slice gateway deletion failure
