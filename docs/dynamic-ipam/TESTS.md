@@ -17,7 +17,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ All validation rules enforced correctly
 
-![Test 01 - Schema Validation](./dynamic-ipam-tests/screenshots/test-01-schema-validation.png)
+<img width="2453" height="1946" alt="test-01" src="https://github.com/user-attachments/assets/56e660e7-6895-4a04-b8fe-35ef69dfeaac" />
 
 ---
 
@@ -33,7 +33,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Webhook prevents CIDR collisions
 
-![Test 02 - CIDR Collision](./dynamic-ipam-tests/screenshots/test-02-cidr-collision.png)
+<img width="2512" height="3047" alt="test-02" src="https://github.com/user-attachments/assets/11793786-869d-452b-bf6b-e180ab416c4c" />
 
 ---
 
@@ -51,7 +51,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Core IPAM features work perfectly
 
-![Test 03 - Core Features](./dynamic-ipam-tests/screenshots/test-03-core-features.png)
+<img width="2457" height="4098" alt="test-03" src="https://github.com/user-attachments/assets/78df650f-c5e6-4f25-880a-a3e7c9278ddc" />
 
 ---
 
@@ -67,7 +67,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Perfect slice isolation
 
-![Test 04 - Multi-Slice Isolation](./dynamic-ipam-tests/screenshots/test-04-multi-slice-isolation.png)
+<img width="2447" height="3912" alt="test-04" src="https://github.com/user-attachments/assets/d1a1f45f-f15f-465b-b2fc-2a25ba29ac3a" />
 
 ---
 
@@ -84,7 +84,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Subnet persistence works as designed
 
-![Test 05 - Lifecycle Persistence](./dynamic-ipam-tests/screenshots/test-05-lifecycle-persistence.png)
+<img width="2506" height="3822" alt="test-05" src="https://github.com/user-attachments/assets/3d6cdc5c-18c5-4b15-8885-473fdcf152d6" />
 
 ---
 
@@ -99,7 +99,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Backward compatibility maintained
 
-![Test 06 - Backward Compatibility](./dynamic-ipam-tests/screenshots/test-06-backward-compatibility.png)
+<img width="2458" height="1985" alt="test-06" src="https://github.com/user-attachments/assets/644866c0-d9d0-452f-b1ad-c7b1c96225fd" />
 
 ---
 
@@ -115,7 +115,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Both modes coexist without interference
 
-![Test 07 - Coexistence](./dynamic-ipam-tests/screenshots/test-07-coexistence.png)
+<img width="2447" height="2873" alt="test-07" src="https://github.com/user-attachments/assets/7aa1d1ad-9961-4a4f-9aa2-7e5cf45eb70d" />
 
 ---
 
@@ -131,7 +131,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Concurrent allocation is safe
 
-![Test 08 - Concurrent Allocation](./dynamic-ipam-tests/screenshots/test-08-concurrent-allocation.png)
+<img width="2445" height="3113" alt="test-08" src="https://github.com/user-attachments/assets/6eb8c3d3-d41b-4c31-8f10-a196f493a196" />
 
 ---
 
@@ -148,7 +148,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Graceful handling at capacity limits
 
-![Test 09 - Near-Capacity](./dynamic-ipam-tests/screenshots/test-09-near-capacity.png)
+<img width="2442" height="3436" alt="test-09" src="https://github.com/user-attachments/assets/d55e9e26-8c7d-4c25-ac16-ce419a95d5c1" />
 
 ---
 
@@ -165,7 +165,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Exhaustion handled gracefully
 
-![Test 10 - Exhaustion](./dynamic-ipam-tests/screenshots/test-10-exhaustion.png)
+<img width="2470" height="4128" alt="test-10" src="https://github.com/user-attachments/assets/69d250d1-e0d5-402c-a67b-8368bc9889df" />
 
 ---
 
@@ -182,7 +182,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Zero network performance impact
 
-![Test 11 - Network Performance](./dynamic-ipam-tests/screenshots/test-11-network-performance.png)
+<img width="2457" height="4070" alt="test-11" src="https://github.com/user-attachments/assets/0203efa0-9e29-46ab-b8bc-c38560b8e326" />
 
 ---
 
@@ -198,7 +198,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Subnet propagation works perfectly
 
-![Test 12 - Config Propagation](./dynamic-ipam-tests/screenshots/test-12-propagation.png)
+<img width="2446" height="3464" alt="test-12" src="https://github.com/user-attachments/assets/7651e940-b7a2-467e-b902-44ad1a8949e8" />
 
 ---
 
@@ -215,7 +215,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Controller recovers state from CRDs
 
-![Test 13 - Controller Recovery](./dynamic-ipam-tests/screenshots/test-13-recovery.png)
+<img width="2451" height="2919" alt="test-13" src="https://github.com/user-attachments/assets/69e6d56d-3b75-441d-964f-b921f0f02637" />
 
 ---
 
@@ -232,7 +232,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Metrics are 100% accurate
 
-![Test 14 - Prometheus Metrics](./dynamic-ipam-tests/screenshots/test-14-metrics.png)
+<img width="2447" height="3051" alt="test-14" src="https://github.com/user-attachments/assets/62d24a33-f83a-474e-943b-46f7100b390a" />
 
 ---
 
@@ -251,4 +251,3 @@ All tests demonstrate production-ready quality with:
 - ✅ Full state recovery
 - ✅ Accurate observability
 
-**Status:** Ready for production deployment
