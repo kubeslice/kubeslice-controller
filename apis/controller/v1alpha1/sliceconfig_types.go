@@ -55,7 +55,7 @@ type SliceConfigSpec struct {
 	//+kubebuilder:default:=Application
 	SliceType            string                      `json:"sliceType,omitempty"`
 	SliceGatewayProvider *WorkerSliceGatewayProvider `json:"sliceGatewayProvider,omitempty"`
-	//+kubebuilder:validation:Enum:=Static;Dynamic
+	//+kubebuilder:validation:Enum:=Static;Dynamic;Local
 	//+kubebuilder:default:=Static
 	SliceIpamType          string   `json:"sliceIpamType,omitempty"`
 	Clusters               []string `json:"clusters,omitempty"`
