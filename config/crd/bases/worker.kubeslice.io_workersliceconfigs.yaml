@@ -163,6 +163,7 @@ spec:
                 enum:
                 - Static
                 - Dynamic
+                - Local
                 type: string
               sliceName:
                 type: string
