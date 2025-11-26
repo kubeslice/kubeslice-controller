@@ -102,7 +102,7 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 **Result:** ✅ Backward compatibility maintained for all static IPAM types
 
-<img width="2458" height="1985" alt="test-06" src="https://github.com/user-attachments/assets/644866c0-d9d0-452f-b1ad-c7b1c96225fd" />
+<img width="2458" height="1985" alt="test-06" src="https://github.com/user-attachments/assets/5bc40b69-0181-4338-9087-676ae5792695" />
 
 ---
 
