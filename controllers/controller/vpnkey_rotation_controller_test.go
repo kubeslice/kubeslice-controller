@@ -51,7 +51,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 					SliceGatewayType: "OpenVPN",
 					SliceCaType:      "Local",
 				},
-				SliceIpamType: "Local",
+				SliceIpamType: "Static",
 				SliceType:     "Application",
 				QosProfileDetails: &v1alpha1.QOSProfile{
 					BandwidthCeilingKbps: 5120,
@@ -204,7 +204,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 						SliceGatewayType: "OpenVPN",
 						SliceCaType:      "Local",
 					},
-					SliceIpamType: "Local",
+					SliceIpamType: "Static",
 					SliceType:     "Application",
 				},
 			}
@@ -456,7 +456,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 					SliceGatewayType: "OpenVPN",
 					SliceCaType:      "Local",
 				},
-				SliceIpamType: "Local",
+				SliceIpamType: "Static",
 				SliceType:     "Application",
 				QosProfileDetails: &v1alpha1.QOSProfile{
 					BandwidthCeilingKbps: 5120,
@@ -665,7 +665,7 @@ var _ = Describe("VpnKeyRotation Controller", Ordered, func() {
 					SliceGatewayType: "OpenVPN",
 					SliceCaType:      "Local",
 				},
-				SliceIpamType: "Local",
+				SliceIpamType: "Static",
 				SliceType:     "Application",
 				QosProfileDetails: &v1alpha1.QOSProfile{
 					BandwidthCeilingKbps: 5120,

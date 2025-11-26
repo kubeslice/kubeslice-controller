@@ -101,7 +101,7 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 		"cluster-2": 2,
 	}
 
-	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{
 		"original-slice-name": sliceConfig.Name,
@@ -315,7 +315,7 @@ func SliceConfigErrorOnCreateWorkerSliceConfig(t *testing.T) {
 	}
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	err1 := errors.New("internal_error")
-	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, err1).Once()
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, err1).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -348,7 +348,7 @@ func SliceConfigErrorOnCreateWorkerSliceGateway(t *testing.T) {
 	}
 
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
-	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	err1 := errors.New("internal_error")
 	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, err1).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
@@ -625,7 +625,7 @@ func SliceConfigErrorOnListingServiceExport(t *testing.T) {
 		"cluster-2": 2,
 	}
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
-	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{
 		"original-slice-name": sliceConfig.Name,
@@ -666,7 +666,7 @@ func SliceConfigErrorOnCreateOrUpdateServiceImport(t *testing.T) {
 	}
 
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
-	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{
 		"original-slice-name": sliceConfig.Name,

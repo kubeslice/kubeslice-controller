@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -276,7 +277,7 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 	return nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, clusterServiceMock, sliceConfigServiceMock, serviceExportConfigServiceMock, sliceQoSConfigServiceMock, mMock
 }
 
-func prepareProjectTestContext(ctx context.Context, client util.Client,
+func prepareProjectTestContext(ctx context.Context, client client.Client,
 	scheme *runtime.Scheme) context.Context {
 	eventRecorder := events.NewEventRecorder(client, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",

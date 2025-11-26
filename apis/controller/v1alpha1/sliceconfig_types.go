@@ -55,7 +55,8 @@ type SliceConfigSpec struct {
 	//+kubebuilder:default:=Application
 	SliceType            string                      `json:"sliceType,omitempty"`
 	SliceGatewayProvider *WorkerSliceGatewayProvider `json:"sliceGatewayProvider,omitempty"`
-	//+kubebuilder:default:=Local
+	//+kubebuilder:validation:Enum:=Static;Dynamic
+	//+kubebuilder:default:=Static
 	SliceIpamType          string   `json:"sliceIpamType,omitempty"`
 	Clusters               []string `json:"clusters,omitempty"`
 	StandardQosProfileName string   `json:"standardQosProfileName,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails

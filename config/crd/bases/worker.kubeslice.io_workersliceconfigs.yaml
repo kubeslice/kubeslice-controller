@@ -159,7 +159,10 @@ spec:
                     type: string
                 type: object
               sliceIpamType:
-                default: Local
+                default: Static
+                enum:
+                - Static
+                - Dynamic
                 type: string
               sliceName:
                 type: string

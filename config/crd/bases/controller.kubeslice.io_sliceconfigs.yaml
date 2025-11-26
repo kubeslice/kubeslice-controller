@@ -218,7 +218,10 @@ spec:
                 - sliceGatewayType
                 type: object
               sliceIpamType:
-                default: Local
+                default: Static
+                enum:
+                - Static
+                - Dynamic
                 type: string
               sliceSubnet:
                 type: string

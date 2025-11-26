@@ -8,7 +8,7 @@ spec:
   sliceGatewayProvider:
     sliceGatewayType: OpenVPN
     sliceCaType: Local
-  sliceIpamType: Local
+  sliceIpamType: Static
   clusters:
     - cluster-1
     - cluster-2

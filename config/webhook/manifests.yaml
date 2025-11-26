@@ -90,6 +90,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-controller-kubeslice-io-v1alpha1-sliceipam
+  failurePolicy: Fail
+  name: msliceipam.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - sliceipams
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-controller-kubeslice-io-v1alpha1-sliceqosconfig
   failurePolicy: Fail
   name: msliceqosconfig.kb.io
@@ -233,6 +253,27 @@ webhooks:
     - DELETE
     resources:
     - sliceconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-controller-kubeslice-io-v1alpha1-sliceipam
+  failurePolicy: Fail
+  name: vsliceipam.kb.io
+  rules:
+  - apiGroups:
+    - controller.kubeslice.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - sliceipams
   sideEffects: None
 - admissionReviewVersions:
   - v1

@@ -29,6 +29,7 @@ type Services struct {
 	SliceQoSConfigService             ISliceQoSConfigService
 	WorkerSliceGatewayRecyclerService IWorkerSliceGatewayRecyclerService
 	VpnKeyRotationService             IVpnKeyRotationService
+	SliceIpamService                  ISliceIpamService
 }
 
 // bootstrapping Services
@@ -43,6 +44,7 @@ func WithServices(
 	sqcs ISliceQoSConfigService,
 	wsgrs IWorkerSliceGatewayRecyclerService,
 	vpn IVpnKeyRotationService,
+	sipam ISliceIpamService,
 ) *Services {
 	return &Services{
 		ProjectService:                    ps,
@@ -55,6 +57,7 @@ func WithServices(
 		SliceQoSConfigService:             sqcs,
 		WorkerSliceGatewayRecyclerService: wsgrs,
 		VpnKeyRotationService:             vpn,
+		SliceIpamService:                  sipam,
 	}
 }
 
@@ -105,6 +108,7 @@ func WithSliceConfigService(
 	wsgrs IWorkerSliceGatewayRecyclerService,
 	mf metrics.IMetricRecorder,
 	vpn IVpnKeyRotationService,
+	sipam ISliceIpamService,
 ) ISliceConfigService {
 	return &SliceConfigService{
 		ns:    ns,
@@ -116,6 +120,7 @@ func WithSliceConfigService(
 		wsgrs: wsgrs,
 		mf:    mf,
 		vpn:   vpn,
+		sipam: sipam,
 	}
 }
 
@@ -210,5 +215,12 @@ func WithVpnKeyRotationService(w IWorkerSliceGatewayService, ws IWorkerSliceConf
 	return &VpnKeyRotationService{
 		wsgs: w,
 		wscs: ws,
+	}
+}
+
+// bootstrapping Slice IPAM service
+func WithSliceIpamService(mf metrics.IMetricRecorder) ISliceIpamService {
+	return &SliceIpamService{
+		mf: mf,
 	}
 }

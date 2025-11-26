@@ -34,6 +34,7 @@ import (
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -100,14 +101,27 @@ func UpdateResource(ctx context.Context, object client.Object) error {
 	logger.Debugf("Updating object kind %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
-	err := kubeSliceCtx.Update(ctx, object)
+	// Retry on conflict to handle concurrent updates
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Fetch latest resourceVersion to avoid conflicts
+		current := object.DeepCopyObject().(client.Object)
+		getErr := kubeSliceCtx.Get(ctx, client.ObjectKey{
+			Namespace: object.GetNamespace(),
+			Name:      object.GetName(),
+		}, current)
+		if getErr != nil {
+			return getErr
+		}
+		object.SetResourceVersion(current.GetResourceVersion())
+		return kubeSliceCtx.Update(ctx, object)
+	})
 	if err != nil {
 		logger.With(zap.Error(err)).Errorf("Failed to update resource: %v", object)
 		return err
 	}
 	logger.Infof("Updated object kind %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
-	return err
+	return nil
 }
 
 // UpdateStatus is a function to update the status of given resource
@@ -116,21 +130,34 @@ func UpdateStatus(ctx context.Context, object client.Object) error {
 	logger.Debugf("Updating object status %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
-	err := kubeSliceCtx.Status().Update(ctx, object)
+	// Retry on conflict to handle concurrent updates on status subresource
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current := object.DeepCopyObject().(client.Object)
+		getErr := kubeSliceCtx.Get(ctx, client.ObjectKey{
+			Namespace: object.GetNamespace(),
+			Name:      object.GetName(),
+		}, current)
+		if getErr != nil {
+			return getErr
+		}
+		object.SetResourceVersion(current.GetResourceVersion())
+		return kubeSliceCtx.Status().Update(ctx, object)
+	})
 	if err != nil {
 		logger.With(zap.Error(err)).Errorf("Failed to update status: %v", object)
-		return err
+		return err // Return the error so caller can detect conflicts
 	}
 	logger.Infof("Updated object status %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
-	err = kubeSliceCtx.Get(ctx, client.ObjectKey{
+	// Fetch fresh copy after successful update
+	fetchErr := kubeSliceCtx.Get(ctx, client.ObjectKey{
 		Namespace: object.GetNamespace(),
 		Name:      object.GetName(),
 	}, object)
-	if err != nil {
-		logger.With(zap.Error(err)).Errorf("failed to fetch object after status update: %+v", object)
+	if fetchErr != nil {
+		logger.With(zap.Error(fetchErr)).Warnf("failed to fetch object after status update, continuing: %+v", object)
 	}
-	return nil
+	return nil // Return nil only if status update succeeded
 }
 
 // DeleteResource is a function to delete the resource of given kind
