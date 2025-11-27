@@ -129,7 +129,12 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 		project.Annotations[k] = v
 	}
 
-	// Defer persisting label/annotation changes to Step 7 to avoid multiple updates
+	// Persist label/annotation changes immediately to ensure project state is updated
+	// This is critical for subsequent reconciliation steps that may depend on these labels
+	err = util.UpdateResource(ctx, project)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Step 2: Namespace Reconciliation
 	if shouldReturn, result, reconErr := util.IsReconciled(t.ns.ReconcileProjectNamespace(ctx, projectNamespace, project)); shouldReturn {
