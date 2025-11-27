@@ -90,16 +90,19 @@ This document provides visual proof of all 14 Dynamic IPAM integration tests exe
 
 ## Test 06: Static IPAM Backward Compatibility
 
-**Purpose:** Ensure Static IPAM mode doesn't trigger Dynamic IPAM resources
+**Purpose:** Ensure Static IPAM mode (including legacy "Local" type) doesn't trigger Dynamic IPAM resources
 
 **What This Tests:**
 
-- SliceConfig with `sliceIpamType: Static` - no SliceIpam created
+- CRD accepts all three enum values (Local, Static, Dynamic)
+- SliceConfig with `sliceIpamType: Local` (legacy) - no SliceIpam created
+- SliceConfig with `sliceIpamType: Static` (explicit) - no SliceIpam created
 - SliceConfig with omitted sliceIpamType (defaults to Static) - no SliceIpam created
+- Legacy "Local" value works identically to "Static"
 
-**Result:** ✅ Backward compatibility maintained
+**Result:** ✅ Backward compatibility maintained for all static IPAM types
 
-<img width="2458" height="1985" alt="test-06" src="https://github.com/user-attachments/assets/644866c0-d9d0-452f-b1ad-c7b1c96225fd" />
+<img width="2458" height="1985" alt="test-06" src="https://github.com/user-attachments/assets/5bc40b69-0181-4338-9087-676ae5792695" />
 
 ---
 
@@ -250,4 +253,3 @@ All tests demonstrate production-ready quality with:
 - ✅ Zero performance impact
 - ✅ Full state recovery
 - ✅ Accurate observability
-
