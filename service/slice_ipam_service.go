@@ -430,9 +430,46 @@ func (s *SliceIpamService) handleSliceIpamDeletion(ctx context.Context, sliceIpa
 	}
 
 	if activeAllocations > 0 {
-		logger.Warnf("SliceIpam %s has %d active allocations, waiting for cleanup", sliceIpam.Name, activeAllocations)
-		// Requeue after some time to check again
-		return ctrl.Result{RequeueAfter: time.Minute * 5}, nil
+		// Check if SliceConfig still exists
+		sliceConfig := &v1alpha1.SliceConfig{}
+		key := types.NamespacedName{Name: sliceIpam.Name, Namespace: sliceIpam.Namespace}
+		found, err := util.GetResourceIfExist(ctx, key, sliceConfig)
+		if err != nil {
+			logger.Errorf("Failed to check if SliceConfig exists: %v", err)
+			// Requeue to retry
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+
+		// If SliceConfig doesn't exist, force release all allocations
+		if !found {
+			logger.Warnf("SliceConfig %s not found, force releasing %d active allocations for SliceIpam %s", sliceIpam.Name, activeAllocations, sliceIpam.Name)
+			now := metav1.Now()
+			needsUpdate := false
+			for i, allocation := range sliceIpam.Status.AllocatedSubnets {
+				if allocation.Status == "Allocated" || allocation.Status == "InUse" {
+					sliceIpam.Status.AllocatedSubnets[i].Status = "Released"
+					sliceIpam.Status.AllocatedSubnets[i].ReleasedAt = &now
+					sliceIpam.Status.AvailableSubnets++
+					needsUpdate = true
+					logger.Infof("Force released subnet %s for cluster %s", allocation.Subnet, allocation.ClusterName)
+				}
+			}
+
+			if needsUpdate {
+				sliceIpam.Status.LastUpdated = metav1.Now()
+				if err := util.UpdateStatus(ctx, sliceIpam); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to force release allocations: %v", err)
+				}
+				logger.Infof("Successfully force released all allocations for SliceIpam %s", sliceIpam.Name)
+				// Requeue to proceed with finalizer removal
+				return ctrl.Result{Requeue: true}, nil
+			}
+		} else {
+			// SliceConfig exists, wait for normal cleanup
+			logger.Warnf("SliceIpam %s has %d active allocations, waiting for cleanup", sliceIpam.Name, activeAllocations)
+			// Requeue after some time to check again
+			return ctrl.Result{RequeueAfter: time.Minute * 5}, nil
+		}
 	}
 
 	// Remove finalizer

@@ -20,17 +20,17 @@ type IWorkerSliceGatewayService struct {
 	mock.Mock
 }
 
-// BuildNetworkAddresses provides a mock function with given fields: sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr
-func (_m *IWorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet string, sourceClusterName string, destinationClusterName string, clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses {
-	ret := _m.Called(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr)
+// BuildNetworkAddresses provides a mock function with given fields: sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr, clusterSubnetMap
+func (_m *IWorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet string, sourceClusterName string, destinationClusterName string, clusterMap map[string]int, clusterCidr string, clusterSubnetMap map[string]string) util.WorkerSliceGatewayNetworkAddresses {
+	ret := _m.Called(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr, clusterSubnetMap)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildNetworkAddresses")
 	}
 
 	var r0 util.WorkerSliceGatewayNetworkAddresses
-	if rf, ok := ret.Get(0).(func(string, string, string, map[string]int, string) util.WorkerSliceGatewayNetworkAddresses); ok {
-		r0 = rf(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr)
+	if rf, ok := ret.Get(0).(func(string, string, string, map[string]int, string, map[string]string) util.WorkerSliceGatewayNetworkAddresses); ok {
+		r0 = rf(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr, clusterSubnetMap)
 	} else {
 		r0 = ret.Get(0).(util.WorkerSliceGatewayNetworkAddresses)
 	}

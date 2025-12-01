@@ -587,7 +587,7 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 
 	gwAddress := util.WorkerSliceGatewayNetworkAddresses{}
 
-	wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
+		wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
 
 	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -1101,7 +1101,7 @@ func runTriggerJobsForCertCreation(t *testing.T, tc triggerJobsForCertCreationTe
 
 	gwAddress := util.WorkerSliceGatewayNetworkAddresses{}
 
-	wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
+		wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
 
 	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.generateCertsRet1).Once()
 
