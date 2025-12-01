@@ -46,7 +46,7 @@ const gatewayName = "%s-%s-%s"
 type IWorkerSliceGatewayService interface {
 	ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string,
-		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error)
+		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceIpamType string) (ctrl.Result, error)
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
@@ -348,7 +348,7 @@ type IndividualCertPairRequest struct {
 // CreateMinimumWorkerSliceGateways is a function to create gateways with minimum specification
 func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error) {
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceIpamType string) (ctrl.Result, error) {
 
 	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
 	if err != nil {
@@ -358,18 +358,8 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 		return ctrl.Result{}, nil
 	}
 
-	// Check if slice uses Dynamic IPAM by reading SliceConfig
-	sliceConfig := &controllerv1alpha1.SliceConfig{}
-	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{
-		Name:      sliceName,
-		Namespace: namespace,
-	}, sliceConfig)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
 	var clusterSubnetMap map[string]string
-	if found && sliceConfig.Spec.SliceIpamType == "Dynamic" {
+	if sliceIpamType == "Dynamic" {
 		// For Dynamic IPAM, read clusterSubnetCIDR from WorkerSliceConfig
 		logger := util.CtxLogger(ctx)
 		clusterSubnetMap = make(map[string]string)
