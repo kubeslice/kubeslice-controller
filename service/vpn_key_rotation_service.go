@@ -45,6 +45,7 @@ type IVpnKeyRotationService interface {
 type VpnKeyRotationService struct {
 	wsgs                  IWorkerSliceGatewayService
 	wscs                  IWorkerSliceConfigService
+	sipam                 ISliceIpamService
 	jobCreationInProgress atomic.Bool
 }
 
@@ -353,8 +354,28 @@ func (v *VpnKeyRotationService) triggerJobsForCertCreation(ctx context.Context, 
 				return err
 			}
 			clusterMap := v.wscs.ComputeClusterMap(s.Spec.Clusters, workerSliceConfigs)
+
+			// Construct subnetMap from WorkerSliceConfigs
+			subnetMap := make(map[string]string)
+			for _, wsc := range workerSliceConfigs {
+				if wsc.Spec.ClusterSubnetCIDR != "" {
+					subnetMap[wsc.Labels["worker-cluster"]] = wsc.Spec.ClusterSubnetCIDR
+				}
+			}
+
+			// For Dynamic IPAM, we need the SliceSubnet from the SliceIpam resource
+			effectiveSliceSubnet := s.Spec.SliceSubnet
+			if s.Spec.SliceIpamType == "Dynamic" && v.sipam != nil {
+				sliceIpam := &controllerv1alpha1.SliceIpam{}
+				ipamKey := types.NamespacedName{Name: s.Name, Namespace: s.Namespace}
+				foundIpam, ipamErr := util.GetResourceIfExist(ctx, ipamKey, sliceIpam)
+				if ipamErr == nil && foundIpam {
+					effectiveSliceSubnet = sliceIpam.Spec.SliceSubnet
+				}
+			}
+
 			// contruct gw address
-			gatewayAddresses := v.wsgs.BuildNetworkAddresses(s.Spec.SliceSubnet, gateway.Spec.LocalGatewayConfig.ClusterName, gateway.Spec.RemoteGatewayConfig.ClusterName, clusterMap, clusterCidr)
+			gatewayAddresses := v.wsgs.BuildNetworkAddresses(effectiveSliceSubnet, gateway.Spec.LocalGatewayConfig.ClusterName, gateway.Spec.RemoteGatewayConfig.ClusterName, clusterMap, subnetMap, clusterCidr)
 			// call GenerateCerts()
 			if err := v.wsgs.GenerateCerts(ctx, s.Name, s.Namespace, gateway.Spec.GatewayProtocol, &gateway, cl, gatewayAddresses); err != nil {
 				return err

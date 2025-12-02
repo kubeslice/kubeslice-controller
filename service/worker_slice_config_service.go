@@ -42,7 +42,7 @@ type IWorkerSliceConfigService interface {
 	DeleteWorkerSliceConfigByLabel(ctx context.Context, label map[string]string, namespace string) error
 	ListWorkerSliceConfigs(ctx context.Context, ownerLabel map[string]string, namespace string) ([]workerv1alpha1.WorkerSliceConfig, error)
 	ComputeClusterMap(clusterNames []string, workerSliceConfigs []workerv1alpha1.WorkerSliceConfig) map[string]int
-	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceConfig *controllerv1alpha1.SliceConfig, sipam interface{}) (map[string]int, error)
+	CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceConfig *controllerv1alpha1.SliceConfig, sipam interface{}) (map[string]int, map[string]string, error)
 	CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx context.Context, clusters []string, namespace string, label map[string]string, name string) error
 }
 
@@ -288,7 +288,7 @@ outer:
 
 // CreateMinimalWorkerSliceConfig CreateWorkerSliceConfig is a function to create the worker slice configs with minimum number of fields.
 // More fields are added in reconciliation loop.
-func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceConfig *controllerv1alpha1.SliceConfig, sipam interface{}) (map[string]int, error) {
+func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceConfig *controllerv1alpha1.SliceConfig, sipam interface{}) (map[string]int, map[string]string, error) {
 	logger := util.CtxLogger(ctx)
 
 	//Load Event Recorder with project name, slice name and namespace
@@ -304,13 +304,14 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 
 	err := s.cleanUpSlices(ctx, label, namespace, clusters)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	workerSliceConfigs, err := s.ListWorkerSliceConfigs(ctx, label, namespace)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	clusterMap := s.ComputeClusterMap(clusters, workerSliceConfigs)
+	subnetMap := make(map[string]string)
 
 	// Check if we're using Dynamic IPAM and convert sipam to proper type
 	var sliceIpamService ISliceIpamService
@@ -332,7 +333,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		}, existingSlice)
 
 		if err != nil {
-			return clusterMap, err
+			return clusterMap, nil, err
 		}
 
 		// Determine cluster subnet based on IPAM type
@@ -345,7 +346,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			subnet, allocErr := sliceIpamService.AllocateSubnetForCluster(ctx, name, cluster, namespace)
 			if allocErr != nil {
 				logger.Errorf("Failed to allocate subnet for cluster %s: %v", cluster, allocErr)
-				return clusterMap, fmt.Errorf("dynamic IPAM allocation failed for cluster %s: %v", cluster, allocErr)
+				return clusterMap, nil, fmt.Errorf("dynamic IPAM allocation failed for cluster %s: %v", cluster, allocErr)
 			}
 			clusterSubnetCIDR = subnet
 			logger.Infof("Allocated subnet %s to cluster %s via Dynamic IPAM", subnet, cluster)
@@ -354,6 +355,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			clusterSubnetCIDR = util.GetClusterPrefixPool(sliceSubnet, ipamOctet, clusterCidr)
 			logger.Debugf("Using Static IPAM: subnet %s for cluster %s", clusterSubnetCIDR, cluster)
 		}
+		subnetMap[cluster] = clusterSubnetCIDR
 
 		// determine gw svc type
 		sliceGwSvcType := defaultSliceGatewayServiceType
@@ -400,7 +402,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
 						expectedSlice.Name, namespace)
-					return clusterMap, err
+					return clusterMap, nil, err
 				}
 			}
 			//Register an event for worker slice config creation success
@@ -439,7 +441,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 				if !k8sErrors.IsAlreadyExists(err) { // ignores resource already exists error(for handling parallel calls to create same resource)
 					logger.Debug("failed to create worker slice %s since it already exists, namespace - %s ",
 						workerSliceConfigName, namespace)
-					return clusterMap, err
+					return clusterMap, nil, err
 				}
 			}
 			//Register an event for worker slice config update success
@@ -454,7 +456,7 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 			)
 		}
 	}
-	return clusterMap, nil
+	return clusterMap, subnetMap, nil
 }
 
 func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx context.Context, clusters []string, namespace string, label map[string]string, name string) error {

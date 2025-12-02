@@ -240,17 +240,32 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		logger.Infof("Using Static IPAM for slice %s with clusterCidr %s", sliceConfig.Name, clusterCidr)
 	}
 
+	// For Dynamic IPAM, we need the SliceSubnet from the SliceIpam resource to generate VPN addresses
+	// sliceConfig.Spec.SliceSubnet is empty for Dynamic IPAM
+	effectiveSliceSubnet := sliceConfig.Spec.SliceSubnet
+	if sliceConfig.Spec.SliceIpamType == "Dynamic" && s.sipam != nil {
+		sliceIpam := &v1alpha1.SliceIpam{}
+		ipamKey := types.NamespacedName{Name: sliceConfig.Name, Namespace: sliceConfig.Namespace}
+		foundIpam, ipamErr := util.GetResourceIfExist(ctx, ipamKey, sliceIpam)
+		if ipamErr == nil && foundIpam {
+			effectiveSliceSubnet = sliceIpam.Spec.SliceSubnet
+			logger.Infof("Using SliceSubnet %s from SliceIpam for VPN address generation", effectiveSliceSubnet)
+		} else {
+			logger.Warnf("Could not get SliceSubnet from SliceIpam for VPN address generation")
+		}
+	}
+
 	// collect slice gw svc info for given clusters
 	sliceGwSvcTypeMap := getSliceGwSvcTypes(sliceConfig)
 
 	// Pass sliceConfig and sipam service to enable Dynamic IPAM in worker slice config creation
-	clusterMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig, s.sipam)
+	clusterMap, subnetMap, err := s.ms.CreateMinimalWorkerSliceConfig(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name, effectiveSliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig, s.sipam)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, subnetMap, effectiveSliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
