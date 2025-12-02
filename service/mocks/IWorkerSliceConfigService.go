@@ -39,7 +39,7 @@ func (_m *IWorkerSliceConfigService) ComputeClusterMap(clusterNames []string, wo
 }
 
 // CreateMinimalWorkerSliceConfig provides a mock function with given fields: ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig, sipam
-func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceConfig *controllerv1alpha1.SliceConfig, sipam interface{}) (map[string]int, error) {
+func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Context, clusters []string, namespace string, label map[string]string, name string, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceConfig *controllerv1alpha1.SliceConfig, sipam interface{}) (map[string]int, map[string]string, error) {
 	ret := _m.Called(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig, sipam)
 
 	if len(ret) == 0 {
@@ -47,8 +47,9 @@ func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.
 	}
 
 	var r0 map[string]int
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType, *controllerv1alpha1.SliceConfig, interface{}) (map[string]int, error)); ok {
+	var r1 map[string]string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType, *controllerv1alpha1.SliceConfig, interface{}) (map[string]int, map[string]string, error)); ok {
 		return rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig, sipam)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType, *controllerv1alpha1.SliceConfig, interface{}) map[string]int); ok {
@@ -59,13 +60,21 @@ func (_m *IWorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType, *controllerv1alpha1.SliceConfig, interface{}) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType, *controllerv1alpha1.SliceConfig, interface{}) map[string]string); ok {
 		r1 = rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig, sipam)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(map[string]string)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, []string, string, map[string]string, string, string, string, map[string]*controllerv1alpha1.SliceGatewayServiceType, *controllerv1alpha1.SliceConfig, interface{}) error); ok {
+		r2 = rf(ctx, clusters, namespace, label, name, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig, sipam)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // CreateMinimalWorkerSliceConfigForNoNetworkSlice provides a mock function with given fields: ctx, clusters, namespace, label, name

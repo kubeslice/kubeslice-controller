@@ -20,17 +20,17 @@ type IWorkerSliceGatewayService struct {
 	mock.Mock
 }
 
-// BuildNetworkAddresses provides a mock function with given fields: sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr
-func (_m *IWorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet string, sourceClusterName string, destinationClusterName string, clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses {
-	ret := _m.Called(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr)
+// BuildNetworkAddresses provides a mock function with given fields: sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, subnetMap, clusterCidr
+func (_m *IWorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet string, sourceClusterName string, destinationClusterName string, clusterMap map[string]int, subnetMap map[string]string, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses {
+	ret := _m.Called(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, subnetMap, clusterCidr)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildNetworkAddresses")
 	}
 
 	var r0 util.WorkerSliceGatewayNetworkAddresses
-	if rf, ok := ret.Get(0).(func(string, string, string, map[string]int, string) util.WorkerSliceGatewayNetworkAddresses); ok {
-		r0 = rf(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr)
+	if rf, ok := ret.Get(0).(func(string, string, string, map[string]int, map[string]string, string) util.WorkerSliceGatewayNetworkAddresses); ok {
+		r0 = rf(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, subnetMap, clusterCidr)
 	} else {
 		r0 = ret.Get(0).(util.WorkerSliceGatewayNetworkAddresses)
 	}
@@ -38,9 +38,9 @@ func (_m *IWorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet string, 
 	return r0
 }
 
-// CreateMinimumWorkerSliceGateways provides a mock function with given fields: ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap
-func (_m *IWorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*v1alpha1.SliceGatewayServiceType) (reconcile.Result, error) {
-	ret := _m.Called(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+// CreateMinimumWorkerSliceGateways provides a mock function with given fields: ctx, sliceName, clusterNames, namespace, label, clusterMap, subnetMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap
+func (_m *IWorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int, subnetMap map[string]string, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*v1alpha1.SliceGatewayServiceType) (reconcile.Result, error) {
+	ret := _m.Called(ctx, sliceName, clusterNames, namespace, label, clusterMap, subnetMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateMinimumWorkerSliceGateways")
@@ -48,17 +48,17 @@ func (_m *IWorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx conte
 
 	var r0 reconcile.Result
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []string, string, map[string]string, map[string]int, string, string, map[string]*v1alpha1.SliceGatewayServiceType) (reconcile.Result, error)); ok {
-		return rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, string, map[string]string, map[string]int, map[string]string, string, string, map[string]*v1alpha1.SliceGatewayServiceType) (reconcile.Result, error)); ok {
+		return rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, subnetMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, []string, string, map[string]string, map[string]int, string, string, map[string]*v1alpha1.SliceGatewayServiceType) reconcile.Result); ok {
-		r0 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, string, map[string]string, map[string]int, map[string]string, string, string, map[string]*v1alpha1.SliceGatewayServiceType) reconcile.Result); ok {
+		r0 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, subnetMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	} else {
 		r0 = ret.Get(0).(reconcile.Result)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, []string, string, map[string]string, map[string]int, string, string, map[string]*v1alpha1.SliceGatewayServiceType) error); ok {
-		r1 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	if rf, ok := ret.Get(1).(func(context.Context, string, []string, string, map[string]string, map[string]int, map[string]string, string, string, map[string]*v1alpha1.SliceGatewayServiceType) error); ok {
+		r1 = rf(ctx, sliceName, clusterNames, namespace, label, clusterMap, subnetMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	} else {
 		r1 = ret.Error(1)
 	}
