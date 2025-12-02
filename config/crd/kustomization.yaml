@@ -12,6 +12,7 @@ resources:
   - bases/controller.kubeslice.io_sliceqosconfigs.yaml
   - bases/worker.kubeslice.io_workerslicegwrecyclers.yaml
   - bases/controller.kubeslice.io_vpnkeyrotations.yaml
+  - bases/controller.kubeslice.io_sliceipams.yaml
   #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
