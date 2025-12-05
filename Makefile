@@ -104,14 +104,22 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
-	docker buildx create --name container --driver=docker-container || true
-	docker build --builder container --platform linux/amd64,linux/arm64 -t ${IMG} .
+docker-build: ## Build docker image with the manager (multi-arch, requires --push to create manifest list).
+	@if ! docker buildx inspect container >/dev/null 2>&1; then \
+		docker buildx create --name container --driver=docker-container --driver-opt network=host --use; \
+	else \
+		docker buildx use container; \
+	fi
+	docker buildx build --builder container --platform linux/amd64,linux/arm64 -t ${IMG} .
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	docker buildx create --name container --driver=docker-container || true
-	docker build --push --builder container --platform linux/amd64,linux/arm64 -t ${IMG} .
+docker-push: ## Build and push docker image with the manager (multi-arch manifest list).
+	@if ! docker buildx inspect container >/dev/null 2>&1; then \
+		docker buildx create --name container --driver=docker-container --driver-opt network=host --use; \
+	else \
+		docker buildx use container; \
+	fi
+	docker buildx build --push --builder container --platform linux/amd64,linux/arm64 -t ${IMG} .
 
 ##@ Deployment
 

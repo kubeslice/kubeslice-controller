@@ -27,6 +27,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
-COPY --from=builder /workspace/cleanup/cleanup .
+COPY --from=builder /workspace/cleanup .
 USER 65532:65532
 ENTRYPOINT ["/manager"]
