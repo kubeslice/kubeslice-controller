@@ -608,9 +608,9 @@ func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClu
 	clusterMap map[string]int, clusterCidr string, clusterSubnetMap map[string]string) util.WorkerSliceGatewayNetworkAddresses {
 	gatewayAddresses := util.WorkerSliceGatewayNetworkAddresses{}
 	ipr := strings.Split(sliceSubnet, ".")
-	
+
 	var serverSubnet, clientSubnet string
-	
+
 	// Use Dynamic IPAM allocation if available (clusterSubnetMap is not nil and has entries)
 	if clusterSubnetMap != nil {
 		if subnet, ok := clusterSubnetMap[sourceClusterName]; ok && subnet != "" {
@@ -630,7 +630,7 @@ func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClu
 		serverSubnet = util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr)
 		clientSubnet = util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr)
 	}
-	
+
 	gatewayAddresses.ServerNetwork = strings.SplitN(serverSubnet, "/", -1)[0]
 	gatewayAddresses.ClientNetwork = strings.SplitN(clientSubnet, "/", -1)[0]
 	gatewayAddresses.ServerSubnet = serverSubnet
