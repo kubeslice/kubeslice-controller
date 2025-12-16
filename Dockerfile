@@ -20,6 +20,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS:-linux} \
     GOARCH=${TARGETARCH} \
     go build -ldflags="-w -s" -trimpath -o manager main.go && \
+    CGO_ENABLED=0 \
+    GOOS=${TARGETOS:-linux} \
+    GOARCH=${TARGETARCH} \
     go build -ldflags="-w -s" -trimpath -o /workspace/cleanup-binary ./cleanup/
 
 # Use distroless as minimal base image to package the manager binary
