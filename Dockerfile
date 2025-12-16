@@ -20,13 +20,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS:-linux} \
     GOARCH=${TARGETARCH} \
     go build -ldflags="-w -s" -trimpath -o manager main.go && \
-    go build -ldflags="-w -s" -trimpath -o cleanup ./cleanup/
+    go build -ldflags="-w -s" -trimpath -o /workspace/cleanup-binary ./cleanup/
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
-COPY --from=builder /workspace/cleanup .
+COPY --from=builder /workspace/cleanup-binary /cleanup
 USER 65532:65532
 ENTRYPOINT ["/manager"]
