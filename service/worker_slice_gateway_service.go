@@ -46,7 +46,7 @@ const gatewayName = "%s-%s-%s"
 type IWorkerSliceGatewayService interface {
 	ReconcileWorkerSliceGateways(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string, clusterNames []string, namespace string,
-		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error)
+		label map[string]string, clusterMap map[string]int, sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceIpamType string) (ctrl.Result, error)
 	ListWorkerSliceGateways(ctx context.Context, ownerLabel map[string]string, namespace string) ([]v1alpha1.WorkerSliceGateway, error)
 	DeleteWorkerSliceGatewaysByLabel(ctx context.Context, label map[string]string, namespace string) error
 	NodeIpReconciliationOfWorkerSliceGateways(ctx context.Context, cluster *controllerv1alpha1.Cluster, namespace string) error
@@ -54,7 +54,7 @@ type IWorkerSliceGatewayService interface {
 		serverGateway *v1alpha1.WorkerSliceGateway, clientGateway *v1alpha1.WorkerSliceGateway,
 		gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error
 	BuildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
-		clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses
+		clusterMap map[string]int, clusterCidr string, clusterSubnetMap map[string]string) util.WorkerSliceGatewayNetworkAddresses
 }
 
 // WorkerSliceGatewayService is a schema for interfaces JobService, WorkerSliceConfigService, SecretService
@@ -348,7 +348,7 @@ type IndividualCertPairRequest struct {
 // CreateMinimumWorkerSliceGateways is a function to create gateways with minimum specification
 func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, label map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error) {
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType, sliceIpamType string) (ctrl.Result, error) {
 
 	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
 	if err != nil {
@@ -358,7 +358,35 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 		return ctrl.Result{}, nil
 	}
 
-	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	var clusterSubnetMap map[string]string
+	if sliceIpamType == "Dynamic" {
+		// For Dynamic IPAM, read clusterSubnetCIDR from WorkerSliceConfig
+		logger := util.CtxLogger(ctx)
+		clusterSubnetMap = make(map[string]string)
+		for _, clusterName := range clusterNames {
+			workerSliceConfigName := fmt.Sprintf(workerSliceConfigNameFormat, sliceName, clusterName)
+			workerSliceConfig := &v1alpha1.WorkerSliceConfig{}
+			foundWsc, err := util.GetResourceIfExist(ctx, client.ObjectKey{
+				Name:      workerSliceConfigName,
+				Namespace: namespace,
+			}, workerSliceConfig)
+			if err != nil {
+				logger.Warnf("Failed to get WorkerSliceConfig %s for cluster %s: %v", workerSliceConfigName, clusterName, err)
+				continue
+			}
+			if foundWsc && workerSliceConfig.Spec.ClusterSubnetCIDR != "" {
+				clusterSubnetMap[clusterName] = workerSliceConfig.Spec.ClusterSubnetCIDR
+				logger.Infof("Using Dynamic IPAM subnet %s for cluster %s", workerSliceConfig.Spec.ClusterSubnetCIDR, clusterName)
+			} else if foundWsc {
+				logger.Warnf("WorkerSliceConfig %s found but clusterSubnetCIDR is empty for cluster %s", workerSliceConfigName, clusterName)
+			}
+		}
+		if len(clusterSubnetMap) < len(clusterNames) {
+			logger.Warnf("Could not retrieve clusterSubnetCIDR for all clusters, falling back to Static IPAM logic for missing clusters")
+		}
+	}
+
+	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, clusterNames, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap, clusterSubnetMap)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -438,7 +466,8 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 // createMinimumGatewaysIfNotExists is a helper function to create the gateways between worker clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, ownerLabel map[string]string, clusterMap map[string]int,
-	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType) (ctrl.Result, error) {
+	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType,
+	clusterSubnetMap map[string]string) (ctrl.Result, error) {
 	noClusters := len(clusterNames)
 	logger := util.CtxLogger(ctx)
 	clusterMapping := map[string]*controllerv1alpha1.Cluster{}
@@ -454,7 +483,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		for j := i + 1; j < noClusters; j++ {
 			sourceCluster, destinationCluster := clusterMapping[clusterNames[i]], clusterMapping[clusterNames[j]]
 			gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
-			gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
+			gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr, clusterSubnetMap)
 			// determine the gateway svc parameters
 			sliceGwSvcType := defaultSliceGatewayServiceType
 			gwSvcProtocol := defaultSliceGatewayServiceProtocol
@@ -576,11 +605,32 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 
 // buildNetworkAddresses - function generates the object of WorkerSliceGatewayNetworkAddresses
 func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
-	clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses {
+	clusterMap map[string]int, clusterCidr string, clusterSubnetMap map[string]string) util.WorkerSliceGatewayNetworkAddresses {
 	gatewayAddresses := util.WorkerSliceGatewayNetworkAddresses{}
 	ipr := strings.Split(sliceSubnet, ".")
-	serverSubnet := util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr)
-	clientSubnet := util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr)
+
+	var serverSubnet, clientSubnet string
+
+	// Use Dynamic IPAM allocation if available (clusterSubnetMap is not nil and has entries)
+	if clusterSubnetMap != nil {
+		if subnet, ok := clusterSubnetMap[sourceClusterName]; ok && subnet != "" {
+			serverSubnet = subnet
+		} else {
+			// Fallback to Static IPAM if not found in map
+			serverSubnet = util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr)
+		}
+		if subnet, ok := clusterSubnetMap[destinationClusterName]; ok && subnet != "" {
+			clientSubnet = subnet
+		} else {
+			// Fallback to Static IPAM if not found in map
+			clientSubnet = util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr)
+		}
+	} else {
+		// Static IPAM: use existing logic
+		serverSubnet = util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr)
+		clientSubnet = util.GetClusterPrefixPool(sliceSubnet, clusterMap[destinationClusterName], clusterCidr)
+	}
+
 	gatewayAddresses.ServerNetwork = strings.SplitN(serverSubnet, "/", -1)[0]
 	gatewayAddresses.ClientNetwork = strings.SplitN(clientSubnet, "/", -1)[0]
 	gatewayAddresses.ServerSubnet = serverSubnet

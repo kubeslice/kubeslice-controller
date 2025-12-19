@@ -19,9 +19,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/kubeslice/kubeslice-controller/metrics"
 	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
-	"testing"
 
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
@@ -1270,7 +1271,7 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 	mMock.AssertExpectations(t)
 }
 
-func prepareACSTestContext(ctx context.Context, client util.Client,
+func prepareACSTestContext(ctx context.Context, client client.Client,
 	scheme *runtime.Scheme) context.Context {
 	if scheme == nil {
 		scheme = runtime.NewScheme()

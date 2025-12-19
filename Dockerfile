@@ -1,39 +1,35 @@
-# Build the manager binary
-FROM golang:1.24 AS builder
+# syntax=docker/dockerfile:1
+FROM --platform=$BUILDPLATFORM golang:1.24 AS builder
 LABEL maintainer="Avesha Systems"
-
+ARG TARGETOS
+ARG TARGETARCH
+ARG BUILDPLATFORM
 WORKDIR /workspace
+
 # Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
+COPY go.mod go.sum ./
 RUN go mod download
 
-ARG TARGETOS
-ARG TARGETPLATFORM
-ARG TARGETARCH
 
 # Copy the go source
-COPY main.go main.go
-COPY apis/ apis/
-COPY controllers/ controllers/
-COPY service/ service/
-COPY util/ util/
-COPY events/ events/
-COPY metrics/ metrics/
-COPY cleanup/ cleanup/
-
-# Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -o manager main.go
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -o cleanup ./cleanup/
+COPY . .
+# Cross-compile with optimizations and caching
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 \
+    GOOS=${TARGETOS:-linux} \
+    GOARCH=${TARGETARCH} \
+    go build -ldflags="-w -s" -trimpath -o manager main.go && \
+    CGO_ENABLED=0 \
+    GOOS=${TARGETOS:-linux} \
+    GOARCH=${TARGETARCH} \
+    go build -ldflags="-w -s" -trimpath -o /workspace/cleanup-binary ./cleanup/
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
-COPY --from=builder /workspace/cleanup/cleanup .
+COPY --from=builder /workspace/cleanup-binary /cleanup
 USER 65532:65532
-
 ENTRYPOINT ["/manager"]

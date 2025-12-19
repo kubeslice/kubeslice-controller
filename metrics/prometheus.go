@@ -2,13 +2,14 @@ package metrics
 
 import (
 	"fmt"
-	mfm "github.com/kubeslice/kubeslice-monitoring/pkg/metrics"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"math/rand"
 	"net/http"
 	"os"
-	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"time"
+
+	mfm "github.com/kubeslice/kubeslice-monitoring/pkg/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -18,6 +19,17 @@ import (
 var (
 	KubeSliceEventsCounter *prometheus.CounterVec
 
+	// IPAM-specific metrics
+	IPAMAllocationLatency prometheus.ObserverVec
+	IPAMTotalSubnets      *prometheus.GaugeVec
+	IPAMAvailableSubnets  *prometheus.GaugeVec
+	IPAMAllocatedSubnets  *prometheus.GaugeVec
+	IPAMUtilizationRate   *prometheus.GaugeVec
+	IPAMFragmentationRate *prometheus.GaugeVec
+	IPAMAllocationsTotal  *prometheus.CounterVec
+	IPAMReleasesTotal     *prometheus.CounterVec
+	IPAMCleanupsTotal     *prometheus.CounterVec
+
 	controllerNamespace = "kubeslice_controller"
 
 	log = ctrl.Log.WithName("setup")
@@ -26,7 +38,6 @@ var (
 // StartMetricsCollector registers metrics to prometheus
 func StartMetricsCollector(metricCollectorPort string, shouldStart bool) {
 	metricCollectorPort = ":" + metricCollectorPort
-	//log.Info("Starting metric collector @ %s", metricCollectorPort)
 	rand.Seed(time.Now().Unix())
 	histogramVec := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name: "prom_request_time",
@@ -55,6 +66,69 @@ func StartMetricsCollector(metricCollectorPort string, shouldStart bool) {
 	)
 
 	prometheus.MustRegister(KubeSliceEventsCounter)
+
+	// Initialize IPAM metrics
+	IPAMAllocationLatency = mf.NewHistogram(
+		"ipam_allocation_latency_seconds",
+		"Time taken to allocate a subnet to a cluster",
+		append([]string{"cluster"}, getDefaultLabels()...),
+	)
+
+	IPAMTotalSubnets = mf.NewGauge(
+		"ipam_total_subnets",
+		"Total number of subnets available in the slice",
+		getDefaultLabels(),
+	)
+	prometheus.MustRegister(IPAMTotalSubnets)
+
+	IPAMAvailableSubnets = mf.NewGauge(
+		"ipam_available_subnets",
+		"Number of available subnets that can be allocated",
+		getDefaultLabels(),
+	)
+	prometheus.MustRegister(IPAMAvailableSubnets)
+
+	IPAMAllocatedSubnets = mf.NewGauge(
+		"ipam_allocated_subnets",
+		"Number of currently allocated subnets",
+		getDefaultLabels(),
+	)
+	prometheus.MustRegister(IPAMAllocatedSubnets)
+
+	IPAMUtilizationRate = mf.NewGauge(
+		"ipam_utilization_rate",
+		"Percentage of subnet utilization (0-100)",
+		getDefaultLabels(),
+	)
+	prometheus.MustRegister(IPAMUtilizationRate)
+
+	IPAMFragmentationRate = mf.NewGauge(
+		"ipam_fragmentation_rate",
+		"Percentage of IP space fragmentation (0-100)",
+		getDefaultLabels(),
+	)
+	prometheus.MustRegister(IPAMFragmentationRate)
+
+	IPAMAllocationsTotal = mf.NewCounter(
+		"ipam_allocations_total",
+		"Total number of subnet allocations",
+		append([]string{"cluster", "status"}, getDefaultLabels()...),
+	)
+	prometheus.MustRegister(IPAMAllocationsTotal)
+
+	IPAMReleasesTotal = mf.NewCounter(
+		"ipam_releases_total",
+		"Total number of subnet releases",
+		append([]string{"cluster"}, getDefaultLabels()...),
+	)
+	prometheus.MustRegister(IPAMReleasesTotal)
+
+	IPAMCleanupsTotal = mf.NewCounter(
+		"ipam_cleanups_total",
+		"Total number of subnet cleanups performed",
+		getDefaultLabels(),
+	)
+	prometheus.MustRegister(IPAMCleanupsTotal)
 
 	if !shouldStart {
 		return
