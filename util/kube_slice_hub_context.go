@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -25,6 +26,8 @@ import (
 	k8sUuid "k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type Client = client.Client
 
 var Loglevel zapcore.Level
 var LoglevelString string
