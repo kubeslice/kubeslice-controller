@@ -401,6 +401,7 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 	ts := metav1.NewTime(time.Date(2021, 06, 16, 20, 34, 58, 651387237, time.UTC))
 	expiryTs := metav1.NewTime(ts.AddDate(0, 0, 30).Add(-1 * time.Hour))
 	newTs := metav1.NewTime(time.Date(2021, 07, 16, 20, 34, 58, 651387237, time.UTC))
+	newExpiryTs := metav1.NewTime(newTs.AddDate(0, 0, 30).Add(-1 * time.Hour))
 	testCases := []reconcileVpnKeyRotationConfigTestCase{
 		{
 			name: "should update CertCreation TS and Expiry TS when it is nil",
@@ -474,6 +475,56 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 			updateRet1:      nil,
 			now:             newTs,
 			reconcileResult: ctrl.Result{RequeueAfter: 30 * time.Second},
+		},
+		{
+			name: "should clear RotationInProgress and update timestamps after jobs complete",
+			arg1: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName:               "test-slice",
+					Clusters:                []string{"worker-1", "worker-2"},
+					RotationInterval:        30,
+					CertificateCreationTime: &ts,
+					CertificateExpiryTime:   &expiryTs,
+					RotationCount:           1,
+				},
+				Status: controllerv1alpha1.VpnKeyRotationStatus{
+					RotationInProgress: true,
+				},
+			},
+			arg2: &controllerv1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+			},
+			expectedErr: nil,
+			expectedResp: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName:               "test-slice",
+					Clusters:                []string{"worker-1", "worker-2"},
+					RotationInterval:        30,
+					CertificateCreationTime: &newTs,
+					CertificateExpiryTime:   &newExpiryTs,
+					RotationCount:           2,
+				},
+				Status: controllerv1alpha1.VpnKeyRotationStatus{
+					RotationInProgress: false,
+				},
+			},
+			updateArg1:      mock.Anything,
+			updateArg2:      mock.Anything,
+			updateArg3:      mock.Anything,
+			updateRet1:      nil,
+			now:             newTs,
+			reconcileResult: ctrl.Result{},
 		},
 	}
 	for _, tc := range testCases {
@@ -591,8 +642,15 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 
 	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
+	// Status().Update() is called when setting or clearing RotationInProgress on the status subresource.
+	clientMock.On("Status").Return(clientMock)
 	clientMock.
 		On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
+	// Second Update covers the status subresource write (triggered via util.UpdateStatus).
+	clientMock.
+		On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
+	// Get re-fetches the object after util.UpdateStatus completes.
+	clientMock.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	reconcileResult, gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
 	require.Equal(t, gotErr, tc.expectedErr)

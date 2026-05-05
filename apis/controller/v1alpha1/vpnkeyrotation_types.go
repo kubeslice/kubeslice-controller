@@ -46,6 +46,10 @@ type VpnKeyRotationStatus struct {
 	CurrentRotationState map[string]StatusOfKeyRotation `json:"currentRotationState,omitempty"`
 	// This is circular array of last n number of rotation status.
 	StatusHistory map[string][]StatusOfKeyRotation `json:"statusHistory,omitempty"`
+	// RotationInProgress indicates that cert-generation jobs have been triggered
+	// for this slice and are not yet complete. Persisted in etcd so that pod
+	// restarts and leader-election failovers preserve the state correctly.
+	RotationInProgress bool `json:"rotationInProgress,omitempty"`
 }
 
 // StatusOfKeyRotation represent per gateway status

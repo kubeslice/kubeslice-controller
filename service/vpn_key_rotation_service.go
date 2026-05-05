@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sync/atomic"
 	"time"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -43,9 +42,8 @@ type IVpnKeyRotationService interface {
 }
 
 type VpnKeyRotationService struct {
-	wsgs                  IWorkerSliceGatewayService
-	wscs                  IWorkerSliceConfigService
-	jobCreationInProgress atomic.Bool
+	wsgs IWorkerSliceGatewayService
+	wscs IWorkerSliceConfigService
 }
 
 // JobStatus represents the status of a job.
@@ -266,14 +264,17 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 
 	} else {
 		if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
-			if !v.jobCreationInProgress.Load() {
+			if !copyVpnConfig.Status.RotationInProgress {
 				if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
 					logger.Error("error creating new certs", err)
 					// register an event
 					util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobCreationFailed)
 					return ctrl.Result{}, nil, err
 				}
-				v.jobCreationInProgress.Store(true)
+				copyVpnConfig.Status.RotationInProgress = true
+				if err := util.UpdateStatus(ctx, copyVpnConfig); err != nil {
+					return ctrl.Result{}, nil, err
+				}
 				logger.Debugf("jobs triggered for creating new certs for slice %s", s.Name)
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
@@ -302,8 +303,10 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 			if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
 				return ctrl.Result{}, nil, err
 			}
-			// restore the variable jobCreationInProgress to false
-			v.jobCreationInProgress.Store(false)
+			copyVpnConfig.Status.RotationInProgress = false
+			if err := util.UpdateStatus(ctx, copyVpnConfig); err != nil {
+				return ctrl.Result{}, nil, err
+			}
 			//register an event
 			util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventVPNKeyRotationStart)
 		}
