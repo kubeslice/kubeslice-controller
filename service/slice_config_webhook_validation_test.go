@@ -90,6 +90,11 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters":                      UpdateValidateSliceConfigWithExternalGatewayConfigHasDuplicateClusters,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithoutErrors":                                                      UpdateValidateSliceConfigWithoutErrors,
 	"SliceConfigWebhookValidation_UpdateValidateSliceGatewayServiceType":                                                       UpdateValidateSliceConfig_PreventUpdate_SliceGatewayServiceType,
+	"SliceConfigWebhookValidation_ValidateTopologyHubNotInClusters":                                                            ValidateTopologyHubNotInClusters,
+	"SliceConfigWebhookValidation_ValidateTopologyDuplicateHubs":                                                               ValidateTopologyDuplicateHubs,
+	"SliceConfigWebhookValidation_ValidateTopologySpokesDefault":                                                               ValidateTopologySpokesDefault,
+	"SliceConfigWebhookValidation_ValidateTopologySpokeIsHub":                                                                  ValidateTopologySpokeIsHub,
+	"SliceConfigWebhookValidation_ValidateTopologyMaxHubs":                                                                     ValidateTopologyMaxHubs,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithApplicationNamespacesNotEmpty":                                  DeleteValidateSliceConfigWithApplicationNamespacesAndAllowedNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty":                                 DeleteValidateSliceConfigWithOnboardedAppNamespacesNotEmpty,
 	"SliceConfigWebhookValidation_validateAllowedNamespacesWithDuplicateClusters":                                              ValidateAllowedNamespacesWithDuplicateClusters,
@@ -205,6 +210,73 @@ func test_validateSlicegatewayServiceType(t *testing.T) {
 	sliceConfig.Spec.Clusters = []string{"demo-cluster", "c2", "cx"}
 	err = validateSlicegatewayServiceType(ctx, sliceConfig)
 	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateTopologyHubNotInClusters(t *testing.T) {
+	name := "test-slice"
+	namespace := "test-ns"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.TopologyMode = controllerv1alpha1.TopologyModeHubAndSpoke
+	sliceConfig.Spec.Hubs = []string{"c1"}
+	sliceConfig.Spec.Clusters = []string{"c2"}
+	err := validateTopology(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "hub must be part of clusters")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateTopologyDuplicateHubs(t *testing.T) {
+	name := "test-slice"
+	namespace := "test-ns"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.TopologyMode = controllerv1alpha1.TopologyModeHubAndSpoke
+	sliceConfig.Spec.Hubs = []string{"c1", "c1"}
+	sliceConfig.Spec.Clusters = []string{"c1", "c2"}
+	err := validateTopology(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Duplicate value")
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateTopologySpokesDefault(t *testing.T) {
+	name := "test-slice"
+	namespace := "test-ns"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.TopologyMode = controllerv1alpha1.TopologyModeHubAndSpoke
+	sliceConfig.Spec.Hubs = []string{"c1"}
+	sliceConfig.Spec.Clusters = []string{"c1", "c2"}
+	err := validateTopology(sliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func ValidateTopologySpokeIsHub(t *testing.T) {
+	name := "test-slice"
+	namespace := "test-ns"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.TopologyMode = controllerv1alpha1.TopologyModeHubAndSpoke
+	sliceConfig.Spec.Hubs = []string{"c1"}
+	sliceConfig.Spec.Spokes = []string{"c1", "c2"}
+	sliceConfig.Spec.Clusters = []string{"c1", "c2"}
+	err := validateTopology(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "spoke cannot also be a hub")
+	clientMock.AssertExpectations(t)
+}
+
+// ValidateTopologyMaxHubs verifies that specifying more than 2 hubs is rejected.
+// Issue #300 specifies: "hubs: 1–2 hub cluster names (must be members of the slice)"
+func ValidateTopologyMaxHubs(t *testing.T) {
+	name := "test-slice"
+	namespace := "test-ns"
+	clientMock, sliceConfig, _ := setupSliceConfigWebhookValidationTest(name, namespace)
+	sliceConfig.Spec.TopologyMode = controllerv1alpha1.TopologyModeHubAndSpoke
+	sliceConfig.Spec.Hubs = []string{"c1", "c2", "c3"} // 3 hubs — exceeds max of 2
+	sliceConfig.Spec.Clusters = []string{"c1", "c2", "c3", "c4"}
+	err := validateTopology(sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "HubAndSpoke topology supports a maximum of 2 hub clusters")
 	clientMock.AssertExpectations(t)
 }
 
