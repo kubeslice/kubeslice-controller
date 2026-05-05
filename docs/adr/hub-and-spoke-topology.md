@@ -1,6 +1,6 @@
 # ADR: Partial Mesh MVP — Hub-and-Spoke Topology
 
-- **Status:** Accepted
+- **Status:** Proposed
 - **Issue:** [#300](https://github.com/kubeslice/kubeslice-controller/issues/300)
 - **Date:** 2026-05-05
 
