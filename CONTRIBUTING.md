@@ -45,7 +45,7 @@ If you encounter a bug, please file an issue in the Github repository. Please pr
 
 
 ## Coding Guidelines
-* Follow good [coding guidelines](https://github.com/golang/go/wiki/CodeReviewComments).
+* Follow good [coding guidelines](https://go.dev/wiki/CodeReviewComments).
 * Write good [commit messages](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#-commit-message-format).
 
 ## Developer Guide
