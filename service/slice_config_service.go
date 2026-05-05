@@ -267,6 +267,10 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	err = s.vpn.DeleteVpnKeyRotationConfig(ctx, slice.Name, namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
 }
 

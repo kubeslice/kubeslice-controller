@@ -335,7 +335,7 @@ type getSliceConfigTestCase struct {
 func Test_getSliceConfig(t *testing.T) {
 	testCases := []getSliceConfigTestCase{
 		{
-			name:         "it should return error in sliceconfig not found",
+			name:         "it should return error on API failure",
 			sliceName:    "test-slice",
 			namespace:    "test-ns",
 			expectedResp: nil,
@@ -360,6 +360,17 @@ func Test_getSliceConfig(t *testing.T) {
 			getArg2:     mock.Anything,
 			getArg3:     mock.Anything,
 			getRet1:     nil,
+		},
+		{
+			name:         "it should return nil when sliceconfig does not exist",
+			sliceName:    "test-slice",
+			namespace:    "test-ns",
+			expectedResp: nil,
+			expectedErr:  nil,
+			getArg1:      mock.Anything,
+			getArg2:      mock.Anything,
+			getArg3:      mock.Anything,
+			getRet1:      kubeerrors.NewNotFound(util.Resource("SliceConfig"), "test-slice"),
 		},
 	}
 	for _, tc := range testCases {
@@ -1362,4 +1373,87 @@ func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase
 	require.Equal(t, tc.expectedError, gotErr)
 	require.Equal(t, tc.expectedResponse, gotResp)
 
+}
+
+type deleteVpnKeyRotationConfigTestCase struct {
+	name                      string
+	sliceName                 string
+	namespace                 string
+	expectedErr               error
+	getArg1, getArg2, getArg3 interface{}
+	getRet1                   interface{}
+	deleteArg1, deleteArg2    interface{}
+	deleteRet1                interface{}
+}
+
+func Test_DeleteVpnKeyRotationConfig(t *testing.T) {
+	testCases := []deleteVpnKeyRotationConfigTestCase{
+		{
+			name:        "should delete vpnkeyrotation config successfully",
+			sliceName:   "demo-slice",
+			namespace:   "demo-namespace",
+			expectedErr: nil,
+			getArg1:     mock.Anything,
+			getArg2:     mock.Anything,
+			getArg3:     mock.Anything,
+			getRet1:     nil,
+			deleteArg1:  mock.Anything,
+			deleteArg2:  mock.Anything,
+			deleteRet1:  nil,
+		},
+		{
+			name:        "should return nil when vpnkeyrotation config does not exist",
+			sliceName:   "demo-slice",
+			namespace:   "demo-namespace",
+			expectedErr: nil,
+			getArg1:     mock.Anything,
+			getArg2:     mock.Anything,
+			getArg3:     mock.Anything,
+			getRet1:     kubeerrors.NewNotFound(util.Resource("VpnKeyRotation"), "demo-slice"),
+		},
+		{
+			name:        "should return error if fetching vpnkeyrotation config fails",
+			sliceName:   "demo-slice",
+			namespace:   "demo-namespace",
+			expectedErr: errors.New("failed to fetch vpnkeyrotation"),
+			getArg1:     mock.Anything,
+			getArg2:     mock.Anything,
+			getArg3:     mock.Anything,
+			getRet1:     errors.New("failed to fetch vpnkeyrotation"),
+		},
+		{
+			name:        "should return error if deleting vpnkeyrotation config fails",
+			sliceName:   "demo-slice",
+			namespace:   "demo-namespace",
+			expectedErr: errors.New("failed to delete vpnkeyrotation"),
+			getArg1:     mock.Anything,
+			getArg2:     mock.Anything,
+			getArg3:     mock.Anything,
+			getRet1:     nil,
+			deleteArg1:  mock.Anything,
+			deleteArg2:  mock.Anything,
+			deleteRet1:  errors.New("failed to delete vpnkeyrotation"),
+		},
+	}
+	for _, tc := range testCases {
+		runDeleteVpnKeyRotationConfigTestCase(t, tc)
+	}
+}
+
+func runDeleteVpnKeyRotationConfigTestCase(t *testing.T, tc deleteVpnKeyRotationConfigTestCase) {
+	ctx, clientMock, vpn, _, _ := setupTestCase()
+
+	clientMock.
+		On("Get", tc.getArg1, tc.getArg2, tc.getArg3).
+		Return(tc.getRet1).Once()
+
+	if tc.deleteArg1 != nil {
+		clientMock.
+			On("Delete", tc.deleteArg1, tc.deleteArg2).
+			Return(tc.deleteRet1).Once()
+	}
+
+	gotErr := vpn.DeleteVpnKeyRotationConfig(ctx, tc.sliceName, tc.namespace)
+	require.Equal(t, tc.expectedErr, gotErr)
+	clientMock.AssertExpectations(t)
 }
