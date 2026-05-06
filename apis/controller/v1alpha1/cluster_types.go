@@ -28,6 +28,11 @@ const (
 	ComponentHealthStatusError   = "Error"
 )
 
+// Condition type constants for Cluster.
+const (
+	ConditionClusterRegistered = "ClusterRegistered"
+)
+
 type ClusterHealthStatus string
 
 const (
@@ -136,6 +141,11 @@ type ClusterStatus struct {
 	// VCPURestriction is the restriction on the cluster disabling the creation of new pods
 	VCPURestriction *VCPURestriction `json:"vCPURestriction,omitempty"`
 	GPURestriction  *GPURestriction  `json:"GPURestriction,omitempty"`
+	// Conditions represent the latest available observations of the Cluster state.
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type GPURestriction struct {

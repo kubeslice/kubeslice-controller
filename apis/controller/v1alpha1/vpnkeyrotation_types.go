@@ -40,12 +40,22 @@ type VpnKeyRotationSpec struct {
 	RotationCount int `json:"rotationCount,omitempty"`
 }
 
+// Condition type constants for VpnKeyRotation.
+const (
+	ConditionVPNRotationComplete = "VPNRotationComplete"
+)
+
 // VpnKeyRotationStatus defines the observed state of VpnKeyRotation
 type VpnKeyRotationStatus struct {
 	// This is map of gateway name to the current rotation state
 	CurrentRotationState map[string]StatusOfKeyRotation `json:"currentRotationState,omitempty"`
 	// This is circular array of last n number of rotation status.
 	StatusHistory map[string][]StatusOfKeyRotation `json:"statusHistory,omitempty"`
+	// Conditions represent the latest available observations of the VpnKeyRotation state.
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // StatusOfKeyRotation represent per gateway status

@@ -29,6 +29,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/util"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -219,6 +220,24 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	if copyVpnConfig == nil {
 		return ctrl.Result{}, nil
 	}
+
+	// Set VPNRotationComplete condition based on whether certificates have been issued.
+	vpnRotationStatus := metav1.ConditionFalse
+	vpnRotationReason := "InProgress"
+	if !copyVpnConfig.Spec.CertificateCreationTime.IsZero() {
+		vpnRotationStatus = metav1.ConditionTrue
+		vpnRotationReason = "CertificatesIssued"
+	}
+	apimeta.SetStatusCondition(&copyVpnConfig.Status.Conditions, metav1.Condition{
+		Type:               controllerv1alpha1.ConditionVPNRotationComplete,
+		Status:             vpnRotationStatus,
+		ObservedGeneration: copyVpnConfig.Generation,
+		Reason:             vpnRotationReason,
+	})
+	if statusErr := util.UpdateStatus(ctx, copyVpnConfig); statusErr != nil {
+		logger.Errorf("error updating vpnkeyrotation status conditions: %s", statusErr.Error())
+	}
+
 	expiryTime := copyVpnConfig.Spec.CertificateExpiryTime.Time
 	remainingDuration := expiryTime.Sub(metav1.Now().Time)
 	logger.Debugf("vpnkeyrotation config reconciler will requeue after %s", remainingDuration)
