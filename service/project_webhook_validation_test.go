@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
@@ -57,6 +58,7 @@ var ProjectWebhookTestbed = map[string]func(*testing.T){
 	"Test_ValidateProjectUpdate_ThrowsErrorIf_RoleBinding_ReadWrite_exists_throws_error": Test_ValidateProjectUpdate_ThrowsErrorIf_RoleBinding_ReadWrite_exists_throws_error,
 	"Test_ValidateProjectUpdate_Happy":                                                   Test_ValidateProjectUpdate_Happy,
 	"Test_ValidateProjectDelete_FailsIfSliceConfigExists":                                Test_ValidateProjectDelete_FailsIfSliceConfigExists,
+	"Test_ValidateProjectDelete_FailsWhenSliceConfigListFails":                            Test_ValidateProjectDelete_FailsWhenSliceConfigListFails,
 }
 
 func TestValidateProjectCreate_Applied_Namespace_Error(t *testing.T) {
@@ -315,6 +317,19 @@ func Test_ValidateProjectDelete_FailsIfSliceConfigExists(t *testing.T) {
 	}).Once()
 	_, err := ValidateProjectDelete(ctx, project)
 	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+func Test_ValidateProjectDelete_FailsWhenSliceConfigListFails(t *testing.T) {
+	project := &controllerv1alpha1.Project{}
+	project.ObjectMeta.Name = "testProject"
+	clientMock := &utilMock.Client{}
+	ctx := prepareProjectWebhookTestContext(context.Background(), clientMock, nil)
+	listErr := errors.New("simulate apiserver list error")
+	clientMock.On("List", ctx, mock.Anything, mock.Anything).Return(listErr).Once()
+	_, err := ValidateProjectDelete(ctx, project)
+	require.Error(t, err)
+	require.True(t, k8sError.IsInternalError(err), "expected InternalError, got %#v", err)
 	clientMock.AssertExpectations(t)
 }
 

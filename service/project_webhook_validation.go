@@ -68,25 +68,32 @@ func ValidateProjectUpdate(ctx context.Context, project *controllerv1alpha1.Proj
 }
 
 func ValidateProjectDelete(ctx context.Context, project *controllerv1alpha1.Project) (admission.Warnings, error) {
-	if exists := validateIfSliceConfigExists(ctx, project); exists {
-		err := field.Forbidden(field.NewPath("Project"), "The Project can be delete only after deleting the slice config")
+	exists, listErr := validateIfSliceConfigExists(ctx, project)
+	if listErr != nil {
+		return nil, apierrors.NewInternalError(listErr)
+	}
+	if exists {
+		err := field.Forbidden(field.NewPath("Project"), "The Project can be deleted only after deleting the slice config")
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "Project"}, project.Name, field.ErrorList{err})
 	}
 	return nil, nil
 }
 
-func validateIfSliceConfigExists(ctx context.Context, project *controllerv1alpha1.Project) bool {
+func validateIfSliceConfigExists(ctx context.Context, project *controllerv1alpha1.Project) (bool, error) {
 	sliceConfig := &controllerv1alpha1.SliceConfigList{}
 	projectNamespace := fmt.Sprintf(ProjectNamespacePrefix, project.GetName())
 	err := util.ListResources(ctx, sliceConfig, client.InNamespace(projectNamespace))
+	if err != nil {
+		return false, fmt.Errorf("failed to list SliceConfigs in namespace %s: %w", projectNamespace, err)
+	}
 	// if the only existing slice config is the default slice config, the project can be deleted
-	if err == nil && len(sliceConfig.Items) == 1 && sliceConfig.Items[0].Name == fmt.Sprintf(util.DefaultProjectSliceName, project.GetName()) {
-		return false
+	if len(sliceConfig.Items) == 1 && sliceConfig.Items[0].Name == fmt.Sprintf(util.DefaultProjectSliceName, project.GetName()) {
+		return false, nil
 	}
-	if err == nil && len(sliceConfig.Items) > 0 {
-		return true
+	if len(sliceConfig.Items) > 0 {
+		return true, nil
 	}
-	return false
+	return false, nil
 }
 
 func validateProjectName(name string) *field.Error {
@@ -172,7 +179,10 @@ func validateRoleBindingIfExists(ctx context.Context, project *controllerv1alpha
 			Name:      fmt.Sprintf(format, name),
 		}
 		actualRoleBinding := rbacv1.RoleBinding{}
-		exist, _ := util.GetResourceIfExist(ctx, roleBindingNamespacedName, &actualRoleBinding)
+		exist, err := util.GetResourceIfExist(ctx, roleBindingNamespacedName, &actualRoleBinding)
+		if err != nil {
+			return field.InternalError(field.NewPath("spec").Child("roleBinding").Child(child), fmt.Errorf("error verifying RoleBinding %q: %w", name, err))
+		}
 		if exist {
 			for key, value := range labels {
 				if actualRoleBinding.Labels[key] != value {
@@ -194,7 +204,10 @@ func validateSANamesIfAlreadyExists(ctx context.Context, project *controllerv1al
 			Name:      fmt.Sprintf(format, name),
 		}
 		sa := corev1.ServiceAccount{}
-		exist, _ := util.GetResourceIfExist(ctx, serviceAccountNamespacedName, &sa)
+		exist, err := util.GetResourceIfExist(ctx, serviceAccountNamespacedName, &sa)
+		if err != nil {
+			return field.InternalError(field.NewPath("spec").Child("serviceAccount").Child(child), fmt.Errorf("error verifying ServiceAccount %q: %w", name, err))
+		}
 		if exist {
 			for key, value := range labels {
 				if sa.Labels[key] != value {
