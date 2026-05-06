@@ -194,9 +194,20 @@ type KubesliceEvent struct {
 	IsEventRaised bool `json:"isEventRaised,omitempty"`
 }
 
+// Condition type constants for SliceConfig.
+const (
+	ConditionSliceConfigReady   = "SliceConfigReady"
+	ConditionClustersRegistered = "ClustersRegistered"
+)
+
 // SliceConfigStatus defines the observed state of SliceConfig
 type SliceConfigStatus struct {
 	KubesliceEvents []KubesliceEvent `json:"kubesliceEvents,omitempty"`
+	// Conditions represent the latest available observations of the SliceConfig state.
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

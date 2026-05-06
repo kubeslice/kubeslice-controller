@@ -28,6 +28,8 @@ import (
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -209,6 +211,38 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
+
+	// Reflect cluster registration state into ClustersRegistered condition.
+	allRegistered := len(sliceConfig.Spec.Clusters) > 0
+	for _, clusterName := range sliceConfig.Spec.Clusters {
+		cl := v1alpha1.Cluster{}
+		found, ferr := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: req.Namespace}, &cl)
+		if ferr != nil || !found || cl.Status.RegistrationStatus != v1alpha1.RegistrationStatusRegistered {
+			allRegistered = false
+			break
+		}
+	}
+	clustersRegisteredStatus := metav1.ConditionFalse
+	clustersRegisteredReason := "ClustersNotRegistered"
+	if allRegistered {
+		clustersRegisteredStatus = metav1.ConditionTrue
+		clustersRegisteredReason = "AllClustersRegistered"
+	}
+	apimeta.SetStatusCondition(&sliceConfig.Status.Conditions, metav1.Condition{
+		Type:               v1alpha1.ConditionClustersRegistered,
+		Status:             clustersRegisteredStatus,
+		ObservedGeneration: sliceConfig.Generation,
+		Reason:             clustersRegisteredReason,
+	})
+	apimeta.SetStatusCondition(&sliceConfig.Status.Conditions, metav1.Condition{
+		Type:               v1alpha1.ConditionSliceConfigReady,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: sliceConfig.Generation,
+		Reason:             "ReconcileComplete",
+	})
+	if statusErr := util.UpdateStatus(ctx, sliceConfig); statusErr != nil {
+		return ctrl.Result{}, statusErr
+	}
 
 	// Step 6: Create VPNKeyRotation CR
 	// TODO(rahul): handle change in rotation interval

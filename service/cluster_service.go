@@ -28,6 +28,8 @@ import (
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -321,6 +323,24 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 	logger.Infof("cluster %v reconciled", req.NamespacedName)
+
+	// Mirror RegistrationStatus into a standard condition.
+	clusterRegisteredStatus := metav1.ConditionFalse
+	clusterRegisteredReason := "NotRegistered"
+	if cluster.Status.RegistrationStatus == v1alpha1.RegistrationStatusRegistered {
+		clusterRegisteredStatus = metav1.ConditionTrue
+		clusterRegisteredReason = "ClusterRegistered"
+	}
+	apimeta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:               v1alpha1.ConditionClusterRegistered,
+		Status:             clusterRegisteredStatus,
+		ObservedGeneration: cluster.Generation,
+		Reason:             clusterRegisteredReason,
+		Message:            string(cluster.Status.RegistrationStatus),
+	})
+	if statusErr := util.UpdateStatus(ctx, cluster); statusErr != nil {
+		return ctrl.Result{}, statusErr
+	}
 	return ctrl.Result{}, nil
 }
 
