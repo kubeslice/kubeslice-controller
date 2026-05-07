@@ -119,6 +119,9 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
 	"Test_validateSlicegatewayServiceType":                                                                                     test_validateSlicegatewayServiceType,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigRemoveClusterWithOnboardedNamespaces":                               UpdateValidateSliceConfigRemoveClusterWithOnboardedNamespaces,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigRemoveClusterWithApplicationNamespaces":                             UpdateValidateSliceConfigRemoveClusterWithApplicationNamespaces,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigRemoveClusterAllNamespacesDrained":                                  UpdateValidateSliceConfigRemoveClusterAllNamespacesDrained,
 }
 
 func test_validateSlicegatewayServiceType(t *testing.T) {
@@ -2315,4 +2318,92 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest", nil)
 	return clientMock, sliceConfig, ctx
+}
+
+// UpdateValidateSliceConfigRemoveClusterWithOnboardedNamespaces verifies that removing a cluster
+// is blocked when its WorkerSliceConfig still has OnboardedAppNamespaces in status (deboarding in progress).
+func UpdateValidateSliceConfigRemoveClusterWithOnboardedNamespaces(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	oldSliceConfig := &controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+
+	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+
+	// List WorkerSliceConfigs for cluster-2 — still has onboarded namespaces.
+	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
+	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
+		arg.Items = make([]workerv1alpha1.WorkerSliceConfig, 1)
+		arg.Items[0].Status.OnboardedAppNamespaces = []workerv1alpha1.NamespaceConfig{
+			{Name: "ns-alpha"},
+			{Name: "ns-beta"},
+		}
+	}).Once()
+
+	err := validateClustersOnUpdate(ctx, newSliceConfig, oldSliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "namespace deboarding in progress for cluster")
+	clientMock.AssertExpectations(t)
+}
+
+// UpdateValidateSliceConfigRemoveClusterWithApplicationNamespaces verifies that removing a cluster
+// is blocked when its WorkerSliceConfig still has ApplicationNamespaces in spec (not yet deboarded).
+func UpdateValidateSliceConfigRemoveClusterWithApplicationNamespaces(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	oldSliceConfig := &controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+
+	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+
+	// List WorkerSliceConfigs for cluster-2 — ApplicationNamespaces not yet cleared.
+	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
+	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(1).(*workerv1alpha1.WorkerSliceConfigList)
+		arg.Items = make([]workerv1alpha1.WorkerSliceConfig, 1)
+		arg.Items[0].Spec.NamespaceIsolationProfile.ApplicationNamespaces = []string{"ns-alpha", "ns-beta"}
+	}).Once()
+
+	err := validateClustersOnUpdate(ctx, newSliceConfig, oldSliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "deboard namespaces from cluster")
+	clientMock.AssertExpectations(t)
+}
+
+// UpdateValidateSliceConfigRemoveClusterAllNamespacesDrained verifies that removing a cluster
+// is allowed when all namespaces have been deboarded (both Spec and Status are clean).
+func UpdateValidateSliceConfigRemoveClusterAllNamespacesDrained(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+
+	oldSliceConfig := &controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+
+	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+	newSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+
+	// List WorkerSliceConfigs for cluster-2 — fully drained, empty items.
+	workerSliceConfig := &workerv1alpha1.WorkerSliceConfigList{}
+	clientMock.On("List", ctx, workerSliceConfig, mock.Anything, mock.Anything).Return(nil).Once()
+
+	// Get for cluster-1 in the all-clusters validation loop.
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      "cluster-1",
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{"10.10.1.1"}
+	}).Once()
+
+	err := validateClustersOnUpdate(ctx, newSliceConfig, oldSliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
 }
