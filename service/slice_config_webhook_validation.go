@@ -505,6 +505,9 @@ func validateExternalGatewayConfig(sliceConfig *controllerv1alpha1.SliceConfig) 
 func validateApplicationNamespaces(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
 	for _, applicationNamespace := range sliceConfig.Spec.NamespaceIsolationProfile.ApplicationNamespaces {
 		/* check duplicate values of clusters */
+		if len(applicationNamespace.Namespace) == 0 && len(applicationNamespace.Clusters) == 0 {
+			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces"), "namespace and clusters are required")
+		}
 		if len(applicationNamespace.Namespace) > 0 && len(applicationNamespace.Clusters) == 0 {
 			return field.Required(field.NewPath("Spec").Child("NamespaceIsolationProfile").Child("ApplicationNamespaces").Child("Clusters"), "clusters")
 		}
