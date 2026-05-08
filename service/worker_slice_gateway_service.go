@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -595,6 +596,7 @@ func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClu
 func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinationCluster *controllerv1alpha1.Cluster,
 	sliceName, namespace, gatewayHostType, gatewayConnType, gatewayProtocol string, labels map[string]string, gatewayNumber int,
 	gatewaySubnet, localVpnAddress, remoteGatewayName, remoteGatewaySubnet, remoteVpnAddress, localGatewayName string) *v1alpha1.WorkerSliceGateway {
+	labels = maps.Clone(labels)
 	labels["worker-cluster"] = sourceCluster.Name
 	labels["remote-cluster"] = destinationCluster.Name
 	labels["kubeslice-manager"] = "controller"
