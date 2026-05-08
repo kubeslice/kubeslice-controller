@@ -72,6 +72,9 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
 		Name: req.Namespace,
 	}, projectNs)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if !found || !c.checkForProjectNamespace(projectNs) {
 		logger.Infof("Created Cluster %v is not in project namespace. Returning from reconciliation loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
