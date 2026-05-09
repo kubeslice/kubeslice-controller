@@ -445,7 +445,7 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 			reconcileResult: ctrl.Result{},
 		},
 		{
-			name: "should requeue after firing new jobs",
+			name: "should requeue after firing new jobs when no jobs exist",
 			arg1: &controllerv1alpha1.VpnKeyRotation{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-slice",
@@ -475,11 +475,39 @@ func Test_reconcileVpnKeyRotationConfig(t *testing.T) {
 			now:             newTs,
 			reconcileResult: ctrl.Result{RequeueAfter: 30 * time.Second},
 		},
+		{
+			name: "should not trigger new jobs if jobs already running after controller restart",
+			arg1: &controllerv1alpha1.VpnKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+				Spec: controllerv1alpha1.VpnKeyRotationSpec{
+					SliceName:               "test-slice",
+					Clusters:                []string{"worker-1", "worker-2"},
+					RotationInterval:        30,
+					CertificateCreationTime: &ts,
+					CertificateExpiryTime:   &expiryTs,
+					RotationCount:           1,
+				},
+    		},
+			arg2: &controllerv1alpha1.SliceConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-slice",
+					Namespace: "test-ns",
+				},
+			},
+			expectedErr:     nil,
+			expectedResp:    nil,
+			now:             newTs,
+			reconcileResult: ctrl.Result{RequeueAfter: 30 * time.Second},
+		},
 	}
 	for _, tc := range testCases {
 		runReconcileVpnKeyRotationConfig(t, &tc)
 	}
 }
+
 func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationConfigTestCase) {
 	ctx, clientMock, vpn, wg, ws := setupTestCase()
 
@@ -491,108 +519,164 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 	// NOTE: Monkey pathcing sometimes requires the inlining to be disabled
 	// use go test -gcflags=-l
 	// setup Expectations
-	gwList := &workerv1alpha1.WorkerSliceGatewayList{}
-	clientMock.
-		On("List", mock.Anything, gwList, mock.Anything).
-		Return(nil).Run(func(args mock.Arguments) {
-		w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
-		w.Items = append(w.Items,
-			workerv1alpha1.WorkerSliceGateway{
-				Spec: workerv1alpha1.WorkerSliceGatewaySpec{
-					GatewayHostType: "Server",
-					RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
-						GatewayName: "test-slice-worker-2-worker-1",
-					},
-				},
-			},
-			workerv1alpha1.WorkerSliceGateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-slice-worker-2-worker-1",
-				},
-				Spec: workerv1alpha1.WorkerSliceGatewaySpec{
-					GatewayHostType: "Client",
-					RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
-						GatewayName: "test-slice-worker-1-worker-2",
-					},
-				},
-			})
-	}).Times(1)
 
-	jobList := &batchv1.JobList{}
+	if tc.name == "should not trigger new jobs if jobs already running after controller restart" {
+        clientMock.
+            On("List", mock.Anything, mock.Anything, mock.Anything).
+            Return(nil).Run(func(args mock.Arguments) {
+            w := args.Get(1).(*batchv1.JobList)
+            w.Items = append(w.Items, batchv1.Job{
+                ObjectMeta: metav1.ObjectMeta{
+                    Name: "job-already-running",
+                    Labels: map[string]string{
+                        "SLICE_NAME": "test-slice",
+                    },
+                },
+                Status: batchv1.JobStatus{
+                    Active: 1,
+                },
+            })
+        }).Once()
 
-	clientMock.
-		On("List", mock.Anything, jobList, mock.Anything).
-		Return(nil).Run(func(args mock.Arguments) {
-		w := args.Get(1).(*batchv1.JobList)
-		w.Items = append(w.Items,
-			batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "job-1",
-					Labels: map[string]string{
-						"SLICE_NAME": "test-slice",
-					},
-				},
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
+    } else if tc.name == "should requeue after firing new jobs when no jobs exist" {
+        clientMock.
+            On("List", mock.Anything, mock.Anything, mock.Anything).
+            Return(nil).Run(func(args mock.Arguments) {
+            w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
+            w.Items = append(w.Items,
+                workerv1alpha1.WorkerSliceGateway{
+                    Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+                        GatewayHostType: "Server",
+                        RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+                            GatewayName: "test-slice-worker-2-worker-1",
+                        },
+                    },
+                },
+                workerv1alpha1.WorkerSliceGateway{
+                    ObjectMeta: metav1.ObjectMeta{
+                        Name: "test-slice-worker-2-worker-1",
+                    },
+                    Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+                        GatewayHostType: "Client",
+                    },
+                })
+        }).Once()
+
+        clientMock.
+            On("List", mock.Anything, mock.Anything, mock.Anything).
+            Return(nil).Run(func(args mock.Arguments) {
+            w := args.Get(1).(*batchv1.JobList)
+            w.Items = []batchv1.Job{}
+        }).Once()
+
+        ws.On("ListWorkerSliceConfigs", mock.Anything, mock.Anything, mock.Anything).
+            Return([]workerv1alpha1.WorkerSliceConfig{}, nil).Once()
+        ws.On("ComputeClusterMap", mock.Anything, mock.Anything).
+            Return(map[string]int{"worker-1": 1, "worker-2": 2}).Once()
+        wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+            Return(util.WorkerSliceGatewayNetworkAddresses{}).Once()
+        wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+            Return(nil).Once()
+	} else {
+		clientMock.
+			On("List", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
+			w.Items = append(w.Items,
+				workerv1alpha1.WorkerSliceGateway{
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Server",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-2-worker-1",
 						},
 					},
 				},
-			},
-			batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "job-2",
-					Labels: map[string]string{
-						"SLICE_NAME": "test-slice",
+				workerv1alpha1.WorkerSliceGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-2-worker-1",
 					},
-				},
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Client",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-1-worker-2",
+						},
+					},
+				})
+		}).Times(1)
+
+		clientMock.
+			On("List", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*batchv1.JobList)
+			w.Items = append(w.Items,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-1",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
+					},
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: corev1.ConditionTrue,
+							},
 						},
 					},
 				},
-			})
-	}).Times(2)
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-2",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
+					},
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: corev1.ConditionTrue,
+							},
+						},
+					},
+				})
+		}).Times(2)
 
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+		clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 
-	workerSliceConfigs := workerv1alpha1.WorkerSliceConfigList{
-		Items: []workerv1alpha1.WorkerSliceConfig{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-slice-config-1",
+		workerSliceConfigs := workerv1alpha1.WorkerSliceConfigList{
+			Items: []workerv1alpha1.WorkerSliceConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-config-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-config-2",
+					},
 				},
 			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-slice-config-2",
-				},
-			},
-		},
+		}
+
+		ws.On("ListWorkerSliceConfigs", mock.Anything, mock.Anything, mock.Anything).Return(workerSliceConfigs.Items, nil).Once()
+
+		clusterMap := map[string]int{
+			"cluster-1": 1,
+			"cluster-2": 2,
+		}
+
+		ws.On("ComputeClusterMap", mock.Anything, mock.Anything).Return(clusterMap).Once()
+
+		gwAddress := util.WorkerSliceGatewayNetworkAddresses{}
+
+		wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
+
+		wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		clientMock.On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
 	}
-
-	ws.On("ListWorkerSliceConfigs", mock.Anything, mock.Anything, mock.Anything).Return(workerSliceConfigs.Items, nil).Once()
-
-	clusterMap := map[string]int{
-		"cluster-1": 1,
-		"cluster-2": 2,
-	}
-
-	ws.On("ComputeClusterMap", mock.Anything, mock.Anything).Return(clusterMap).Once()
-
-	gwAddress := util.WorkerSliceGatewayNetworkAddresses{}
-
-	wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
-
-	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-
-	clientMock.
-		On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
 
 	reconcileResult, gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
 	require.Equal(t, gotErr, tc.expectedErr)
