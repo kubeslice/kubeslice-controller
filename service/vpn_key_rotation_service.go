@@ -45,7 +45,6 @@ type IVpnKeyRotationService interface {
 type VpnKeyRotationService struct {
 	wsgs                  IWorkerSliceGatewayService
 	wscs                  IWorkerSliceConfigService
-	jobCreationInProgress atomic.Bool
 }
 
 // JobStatus represents the status of a job.
@@ -266,18 +265,6 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 
 	} else {
 		if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
-			if !v.jobCreationInProgress.Load() {
-				if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
-					logger.Error("error creating new certs", err)
-					// register an event
-					util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobCreationFailed)
-					return ctrl.Result{}, nil, err
-				}
-				v.jobCreationInProgress.Store(true)
-				logger.Debugf("jobs triggered for creating new certs for slice %s", s.Name)
-				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
-			}
-			// verify jobs are completed
 			status, err := v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName)
 			if err != nil {
 				return ctrl.Result{}, nil, err
@@ -293,6 +280,12 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 				return ctrl.Result{}, nil, nil
 			}
 			if status == JobNotCreated {
+				// Use Kubernetes API to check if the cert creation jobs are created or not
+				if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
+                	logger.Error("error creating new certs", err)
+                	util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobCreationFailed)
+                	return ctrl.Result{}, nil, err
+            	}
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
 			copyVpnConfig.Spec.CertificateCreationTime = &now
@@ -303,7 +296,6 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 				return ctrl.Result{}, nil, err
 			}
 			// restore the variable jobCreationInProgress to false
-			v.jobCreationInProgress.Store(false)
 			//register an event
 			util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventVPNKeyRotationStart)
 		}
