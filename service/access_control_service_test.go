@@ -1270,7 +1270,7 @@ func ACS_ReconcileWorkerClusterServiceAccountAndRoleBindings(t *testing.T) {
 	mMock.AssertExpectations(t)
 }
 
-func prepareACSTestContext(ctx context.Context, client util.Client,
+func prepareACSTestContext(ctx context.Context, client *utilMock.Client,
 	scheme *runtime.Scheme) context.Context {
 	if scheme == nil {
 		scheme = runtime.NewScheme()

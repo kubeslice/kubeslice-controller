@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sync/atomic"
+	"strconv"
 	"time"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -43,9 +43,8 @@ type IVpnKeyRotationService interface {
 }
 
 type VpnKeyRotationService struct {
-	wsgs                  IWorkerSliceGatewayService
-	wscs                  IWorkerSliceConfigService
-	jobCreationInProgress atomic.Bool
+	wsgs IWorkerSliceGatewayService
+	wscs IWorkerSliceConfigService
 }
 
 // JobStatus represents the status of a job.
@@ -266,24 +265,32 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 
 	} else {
 		if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
-			if !v.jobCreationInProgress.Load() {
+			// Check Kubernetes state first to avoid duplicating jobs after a controller restart.
+			// Jobs are labelled with SLICE_NAME and ROTATION_COUNT so we can identify
+			// whether the current rotation cycle has already been triggered.
+			hasJobs, err := v.hasJobsForCurrentRotation(ctx, copyVpnConfig.Spec.SliceName, copyVpnConfig.Spec.RotationCount)
+			if err != nil {
+				return ctrl.Result{}, nil, err
+			}
+			if !hasJobs {
+				// No jobs for the current rotation cycle — trigger them now.
 				if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
 					logger.Error("error creating new certs", err)
 					// register an event
 					util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobCreationFailed)
 					return ctrl.Result{}, nil, err
 				}
-				v.jobCreationInProgress.Store(true)
 				logger.Debugf("jobs triggered for creating new certs for slice %s", s.Name)
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
-			// verify jobs are completed
+			// Jobs already exist for this rotation cycle (possibly from before a restart).
+			// Verify their completion status.
 			status, err := v.verifyAllJobsAreCompleted(ctx, copyVpnConfig.Spec.SliceName)
 			if err != nil {
 				return ctrl.Result{}, nil, err
 			}
 			logger.Debugf("certs job status for sliceconfig %s = %s ", s.Name, status.String())
-			// requeue after 1 minute if job is still running
+			// requeue after 30 seconds if job is still running
 			if status == JobStatusRunning {
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
@@ -292,9 +299,8 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 				util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobFailed)
 				return ctrl.Result{}, nil, nil
 			}
-			if status == JobNotCreated {
-				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
-			}
+			// status == JobStatusComplete: all jobs for this rotation cycle finished successfully.
+			// Update timestamps and increment rotation count to conclude this cycle.
 			copyVpnConfig.Spec.CertificateCreationTime = &now
 			expiryTS := metav1.NewTime(now.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
 			copyVpnConfig.Spec.CertificateExpiryTime = &expiryTS
@@ -302,8 +308,6 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 			if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
 				return ctrl.Result{}, nil, err
 			}
-			// restore the variable jobCreationInProgress to false
-			v.jobCreationInProgress.Store(false)
 			//register an event
 			util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventVPNKeyRotationStart)
 		}
@@ -353,8 +357,15 @@ func (v *VpnKeyRotationService) triggerJobsForCertCreation(ctx context.Context, 
 				return err
 			}
 			clusterMap := v.wscs.ComputeClusterMap(s.Spec.Clusters, workerSliceConfigs)
-			// contruct gw address
+			// construct gw address
 			gatewayAddresses := v.wsgs.BuildNetworkAddresses(s.Spec.SliceSubnet, gateway.Spec.LocalGatewayConfig.ClusterName, gateway.Spec.RemoteGatewayConfig.ClusterName, clusterMap, clusterCidr)
+			// Inject ROTATION_COUNT into the gateway context so the cert job carries the label.
+			// GenerateCerts will pass this through to CreateJob via the environment map,
+			// allowing hasJobsForCurrentRotation to find the jobs after a controller restart.
+			gateway := gateway
+			gateway.Annotations = mergeAnnotations(gateway.Annotations, map[string]string{
+				"rotation-count": strconv.Itoa(vpnKeyRotationConfig.Spec.RotationCount),
+			})
 			// call GenerateCerts()
 			if err := v.wsgs.GenerateCerts(ctx, s.Name, s.Namespace, gateway.Spec.GatewayProtocol, &gateway, cl, gatewayAddresses); err != nil {
 				return err
@@ -362,6 +373,17 @@ func (v *VpnKeyRotationService) triggerJobsForCertCreation(ctx context.Context, 
 		}
 	}
 	return nil
+}
+
+// mergeAnnotations merges src into dst, returning dst.
+func mergeAnnotations(dst, src map[string]string) map[string]string {
+	if dst == nil {
+		dst = make(map[string]string, len(src))
+	}
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
 }
 
 func (v *VpnKeyRotationService) listWorkerSliceGateways(ctx context.Context, labels map[string]string) (*workerv1alpha1.WorkerSliceGatewayList, error) {
@@ -401,6 +423,25 @@ func (v *VpnKeyRotationService) listClientPairGateway(wl *workerv1alpha1.WorkerS
 		}
 	}
 	return nil, fmt.Errorf("cannot find gateway %s", clientGatewayName)
+}
+
+// hasJobsForCurrentRotation returns true if any cert-rotation jobs for the given slice
+// and rotation cycle already exist in Kubernetes. This is used as the authoritative,
+// restart-safe check to prevent duplicate job creation: if jobs are present (even after
+// a controller restart), the reconciler resumes waiting for completion instead of
+// firing a second batch of jobs.
+func (v *VpnKeyRotationService) hasJobsForCurrentRotation(ctx context.Context, sliceName string, rotationCount int) (bool, error) {
+	jobs := batchv1.JobList{}
+	listOpts := []client.ListOption{
+		client.MatchingLabels(map[string]string{
+			"SLICE_NAME":     sliceName,
+			"ROTATION_COUNT": strconv.Itoa(rotationCount),
+		}),
+	}
+	if err := util.ListResources(ctx, &jobs, listOpts...); err != nil {
+		return false, err
+	}
+	return len(jobs.Items) > 0, nil
 }
 
 // verifyAllJobsAreCompleted checks if all the jobs are in complete state

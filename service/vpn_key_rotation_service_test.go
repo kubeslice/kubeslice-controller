@@ -488,111 +488,122 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 		return tc.now
 	})
 	defer patch.Unpatch()
-	// NOTE: Monkey pathcing sometimes requires the inlining to be disabled
+	// NOTE: Monkey patching sometimes requires the inlining to be disabled
 	// use go test -gcflags=-l
-	// setup Expectations
-	gwList := &workerv1alpha1.WorkerSliceGatewayList{}
-	clientMock.
-		On("List", mock.Anything, gwList, mock.Anything).
-		Return(nil).Run(func(args mock.Arguments) {
-		w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
-		w.Items = append(w.Items,
-			workerv1alpha1.WorkerSliceGateway{
-				Spec: workerv1alpha1.WorkerSliceGatewaySpec{
-					GatewayHostType: "Server",
-					RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
-						GatewayName: "test-slice-worker-2-worker-1",
-					},
-				},
-			},
-			workerv1alpha1.WorkerSliceGateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-slice-worker-2-worker-1",
-				},
-				Spec: workerv1alpha1.WorkerSliceGatewaySpec{
-					GatewayHostType: "Client",
-					RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
-						GatewayName: "test-slice-worker-1-worker-2",
-					},
-				},
-			})
-	}).Times(1)
 
-	jobList := &batchv1.JobList{}
+	// Both test cases exercise the first-time path (timestamps nil) OR the expiry path.
+	// For the "should update CertCreation TS" case (timestamps zero), the flow is:
+	//   verifyAllJobsAreCompleted(List) → complete → update timestamps.
+	// For the "should requeue after firing new jobs" case (certs expired, now > expiryTS):
+	//   hasJobsForCurrentRotation(List) → empty → triggerJobsForCertCreation(List gateways, GenerateCerts...) → requeue.
+	isCertExpiredCase := tc.arg1.Spec.CertificateCreationTime != nil && tc.arg1.Spec.CertificateExpiryTime != nil
 
-	clientMock.
-		On("List", mock.Anything, jobList, mock.Anything).
-		Return(nil).Run(func(args mock.Arguments) {
-		w := args.Get(1).(*batchv1.JobList)
-		w.Items = append(w.Items,
-			batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "job-1",
-					Labels: map[string]string{
-						"SLICE_NAME": "test-slice",
+	if !isCertExpiredCase {
+		// First-time path: verifyAllJobsAreCompleted is called → jobs complete → update timestamps.
+		jobList := &batchv1.JobList{}
+		clientMock.
+			On("List", mock.Anything, jobList, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*batchv1.JobList)
+			w.Items = append(w.Items,
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-1",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
 					},
-				},
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: corev1.ConditionTrue,
+							},
 						},
 					},
 				},
-			},
-			batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "job-2",
-					Labels: map[string]string{
-						"SLICE_NAME": "test-slice",
+				batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "job-2",
+						Labels: map[string]string{
+							"SLICE_NAME": "test-slice",
+						},
 					},
-				},
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
+					Status: batchv1.JobStatus{
+						Conditions: []batchv1.JobCondition{
+							{
+								Type:   batchv1.JobComplete,
+								Status: corev1.ConditionTrue,
+							},
+						},
+					},
+				})
+		}).Once()
+
+		clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+		clientMock.
+			On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
+	} else {
+		// Expiry path: hasJobsForCurrentRotation → empty list → triggerJobsForCertCreation.
+		// First List call is for hasJobsForCurrentRotation (returns empty → no existing jobs).
+		jobList := &batchv1.JobList{}
+		clientMock.
+			On("List", mock.Anything, jobList, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			// Return empty list: no jobs for the current rotation count.
+			_ = args.Get(1).(*batchv1.JobList)
+		}).Once()
+
+		// Second List call is for triggerJobsForCertCreation (gateway list).
+		gwList := &workerv1alpha1.WorkerSliceGatewayList{}
+		clientMock.
+			On("List", mock.Anything, gwList, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*workerv1alpha1.WorkerSliceGatewayList)
+			w.Items = append(w.Items,
+				workerv1alpha1.WorkerSliceGateway{
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Server",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-2-worker-1",
 						},
 					},
 				},
-			})
-	}).Times(2)
+				workerv1alpha1.WorkerSliceGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-worker-2-worker-1",
+					},
+					Spec: workerv1alpha1.WorkerSliceGatewaySpec{
+						GatewayHostType: "Client",
+						RemoteGatewayConfig: workerv1alpha1.SliceGatewayConfig{
+							GatewayName: "test-slice-worker-1-worker-2",
+						},
+					},
+				})
+		}).Times(1)
 
-	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
-
-	workerSliceConfigs := workerv1alpha1.WorkerSliceConfigList{
-		Items: []workerv1alpha1.WorkerSliceConfig{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-slice-config-1",
+		workerSliceConfigs := workerv1alpha1.WorkerSliceConfigList{
+			Items: []workerv1alpha1.WorkerSliceConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-config-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-slice-config-2",
+					},
 				},
 			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-slice-config-2",
-				},
-			},
-		},
+		}
+
+		ws.On("ListWorkerSliceConfigs", mock.Anything, mock.Anything, mock.Anything).Return(workerSliceConfigs.Items, nil).Once()
+		ws.On("ComputeClusterMap", mock.Anything, mock.Anything).Return(map[string]int{"cluster-1": 1, "cluster-2": 2}).Once()
+
+		gwAddress := util.WorkerSliceGatewayNetworkAddresses{}
+		wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
+		wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	}
-
-	ws.On("ListWorkerSliceConfigs", mock.Anything, mock.Anything, mock.Anything).Return(workerSliceConfigs.Items, nil).Once()
-
-	clusterMap := map[string]int{
-		"cluster-1": 1,
-		"cluster-2": 2,
-	}
-
-	ws.On("ComputeClusterMap", mock.Anything, mock.Anything).Return(clusterMap).Once()
-
-	gwAddress := util.WorkerSliceGatewayNetworkAddresses{}
-
-	wg.On("BuildNetworkAddresses", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gwAddress).Once()
-
-	wg.On("GenerateCerts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-
-	clientMock.
-		On("Update", tc.updateArg1, tc.updateArg2).Return(tc.updateRet1).Once()
 
 	reconcileResult, gotResp, gotErr := vpn.reconcileVpnKeyRotationConfig(ctx, tc.arg1, tc.arg2)
 	require.Equal(t, gotErr, tc.expectedErr)
@@ -600,6 +611,266 @@ func runReconcileVpnKeyRotationConfig(t *testing.T, tc *reconcileVpnKeyRotationC
 	require.Equal(t, tc.expectedResp, gotResp)
 	require.Equal(t, tc.reconcileResult, reconcileResult)
 }
+
+// ---------------------------------------------------------------------------
+// Tests for hasJobsForCurrentRotation
+// ---------------------------------------------------------------------------
+
+func Test_hasJobsForCurrentRotation(t *testing.T) {
+	t.Run("returns false when no jobs exist for rotation count", func(t *testing.T) {
+		ctx, clientMock, vpn, _, _ := setupTestCase()
+		clientMock.
+			On("List", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Once()
+
+		got, err := vpn.hasJobsForCurrentRotation(ctx, "test-slice", 1)
+		require.NoError(t, err)
+		require.False(t, got)
+		clientMock.AssertExpectations(t)
+	})
+
+	t.Run("returns true when jobs exist for rotation count", func(t *testing.T) {
+		ctx, clientMock, vpn, _, _ := setupTestCase()
+		clientMock.
+			On("List", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			w := args.Get(1).(*batchv1.JobList)
+			w.Items = append(w.Items, batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "open-cert-abc12345",
+					Labels: map[string]string{
+						"SLICE_NAME":     "test-slice",
+						"ROTATION_COUNT": "1",
+					},
+				},
+			})
+		}).Once()
+
+		got, err := vpn.hasJobsForCurrentRotation(ctx, "test-slice", 1)
+		require.NoError(t, err)
+		require.True(t, got)
+		clientMock.AssertExpectations(t)
+	})
+
+	t.Run("returns error when list fails", func(t *testing.T) {
+		ctx, clientMock, vpn, _, _ := setupTestCase()
+		clientMock.
+			On("List", mock.Anything, mock.Anything, mock.Anything).
+			Return(errors.New("list failed")).Once()
+
+		got, err := vpn.hasJobsForCurrentRotation(ctx, "test-slice", 1)
+		require.Error(t, err)
+		require.False(t, got)
+		clientMock.AssertExpectations(t)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Idempotent reconcile tests — simulates controller restart scenarios
+// ---------------------------------------------------------------------------
+
+// Test_IdempotentReconcileAfterRestart verifies that when the controller restarts
+// mid-rotation (certs expired, jobs already exist for the current rotation count),
+// the reconciler does NOT fire duplicate jobs — it resumes waiting for completion.
+func Test_IdempotentReconcileAfterRestart(t *testing.T) {
+	ts := metav1.NewTime(time.Date(2021, 6, 16, 20, 34, 58, 651387237, time.UTC))
+	expiryTs := metav1.NewTime(ts.AddDate(0, 0, 30).Add(-1 * time.Hour))
+	// "now" is past expiry
+	pastExpiry := metav1.NewTime(expiryTs.Add(2 * time.Hour))
+
+	patch := monkey.Patch(metav1.Now, func() metav1.Time { return pastExpiry })
+	defer patch.Unpatch()
+
+	ctx, clientMock, vpn, wg, _ := setupTestCase()
+
+	vpnCfg := &controllerv1alpha1.VpnKeyRotation{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-slice", Namespace: "test-ns"},
+		Spec: controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               "test-slice",
+			RotationInterval:        30,
+			RotationCount:           2,
+			CertificateCreationTime: &ts,
+			CertificateExpiryTime:   &expiryTs,
+		},
+	}
+	sliceCfg := &controllerv1alpha1.SliceConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-slice", Namespace: "test-ns"},
+	}
+
+	// hasJobsForCurrentRotation → jobs already exist for rotationCount=2 (pre-restart jobs)
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items, batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "open-cert-abc12345",
+				Labels: map[string]string{
+					"SLICE_NAME":     "test-slice",
+					"ROTATION_COUNT": "2",
+				},
+			},
+			Status: batchv1.JobStatus{Active: 1},
+		})
+	}).Once()
+
+	// verifyAllJobsAreCompleted → still running
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items, batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "open-cert-abc12345",
+				Labels: map[string]string{"SLICE_NAME": "test-slice"},
+			},
+			Status: batchv1.JobStatus{Active: 1},
+		})
+	}).Once()
+
+	// GenerateCerts must NOT be called — confirm no duplicate jobs
+	wg.AssertNotCalled(t, "GenerateCerts")
+
+	result, resp, err := vpn.reconcileVpnKeyRotationConfig(ctx, vpnCfg, sliceCfg)
+
+	require.NoError(t, err)
+	require.Nil(t, resp)
+	require.Equal(t, 30*time.Second, result.RequeueAfter)
+	clientMock.AssertExpectations(t)
+}
+
+// Test_ExistingRunningJobsOnRestart verifies that when jobs for the current rotation
+// are running (detected after restart), the reconciler returns RequeueAfter without
+// creating new jobs.
+func Test_ExistingRunningJobsOnRestart(t *testing.T) {
+	ts := metav1.NewTime(time.Date(2021, 6, 16, 20, 34, 58, 0, time.UTC))
+	expiryTs := metav1.NewTime(ts.AddDate(0, 0, 30).Add(-1 * time.Hour))
+	pastExpiry := metav1.NewTime(expiryTs.Add(time.Hour))
+
+	patch := monkey.Patch(metav1.Now, func() metav1.Time { return pastExpiry })
+	defer patch.Unpatch()
+
+	ctx, clientMock, vpn, wg, _ := setupTestCase()
+
+	vpnCfg := &controllerv1alpha1.VpnKeyRotation{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-slice", Namespace: "ns"},
+		Spec: controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               "my-slice",
+			RotationInterval:        30,
+			RotationCount:           3,
+			CertificateCreationTime: &ts,
+			CertificateExpiryTime:   &expiryTs,
+		},
+	}
+	sliceCfg := &controllerv1alpha1.SliceConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-slice", Namespace: "ns"},
+	}
+
+	// hasJobsForCurrentRotation → jobs exist
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items, batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"SLICE_NAME": "my-slice", "ROTATION_COUNT": "3"},
+			},
+			Status: batchv1.JobStatus{Active: 1},
+		})
+	}).Once()
+
+	// verifyAllJobsAreCompleted → still running
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items, batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"SLICE_NAME": "my-slice"},
+			},
+			Status: batchv1.JobStatus{Active: 1},
+		})
+	}).Once()
+
+	wg.AssertNotCalled(t, "GenerateCerts")
+
+	result, resp, err := vpn.reconcileVpnKeyRotationConfig(ctx, vpnCfg, sliceCfg)
+
+	require.NoError(t, err)
+	require.Nil(t, resp)
+	require.Equal(t, 30*time.Second, result.RequeueAfter)
+	clientMock.AssertExpectations(t)
+}
+
+// Test_NoDuplicateJobsOnConcurrentReconcile verifies that a second reconcile
+// execution (e.g. caused by a requeue firing while the first is still running)
+// does not create a second batch of cert jobs when jobs for the current rotation
+// count already exist.
+func Test_NoDuplicateJobsOnConcurrentReconcile(t *testing.T) {
+	ts := metav1.NewTime(time.Date(2021, 6, 16, 20, 34, 58, 0, time.UTC))
+	expiryTs := metav1.NewTime(ts.AddDate(0, 0, 30).Add(-1 * time.Hour))
+	pastExpiry := metav1.NewTime(expiryTs.Add(time.Hour))
+
+	patch := monkey.Patch(metav1.Now, func() metav1.Time { return pastExpiry })
+	defer patch.Unpatch()
+
+	ctx, clientMock, vpn, wg, _ := setupTestCase()
+
+	vpnCfg := &controllerv1alpha1.VpnKeyRotation{
+		ObjectMeta: metav1.ObjectMeta{Name: "slice-a", Namespace: "ns"},
+		Spec: controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               "slice-a",
+			RotationInterval:        30,
+			RotationCount:           1,
+			CertificateCreationTime: &ts,
+			CertificateExpiryTime:   &expiryTs,
+		},
+	}
+	sliceCfg := &controllerv1alpha1.SliceConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "slice-a", Namespace: "ns"},
+	}
+
+	// Simulate: jobs already created by the first reconcile call (same RotationCount=1).
+	existingJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "open-cert-existing",
+			Labels: map[string]string{"SLICE_NAME": "slice-a", "ROTATION_COUNT": "1"},
+		},
+		Status: batchv1.JobStatus{Active: 1},
+	}
+
+	// hasJobsForCurrentRotation → returns existing job → must NOT trigger again
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items, existingJob)
+	}).Once()
+
+	// verifyAllJobsAreCompleted → still running
+	clientMock.
+		On("List", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		w := args.Get(1).(*batchv1.JobList)
+		w.Items = append(w.Items, batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"SLICE_NAME": "slice-a"},
+			},
+			Status: batchv1.JobStatus{Active: 1},
+		})
+	}).Once()
+
+	// GenerateCerts / triggerJobsForCertCreation must NOT be called
+	wg.AssertNotCalled(t, "GenerateCerts")
+
+	result, resp, err := vpn.reconcileVpnKeyRotationConfig(ctx, vpnCfg, sliceCfg)
+
+	require.NoError(t, err)
+	require.Nil(t, resp)
+	require.Equal(t, 30*time.Second, result.RequeueAfter)
+	clientMock.AssertExpectations(t)
+}
+
 
 type listClientPairGatewayTesCase struct {
 	name         string

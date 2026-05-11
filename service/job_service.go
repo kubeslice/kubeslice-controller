@@ -63,7 +63,8 @@ func (j *JobService) CreateJob(ctx context.Context, namespace string, jobImage s
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				"SLICE_NAME": environment["SLICE_NAME"],
+				"SLICE_NAME":     environment["SLICE_NAME"],
+				"ROTATION_COUNT": environment["ROTATION_COUNT"],
 			},
 		},
 		Spec: batchv1.JobSpec{

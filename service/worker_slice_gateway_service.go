@@ -688,6 +688,13 @@ func (s *WorkerSliceGatewayService) GenerateCerts(ctx context.Context, sliceName
 	} else {
 		environment["VPN_CIPHER"] = sliceConfig.Spec.VPNConfig.Cipher
 	}
+	// Propagate the rotation count annotation (set by VpnKeyRotationService) into the
+	// job environment so the Job carries a ROTATION_COUNT label. This allows the
+	// reconciler to detect existing jobs for the current rotation cycle after a restart,
+	// preventing duplicate cert job creation.
+	if rc, ok := serverGateway.Annotations["rotation-count"]; ok {
+		environment["ROTATION_COUNT"] = rc
+	}
 
 	jobNamespace = os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE")
 	util.CtxLogger(ctx).Info("jobNamespace", jobNamespace) //todo:remove
