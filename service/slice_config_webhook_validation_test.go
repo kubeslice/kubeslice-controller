@@ -119,6 +119,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
 	"Test_validateSlicegatewayServiceType":                                                                                     test_validateSlicegatewayServiceType,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNilClusterHealthIsAllowed":                                       TestValidateClustersOnUpdate_NilClusterHealthIsAllowed,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNilClusterHealthUnhealthy":                                       TestValidateClustersOnUpdate_NonNilClusterHealthUnhealthyIsRejected,
 }
 
 func test_validateSlicegatewayServiceType(t *testing.T) {
@@ -2299,6 +2301,62 @@ func TestValidateClustersOnUpdate_NetworkSliceOnNoNetClustersError(t *testing.T)
 	require.Contains(t, err.Error(), "cluster network is not present")
 	clientMock.AssertExpectations(t)
 
+}
+
+// TestValidateClustersOnUpdate_NilClusterHealthIsAllowed verifies that a newly-registered
+// cluster whose ClusterHealth has not yet been reported (nil pointer) does NOT cause a panic
+// and is treated as healthy (issue #315).
+func TestValidateClustersOnUpdate_NilClusterHealthIsAllowed(t *testing.T) {
+	oldSliceConfig := &controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest("slice_config", "random")
+	newSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	// cluster-1 is a newly added cluster (not present in oldSliceConfig)
+	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[0],
+		Namespace: "random",
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Status.NodeIPs = []string{"1.1.1.1"}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		// ClusterHealth is intentionally left nil to simulate a newly-registered cluster
+		arg.Status.ClusterHealth = nil
+	}).Twice()
+
+	// Must not panic; nil ClusterHealth should be treated as healthy
+	err := validateClustersOnUpdate(ctx, newSliceConfig, oldSliceConfig)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+}
+
+// TestValidateClustersOnUpdate_NonNilClusterHealthUnhealthyIsRejected ensures that a cluster
+// with an explicitly non-normal health status is still rejected after the nil-guard is in place.
+func TestValidateClustersOnUpdate_NonNilClusterHealthUnhealthyIsRejected(t *testing.T) {
+	oldSliceConfig := &controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest("slice_config", "random")
+	newSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	// cluster-1 is a newly added cluster (not present in oldSliceConfig)
+	newSliceConfig.Spec.Clusters = []string{"cluster-1"}
+
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[0],
+		Namespace: "random",
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Status.NodeIPs = []string{"1.1.1.1"}
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusWarning,
+		}
+	}).Once()
+
+	err := validateClustersOnUpdate(ctx, newSliceConfig, oldSliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "cluster health is not normal")
+	clientMock.AssertExpectations(t)
 }
 
 func setupSliceConfigWebhookValidationTest(name string, namespace string) (*utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context) {
