@@ -264,7 +264,7 @@ func validateSliceSubnet(sliceConfig *controllerv1alpha1.SliceConfig) *field.Err
 	if !util.IsPrivateSubnet(sliceConfig.Spec.SliceSubnet) {
 		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), sliceConfig.Spec.SliceSubnet, "must be a private subnet")
 	}
-	if !util.HasPrefix(sliceConfig.Spec.SliceSubnet, "16") {
+	if !strings.HasSuffix(sliceConfig.Spec.SliceSubnet, "/16") {
 		return field.Invalid(field.NewPath("Spec").Child("sliceSubnet"), sliceConfig.Spec.SliceSubnet, "prefix must be 16")
 	}
 	if !util.HasLastTwoOctetsZero(sliceConfig.Spec.SliceSubnet) {
