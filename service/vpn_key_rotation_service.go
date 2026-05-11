@@ -186,6 +186,10 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	}
 	if !reflect.DeepEqual(copyVpnConfig.Spec.RotationInterval, s.Spec.RotationInterval) {
 		copyVpnConfig.Spec.RotationInterval = s.Spec.RotationInterval
+		if copyVpnConfig.Spec.CertificateCreationTime != nil {
+			newExpiry := metav1.NewTime(copyVpnConfig.Spec.CertificateCreationTime.AddDate(0, 0, s.Spec.RotationInterval))
+			copyVpnConfig.Spec.CertificateExpiryTime = &newExpiry
+		}
 		toUpdate = true
 	}
 	if !reflect.DeepEqual(copyVpnConfig.Spec.SliceName, s.Name) {

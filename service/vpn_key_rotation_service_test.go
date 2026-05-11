@@ -1363,3 +1363,55 @@ func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase
 	require.Equal(t, tc.expectedResponse, gotResp)
 
 }
+
+func Test_ReconcileVpnKeyRotationIntervalChange(t *testing.T) {
+	ctx, clientMock, vpn, _, _ := setupTestCase()
+
+	creationTime := metav1.NewTime(time.Date(2021, 6, 16, 20, 34, 58, 651387237, time.UTC))
+	oldExpiry := metav1.NewTime(creationTime.AddDate(0, 0, 90))
+
+	clientMock.
+		On("Get", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		v := args.Get(2).(*controllerv1alpha1.VpnKeyRotation)
+		v.ObjectMeta = metav1.ObjectMeta{Name: "test-slice", Namespace: "test-ns"}
+		v.Spec = controllerv1alpha1.VpnKeyRotationSpec{
+			SliceName:               "test-slice",
+			RotationInterval:        90,
+			ClusterGatewayMapping:   map[string][]string{},
+			CertificateCreationTime: &creationTime,
+			CertificateExpiryTime:   &oldExpiry,
+		}
+	}).Once()
+
+	clientMock.
+		On("Get", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		s := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		s.ObjectMeta = metav1.ObjectMeta{Name: "test-slice", Namespace: "test-ns"}
+		s.Spec = controllerv1alpha1.SliceConfigSpec{
+			RotationInterval: 30,
+		}
+	}).Once()
+
+	var capturedVpn controllerv1alpha1.VpnKeyRotation
+	clientMock.
+		On("Update", mock.Anything, mock.Anything).
+		Return(nil).Run(func(args mock.Arguments) {
+		capturedVpn = *args.Get(1).(*controllerv1alpha1.VpnKeyRotation)
+	}).Once()
+
+	clientMock.On("Create", mock.Anything, mock.AnythingOfType("*v1.Event")).Return(nil).Maybe()
+
+	result, err := vpn.ReconcileVpnKeyRotation(ctx, ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: "test-ns", Name: "test-slice"},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, ctrl.Result{Requeue: true}, result)
+	require.Equal(t, 30, capturedVpn.Spec.RotationInterval)
+	expectedExpiry := metav1.NewTime(creationTime.AddDate(0, 0, 30))
+	require.Equal(t, expectedExpiry.UTC(), capturedVpn.Spec.CertificateExpiryTime.UTC())
+
+	clientMock.AssertExpectations(t)
+}
