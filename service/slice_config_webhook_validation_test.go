@@ -118,6 +118,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateRotationInterval_Change_Increased":                                                                            TestValidateRotationInterval_Change_Increased,
 	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigVPNConfigRemovedDoesNotPanic":                                       UpdateValidateSliceConfigVPNConfigRemovedDoesNotPanic,
 	"Test_validateSlicegatewayServiceType":                                                                                     test_validateSlicegatewayServiceType,
 }
 
@@ -934,6 +935,23 @@ func UpdateValidateSliceConfigUpdatingVPNCipher(t *testing.T) {
 	require.Contains(t, err.Error(), "Spec.VPNConfig.Cipher: Invalid value:")
 	require.Contains(t, err.Error(), "cannot be updated")
 	clientMock.AssertExpectations(t)
+}
+
+func UpdateValidateSliceConfigVPNConfigRemovedDoesNotPanic(t *testing.T) {
+	// Regression test for issue #322: preventUpdate panicked when the old
+	// SliceConfig had VPNConfig set but the update request omitted it,
+	// dereferencing the new (nil) VPNConfig.Cipher.
+	oldSliceConfig := controllerv1alpha1.SliceConfig{}
+	oldSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
+	oldSliceConfig.Spec.VPNConfig = &controllerv1alpha1.VPNConfiguration{
+		Cipher: "AES-256-CBC",
+	}
+	newSliceConfig := &controllerv1alpha1.SliceConfig{}
+	newSliceConfig.Spec.SliceSubnet = "192.168.1.0/16"
+	// VPNConfig deliberately left nil on the update.
+	require.NotPanics(t, func() {
+		_ = preventUpdate(context.Background(), newSliceConfig, runtime.Object(&oldSliceConfig))
+	})
 }
 
 func UpdateValidateSliceConfigUpdatingSliceType(t *testing.T) {
