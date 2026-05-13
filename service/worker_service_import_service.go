@@ -193,16 +193,22 @@ func (s *WorkerServiceImportService) CreateMinimalWorkerServiceImport(ctx contex
 
 	for _, cluster := range clusters {
 		logger.Debugf("Cluster Object %s", cluster)
-		label["worker-cluster"] = cluster
-		label["project-namespace"] = namespace
-		label["original-slice-name"] = sliceName
-		label["kubeslice-manager"] = "controller"
+		// Clone the label map to avoid mutating the shared map from the caller.
+		// This is the same class of bug as #324 (buildMinimumGateway shared label mutation).
+		iterLabels := make(map[string]string, len(label))
+		for k, v := range label {
+			iterLabels[k] = v
+		}
+		iterLabels["worker-cluster"] = cluster
+		iterLabels["project-namespace"] = namespace
+		iterLabels["original-slice-name"] = sliceName
+		iterLabels["kubeslice-manager"] = "controller"
 
 		expectedWorkerServiceImport := workerv1alpha1.WorkerServiceImport{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-%s-%s-%s", serviceName, serviceNamespace, sliceName, cluster),
-				Labels:    label,
+				Labels:    iterLabels,
 				Namespace: namespace,
 			},
 			Spec: workerv1alpha1.WorkerServiceImportSpec{
