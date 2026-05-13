@@ -267,6 +267,22 @@ func (s *SliceConfigService) cleanUpSliceConfigResources(ctx context.Context,
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
+	vpnKeyRotation := &v1alpha1.VpnKeyRotation{}
+	found, err := util.GetResourceIfExist(ctx, types.NamespacedName{
+		Name:      slice.Name,
+		Namespace: namespace,
+	}, vpnKeyRotation)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if found {
+		err = util.DeleteResource(ctx, vpnKeyRotation)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 
