@@ -83,6 +83,10 @@ func CreateResource(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
 	logger.Debugf("Creating object kind %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused Create of %s/%s: %v", object.GetNamespace(), object.GetName(), err)
+		return fmt.Errorf("create %s %s/%s: %w", GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Create(ctx, object)
 	if err != nil {
@@ -99,6 +103,10 @@ func UpdateResource(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
 	logger.Debugf("Updating object kind %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused Update of %s/%s: %v", object.GetNamespace(), object.GetName(), err)
+		return fmt.Errorf("update %s %s/%s: %w", GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Update(ctx, object)
 	if err != nil {
@@ -115,6 +123,10 @@ func UpdateStatus(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
 	logger.Debugf("Updating object status %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused UpdateStatus of %s/%s: %v", object.GetNamespace(), object.GetName(), err)
+		return fmt.Errorf("update status %s %s/%s: %w", GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Status().Update(ctx, object)
 	if err != nil {
@@ -138,6 +150,10 @@ func DeleteResource(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
 	logger.Debugf("Deleting object kind %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused Delete of %s/%s: %v", object.GetNamespace(), object.GetName(), err)
+		return fmt.Errorf("delete %s %s/%s: %w", GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Delete(ctx, object)
 	if err != nil {
@@ -164,6 +180,10 @@ func AddFinalizer(ctx context.Context, object client.Object, finalizerName strin
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	logger := CtxLogger(ctx)
 	logger.Debugf("Adding finalizer %s to %s", finalizerName, object.GetName())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused AddFinalizer of %s on %s/%s: %v", finalizerName, object.GetNamespace(), object.GetName(), err)
+		return ctrl.Result{}, fmt.Errorf("add finalizer %s on %s %s/%s: %w", finalizerName, GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	controllerutil.AddFinalizer(object, finalizerName)
 	if err := kubeSliceCtx.Update(ctx, object); err != nil {
 		logger.With(zap.Error(err)).Errorf("Failed to add finalizer")
@@ -185,6 +205,10 @@ func RemoveFinalizer(ctx context.Context, object client.Object, finalizerName st
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	logger := CtxLogger(ctx)
 	logger.Debugf("Removing finalizer %s from %s", finalizerName, object.GetName())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused RemoveFinalizer of %s on %s/%s: %v", finalizerName, object.GetNamespace(), object.GetName(), err)
+		return ctrl.Result{}, fmt.Errorf("remove finalizer %s on %s %s/%s: %w", finalizerName, GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	controllerutil.RemoveFinalizer(object, finalizerName)
 	if err := kubeSliceCtx.Update(ctx, object); err != nil {
 		logger.With(zap.Error(err)).Errorf("Failed to remove finalizer %s", finalizerName)

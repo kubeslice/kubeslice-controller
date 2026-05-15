@@ -32,12 +32,21 @@ var LoglevelString string
 type kubeSliceControllerContextKey struct {
 }
 
-// kubeSliceControllerRequestContext is a schema for request context
+// kubeSliceControllerRequestContext is a schema for request context.
+//
+// leaderGate is the per-request HA fence (see util/leader_gate.go). It is
+// populated in PrepareKubeSliceControllersRequestContext from the
+// process-wide DefaultLeaderGate so existing call sites need no changes;
+// tests may swap it for a mock by inserting their own request context.
+// A nil value is treated as "fall back to package default" by
+// util.requireLeader, so any older caller that constructs this struct
+// directly still gets correct behaviour.
 type kubeSliceControllerRequestContext struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	Log           *zap.SugaredLogger
 	eventRecorder *events.EventRecorder
+	leaderGate    LeaderGate
 }
 
 // kubeSliceControllerContext is instance of kubeSliceControllerContextKey
@@ -64,6 +73,7 @@ func PrepareKubeSliceControllersRequestContext(ctx context.Context, client clien
 		Scheme:        scheme,
 		Log:           log,
 		eventRecorder: er,
+		leaderGate:    DefaultLeaderGate(),
 	}
 	newCtx := context.WithValue(ctx, kubeSliceControllerContext, ctxVal)
 	return newCtx
@@ -97,4 +107,20 @@ func CtxScheme(ctx context.Context) *runtime.Scheme {
 func CtxEventRecorder(ctx context.Context) events.EventRecorder {
 	recorder := GetKubeSliceControllerRequestContext(ctx).eventRecorder
 	return *recorder
+}
+
+// CtxLeaderGate returns the per-request LeaderGate, falling back to the
+// process-wide DefaultLeaderGate when the request context does not
+// carry one (e.g., contexts produced before HA wiring landed, or by
+// callers that bypass PrepareKubeSliceControllersRequestContext).
+//
+// Reconciler code paths rarely need this directly; util's mutation
+// helpers consult it internally via requireLeader.
+func CtxLeaderGate(ctx context.Context) LeaderGate {
+	if ctx != nil {
+		if rc := GetKubeSliceControllerRequestContext(ctx); rc != nil && rc.leaderGate != nil {
+			return rc.leaderGate
+		}
+	}
+	return DefaultLeaderGate()
 }

@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,6 +29,10 @@ func CleanupUpdateResource(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
 	logger.Debugf("Updating %s %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused CleanupUpdateResource of %s/%s: %v", object.GetNamespace(), object.GetName(), err)
+		return fmt.Errorf("cleanup update %s %s/%s: %w", GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Update(ctx, object)
 	if err != nil {
@@ -44,6 +49,10 @@ func CleanupUpdateStatus(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
 	logger.Debugf("Updating status of %s with name %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused CleanupUpdateStatus of %s/%s: %v", object.GetNamespace(), object.GetName(), err)
+		return fmt.Errorf("cleanup update status %s %s/%s: %w", GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Status().Update(ctx, object)
 	if err != nil {
@@ -67,6 +76,10 @@ func CleanupDeleteResource(ctx context.Context, object client.Object) error {
 	logger := CtxLogger(ctx)
 	logger.Debugf("Deleting %s %s in namespace %s", GetObjectKind(object), object.GetName(),
 		object.GetNamespace())
+	if err := requireLeader(ctx); err != nil {
+		logger.Debugf("leader-gate refused CleanupDeleteResource of %s/%s: %v", object.GetNamespace(), object.GetName(), err)
+		return fmt.Errorf("cleanup delete %s %s/%s: %w", GetObjectKind(object), object.GetNamespace(), object.GetName(), err)
+	}
 	kubeSliceCtx := GetKubeSliceControllerRequestContext(ctx)
 	err := kubeSliceCtx.Delete(ctx, object)
 	if err != nil {
