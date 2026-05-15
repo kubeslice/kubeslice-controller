@@ -302,6 +302,13 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfig(ctx context.Co
 		WithNamespace(namespace).
 		WithSlice(name)
 
+	// Clone label map to avoid mutating the caller's map, which may be
+	// reused for subsequent operations (e.g., gateway cleanup).
+	clonedLabel := make(map[string]string, len(label))
+	for k, v := range label {
+		clonedLabel[k] = v
+	}
+	label = clonedLabel
 	err := s.cleanUpSlices(ctx, label, namespace, clusters)
 	if err != nil {
 		return nil, err
@@ -442,6 +449,12 @@ func (s *WorkerSliceConfigService) CreateMinimalWorkerSliceConfigForNoNetworkSli
 		WithNamespace(namespace).
 		WithSlice(name)
 
+	// Clone label map to avoid mutating the caller's map.
+	clonedLabel := make(map[string]string, len(label))
+	for k, v := range label {
+		clonedLabel[k] = v
+	}
+	label = clonedLabel
 	err := s.cleanUpSlices(ctx, label, namespace, clusters)
 	if err != nil {
 		return err
