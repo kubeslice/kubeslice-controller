@@ -62,9 +62,17 @@ func ValidateServiceExportConfigDelete(ctx context.Context, serviceExportConfig 
 
 func validateServiceExportClusterAndSlice(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
 	cluster := &controllerv1alpha1.Cluster{}
-	clusterExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Spec.SourceCluster, Namespace: serviceExport.Namespace}, cluster)
+	clusterExist, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Spec.SourceCluster, Namespace: serviceExport.Namespace}, cluster)
+	if err != nil {
+		return field.InternalError(field.NewPath("Spec").Child("SourceCluster"),
+			fmt.Errorf("failed to look up cluster %s: %w", serviceExport.Spec.SourceCluster, err))
+	}
 	sliceConfig := &controllerv1alpha1.SliceConfig{}
-	sliceExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Spec.SliceName, Namespace: serviceExport.Namespace}, sliceConfig)
+	sliceExist, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Spec.SliceName, Namespace: serviceExport.Namespace}, sliceConfig)
+	if err != nil {
+		return field.InternalError(field.NewPath("Spec").Child("SliceName"),
+			fmt.Errorf("failed to look up slice %s: %w", serviceExport.Spec.SliceName, err))
+	}
 	if !sliceExist {
 		return field.Invalid(field.NewPath("Spec").Child("SliceName"), serviceExport.Spec.SliceName, "There is no valid slice with this name")
 	}
@@ -90,9 +98,17 @@ func validateServiceEndpoint(ctx context.Context, serviceExport *controllerv1alp
 	for _, serviceDiscoveryEndPoint := range serviceExport.Spec.ServiceDiscoveryEndpoints {
 		clusterName := serviceDiscoveryEndPoint.Cluster
 		cluster := &controllerv1alpha1.Cluster{}
-		clusterExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: serviceExport.Namespace}, cluster)
+		clusterExist, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: serviceExport.Namespace}, cluster)
+		if err != nil {
+			return field.InternalError(field.NewPath("Spec").Child("ServiceDiscoveryEndpoints").Child("Cluster"),
+				fmt.Errorf("failed to look up cluster %s: %w", clusterName, err))
+		}
 		sliceConfig := &controllerv1alpha1.SliceConfig{}
-		sliceExist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceName, Namespace: serviceExport.Namespace}, sliceConfig)
+		sliceExist, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceName, Namespace: serviceExport.Namespace}, sliceConfig)
+		if err != nil {
+			return field.InternalError(field.NewPath("Spec").Child("SliceName"),
+				fmt.Errorf("failed to look up slice %s: %w", sliceName, err))
+		}
 		if !sliceExist {
 			return field.Invalid(field.NewPath("Spec").Child("SliceName"), serviceExport.Spec.SliceName, "There is no valid slice with this name")
 		}
@@ -116,7 +132,11 @@ func validateServiceEndpoint(ctx context.Context, serviceExport *controllerv1alp
 
 func validateServiceExportConfigNamespace(ctx context.Context, serviceExport *controllerv1alpha1.ServiceExportConfig) *field.Error {
 	namespace := &corev1.Namespace{}
-	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Namespace}, namespace)
+	exist, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serviceExport.Namespace}, namespace)
+	if err != nil {
+		return field.InternalError(field.NewPath("metadata").Child("namespace"),
+			fmt.Errorf("failed to look up namespace %s: %w", serviceExport.Namespace, err))
+	}
 	if !exist || !util.CheckForProjectNamespace(namespace) {
 		return field.Invalid(field.NewPath("metadata").Child("namespace"), serviceExport.Namespace, "ServiceExportConfig must be applied on project namespace")
 	}

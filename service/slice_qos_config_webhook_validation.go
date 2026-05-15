@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -57,7 +58,11 @@ func validateSliceQosConfigSpec(ctx context.Context, sliceQosConfig *controllerv
 // validateAppliedInProjectNamespace is a function to validate the if the SliceQosConfig is applied in project namespace or not
 func validateSliceQosConfigAppliedInProjectNamespace(ctx context.Context, sliceQoSConfig *controllerv1alpha1.SliceQoSConfig) *field.Error {
 	namespace := &corev1.Namespace{}
-	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceQoSConfig.Namespace}, namespace)
+	exist, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceQoSConfig.Namespace}, namespace)
+	if err != nil {
+		return field.InternalError(field.NewPath("metadata").Child("namespace"),
+			fmt.Errorf("failed to look up namespace %s: %w", sliceQoSConfig.Namespace, err))
+	}
 	if !exist || !util.CheckForProjectNamespace(namespace) {
 		return field.Invalid(field.NewPath("metadata").Child("namespace"), sliceQoSConfig.Name, "SliceQosConfig must be applied on project namespace")
 	}

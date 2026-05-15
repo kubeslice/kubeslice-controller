@@ -70,7 +70,11 @@ func ValidateClusterDelete(ctx context.Context, c *controllerv1alpha1.Cluster) (
 // validateAppliedInProjectNamespace is a function to validate the if the cluster is applied in project namespace or not
 func validateAppliedInProjectNamespace(ctx context.Context, c *controllerv1alpha1.Cluster) *field.Error {
 	namespace := &corev1.Namespace{}
-	exist, _ := util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Namespace}, namespace)
+	exist, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: c.Namespace}, namespace)
+	if err != nil {
+		return field.InternalError(field.NewPath("metadata").Child("namespace"),
+			fmt.Errorf("failed to look up namespace %s: %w", c.Namespace, err))
+	}
 	if !exist || !util.CheckForProjectNamespace(namespace) {
 		return field.Invalid(field.NewPath("metadata").Child("namespace"), c.Namespace, "cluster must be applied on project namespace")
 	}
