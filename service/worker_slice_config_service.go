@@ -281,6 +281,15 @@ outer:
 	workerSliceConfig.Spec.ClusterSubnetCIDR = clusterSubnetCIDR
 	err = util.UpdateResource(ctx, workerSliceConfig)
 	if err != nil {
+		util.RecordEvent(ctx, eventRecorder, workerSliceConfig, nil, events.EventWorkerSliceConfigUpdateFailed)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "update_failed",
+				"event":       string(events.EventWorkerSliceConfigUpdateFailed),
+				"object_name": workerSliceConfig.Name,
+				"object_kind": metricKindWorkerSliceConfig,
+			},
+		)
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, err
