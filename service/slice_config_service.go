@@ -128,7 +128,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if !found || !s.checkForProjectNamespace(nsResource) {
+	if !found || !util.CheckForProjectNamespace(nsResource) {
 		logger.Infof("Created SliceConfig %v is not in project namespace. Returning from reconciliation loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
@@ -239,11 +239,6 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// checkForProjectNamespace is a function to check the namespace is in proper format
-func (s *SliceConfigService) checkForProjectNamespace(namespace *corev1.Namespace) bool {
-	return namespace.Labels[util.LabelName] == fmt.Sprintf(util.LabelValue, "Project", namespace.Name)
 }
 
 // cleanUpSliceConfigResources is a function to delete the slice config resources

@@ -18,7 +18,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/kubeslice/kubeslice-controller/metrics"
@@ -110,7 +109,7 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if !found || !q.checkForProjectNamespace(nsResource) {
+	if !found || !util.CheckForProjectNamespace(nsResource) {
 		logger.Infof("Created QoS Profile %v is not in project namespace. Returning from reconciliation loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
@@ -121,11 +120,6 @@ func (q *SliceQoSConfigService) ReconcileSliceQoSConfig(ctx context.Context, req
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// checkForProjectNamespace is a function to check the namespace is in proper format
-func (q *SliceQoSConfigService) checkForProjectNamespace(namespace *corev1.Namespace) bool {
-	return namespace.Labels[util.LabelName] == fmt.Sprintf(util.LabelValue, "Project", namespace.Name)
 }
 
 // updateWorkerSliceConfigs is a function to trigger reconciliation of worker slice config whenever there is a change in qos profile
