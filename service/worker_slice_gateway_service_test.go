@@ -66,6 +66,7 @@ var WorkerSliceGatewayTestbed = map[string]func(*testing.T){
 	"TestCreateMinimumWorkerSliceGateways_IfNotExists":           testCreateMinimumWorkerSliceGatewaysNotExists,
 	"TestDeleteWorkerSliceGatewaysByLabel_IfExists":              testDeleteWorkerSliceGatewaysByLabelExists,
 	"TestNodeIpReconciliationOfWorkerSliceGateways_IfExists":     testNodeIpReconciliationOfWorkerSliceGatewaysExists,
+	"TestBuildMinimumGateway_LabelsAreIsolatedPerGateway":        testBuildMinimumGatewayLabelsAreIsolatedPerGateway,
 }
 
 func testWorkerSliceGatewayReconciliationSuccess(t *testing.T) {
@@ -551,7 +552,6 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 			Annotations:                nil,
 			OwnerReferences:            nil,
 			Finalizers:                 nil,
-			ClusterName:                "",
 			ManagedFields:              nil,
 		},
 		Spec:   controllerv1alpha1.ClusterSpec{},
@@ -561,6 +561,38 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
+}
+
+func testBuildMinimumGatewayLabelsAreIsolatedPerGateway(t *testing.T) {
+	service := WorkerSliceGatewayService{}
+	ownerLabels := map[string]string{
+		"kubebuilder.k8s.io/owner": "slice-owner",
+	}
+	sourceCluster := &controllerv1alpha1.Cluster{
+		ObjectMeta: k8sapimachinery.ObjectMeta{Name: "cluster-a"},
+	}
+	destinationCluster := &controllerv1alpha1.Cluster{
+		ObjectMeta: k8sapimachinery.ObjectMeta{Name: "cluster-b"},
+	}
+
+	serverGateway := service.buildMinimumGateway(
+		sourceCluster, destinationCluster, "slice", "ns", serverGateway, "LoadBalancer", "UDP",
+		ownerLabels, 1, "10.1.0.0/24", "10.1.255.1", "slice-cluster-b-cluster-a", "10.2.0.0/24", "10.1.255.2", "slice-cluster-a-cluster-b",
+	)
+	clientGateway := service.buildMinimumGateway(
+		destinationCluster, sourceCluster, "slice", "ns", clientGateway, "LoadBalancer", "UDP",
+		ownerLabels, 1, "10.2.0.0/24", "10.2.255.1", "slice-cluster-a-cluster-b", "10.1.0.0/24", "10.2.255.2", "slice-cluster-b-cluster-a",
+	)
+
+	require.Equal(t, "cluster-a", serverGateway.Labels["worker-cluster"])
+	require.Equal(t, "cluster-b", serverGateway.Labels["remote-cluster"])
+	require.Equal(t, "cluster-b", clientGateway.Labels["worker-cluster"])
+	require.Equal(t, "cluster-a", clientGateway.Labels["remote-cluster"])
+
+	_, workerClusterLabelPresent := ownerLabels["worker-cluster"]
+	_, remoteClusterLabelPresent := ownerLabels["remote-cluster"]
+	require.False(t, workerClusterLabelPresent)
+	require.False(t, remoteClusterLabelPresent)
 }
 
 func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretService, *mocks.IWorkerSliceConfigService, *mocks.IJobService, WorkerSliceGatewayService, ctrl.Request, *utilMock.Client, *workerv1alpha1.WorkerSliceGateway, context.Context, *metricMock.IMetricRecorder) {
