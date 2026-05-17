@@ -217,7 +217,7 @@ func Retry(ctx context.Context, backoffLimit int, sleep time.Duration, f func() 
 		}
 	}
 	elapsed := time.Since(start)
-	return fmt.Errorf("retry failed after %d attempts (took %d seconds), last error: %s", backoffLimit, int(elapsed.Seconds()), err)
+	return fmt.Errorf("retry failed after %d attempts (took %d seconds), last error: %w", backoffLimit, int(elapsed.Seconds()), err)
 }
 
 // Set Difference: A - B
