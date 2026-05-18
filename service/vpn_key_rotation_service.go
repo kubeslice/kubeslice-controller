@@ -249,7 +249,8 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 		if status == JobStatusError || status == JobStatusSuspended {
 			// register an event
 			util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobFailed)
-			return ctrl.Result{}, nil, nil
+			v.jobCreationInProgress.Store(false)
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 		}
 		if status == JobNotCreated {
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
@@ -290,7 +291,8 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 			if status == JobStatusError || status == JobStatusSuspended {
 				// register an event
 				util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobFailed)
-				return ctrl.Result{}, nil, nil
+				v.jobCreationInProgress.Store(false)
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
 			if status == JobNotCreated {
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
