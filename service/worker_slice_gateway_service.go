@@ -599,11 +599,11 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 	for key, value := range labels {
 		gatewayLabels[key] = value
 	}
+	gatewayLabels["kubeslice-manager"] = "controller"
+	gatewayLabels["project-namespace"] = namespace
+	gatewayLabels["original-slice-name"] = sliceName
 	gatewayLabels["worker-cluster"] = sourceCluster.Name
 	gatewayLabels["remote-cluster"] = destinationCluster.Name
-	labels["kubeslice-manager"] = "controller"
-	labels["project-namespace"] = namespace
-	labels["original-slice-name"] = sliceName
 	sourceClusterNodeIPs := sourceCluster.Spec.NodeIPs
 	destinationClusterNodeIPs := destinationCluster.Spec.NodeIPs
 

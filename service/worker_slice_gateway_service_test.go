@@ -591,8 +591,16 @@ func testBuildMinimumGatewayLabelsAreIsolatedPerGateway(t *testing.T) {
 
 	_, workerClusterLabelPresent := ownerLabels["worker-cluster"]
 	_, remoteClusterLabelPresent := ownerLabels["remote-cluster"]
+	_, managerLabelPresent := ownerLabels["kubeslice-manager"]
+	_, projectNamespaceLabelPresent := ownerLabels["project-namespace"]
+	_, originalSliceNameLabelPresent := ownerLabels["original-slice-name"]
 	require.False(t, workerClusterLabelPresent)
 	require.False(t, remoteClusterLabelPresent)
+	require.False(t, managerLabelPresent)
+	require.False(t, projectNamespaceLabelPresent)
+	require.False(t, originalSliceNameLabelPresent)
+	require.Equal(t, 1, len(ownerLabels))
+	require.Equal(t, "slice-owner", ownerLabels["kubebuilder.k8s.io/owner"])
 }
 
 func setupWorkerSliceGatewayTest(name string, namespace string) (*mocks.ISecretService, *mocks.IWorkerSliceConfigService, *mocks.IJobService, WorkerSliceGatewayService, ctrl.Request, *utilMock.Client, *workerv1alpha1.WorkerSliceGateway, context.Context, *metricMock.IMetricRecorder) {
