@@ -170,6 +170,10 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 			logger.Errorf("failed to set SliceConfig as owner of vpnKeyRotationConfig. Err %s", err.Error())
 			return ctrl.Result{}, err
 		}
+		if err := util.UpdateResource(ctx, vpnKeyRotationConfig); err != nil {
+			logger.Errorf("failed to persist owner reference for vpnKeyRotationConfig %s. Err %s", vpnKeyRotationConfig.Name, err.Error())
+			return ctrl.Result{}, err
+		}
 	}
 	// Step 1: Build map of clusterName: gateways
 	clusterGatewayMapping, err := v.constructClusterGatewayMapping(ctx, s)
