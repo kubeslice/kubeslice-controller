@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/jinzhu/copier"
-	"go.uber.org/zap"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -231,7 +230,7 @@ outer:
 		DeepCopy: true,
 	})
 	if err != nil {
-		logger.With(zap.Error(err)).Errorf("Failed to deep copy external gateway configuration")
+		return ctrl.Result{}, err
 	}
 
 	// determine Slice gateway service type
