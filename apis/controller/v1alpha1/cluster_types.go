@@ -147,6 +147,9 @@ type ClusterStatus struct {
 type StorageCapabilities struct {
 	// RWXStorageClasses lists all ReadWriteMany-capable StorageClasses detected on the cluster
 	RWXStorageClasses []RWXStorageClass `json:"rwxStorageClasses,omitempty"`
+	// DefaultStorageClass is the name of the StorageClass annotated with
+	// storageclass.kubernetes.io/is-default-class: "true" on the worker cluster
+	DefaultStorageClass string `json:"defaultStorageClass,omitempty"`
 	// LastUpdated is the timestamp when capabilities were last detected
 	LastUpdated metav1.Time `json:"lastUpdated,omitempty"`
 }

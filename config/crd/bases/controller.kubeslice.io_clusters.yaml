@@ -216,6 +216,11 @@ spec:
                   StorageCapabilities contains auto-detected storage capabilities reported by the worker operator.
                   Populated only when the worker operator's storage-capability reconciler is active.
                 properties:
+                  defaultStorageClass:
+                    description: |-
+                      DefaultStorageClass is the name of the StorageClass annotated with
+                      storageclass.kubernetes.io/is-default-class: "true" on the worker cluster
+                    type: string
                   lastUpdated:
                     description: LastUpdated is the timestamp when capabilities were
                       last detected
