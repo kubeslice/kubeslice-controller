@@ -136,6 +136,30 @@ type ClusterStatus struct {
 	// VCPURestriction is the restriction on the cluster disabling the creation of new pods
 	VCPURestriction *VCPURestriction `json:"vCPURestriction,omitempty"`
 	GPURestriction  *GPURestriction  `json:"GPURestriction,omitempty"`
+	// StorageCapabilities contains auto-detected storage capabilities reported by the worker operator.
+	// Populated only when the worker operator's storage-capability reconciler is active.
+	StorageCapabilities *StorageCapabilities `json:"storageCapabilities,omitempty"`
+}
+
+// StorageCapabilities holds auto-detected RWX-capable storage classes on the worker cluster.
+// To add support for a new storage system, append its CSI provisioner string to the
+// worker operator's rwxProvisioners list — no changes to this struct are required.
+type StorageCapabilities struct {
+	// RWXStorageClasses lists all ReadWriteMany-capable StorageClasses detected on the cluster
+	RWXStorageClasses []RWXStorageClass `json:"rwxStorageClasses,omitempty"`
+	// DefaultStorageClass is the name of the StorageClass annotated with
+	// storageclass.kubernetes.io/is-default-class: "true" on the worker cluster
+	DefaultStorageClass string `json:"defaultStorageClass,omitempty"`
+	// LastUpdated is the timestamp when capabilities were last detected
+	LastUpdated metav1.Time `json:"lastUpdated,omitempty"`
+}
+
+// RWXStorageClass describes a single ReadWriteMany-capable StorageClass.
+type RWXStorageClass struct {
+	// Name is the StorageClass name (e.g. "rook-cephfs", "juicefs-sc")
+	Name string `json:"name"`
+	// Provisioner is the CSI provisioner string (e.g. "rook-ceph.cephfs.csi.ceph.com")
+	Provisioner string `json:"provisioner"`
 }
 
 type GPURestriction struct {
