@@ -82,6 +82,10 @@ func validateClusterInAnySlice(ctx context.Context, c *controllerv1alpha1.Cluste
 	workerSlice := &workerv1alpha1.WorkerSliceConfigList{}
 	label := map[string]string{"worker-cluster": c.Name}
 	err := util.ListResources(ctx, workerSlice, client.MatchingLabels(label), client.InNamespace(c.Namespace))
+	if err != nil {
+		return field.InternalError(field.NewPath("Cluster"),
+			fmt.Errorf("failed to verify cluster slice participation: %w", err))
+	}
 
 	workerSliceCount := len(workerSlice.Items)
 	defaultWorkerSliceCount := 0
@@ -95,11 +99,11 @@ func validateClusterInAnySlice(ctx context.Context, c *controllerv1alpha1.Cluste
 		}
 	}
 	// if all the workerslice are default workeslice, then allow cluster deletion
-	if err == nil && workerSliceCount == defaultWorkerSliceCount {
+	if workerSliceCount == defaultWorkerSliceCount {
 		return nil
 	}
 
-	if err == nil && len(workerSlice.Items) > 0 {
+	if len(workerSlice.Items) > 0 {
 		return field.Forbidden(field.NewPath("Cluster"), "The cluster cannot be deleted which is participating in slice config")
 	}
 	return nil
