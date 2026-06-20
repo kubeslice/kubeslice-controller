@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"strconv"
 	"strings"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,6 +46,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateClustersOnCreate(ctx, sliceConfig); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
+	if err := validateTopology(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateApplicationNamespaces(ctx, sliceConfig); err != nil {
@@ -95,6 +99,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 
 	// Common validations to be done irrespective of overlay network deployment mode
 	if err := validateClustersOnUpdate(ctx, sliceConfig, old); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
+	if err := validateTopology(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateApplicationNamespaces(ctx, sliceConfig); err != nil {
@@ -372,6 +379,45 @@ func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alph
 					return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
 				}
 			}
+		}
+	}
+	return nil
+}
+
+func validateTopology(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	mode := sliceConfig.Spec.TopologyMode
+	if mode == "" {
+		if len(sliceConfig.Spec.Hubs) > 0 || len(sliceConfig.Spec.Spokes) > 0 {
+			return field.Invalid(field.NewPath("Spec").Child("TopologyMode"), mode, "TopologyMode is required when hubs or spokes are set")
+		}
+		return nil
+	}
+	if mode != controllerv1alpha1.TopologyModeHubAndSpoke {
+		return field.Invalid(field.NewPath("Spec").Child("TopologyMode"), mode, "unsupported topology mode")
+	}
+	if len(sliceConfig.Spec.Hubs) == 0 {
+		return field.Required(field.NewPath("Spec").Child("Hubs"), "at least one hub is required for HubAndSpoke topology")
+	}
+	if len(sliceConfig.Spec.Hubs) > 2 {
+		return field.Invalid(field.NewPath("Spec").Child("Hubs"), sliceConfig.Spec.Hubs, "HubAndSpoke topology supports a maximum of 2 hub clusters")
+	}
+	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Hubs); duplicate {
+		return field.Duplicate(field.NewPath("Spec").Child("Hubs"), strings.Join(value, ", "))
+	}
+	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Spokes); duplicate {
+		return field.Duplicate(field.NewPath("Spec").Child("Spokes"), strings.Join(value, ", "))
+	}
+	for _, hub := range sliceConfig.Spec.Hubs {
+		if !util.ContainsString(sliceConfig.Spec.Clusters, hub) {
+			return field.Invalid(field.NewPath("Spec").Child("Hubs"), hub, "hub must be part of clusters")
+		}
+	}
+	for _, spoke := range sliceConfig.Spec.Spokes {
+		if !util.ContainsString(sliceConfig.Spec.Clusters, spoke) {
+			return field.Invalid(field.NewPath("Spec").Child("Spokes"), spoke, "spoke must be part of clusters")
+		}
+		if util.ContainsString(sliceConfig.Spec.Hubs, spoke) {
+			return field.Invalid(field.NewPath("Spec").Child("Spokes"), spoke, "spoke cannot also be a hub")
 		}
 	}
 	return nil

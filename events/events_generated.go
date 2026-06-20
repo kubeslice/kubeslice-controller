@@ -734,6 +734,30 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Warning - Certificate Creation job Failed",
 	},
+	"SliceTopologyHubAndSpokeEnabled": {
+		Name:                "SliceTopologyHubAndSpokeEnabled",
+		Reason:              "SliceTopologyHubAndSpokeEnabled",
+		Action:              "SetTopologyMode",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "Slice topology mode set to HubAndSpoke.",
+	},
+	"SliceTopologyReady": {
+		Name:                "SliceTopologyReady",
+		Reason:              "SliceTopologyReady",
+		Action:              "TopologyStatusUpdate",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "All expected HubAndSpoke connections are established. Topology is ready.",
+	},
+	"SliceTopologyDegraded": {
+		Name:                "SliceTopologyDegraded",
+		Reason:              "SliceTopologyDegraded",
+		Action:              "TopologyStatusUpdate",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "HubAndSpoke topology is degraded: one or more expected connections are missing.",
+	},
 }
 
 var (
@@ -826,4 +850,7 @@ var (
 	EventCertificatesRenewNow                 events.EventName = "CertificatesRenewNow"
 	EventIllegalVPNKeyRotationConfigDelete    events.EventName = "IllegalVPNKeyRotationConfigDelete"
 	EventCertificateJobFailed                 events.EventName = "CertificateJobFailed"
+	EventSliceTopologyHubAndSpokeEnabled      events.EventName = "SliceTopologyHubAndSpokeEnabled"
+	EventSliceTopologyReady                   events.EventName = "SliceTopologyReady"
+	EventSliceTopologyDegraded               events.EventName = "SliceTopologyDegraded"
 )

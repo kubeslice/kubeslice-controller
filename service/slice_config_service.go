@@ -25,6 +25,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
@@ -187,7 +188,13 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
 		err = s.ms.CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name)
-		return ctrl.Result{}, err
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := s.updateTopologyStatus(ctx, sliceConfig, ownershipLabel, req.Namespace); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// Step 4: Creation of worker slice Objects and Cluster Labels
@@ -204,11 +211,37 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 
 	// Step 5: Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(
+		ctx,
+		sliceConfig.Name,
+		sliceConfig.Spec.Clusters,
+		req.Namespace,
+		ownershipLabel,
+		clusterMap,
+		sliceConfig.Spec.SliceSubnet,
+		clusterCidr,
+		sliceGwSvcTypeMap,
+		sliceConfig.Spec.TopologyMode,
+		sliceConfig.Spec.Hubs,
+		sliceConfig.Spec.Spokes,
+	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
+
+	// Fire HubAndSpoke topology enabled event on every reconcile when mode is set
+	if sliceConfig.Spec.TopologyMode == v1alpha1.TopologyModeHubAndSpoke {
+		eventRecorder := util.CtxEventRecorder(ctx).
+			WithProject(util.GetProjectName(sliceConfig.Namespace)).
+			WithNamespace(sliceConfig.Namespace).
+			WithSlice(sliceConfig.Name)
+		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceTopologyHubAndSpokeEnabled)
+	}
+
+	if err := s.updateTopologyStatus(ctx, sliceConfig, ownershipLabel, req.Namespace); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Step 6: Create VPNKeyRotation CR
 	// TODO(rahul): handle change in rotation interval
@@ -239,6 +272,70 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (s *SliceConfigService) updateTopologyStatus(ctx context.Context, sliceConfig *v1alpha1.SliceConfig, ownerLabel map[string]string, namespace string) error {
+	eventRecorder := util.CtxEventRecorder(ctx).
+		WithProject(util.GetProjectName(namespace)).
+		WithNamespace(namespace).
+		WithSlice(sliceConfig.Name)
+
+	expectedPairs := buildExpectedPairKeySet(sliceConfig)
+	createdConnections := 0
+	if len(expectedPairs) > 0 {
+		gateways, err := s.sgs.ListWorkerSliceGateways(ctx, ownerLabel, namespace)
+		if err != nil {
+			return err
+		}
+		createdConnections = countCreatedConnections(gateways, expectedPairs)
+	}
+	ready := len(expectedPairs) == createdConnections
+
+	// Fire topology observability events for HubAndSpoke mode
+	if sliceConfig.Spec.TopologyMode == v1alpha1.TopologyModeHubAndSpoke {
+		if ready {
+			util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceTopologyReady)
+		} else {
+			util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventSliceTopologyDegraded)
+		}
+	}
+
+	sliceConfig.Status.Topology = &v1alpha1.TopologyStatus{
+		Mode:                sliceConfig.Spec.TopologyMode,
+		ExpectedConnections: len(expectedPairs),
+		CreatedConnections:  createdConnections,
+		Ready:               ready,
+	}
+	kubeSliceCtx := util.GetKubeSliceControllerRequestContext(ctx)
+	return kubeSliceCtx.Status().Update(ctx, sliceConfig)
+}
+
+func buildExpectedPairKeySet(sliceConfig *v1alpha1.SliceConfig) map[string]struct{} {
+	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
+		return map[string]struct{}{}
+	}
+	pairs := computeDesiredPairs(sliceConfig.Spec.Clusters, sliceConfig.Spec.TopologyMode, sliceConfig.Spec.Hubs, sliceConfig.Spec.Spokes)
+	result := make(map[string]struct{}, len(pairs))
+	for _, pair := range pairs {
+		result[buildPairKey(pair.source, pair.destination)] = struct{}{}
+	}
+	return result
+}
+
+func countCreatedConnections(gateways []workerv1alpha1.WorkerSliceGateway, expected map[string]struct{}) int {
+	if len(expected) == 0 {
+		return 0
+	}
+	seen := make(map[string]struct{})
+	for _, gateway := range gateways {
+		clusterSource := gateway.Spec.LocalGatewayConfig.ClusterName
+		clusterDestination := gateway.Spec.RemoteGatewayConfig.ClusterName
+		pairKey := buildPairKey(clusterSource, clusterDestination)
+		if _, ok := expected[pairKey]; ok {
+			seen[pairKey] = struct{}{}
+		}
+	}
+	return len(seen)
 }
 
 // checkForProjectNamespace is a function to check the namespace is in proper format
