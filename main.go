@@ -110,6 +110,11 @@ func initialize(services *service.Services) {
 	var jobServiceAccount string
 	// get prometheus endpoint from environment
 	var prometheusServiceEndpoint string
+	// HA mode for Active/Standby cross-cluster deployments. See docs/design
+	// for the full HA proposal (LFX #305). Default "disabled" preserves
+	// existing single-cluster behaviour; "active" and "standby" install a
+	// manager-backed leader gate so only the elected pod can mutate state.
+	var haMode string
 
 	flag.StringVar(&rbacResourcePrefix, "rbac-resource-prefix", service.RbacResourcePrefix, "RBAC resource prefix")
 	flag.StringVar(&projectNameSpacePrefixFromCustomer, "project-namespace-prefix", service.ProjectNamespacePrefix, fmt.Sprintf("Overrides the default %s kubeslice namespace", service.ProjectNamespacePrefix))
@@ -137,8 +142,32 @@ func initialize(services *service.Services) {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&haMode, "ha-mode", "disabled",
+		"Active/Standby HA mode: 'disabled' (default, single-cluster behaviour), "+
+			"'active' or 'standby' (cross-cluster HA — installs a leader-gate "+
+			"so only the elected pod mutates state). Modes other than 'disabled' "+
+			"require --leader-elect=true.")
 
 	flag.Parse()
+
+	// Validate --ha-mode early; bail at startup rather than silently
+	// running mis-fenced. Accepted values are stable contract.
+	switch haMode {
+	case "disabled", "active", "standby":
+		// ok
+	default:
+		setupLog.Error(nil, "invalid --ha-mode value; must be one of disabled|active|standby",
+			"value", haMode)
+		os.Exit(1)
+	}
+	// HA mode without leader election would let both clusters mutate at
+	// once. Fail loud at startup; the operator can either flip --leader-elect
+	// on or drop back to --ha-mode=disabled.
+	if haMode != "disabled" && !enableLeaderElection {
+		setupLog.Error(nil, "--ha-mode requires --leader-elect=true",
+			"ha-mode", haMode, "leader-elect", enableLeaderElection)
+		os.Exit(1)
+	}
 
 	// initialize logger
 	if logLevel == "" {
@@ -269,6 +298,21 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	// Install the process-wide LeaderGate. In "disabled" mode this is a
+	// no-op gate (preserves pre-HA behaviour); in "active"/"standby" mode
+	// every util.Create/Update/Delete/UpdateStatus and finalizer-add/remove
+	// is fenced behind mgr.Elected(), so a non-leader pod cannot mutate
+	// cluster state even if a goroutine escapes controller-runtime's
+	// reconciler gate. Must be called BEFORE any reconciler runs.
+	if haMode == "disabled" {
+		util.SetDefaultLeaderGate(util.NoOpLeaderGate{})
+		setupLog.Info("HA leader-gate installed", "mode", haMode, "gate", "no-op")
+	} else {
+		util.SetDefaultLeaderGate(util.NewManagerLeaderGate(mgr))
+		setupLog.Info("HA leader-gate installed", "mode", haMode, "gate", "manager-elected")
+	}
+
 	//setting up the event recorder
 	eventRecorder := events.NewEventRecorder(mgr.GetClient(), mgr.GetScheme(), ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
