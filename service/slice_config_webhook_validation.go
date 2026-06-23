@@ -347,8 +347,15 @@ func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alph
 		if cluster.Status.RegistrationStatus != controllerv1alpha1.RegistrationStatusRegistered {
 			return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster registration is not completed. Possible cause: Slice Operator installation is pending on the cluster.")
 		}
-		if cluster.Status.ClusterHealth.ClusterHealthStatus != controllerv1alpha1.ClusterHealthStatusNormal {
+		if cluster.Status.ClusterHealth != nil && cluster.Status.ClusterHealth.ClusterHealthStatus != controllerv1alpha1.ClusterHealthStatusNormal {
 			return field.Invalid(field.NewPath("Spec").Child("Clusters"), clusterName, "cluster health is not normal")
+		}
+		if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
+			for _, cniSubnet := range cluster.Status.CniSubnet {
+				if util.OverlapIP(cniSubnet, sliceConfig.Spec.SliceSubnet) {
+					return field.Invalid(field.NewPath("Spec").Child("SliceSubnet"), sliceConfig.Spec.SliceSubnet, "must not overlap with CniSubnet "+cniSubnet+" of cluster "+clusterName)
+				}
+			}
 		}
 	}
 	for i, clusterName := range sliceConfig.Spec.Clusters {

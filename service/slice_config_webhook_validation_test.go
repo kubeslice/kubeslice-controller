@@ -77,6 +77,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithClusterDoesNotExist":                                            UpdateValidateSliceConfigWithClusterDoesNotExist,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNewClustersDoesNotExist":                                        UpdateValidateSliceConfigWithNewClustersDoesNotExist,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNewClusterUnhealthy":                                            UpdateValidateSliceConfigWithNewClusterUnhealthy,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNewClusterNilHealth":                                            UpdateValidateSliceConfigWithNewClusterNilHealth,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNewClusterOverlappingCniSubnet":                                 UpdateValidateSliceConfigWithNewClusterOverlappingCniSubnet,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNewClusterRegistrationPending":                                  UpdateValidateSliceConfigWithNewClusterRegistrationPending,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingCluster":             UpdateValidateSliceConfigWithNodeIPsEmptyInSpecAndStatusForParticipatingCluster,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess":                                         UpdateValidateSliceConfigWithNodeIPsInSpecIsSuccess,
@@ -1114,6 +1116,64 @@ func UpdateValidateSliceConfigWithNewClusterUnhealthy(t *testing.T) {
 	require.Contains(t, err.Error(), "Spec.Clusters: Invalid value:")
 	require.Contains(t, err.Error(), "cluster health is not normal")
 	require.Contains(t, err.Error(), newSliceConfig.Spec.Clusters[2])
+	clientMock.AssertExpectations(t)
+}
+
+func UpdateValidateSliceConfigWithNewClusterNilHealth(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	oldSliceConfig := newSliceConfig.DeepCopy()
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2", "cluster-3"}
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[2],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = nil
+	}).Once()
+	// cluster has nil ClusterHealth (Slice Operator not yet installed); should not panic
+	// and should proceed past the health check
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[0],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Spec.NodeIPs = []string{"10.0.0.1"}
+	}).Once()
+	_, err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
+	// no panic; cluster-1 passes (has NodeIPs), so error is nil or about something else — not a crash
+	require.NotContains(t, fmt.Sprintf("%v", err), "nil pointer")
+	clientMock.AssertExpectations(t)
+}
+
+func UpdateValidateSliceConfigWithNewClusterOverlappingCniSubnet(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2"}
+	oldSliceConfig := newSliceConfig.DeepCopy()
+	newSliceConfig.Spec.Clusters = []string{"cluster-1", "cluster-2", "cluster-3"}
+	newSliceConfig.Spec.SliceSubnet = "192.168.0.0/16"
+	overlappingCniSubnet := "192.168.1.0/16"
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name:      newSliceConfig.Spec.Clusters[2],
+		Namespace: namespace,
+	}, &controllerv1alpha1.Cluster{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.Status.RegistrationStatus = controllerv1alpha1.RegistrationStatusRegistered
+		arg.Status.ClusterHealth = &controllerv1alpha1.ClusterHealth{
+			ClusterHealthStatus: controllerv1alpha1.ClusterHealthStatusNormal,
+		}
+		arg.Status.CniSubnet = []string{overlappingCniSubnet}
+	}).Once()
+	_, err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "Spec.SliceSubnet: Invalid value:")
+	require.Contains(t, err.Error(), "must not overlap with CniSubnet")
+	require.Contains(t, err.Error(), overlappingCniSubnet)
 	clientMock.AssertExpectations(t)
 }
 
