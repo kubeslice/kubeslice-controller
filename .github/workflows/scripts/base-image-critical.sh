@@ -5,12 +5,7 @@ then
     echo "Error: base image scan result file does not exist"
     exit 1
 else
-    while read -r line; do
-      x=$(grep -o "CRITICAL: [0-9]*" | awk '{print $2}')
-#      echo "printing the founded critical line"
-#      echo "${x}"
-    done < final.txt
-#    echo "the total sum is: $x"
+    x=$(grep -o "CRITICAL: [0-9]*" final.txt | awk '{print $2}')
 fi
 
 sum=0
