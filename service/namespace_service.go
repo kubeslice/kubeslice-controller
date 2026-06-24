@@ -189,7 +189,7 @@ func (n *NamespaceService) DeleteNamespace(ctx context.Context, namespace string
 	eventRecorder := util.CtxEventRecorder(ctx).WithProject(util.GetProjectName(namespace)).WithNamespace(ControllerNamespace)
 
 	// Load metrics with project name and namespace
-	n.mf.WithProject(util.GetProjectName(util.GetProjectName(namespace))).
+	n.mf.WithProject(util.GetProjectName(namespace)).
 		WithNamespace(ControllerNamespace)
 
 	if err != nil {
