@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -155,12 +155,20 @@ func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv
 	if sliceConfig.Spec.RenewBefore.Equal(oldSliceConfig.Spec.RenewBefore) {
 		return nil
 	}
-	// change detected
+	// change detected — validate only, do not write.
+	// The actual VpnKeyRotation spec update is handled by the reconciler.
 	vpnKeyRotation := controllerv1alpha1.VpnKeyRotation{}
-	exists, _ := util.GetResourceIfExist(ctx, types.NamespacedName{
+	exists, err := util.GetResourceIfExist(ctx, types.NamespacedName{
 		Namespace: sliceConfig.Namespace,
 		Name:      sliceConfig.Name,
 	}, &vpnKeyRotation)
+	if err != nil {
+		return &field.Error{
+			Type:   field.ErrorTypeInternal,
+			Field:  "Field: RenewBefore",
+			Detail: fmt.Sprintf("Failed to fetch VpnKeyRotation: %v", err),
+		}
+	}
 	if exists {
 		for gateway := range vpnKeyRotation.Status.CurrentRotationState {
 			status, ok := vpnKeyRotation.Status.CurrentRotationState[gateway]
@@ -184,15 +192,6 @@ func validateRenewNowInSliceConfig(ctx context.Context, sliceConfig *controllerv
 		}
 	}
 
-	vpnKeyRotation.Spec.CertificateExpiryTime = sliceConfig.Spec.RenewBefore
-	err := util.UpdateResource(ctx, &vpnKeyRotation)
-	if err != nil {
-		return &field.Error{
-			Type:   field.ErrorTypeForbidden,
-			Field:  "Field: RenewBefore",
-			Detail: "Failed to Update Renewal Time, Please try again!",
-		}
-	}
 	return nil
 }
 
@@ -202,25 +201,23 @@ func validateRotationIntervalInSliceConfig(ctx context.Context, sliceConfig *con
 	if sliceConfig.Spec.RotationInterval == oldSliceConfig.Spec.RotationInterval {
 		return nil, nil
 	}
-	// change detected
+	// change detected — validate only, do not write.
+	// The actual VpnKeyRotation spec update (RotationInterval + CertificateExpiryTime)
+	// is handled by ReconcileVpnKeyRotation which already syncs spec drift.
 	vpnKeyRotation := controllerv1alpha1.VpnKeyRotation{}
-	exists, _ := util.GetResourceIfExist(ctx, types.NamespacedName{
+	exists, err := util.GetResourceIfExist(ctx, types.NamespacedName{
 		Namespace: sliceConfig.Namespace,
 		Name:      sliceConfig.Name,
 	}, &vpnKeyRotation)
-	if exists {
-		vpnKeyRotation.Spec.RotationInterval = sliceConfig.Spec.RotationInterval
-		// update the new expiry TS
-		expiryTS := metav1.NewTime(vpnKeyRotation.Spec.CertificateCreationTime.AddDate(0, 0, vpnKeyRotation.Spec.RotationInterval).Add(-1 * time.Hour))
-		vpnKeyRotation.Spec.CertificateExpiryTime = &expiryTS
-		err := util.UpdateResource(ctx, &vpnKeyRotation)
-		if err != nil {
-			return nil, &field.Error{
-				Type:   field.ErrorTypeForbidden,
-				Field:  "Field: RenewBefore",
-				Detail: "Failed to Update Renewal Time, Please try again!",
-			}
+	if err != nil {
+		return nil, &field.Error{
+			Type:   field.ErrorTypeInternal,
+			Field:  "Field: RotationInterval",
+			Detail: fmt.Sprintf("Failed to fetch VpnKeyRotation: %v", err),
 		}
+	}
+	if !exists {
+		return nil, nil
 	}
 	return &vpnKeyRotation, nil
 }

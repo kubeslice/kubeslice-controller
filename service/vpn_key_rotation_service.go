@@ -186,6 +186,12 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	}
 	if !reflect.DeepEqual(copyVpnConfig.Spec.RotationInterval, s.Spec.RotationInterval) {
 		copyVpnConfig.Spec.RotationInterval = s.Spec.RotationInterval
+		// Recalculate CertificateExpiryTime based on the new RotationInterval.
+		// Previously this was done inside the validating webhook (side-effect violation).
+		if copyVpnConfig.Spec.CertificateCreationTime != nil && !copyVpnConfig.Spec.CertificateCreationTime.IsZero() {
+			expiryTS := metav1.NewTime(copyVpnConfig.Spec.CertificateCreationTime.AddDate(0, 0, copyVpnConfig.Spec.RotationInterval).Add(-1 * time.Hour))
+			copyVpnConfig.Spec.CertificateExpiryTime = &expiryTS
+		}
 		toUpdate = true
 	}
 	if !reflect.DeepEqual(copyVpnConfig.Spec.SliceName, s.Name) {
@@ -196,6 +202,15 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 		copyVpnConfig.Spec.Clusters = s.Spec.Clusters
 		toUpdate = true
 	}
+	// Sync RenewBefore from SliceConfig → CertificateExpiryTime on VpnKeyRotation.
+	// Previously this was done inside the validating webhook (side-effect violation).
+	if s.Spec.RenewBefore != nil && !s.Spec.RenewBefore.IsZero() {
+		if copyVpnConfig.Spec.CertificateExpiryTime == nil || !copyVpnConfig.Spec.CertificateExpiryTime.Equal(s.Spec.RenewBefore) {
+			copyVpnConfig.Spec.CertificateExpiryTime = s.Spec.RenewBefore
+			toUpdate = true
+		}
+	}
+
 	if toUpdate {
 		logger.Debugf("vpnkeyrotation config %s deviated from sliceconfig %s", copyVpnConfig.Name, s.Name)
 		if err := util.UpdateResource(ctx, copyVpnConfig); err != nil {
