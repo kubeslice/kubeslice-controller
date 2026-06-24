@@ -86,7 +86,7 @@ func IsPrivateSubnet(subnet string) bool {
 
 // HasPrefix is function to check if the string has given prefix
 func HasPrefix(subnet string, prefix string) bool {
-	return subnet[len(subnet)-2:] == prefix
+	return strings.HasPrefix(subnet, prefix)
 }
 
 // HasLastTwoOctetsZero is a function to check if the subnet address's last octet is 0
