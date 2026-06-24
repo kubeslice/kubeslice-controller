@@ -20,13 +20,13 @@ type IWorkerSliceGatewayService struct {
 	mock.Mock
 }
 
-// BuildNetworkAddresses provides a mock function with given fields: sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr
-func (_m *IWorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet string, sourceClusterName string, destinationClusterName string, clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses {
-	ret := _m.Called(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr)
+// BuildNetworkAddresses provides a mock function with given fields: sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr, gatewayNumber
+func (_m *IWorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet string, sourceClusterName string, destinationClusterName string, clusterMap map[string]int, clusterCidr string, gatewayNumber int) util.WorkerSliceGatewayNetworkAddresses {
+	ret := _m.Called(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr, gatewayNumber)
 
 	var r0 util.WorkerSliceGatewayNetworkAddresses
-	if rf, ok := ret.Get(0).(func(string, string, string, map[string]int, string) util.WorkerSliceGatewayNetworkAddresses); ok {
-		r0 = rf(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr)
+	if rf, ok := ret.Get(0).(func(string, string, string, map[string]int, string, int) util.WorkerSliceGatewayNetworkAddresses); ok {
+		r0 = rf(sliceSubnet, sourceClusterName, destinationClusterName, clusterMap, clusterCidr, gatewayNumber)
 	} else {
 		r0 = ret.Get(0).(util.WorkerSliceGatewayNetworkAddresses)
 	}

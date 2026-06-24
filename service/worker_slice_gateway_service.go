@@ -54,7 +54,7 @@ type IWorkerSliceGatewayService interface {
 		serverGateway *v1alpha1.WorkerSliceGateway, clientGateway *v1alpha1.WorkerSliceGateway,
 		gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error
 	BuildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
-		clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses
+		clusterMap map[string]int, clusterCidr string, gatewayNumber int) util.WorkerSliceGatewayNetworkAddresses
 }
 
 // WorkerSliceGatewayService is a schema for interfaces JobService, WorkerSliceConfigService, SecretService
@@ -454,7 +454,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		for j := i + 1; j < noClusters; j++ {
 			sourceCluster, destinationCluster := clusterMapping[clusterNames[i]], clusterMapping[clusterNames[j]]
 			gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
-			gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
+			gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr, gatewayNumber)
 			// determine the gateway svc parameters
 			sliceGwSvcType := defaultSliceGatewayServiceType
 			gwSvcProtocol := defaultSliceGatewayServiceProtocol
@@ -576,7 +576,7 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 
 // buildNetworkAddresses - function generates the object of WorkerSliceGatewayNetworkAddresses
 func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClusterName, destinationClusterName string,
-	clusterMap map[string]int, clusterCidr string) util.WorkerSliceGatewayNetworkAddresses {
+	clusterMap map[string]int, clusterCidr string, gatewayNumber int) util.WorkerSliceGatewayNetworkAddresses {
 	gatewayAddresses := util.WorkerSliceGatewayNetworkAddresses{}
 	ipr := strings.Split(sliceSubnet, ".")
 	serverSubnet := util.GetClusterPrefixPool(sliceSubnet, clusterMap[sourceClusterName], clusterCidr)
@@ -585,9 +585,9 @@ func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClu
 	gatewayAddresses.ClientNetwork = strings.SplitN(clientSubnet, "/", -1)[0]
 	gatewayAddresses.ServerSubnet = serverSubnet
 	gatewayAddresses.ClientSubnet = clientSubnet
-	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "0")
-	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "1")
-	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], 255, "2")
+	gatewayAddresses.ServerVpnNetwork = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], gatewayNumber, "0")
+	gatewayAddresses.ServerVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], gatewayNumber, "1")
+	gatewayAddresses.ClientVpnAddress = fmt.Sprintf("%s.%s.%d.%s", ipr[0], ipr[1], gatewayNumber, "2")
 	return gatewayAddresses
 }
 
