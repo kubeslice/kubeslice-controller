@@ -20,7 +20,7 @@ jobs:
     if: ${{ github.event.label.name == 'ready-to-test' }}
     steps:
     - name: checkout the repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.event.pull_request.head.sha }}
     
@@ -33,7 +33,7 @@ jobs:
       run: echo "sha_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
     - name: build the kubeslice controller
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v7
       with:
         tags: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
         build-args: |
@@ -41,7 +41,7 @@ jobs:
         push: false
         
     - name: Scanning image for vulnerablilities
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@v0.36.0
       with:
           image-ref: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
           format: 'table'
