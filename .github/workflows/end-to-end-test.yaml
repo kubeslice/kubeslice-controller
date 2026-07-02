@@ -20,20 +20,20 @@ jobs:
     if: ${{ github.event.label.name == 'ready-to-test' }}
     steps:
     - name: checkout the repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         ref: ${{ github.event.pull_request.head.sha }}
-    
+
     - name: Get branch name
       id: branch-name
-      uses: tj-actions/branch-names@v7.0.7
-      
+      uses: tj-actions/branch-names@v9
+
     - name: Set outputs
       id: vars
       run: echo "sha_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
     - name: build the kubeslice controller
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v6
       with:
         tags: kubeslice-controller:${{ steps.vars.outputs.sha_commit }}
         build-args: |
@@ -86,6 +86,14 @@ jobs:
         sh .github/workflows/scripts/start-kind.sh
       env: 
          GITHUB_HEAD_COMMIT: ${{ steps.vars.outputs.sha_commit }}
+
+    - name: Run E2E Tests
+      run: |
+        echo "Running E2E Tests..."
+        make e2e-test
+      env:
+        KUBECONFIG: /home/runner/.kube/config
+        GITHUB_HEAD_COMMIT: ${{ steps.vars.outputs.sha_commit }}
 
     - name: Docker Run Action
       uses: addnab/docker-run-action@v3
@@ -166,7 +174,7 @@ jobs:
     
     - name: Send mail
       if: always()
-      uses: dawidd6/action-send-mail@v3
+      uses: dawidd6/action-send-mail@v6
       with:
        server_address: smtp.gmail.com
        server_port: 465
@@ -183,4 +191,5 @@ jobs:
              for downloading the logs zip file in your local use this API url in curl command https://api.github.com/repos/kubeslice/kubeslice-controller/actions/runs/${{ github.run_id }}/logs
              the report url is ${{ env.CENTRAL_REPORT_URL }}. 
              for looking all the allure reports (including old ones ) please visit at https://kubeslice.github.io/e2e-allure-reports/ .
-             please look result-summary.txt file for more info regarding test cases ( please note you will get result-summary.txt file only if your quality gate check steps ran successfully ). 
+             please look result-summary.txt file for more info regarding test cases ( please note you will get result-summary.txt file only if your quality gate check steps ran successfully ).
+             

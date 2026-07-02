@@ -1,6 +1,6 @@
 module github.com/kubeslice/kubeslice-controller
 
-go 1.24.0
+go 1.24
 
 require (
 	bou.ke/monkey v1.0.2
