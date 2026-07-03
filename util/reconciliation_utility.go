@@ -242,7 +242,9 @@ func GetOwnerLabel(completeResourceName string) map[string]string {
 			lenCompleteResourceName = lenCompleteResourceName - 63
 			j = 63 * (i + 1)
 		}
-		label[LabelManagedBy+"-"+fmt.Sprint(i)] = completeResourceName[j:]
+		if j < len(completeResourceName) {
+			label[LabelManagedBy+"-"+fmt.Sprint(i)] = completeResourceName[j:]
+		}
 	} else {
 		label[LabelManagedBy] = completeResourceName
 	}
