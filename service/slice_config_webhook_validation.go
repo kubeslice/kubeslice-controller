@@ -59,6 +59,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateMaxClusterCount(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if err := validateTopology(sliceConfig); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		if err := validateSliceSubnet(sliceConfig); err != nil {
 			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
@@ -104,6 +107,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
+	if err := validateTopology(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	// Validate single/multi overlay network deployment mode specific fields
@@ -327,6 +333,69 @@ func validateClustersOnCreate(ctx context.Context, sliceConfig *controllerv1alph
 				}
 			}
 		}
+	}
+	return nil
+}
+
+// validateTopology is function to validate the topology specification of slice config
+func validateTopology(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	topology := sliceConfig.Spec.Topology
+	if topology == nil {
+		return nil
+	}
+	topologyPath := field.NewPath("Spec").Child("Topology")
+	switch topology.Mode {
+	case "":
+		if len(topology.Hubs) > 0 {
+			return field.Required(topologyPath.Child("Mode"), "mode must be set to HubAndSpoke when hubs is specified")
+		}
+		return nil
+	case controllerv1alpha1.TopologyModeFullMesh:
+		if len(topology.Hubs) > 0 {
+			return field.Invalid(topologyPath.Child("Hubs"), topology.Hubs, "hubs must be empty when mode is FullMesh")
+		}
+		return nil
+	case controllerv1alpha1.TopologyModeHubAndSpoke:
+		return validateHubAndSpokeTopology(sliceConfig, topologyPath)
+	default:
+		return field.Invalid(topologyPath.Child("Mode"), string(topology.Mode), "unknown topology mode; valid values: FullMesh, HubAndSpoke")
+	}
+}
+
+// validateHubAndSpokeTopology is function to validate the hub and spoke topology rules
+func validateHubAndSpokeTopology(sliceConfig *controllerv1alpha1.SliceConfig, topologyPath *field.Path) *field.Error {
+	topology := sliceConfig.Spec.Topology
+	if len(sliceConfig.Spec.Clusters) < 2 {
+		return field.Invalid(topologyPath.Child("Mode"), string(topology.Mode), "HubAndSpoke topology requires at least 2 clusters")
+	}
+	if len(topology.Hubs) == 0 {
+		return field.Required(topologyPath.Child("Hubs"), "HubAndSpoke topology requires at least one hub")
+	}
+	if duplicate, value := util.CheckDuplicateInArray(topology.Hubs); duplicate {
+		return field.Duplicate(topologyPath.Child("Hubs"), "duplicate hub entry: "+strings.Join(value, ", "))
+	}
+	if len(topology.Hubs) > 1 {
+		return field.Invalid(topologyPath.Child("Hubs"), topology.Hubs, "only one hub is supported in this release")
+	}
+	members := make(map[string]bool, len(sliceConfig.Spec.Clusters))
+	for _, clusterName := range sliceConfig.Spec.Clusters {
+		members[clusterName] = true
+	}
+	hubs := make(map[string]bool, len(topology.Hubs))
+	for i, hubName := range topology.Hubs {
+		if !members[hubName] {
+			return field.Invalid(topologyPath.Child("Hubs").Index(i), hubName, "hub is not a member of spec.clusters")
+		}
+		hubs[hubName] = true
+	}
+	spokes := 0
+	for _, clusterName := range sliceConfig.Spec.Clusters {
+		if !hubs[clusterName] {
+			spokes++
+		}
+	}
+	if spokes == 0 {
+		return field.Invalid(topologyPath.Child("Hubs"), topology.Hubs, "HubAndSpoke topology requires at least one spoke cluster")
 	}
 	return nil
 }

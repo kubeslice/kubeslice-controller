@@ -1,0 +1,35 @@
+# Sample SliceConfig using the HubAndSpoke topology.
+#
+# worker-1 acts as the hub; worker-2 and worker-3 become spokes (all
+# non-hub members are spokes). Tunnel links are created only between
+# hub and spokes: worker-1<->worker-2 and worker-1<->worker-3.
+# No spoke<->spoke (worker-2<->worker-3) link is created.
+#
+# Omitting spec.topology entirely (or setting mode: FullMesh with no
+# hubs) keeps the existing full-mesh behavior.
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: hub-and-spoke-slice
+spec:
+  sliceType: Application
+  sliceSubnet: 10.1.0.0/16
+  sliceGatewayProvider:
+    sliceGatewayType: OpenVPN
+    sliceCaType: Local
+  sliceIpamType: Local
+  clusters:
+    - worker-1
+    - worker-2
+    - worker-3
+  topology:
+    mode: HubAndSpoke
+    hubs:
+      - worker-1
+  qosProfileDetails:
+    queueType: HTB
+    priority: 1
+    tcType: BANDWIDTH_CONTROL
+    bandwidthCeilingKbps: 5120
+    bandwidthGuaranteedKbps: 2560
+    dscpClass: AF11
