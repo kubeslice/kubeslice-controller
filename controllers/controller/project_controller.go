@@ -18,10 +18,12 @@ package controller
 
 import (
 	"context"
+
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/pkg/ha"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +38,9 @@ type ProjectReconciler struct {
 	ProjectService service.IProjectService
 	Log            *zap.SugaredLogger
 	EventRecorder  *events.EventRecorder
+	// LeaderElector gates mutating reconciles on cross-cluster leadership. It is
+	// nil-safe: a nil elector (HA not wired) behaves as standalone. See ADR #293.
+	LeaderElector *ha.ClusterLeaderElector
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -47,6 +52,12 @@ func (t *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Reconcile is a function to reconcile the project, ProjectReconciler implements it
 func (t *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// HA write fence: only the Active hub (or a standalone controller) writes.
+	// A Standby evaluates this on every call and no-ops.
+	if t.LeaderElector != nil && !t.LeaderElector.IsLeader() {
+		t.Log.Info("standby mode, skipping reconcile")
+		return ctrl.Result{}, nil
+	}
 	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, t.Client, t.Scheme, "ProjectController", t.EventRecorder)
 	return t.ProjectService.ReconcileProject(kubeSliceCtx, req)
 }

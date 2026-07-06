@@ -18,13 +18,14 @@ package worker
 
 import (
 	"context"
+
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
+	"github.com/kubeslice/kubeslice-controller/pkg/ha"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
-
-	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,6 +39,9 @@ type WorkerSliceConfigReconciler struct {
 	WorkerSliceService service.IWorkerSliceConfigService
 	Log                *zap.SugaredLogger
 	EventRecorder      *events.EventRecorder
+	// LeaderElector gates mutating reconciles on cross-cluster leadership. It is
+	// nil-safe: a nil elector (HA not wired) behaves as standalone. See ADR #293.
+	LeaderElector *ha.ClusterLeaderElector
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -49,6 +53,12 @@ func (c *WorkerSliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Reconcile is a function to reconcilation of WorkerSliceconfig, WorkerSliceConfigReconciler implements it
 func (c *WorkerSliceConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// HA write fence: only the Active hub (or a standalone controller) writes.
+	// A Standby evaluates this on every call and no-ops.
+	if c.LeaderElector != nil && !c.LeaderElector.IsLeader() {
+		c.Log.Info("standby mode, skipping reconcile")
+		return ctrl.Result{}, nil
+	}
 	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, c.Client, c.Scheme, "WorkerSliceConfigController", c.EventRecorder)
 	return c.WorkerSliceService.ReconcileWorkerSliceConfig(kubeSliceCtx, req)
 }

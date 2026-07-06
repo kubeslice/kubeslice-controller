@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
+
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -42,9 +44,12 @@ import (
 	"github.com/kubeslice/kubeslice-controller/controllers/controller"
 	"github.com/kubeslice/kubeslice-controller/controllers/worker"
 	"github.com/kubeslice/kubeslice-controller/metrics"
+	"github.com/kubeslice/kubeslice-controller/pkg/ha"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	//+kubebuilder:scaffold:imports
 )
@@ -110,6 +115,14 @@ func initialize(services *service.Services) {
 	var jobServiceAccount string
 	// get prometheus endpoint from environment
 	var prometheusServiceEndpoint string
+	// HA (Active/Standby cross-cluster) configuration — see ADR #293 / issue #294
+	var haMode string
+	var haIdentity string
+	var haActiveKubeconfig string
+	var haLeaseDuration time.Duration
+	var haRenewDeadline time.Duration
+	var haRetryPeriod time.Duration
+	var haPaddingSeconds time.Duration
 
 	flag.StringVar(&rbacResourcePrefix, "rbac-resource-prefix", service.RbacResourcePrefix, "RBAC resource prefix")
 	flag.StringVar(&projectNameSpacePrefixFromCustomer, "project-namespace-prefix", service.ProjectNamespacePrefix, fmt.Sprintf("Overrides the default %s kubeslice namespace", service.ProjectNamespacePrefix))
@@ -137,6 +150,15 @@ func initialize(services *service.Services) {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
+	// Cross-cluster HA flags. --ha-mode=standalone (default) preserves today's behaviour.
+	flag.StringVar(&haMode, "ha-mode", "standalone", `Cross-cluster HA mode: "active", "standby", or "standalone" (default).`)
+	flag.StringVar(&haIdentity, "ha-identity", "", "Stable per-cluster identity recorded in the Lease (defaults to the hostname).")
+	flag.StringVar(&haActiveKubeconfig, "ha-active-kubeconfig", "", "Path to the Active hub kubeconfig; required in standby mode.")
+	flag.DurationVar(&haLeaseDuration, "ha-lease-duration", ha.DefaultLeaseDuration, "HA Lease duration.")
+	flag.DurationVar(&haRenewDeadline, "ha-renew-deadline", ha.DefaultRenewDeadline, "Deadline for the Active to renew its Lease before releasing leadership.")
+	flag.DurationVar(&haRetryPeriod, "ha-retry-period", ha.DefaultRetryPeriod, "Interval between Lease renew/watch attempts.")
+	flag.DurationVar(&haPaddingSeconds, "ha-padding-seconds", ha.DefaultPaddingSeconds, "Extra buffer a Standby waits before treating the Active Lease as stale.")
 
 	flag.Parse()
 
@@ -278,8 +300,47 @@ func initialize(services *service.Services) {
 	})
 	// setting up metrics collector
 	go metrics.StartMetricsCollector(service.MetricPort, true)
+
+	// Set up cross-cluster HA leader election (ADR #293 / issue #294). In
+	// standalone mode (the default) the elector is always the leader, so the
+	// reconciler write-fence is a no-op and behaviour is unchanged.
+	haRunMode := ha.ParseHAMode(haMode)
+	localHAClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to build HA local client")
+		os.Exit(1)
+	}
+	var remoteHAClient client.Client
+	if haRunMode == ha.ModeStandby {
+		if haActiveKubeconfig == "" {
+			setupLog.Error(fmt.Errorf("missing --ha-active-kubeconfig"), "standby mode requires the Active hub kubeconfig")
+			os.Exit(1)
+		}
+		remoteCfg, cfgErr := clientcmd.BuildConfigFromFlags("", haActiveKubeconfig)
+		if cfgErr != nil {
+			setupLog.Error(cfgErr, "unable to load Active hub kubeconfig", "path", haActiveKubeconfig)
+			os.Exit(1)
+		}
+		remoteHAClient, cfgErr = client.New(remoteCfg, client.Options{Scheme: scheme})
+		if cfgErr != nil {
+			setupLog.Error(cfgErr, "unable to build remote client for Active hub")
+			os.Exit(1)
+		}
+	}
+	leaderElector := ha.NewClusterLeaderElector(localHAClient, remoteHAClient, ha.Options{
+		Mode:           haRunMode,
+		Identity:       haIdentity,
+		LeaseDuration:  haLeaseDuration,
+		RenewDeadline:  haRenewDeadline,
+		RetryPeriod:    haRetryPeriod,
+		PaddingSeconds: haPaddingSeconds,
+		Log:            controllerLog.With("name", "ha"),
+	})
+	setupLog.Info("high availability configured", "mode", haRunMode, "identity", leaderElector.Identity())
+
 	// initialize controller with Project Kind
 	if err = (&controller.ProjectReconciler{
+		LeaderElector:  leaderElector,
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		Log:            controllerLog.With("name", "Project"),
@@ -291,6 +352,7 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with Cluster Kind
 	if err = (&controller.ClusterReconciler{
+		LeaderElector:  leaderElector,
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		Log:            controllerLog.With("name", "Cluster"),
@@ -302,6 +364,7 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with SliceConfig Kind
 	if err = (&controller.SliceConfigReconciler{
+		LeaderElector:      leaderElector,
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
 		Log:                controllerLog.With("name", "SliceConfig"),
@@ -313,6 +376,7 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with ServiceExportConfig Kind
 	if err = (&controller.ServiceExportConfigReconciler{
+		LeaderElector:              leaderElector,
 		Client:                     mgr.GetClient(),
 		Scheme:                     mgr.GetScheme(),
 		Log:                        controllerLog.With("name", "ServiceExportConfig"),
@@ -323,6 +387,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerSliceGatewayReconciler{
+		LeaderElector:             leaderElector,
 		Client:                    mgr.GetClient(),
 		Scheme:                    mgr.GetScheme(),
 		Log:                       controllerLog.With("name", "WorkerSliceGateway"),
@@ -333,6 +398,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerSliceConfigReconciler{
+		LeaderElector:      leaderElector,
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
 		Log:                controllerLog.With("name", "WorkerSliceConfig"),
@@ -343,6 +409,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerServiceImportReconciler{
+		LeaderElector:              leaderElector,
 		Client:                     mgr.GetClient(),
 		Scheme:                     mgr.GetScheme(),
 		Log:                        controllerLog.With("name", "WorkerServiceImport"),
@@ -353,6 +420,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&controller.SliceQoSConfigReconciler{
+		LeaderElector:         leaderElector,
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
 		Log:                   controllerLog.With("name", "SliceQoSConfig"),
@@ -363,6 +431,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&controller.VpnKeyRotationReconciler{
+		LeaderElector:         leaderElector,
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
 		Log:                   controllerLog.With("name", "VpnKeyRotationConfig"),
@@ -419,8 +488,27 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
+	// Start the HA background loop for the configured mode. Standalone starts
+	// nothing (it is always the leader).
+	switch haRunMode {
+	case ha.ModeActive:
+		go func() {
+			if err := leaderElector.StartLeaseRenewal(ctx); err != nil {
+				setupLog.Error(err, "HA lease renewal loop exited")
+			}
+		}()
+	case ha.ModeStandby:
+		go func() {
+			if err := leaderElector.WatchRemoteLease(ctx); err != nil {
+				setupLog.Error(err, "HA remote lease watch loop exited")
+			}
+		}()
+	}
+
 	setupLog.Info("starting manager")
-	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
@@ -443,3 +531,5 @@ func initialize(services *service.Services) {
 //+kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings;roles;clusterroles,verbs=get;list;watch;create;update;patch;delete
+
+//+kubebuilder:rbac:groups="coordination.k8s.io",resources=leases,verbs=get;list;watch;create;update;patch;delete
