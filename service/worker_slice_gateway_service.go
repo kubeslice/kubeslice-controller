@@ -435,6 +435,22 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 	return nil
 }
 
+// fullMeshClusterPairIndices returns every index pair (i, j) with i < j — one
+// pass per undirected edge of a complete graph on n vertices. For n >= 2 the
+// slice has length n*(n-1)/2; otherwise it is nil.
+func fullMeshClusterPairIndices(n int) [][2]int {
+	if n < 2 {
+		return nil
+	}
+	out := make([][2]int, 0, n*(n-1)/2)
+	for i := 0; i < n; i++ {
+		for j := i + 1; j < n; j++ {
+			out = append(out, [2]int{i, j})
+		}
+	}
+	return out
+}
+
 // createMinimumGatewaysIfNotExists is a helper function to create the gateways between worker clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context.Context, sliceName string,
 	clusterNames []string, namespace string, ownerLabel map[string]string, clusterMap map[string]int,
@@ -450,24 +466,22 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		}
 		clusterMapping[clusterName] = &cluster
 	}
-	for i := 0; i < noClusters; i++ {
-		for j := i + 1; j < noClusters; j++ {
-			sourceCluster, destinationCluster := clusterMapping[clusterNames[i]], clusterMapping[clusterNames[j]]
-			gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
-			gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
-			// determine the gateway svc parameters
-			sliceGwSvcType := defaultSliceGatewayServiceType
-			gwSvcProtocol := defaultSliceGatewayServiceProtocol
-			if val, exists := sliceGwSvcTypeMap[sourceCluster.Name]; exists {
-				sliceGwSvcType = val.Type
-				gwSvcProtocol = val.Protocol
-			}
-			logger.Debugf("setting gwConType in create_minwsg %s", sliceGwSvcType)
-			logger.Debugf("setting gwProto in create_minwsg %s", gwSvcProtocol)
-			err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
+	for _, ij := range fullMeshClusterPairIndices(noClusters) {
+		sourceCluster, destinationCluster := clusterMapping[clusterNames[ij[0]]], clusterMapping[clusterNames[ij[1]]]
+		gatewayNumber := s.calculateGatewayNumber(clusterMap[sourceCluster.Name], clusterMap[destinationCluster.Name])
+		gatewayAddresses := s.BuildNetworkAddresses(sliceSubnet, sourceCluster.Name, destinationCluster.Name, clusterMap, clusterCidr)
+		// determine the gateway svc parameters
+		sliceGwSvcType := defaultSliceGatewayServiceType
+		gwSvcProtocol := defaultSliceGatewayServiceProtocol
+		if val, exists := sliceGwSvcTypeMap[sourceCluster.Name]; exists {
+			sliceGwSvcType = val.Type
+			gwSvcProtocol = val.Protocol
+		}
+		logger.Debugf("setting gwConType in create_minwsg %s", sliceGwSvcType)
+		logger.Debugf("setting gwProto in create_minwsg %s", gwSvcProtocol)
+		err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses)
+		if err != nil {
+			return ctrl.Result{}, err
 		}
 	}
 	return ctrl.Result{}, nil
