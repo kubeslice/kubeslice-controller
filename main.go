@@ -532,4 +532,6 @@ func initialize(services *service.Services) {
 
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings;roles;clusterroles,verbs=get;list;watch;create;update;patch;delete
 
-//+kubebuilder:rbac:groups="coordination.k8s.io",resources=leases,verbs=get;list;watch;create;update;patch;delete
+// NOTE: the HA leader-election Lease lives in the controller's own namespace and
+// reuses the existing leader-election Role's coordination.k8s.io/leases grant
+// (config/rbac/leader_election_role.yaml); no dedicated RBAC marker is needed.
