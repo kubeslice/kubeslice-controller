@@ -28,9 +28,19 @@ import (
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// Condition type constants for SliceConfig status.
+const (
+	SliceConditionWorkerConfigsProvisioned = "WorkerConfigsProvisioned"
+	SliceConditionGatewaysProvisioned      = "GatewaysProvisioned"
+	SliceConditionVPNConfigured            = "VPNConfigured"
+	SliceConditionReady                    = "Ready"
 )
 
 type ISliceConfigService interface {
@@ -187,7 +197,28 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
 		err = s.ms.CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name)
-		return ctrl.Result{}, err
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		apimeta.SetStatusCondition(&sliceConfig.Status.Conditions, metav1.Condition{
+			Type:               SliceConditionWorkerConfigsProvisioned,
+			Status:             metav1.ConditionTrue,
+			Reason:             "WorkerConfigsCreated",
+			Message:            "WorkerSliceConfig provisioned for all clusters",
+			ObservedGeneration: sliceConfig.Generation,
+		})
+		apimeta.SetStatusCondition(&sliceConfig.Status.Conditions, metav1.Condition{
+			Type:               SliceConditionReady,
+			Status:             metav1.ConditionTrue,
+			Reason:             "Provisioned",
+			Message:            "No-network slice provisioned",
+			ObservedGeneration: sliceConfig.Generation,
+		})
+		if statusErr := util.UpdateStatus(ctx, sliceConfig); statusErr != nil {
+			logger.Errorf("failed to update SliceConfig status conditions: %s", statusErr)
+			return ctrl.Result{}, statusErr
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// Step 4: Creation of worker slice Objects and Cluster Labels
@@ -202,12 +233,26 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	apimeta.SetStatusCondition(&sliceConfig.Status.Conditions, metav1.Condition{
+		Type:               SliceConditionWorkerConfigsProvisioned,
+		Status:             metav1.ConditionTrue,
+		Reason:             "WorkerConfigsCreated",
+		Message:            "WorkerSliceConfig provisioned for all clusters",
+		ObservedGeneration: sliceConfig.Generation,
+	})
 
 	// Step 5: Create gateways with minimum specification
 	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	apimeta.SetStatusCondition(&sliceConfig.Status.Conditions, metav1.Condition{
+		Type:               SliceConditionGatewaysProvisioned,
+		Status:             metav1.ConditionTrue,
+		Reason:             "GatewayPairsCreated",
+		Message:            "WorkerSliceGateway pairs created for all cluster pairs",
+		ObservedGeneration: sliceConfig.Generation,
+	})
 	logger.Infof("sliceConfig %v reconciled", req.NamespacedName)
 
 	// Step 6: Create VPNKeyRotation CR
@@ -217,10 +262,17 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		util.RecordEvent(ctx, eventRecorder, sliceConfig, nil, events.EventVPNKeyRotationConfigCreationFailed)
 		return ctrl.Result{}, err
 	}
-	// Step 7: update cluster info into vpnkeyrotation Cconfig
+	// Step 7: update cluster info into vpnkeyrotation config
 	if _, err := s.vpn.ReconcileClusters(ctx, sliceConfig.Name, sliceConfig.Namespace, sliceConfig.Spec.Clusters); err != nil {
 		return ctrl.Result{}, err
 	}
+	apimeta.SetStatusCondition(&sliceConfig.Status.Conditions, metav1.Condition{
+		Type:               SliceConditionVPNConfigured,
+		Status:             metav1.ConditionTrue,
+		Reason:             "VPNKeyRotationCreated",
+		Message:            "VpnKeyRotation CR created for slice",
+		ObservedGeneration: sliceConfig.Generation,
+	})
 
 	// Step 8: Create ServiceImport Objects
 	serviceExports := &v1alpha1.ServiceExportConfigList{}
@@ -238,6 +290,17 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		}
 	}
 
+	apimeta.SetStatusCondition(&sliceConfig.Status.Conditions, metav1.Condition{
+		Type:               SliceConditionReady,
+		Status:             metav1.ConditionTrue,
+		Reason:             "Provisioned",
+		Message:            "Slice provisioned across all clusters",
+		ObservedGeneration: sliceConfig.Generation,
+	})
+	if statusErr := util.UpdateStatus(ctx, sliceConfig); statusErr != nil {
+		logger.Errorf("failed to update SliceConfig status conditions: %s", statusErr)
+		return ctrl.Result{}, statusErr
+	}
 	return ctrl.Result{}, nil
 }
 

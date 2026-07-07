@@ -78,6 +78,10 @@ var SliceConfigTestBed = map[string]func(*testing.T){
 	"SliceConfig_DeleteErrorOnDelete":                            SliceConfigDeleteErrorOnDelete,
 	"SliceConfig_ErrorOnListingServiceExport":                    SliceConfigErrorOnListingServiceExport,
 	"SliceConfig_ErrorOnCreateOrUpdateServiceImport":             SliceConfigErrorOnCreateOrUpdateServiceImport,
+	// status condition tests
+	"SliceConfig_ConditionsSetOnSuccessfulReconcile":    SliceConfigConditionsSetOnSuccessfulReconcile,
+	"SliceConfig_ConditionsSetOnNoNetSuccessfulReconcile": SliceConfigConditionsSetOnNoNetSuccessfulReconcile,
+	"SliceConfig_ReadyConditionFalseWhenGatewayFails":   SliceConfigReadyConditionFalseWhenGatewayFails,
 }
 
 func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
@@ -119,6 +123,9 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 		}
 	}).Once()
 	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, sliceConfig.Spec.Clusters, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	// status condition update at end of reconcile
+	clientMock.On("Status").Return(clientMock).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
@@ -153,6 +160,9 @@ func SliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
 
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfigForNoNetworkSlice", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything).Return(nil).Once()
+	// status condition update at end of NoNet reconcile
+	clientMock.On("Status").Return(clientMock).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil).Once()
 
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
@@ -736,4 +746,145 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 	vpn.On("ReconcileClusters", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceConfigServiceTest", &eventRecorder)
 	return workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, workerServiceImportMock, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock
+}
+
+// SliceConfigConditionsSetOnSuccessfulReconcile verifies that all four status conditions
+// are set to True and Ready is True after a fully successful network-slice reconcile.
+func SliceConfigConditionsSetOnSuccessfulReconcile(t *testing.T) {
+	workerSliceGatewayMock, workerSliceConfigMock, _, workerServiceImportMock, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	namespace := corev1.Namespace{}
+	clientMock.On("Get", ctx, mock.Anything, &namespace).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = requestObj.Namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
+	}).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
+	clusterMap := map[string]int{"cluster-1": 1, "cluster-2": 2}
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
+	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	label := map[string]string{"original-slice-name": sliceConfig.Name}
+	serviceExportList := &controllerv1alpha1.ServiceExportConfigList{}
+	clientMock.On("List", ctx, serviceExportList, client.InNamespace(requestObj.Namespace), client.MatchingLabels(label)).Return(nil).Once()
+	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	var capturedSliceConfig *controllerv1alpha1.SliceConfig
+	clientMock.On("Status").Return(clientMock).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		if sc, ok := args.Get(1).(*controllerv1alpha1.SliceConfig); ok {
+			capturedSliceConfig = sc
+		}
+	}).Once()
+
+	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
+	require.Nil(t, err)
+	require.Equal(t, ctrl.Result{}, result)
+
+	require.NotNil(t, capturedSliceConfig, "UpdateStatus should have been called with the SliceConfig")
+	requireConditionTrue(t, capturedSliceConfig.Status.Conditions, SliceConditionWorkerConfigsProvisioned)
+	requireConditionTrue(t, capturedSliceConfig.Status.Conditions, SliceConditionGatewaysProvisioned)
+	requireConditionTrue(t, capturedSliceConfig.Status.Conditions, SliceConditionVPNConfigured)
+	requireConditionTrue(t, capturedSliceConfig.Status.Conditions, SliceConditionReady)
+}
+
+// SliceConfigConditionsSetOnNoNetSuccessfulReconcile verifies that WorkerConfigsProvisioned
+// and Ready are True for a no-network slice; gateway/VPN conditions are not set.
+func SliceConfigConditionsSetOnNoNetSuccessfulReconcile(t *testing.T) {
+	_, workerSliceConfigMock, _, _, _, clientMock, _, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	clientMock.On("Get", ctx, requestObj.NamespacedName, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	}).Once()
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	namespace := corev1.Namespace{}
+	clientMock.On("Get", ctx, mock.Anything, &namespace).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = requestObj.Namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
+	}).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfigForNoNetworkSlice", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything).Return(nil).Once()
+
+	var capturedSliceConfig *controllerv1alpha1.SliceConfig
+	clientMock.On("Status").Return(clientMock).Once()
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		if sc, ok := args.Get(1).(*controllerv1alpha1.SliceConfig); ok {
+			capturedSliceConfig = sc
+		}
+	}).Once()
+
+	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
+	require.Nil(t, err)
+	require.Equal(t, ctrl.Result{}, result)
+
+	require.NotNil(t, capturedSliceConfig)
+	requireConditionTrue(t, capturedSliceConfig.Status.Conditions, SliceConditionWorkerConfigsProvisioned)
+	requireConditionTrue(t, capturedSliceConfig.Status.Conditions, SliceConditionReady)
+	// gateway and VPN conditions are not applicable for no-network slices
+	require.Nil(t, findCondition(capturedSliceConfig.Status.Conditions, SliceConditionGatewaysProvisioned))
+	require.Nil(t, findCondition(capturedSliceConfig.Status.Conditions, SliceConditionVPNConfigured))
+}
+
+// SliceConfigReadyConditionFalseWhenGatewayFails verifies that no status update is
+// performed (and Ready is never set) when gateway creation returns an error.
+func SliceConfigReadyConditionFalseWhenGatewayFails(t *testing.T) {
+	workerSliceGatewayMock, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	namespace := corev1.Namespace{}
+	clientMock.On("Get", ctx, mock.Anything, &namespace).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = requestObj.Namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
+	}).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
+	clusterMap := map[string]int{"cluster-1": 1, "cluster-2": 2}
+	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
+	gatewayErr := errors.New("gateway creation failed")
+	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, gatewayErr).Once()
+
+	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
+	require.Error(t, err)
+	require.Equal(t, gatewayErr, err)
+	require.Equal(t, ctrl.Result{}, result)
+	// Status().Update() must NOT have been called — no Ready condition written on error path
+	clientMock.AssertNotCalled(t, "Status")
+	clientMock.AssertExpectations(t)
+	workerSliceConfigMock.AssertExpectations(t)
+	workerSliceGatewayMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
+}
+
+// requireConditionTrue asserts that a condition of the given type exists and is True.
+func requireConditionTrue(t *testing.T, conditions []metav1.Condition, condType string) {
+	t.Helper()
+	c := findCondition(conditions, condType)
+	require.NotNilf(t, c, "condition %q not found", condType)
+	require.Equalf(t, metav1.ConditionTrue, c.Status, "condition %q expected True, got %s", condType, c.Status)
+}
+
+// findCondition returns a pointer to the condition with the given type, or nil.
+func findCondition(conditions []metav1.Condition, condType string) *metav1.Condition {
+	for i := range conditions {
+		if conditions[i].Type == condType {
+			return &conditions[i]
+		}
+	}
+	return nil
 }

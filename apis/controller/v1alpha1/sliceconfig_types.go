@@ -196,11 +196,16 @@ type KubesliceEvent struct {
 
 // SliceConfigStatus defines the observed state of SliceConfig
 type SliceConfigStatus struct {
-	KubesliceEvents []KubesliceEvent `json:"kubesliceEvents,omitempty"`
+	// Conditions represent the latest available observations of the SliceConfig's provisioning state.
+	// +listType=map
+	// +listMapKey=type
+	Conditions      []metav1.Condition `json:"conditions,omitempty"`
+	KubesliceEvents []KubesliceEvent   `json:"kubesliceEvents,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="READY",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 
 // SliceConfig is the Schema for the sliceconfig API
 type SliceConfig struct {
