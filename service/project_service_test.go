@@ -32,6 +32,7 @@ import (
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
 	"github.com/kubeslice/kubeslice-controller/util"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	utilMock "github.com/kubeslice/kubeslice-controller/util/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -276,7 +277,7 @@ func setupProjectTest(name string, namespace string) (*mocks.INamespaceService, 
 	return nsServiceMock, acsServicemOCK, projectService, requestObj, clientMock, project, ctx, clusterServiceMock, sliceConfigServiceMock, serviceExportConfigServiceMock, sliceQoSConfigServiceMock, mMock
 }
 
-func prepareProjectTestContext(ctx context.Context, client util.Client,
+func prepareProjectTestContext(ctx context.Context, client client.Client,
 	scheme *runtime.Scheme) context.Context {
 	eventRecorder := events.NewEventRecorder(client, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
