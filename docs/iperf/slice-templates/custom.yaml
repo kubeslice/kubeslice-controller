@@ -1,0 +1,39 @@
+apiVersion: controller.kubeslice.io/v1alpha1
+kind: SliceConfig
+metadata:
+  name: iperf-custom
+spec:
+  sliceSubnet: 10.34.0.0/16
+  sliceType: Application
+  sliceGatewayProvider:
+    sliceGatewayType: OpenVPN
+    sliceCaType: Local
+  sliceIpamType: Local
+  clusters:
+    - <worker-cluster-1>
+    - <worker-cluster-2>
+    - <worker-cluster-3>
+  topologyConfig:
+    topologyType: TopologyCustom
+    connectivityMatrix:
+      - sourceCluster: <worker-cluster-1>
+        targetClusters:
+          - <worker-cluster-2>
+      - sourceCluster: <worker-cluster-3>
+        targetClusters:
+          - <worker-cluster-2>
+  qosProfileDetails:
+    queueType: HTB
+    priority: 1
+    tcType: BANDWIDTH_CONTROL
+    bandwidthCeilingKbps: 5120
+    bandwidthGuaranteedKbps: 2560
+    dscpClass: AF11
+  namespaceIsolationProfile:
+    applicationNamespaces:
+      - namespace: iperf
+        clusters:
+          - <worker-cluster-1>
+          - <worker-cluster-2>
+          - <worker-cluster-3>
+    isolationEnabled: false

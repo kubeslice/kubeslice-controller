@@ -53,6 +53,8 @@ type WorkerSliceConfigSpec struct {
 	ExternalGatewayConfig     ExternalGatewayConfig     `json:"externalGatewayConfig,omitempty"`
 	//+kubebuilder:default:=single-network
 	OverlayNetworkDeploymentMode controllerv1alpha1.NetworkType `json:"overlayNetworkDeploymentMode,omitempty"`
+	// Topology configuration for flexible topology support
+	TopologyConfig *controllerv1alpha1.TopologyConfig `json:"topologyConfig,omitempty"`
 }
 
 // WorkerSliceGatewayProvider defines the configuration for slicegateway

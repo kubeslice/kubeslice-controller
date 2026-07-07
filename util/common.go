@@ -38,6 +38,11 @@ type WorkerSliceGatewayNetworkAddresses struct {
 	ClientVpnAddress string
 }
 
+type GatewayPair struct {
+	Source string
+	Target string
+}
+
 // AppendHyphenToString is a function add hyphen at the end of string
 func AppendHyphenToString(stringToAppend string) string {
 	if strings.HasSuffix(stringToAppend, "-") {

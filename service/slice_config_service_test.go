@@ -737,3 +737,546 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceConfigServiceTest", &eventRecorder)
 	return workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, workerServiceImportMock, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock
 }
+
+func TestResolveTopologyPairs_DefaultFullMesh(t *testing.T) {
+	service := &SliceConfigService{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"cluster1", "cluster2", "cluster3"},
+		},
+	}
+
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	require.Len(t, pairs, 6)
+	
+	expectedPairs := []util.GatewayPair{
+		{Source: "cluster1", Target: "cluster2"},
+		{Source: "cluster1", Target: "cluster3"},
+		{Source: "cluster2", Target: "cluster1"},
+		{Source: "cluster2", Target: "cluster3"},
+		{Source: "cluster3", Target: "cluster1"},
+		{Source: "cluster3", Target: "cluster2"},
+	}
+	require.ElementsMatch(t, expectedPairs, pairs)
+}
+
+func TestResolveTopologyPairs_ExplicitFullMesh(t *testing.T) {
+	service := &SliceConfigService{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"cluster1", "cluster2"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: controllerv1alpha1.TopologyFullMesh,
+			},
+		},
+	}
+
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+	require.Equal(t, "cluster1", pairs[0].Source)
+	require.Equal(t, "cluster2", pairs[0].Target)
+	require.Equal(t, "cluster2", pairs[1].Source)
+	require.Equal(t, "cluster1", pairs[1].Target)
+}
+
+func TestResolveTopologyPairs_CustomTopology(t *testing.T) {
+	service := &SliceConfigService{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"cluster1", "cluster2", "cluster3"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: controllerv1alpha1.TopologyCustom,
+				ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{
+					{SourceCluster: "cluster1", TargetClusters: []string{"cluster2"}},
+					{SourceCluster: "cluster2", TargetClusters: []string{"cluster3"}},
+				},
+			},
+		},
+	}
+
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+	
+	expectedPairs := []util.GatewayPair{
+		{Source: "cluster1", Target: "cluster2"},
+		{Source: "cluster2", Target: "cluster3"},
+	}
+	require.ElementsMatch(t, expectedPairs, pairs)
+}
+
+func TestResolveTopologyPairs_CustomTopologyEmptyMatrix(t *testing.T) {
+	service := &SliceConfigService{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"cluster1", "cluster2"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: controllerv1alpha1.TopologyCustom,
+				ConnectivityMatrix: []controllerv1alpha1.ConnectivityEntry{},
+			},
+		},
+	}
+
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "custom topology requires connectivity matrix")
+	require.Nil(t, pairs)
+}
+
+func TestResolveTopologyPairs_RestrictedTopology(t *testing.T) {
+	service := &SliceConfigService{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"cluster1", "cluster2", "cluster3"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: controllerv1alpha1.TopologyRestricted,
+				ForbiddenEdges: []controllerv1alpha1.ForbiddenEdge{
+					{SourceCluster: "cluster1", TargetClusters: []string{"cluster3"}},
+				},
+			},
+		},
+	}
+
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	// Forbidding 1→3 also removes 3→1 (bidirectional gateway)
+	require.Len(t, pairs, 4)
+	
+	expectedPairs := []util.GatewayPair{
+		{Source: "cluster1", Target: "cluster2"},
+		{Source: "cluster2", Target: "cluster1"},
+		{Source: "cluster2", Target: "cluster3"},
+		{Source: "cluster3", Target: "cluster2"},
+	}
+	require.ElementsMatch(t, expectedPairs, pairs)
+}
+
+func TestResolveTopologyPairs_RestrictedTopologyNoForbidden(t *testing.T) {
+	service := &SliceConfigService{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"cluster1", "cluster2"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: controllerv1alpha1.TopologyRestricted,
+			},
+		},
+	}
+
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+	require.Equal(t, "cluster1", pairs[0].Source)
+	require.Equal(t, "cluster2", pairs[0].Target)
+	require.Equal(t, "cluster2", pairs[1].Source)
+	require.Equal(t, "cluster1", pairs[1].Target)
+}
+
+func TestResolveTopologyPairs_UnknownType(t *testing.T) {
+	service := &SliceConfigService{}
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"cluster1", "cluster2"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: "unknown-type",
+			},
+		},
+	}
+
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown topology type: unknown-type")
+	require.Nil(t, pairs)
+}
+
+func TestResolveFullMeshTopology(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	t.Run("SingleCluster", func(t *testing.T) {
+		pairs := service.resolveFullMeshTopology([]string{"cluster1"})
+		require.Empty(t, pairs)
+	})
+	
+	t.Run("TwoClusters", func(t *testing.T) {
+		pairs := service.resolveFullMeshTopology([]string{"cluster1", "cluster2"})
+		require.Len(t, pairs, 2)
+		require.Equal(t, "cluster1", pairs[0].Source)
+		require.Equal(t, "cluster2", pairs[0].Target)
+		require.Equal(t, "cluster2", pairs[1].Source)
+		require.Equal(t, "cluster1", pairs[1].Target)
+	})
+	
+	t.Run("ThreeClusters", func(t *testing.T) {
+		pairs := service.resolveFullMeshTopology([]string{"cluster1", "cluster2", "cluster3"})
+		require.Len(t, pairs, 6)
+		
+		expectedPairs := []util.GatewayPair{
+			{Source: "cluster1", Target: "cluster2"},
+			{Source: "cluster1", Target: "cluster3"},
+			{Source: "cluster2", Target: "cluster1"},
+			{Source: "cluster2", Target: "cluster3"},
+			{Source: "cluster3", Target: "cluster1"},
+			{Source: "cluster3", Target: "cluster2"},
+		}
+		require.ElementsMatch(t, expectedPairs, pairs)
+	})
+	
+	t.Run("FourClusters", func(t *testing.T) {
+		pairs := service.resolveFullMeshTopology([]string{"cluster1", "cluster2", "cluster3", "cluster4"})
+		require.Len(t, pairs, 12)
+	})
+}
+
+func TestResolveCustomTopology(t *testing.T) {
+	service := &SliceConfigService{}
+	clusters := []string{"cluster1", "cluster2", "cluster3"}
+	
+	t.Run("ValidMatrix", func(t *testing.T) {
+		matrix := []controllerv1alpha1.ConnectivityEntry{
+			{SourceCluster: "cluster1", TargetClusters: []string{"cluster2", "cluster3"}},
+		}
+		
+		pairs, err := service.resolveCustomTopology(clusters, matrix)
+		require.NoError(t, err)
+		require.Len(t, pairs, 2)
+		
+		expectedPairs := []util.GatewayPair{
+			{Source: "cluster1", Target: "cluster2"},
+			{Source: "cluster1", Target: "cluster3"},
+		}
+		require.ElementsMatch(t, expectedPairs, pairs)
+	})
+	
+	t.Run("EmptyMatrix", func(t *testing.T) {
+		matrix := []controllerv1alpha1.ConnectivityEntry{}
+		
+		pairs, err := service.resolveCustomTopology(clusters, matrix)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "custom topology requires connectivity matrix")
+		require.Nil(t, pairs)
+	})
+	
+	t.Run("InvalidSourceCluster", func(t *testing.T) {
+		matrix := []controllerv1alpha1.ConnectivityEntry{
+			{SourceCluster: "invalid", TargetClusters: []string{"cluster2"}},
+		}
+		
+		_, err := service.resolveCustomTopology(clusters, matrix)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unknown source cluster: invalid")
+	})
+	
+	t.Run("InvalidTargetCluster", func(t *testing.T) {
+		matrix := []controllerv1alpha1.ConnectivityEntry{
+			{SourceCluster: "cluster1", TargetClusters: []string{"invalid"}},
+		}
+		
+		_, err := service.resolveCustomTopology(clusters, matrix)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unknown target cluster: invalid")
+	})
+	
+	t.Run("MultipleSourceClusters", func(t *testing.T) {
+		matrix := []controllerv1alpha1.ConnectivityEntry{
+			{SourceCluster: "cluster1", TargetClusters: []string{"cluster2"}},
+			{SourceCluster: "cluster2", TargetClusters: []string{"cluster3"}},
+			{SourceCluster: "cluster3", TargetClusters: []string{"cluster1"}},
+		}
+		
+		pairs, err := service.resolveCustomTopology(clusters, matrix)
+		require.NoError(t, err)
+		require.Len(t, pairs, 3)
+	})
+}
+
+func TestResolveRestrictedTopology(t *testing.T) {
+	service := &SliceConfigService{}
+	clusters := []string{"cluster1", "cluster2", "cluster3"}
+	
+	t.Run("NoForbiddenEdges", func(t *testing.T) {
+		pairs, err := service.resolveRestrictedTopology(clusters, []controllerv1alpha1.ForbiddenEdge{})
+		require.NoError(t, err)
+		require.Len(t, pairs, 6)
+		
+		expectedPairs := []util.GatewayPair{
+			{Source: "cluster1", Target: "cluster2"},
+			{Source: "cluster1", Target: "cluster3"},
+			{Source: "cluster2", Target: "cluster1"},
+			{Source: "cluster2", Target: "cluster3"},
+			{Source: "cluster3", Target: "cluster1"},
+			{Source: "cluster3", Target: "cluster2"},
+		}
+		require.ElementsMatch(t, expectedPairs, pairs)
+	})
+	
+	t.Run("WithForbiddenEdges", func(t *testing.T) {
+		forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "cluster1", TargetClusters: []string{"cluster3"}},
+		}
+		
+		pairs, err := service.resolveRestrictedTopology(clusters, forbiddenEdges)
+		require.NoError(t, err)
+		// Forbidding 1→3 also removes 3→1 (bidirectional gateway)
+		require.Len(t, pairs, 4)
+		
+		expectedPairs := []util.GatewayPair{
+			{Source: "cluster1", Target: "cluster2"},
+			{Source: "cluster2", Target: "cluster1"},
+			{Source: "cluster2", Target: "cluster3"},
+			{Source: "cluster3", Target: "cluster2"},
+		}
+		require.ElementsMatch(t, expectedPairs, pairs)
+	})
+}
+
+func TestBuildForbiddenSet(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	t.Run("SingleEdge", func(t *testing.T) {
+		forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "cluster1", TargetClusters: []string{"cluster2"}},
+		}
+		
+		forbidden := service.buildForbiddenSet(forbiddenEdges)
+		require.Len(t, forbidden, 1)
+		require.True(t, forbidden["cluster1-cluster2"])
+	})
+	
+	t.Run("MultipleEdges", func(t *testing.T) {
+		forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
+			{SourceCluster: "cluster1", TargetClusters: []string{"cluster2", "cluster3"}},
+			{SourceCluster: "cluster2", TargetClusters: []string{"cluster3"}},
+		}
+		
+		forbidden := service.buildForbiddenSet(forbiddenEdges)
+		require.Len(t, forbidden, 3)
+		require.True(t, forbidden["cluster1-cluster2"])
+		require.True(t, forbidden["cluster1-cluster3"])
+		require.True(t, forbidden["cluster2-cluster3"])
+	})
+	
+	t.Run("EmptyEdges", func(t *testing.T) {
+		forbidden := service.buildForbiddenSet([]controllerv1alpha1.ForbiddenEdge{})
+		require.Empty(t, forbidden)
+	})
+}
+
+func TestFilterForbiddenPairs(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	t.Run("FilterSomePairs", func(t *testing.T) {
+		pairs := []util.GatewayPair{
+			{Source: "cluster1", Target: "cluster2"},
+			{Source: "cluster1", Target: "cluster3"},
+			{Source: "cluster2", Target: "cluster3"},
+		}
+		
+		forbidden := map[string]bool{
+			"cluster1-cluster3": true,
+		}
+		
+		filtered := service.filterForbiddenPairs(pairs, forbidden)
+		require.Len(t, filtered, 2)
+		
+		expectedPairs := []util.GatewayPair{
+			{Source: "cluster1", Target: "cluster2"},
+			{Source: "cluster2", Target: "cluster3"},
+		}
+		require.ElementsMatch(t, expectedPairs, filtered)
+	})
+	
+	t.Run("NoForbiddenPairs", func(t *testing.T) {
+		pairs := []util.GatewayPair{
+			{Source: "cluster1", Target: "cluster2"},
+		}
+		
+		forbidden := map[string]bool{}
+		
+		filtered := service.filterForbiddenPairs(pairs, forbidden)
+		require.Equal(t, pairs, filtered)
+	})
+	
+	t.Run("AllPairsForbidden", func(t *testing.T) {
+		pairs := []util.GatewayPair{
+			{Source: "cluster1", Target: "cluster2"},
+		}
+		
+		forbidden := map[string]bool{
+			"cluster1-cluster2": true,
+		}
+		
+		filtered := service.filterForbiddenPairs(pairs, forbidden)
+		require.Empty(t, filtered)
+	})
+}
+
+func TestMakeClusterSet(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	t.Run("ValidClusters", func(t *testing.T) {
+		clusters := []string{"cluster1", "cluster2", "cluster3"}
+		set := service.makeClusterSet(clusters)
+		
+		require.Len(t, set, 3)
+		require.True(t, set["cluster1"])
+		require.True(t, set["cluster2"])
+		require.True(t, set["cluster3"])
+		require.False(t, set["nonexistent"])
+	})
+	
+	t.Run("EmptyClusters", func(t *testing.T) {
+		set := service.makeClusterSet([]string{})
+		require.Empty(t, set)
+	})
+	
+	t.Run("SingleCluster", func(t *testing.T) {
+		set := service.makeClusterSet([]string{"only"})
+		require.Len(t, set, 1)
+		require.True(t, set["only"])
+	})
+	
+	t.Run("DuplicateClusters", func(t *testing.T) {
+		clusters := []string{"c1", "c2", "c1"}
+		set := service.makeClusterSet(clusters)
+		require.Len(t, set, 2)
+		require.True(t, set["c1"])
+		require.True(t, set["c2"])
+	})
+}
+
+func TestResolveTopologyPairs_NilTopology(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters:       []string{"c1", "c2"},
+			TopologyConfig: nil,
+		},
+	}
+	
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+}
+
+func TestResolveTopologyPairs_EmptyTopologyType(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	sliceConfig := &controllerv1alpha1.SliceConfig{
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			Clusters: []string{"c1", "c2"},
+			TopologyConfig: &controllerv1alpha1.TopologyConfig{
+				TopologyType: "",
+			},
+		},
+	}
+	
+	pairs, err := service.resolveTopologyPairs(sliceConfig)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+}
+
+func TestResolveFullMeshTopology_ZeroClusters(t *testing.T) {
+	service := &SliceConfigService{}
+	pairs := service.resolveFullMeshTopology([]string{})
+	require.Empty(t, pairs)
+}
+
+func TestResolveFullMeshTopology_FiveClusters(t *testing.T) {
+	service := &SliceConfigService{}
+	clusters := []string{"c1", "c2", "c3", "c4", "c5"}
+	pairs := service.resolveFullMeshTopology(clusters)
+	require.Len(t, pairs, 20)
+}
+
+func TestResolveCustomTopology_MultipleTargets(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	clusters := []string{"c1", "c2", "c3", "c4"}
+	matrix := []controllerv1alpha1.ConnectivityEntry{
+		{SourceCluster: "c1", TargetClusters: []string{"c2", "c3", "c4"}},
+	}
+	
+	pairs, err := service.resolveCustomTopology(clusters, matrix)
+	require.NoError(t, err)
+	require.Len(t, pairs, 3)
+}
+
+func TestResolveCustomTopology_AllPossiblePairs(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	clusters := []string{"c1", "c2"}
+	matrix := []controllerv1alpha1.ConnectivityEntry{
+		{SourceCluster: "c1", TargetClusters: []string{"c2"}},
+		{SourceCluster: "c2", TargetClusters: []string{"c1"}},
+	}
+	
+	pairs, err := service.resolveCustomTopology(clusters, matrix)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+}
+
+func TestResolveRestrictedTopology_MultipleForbiddenEdges(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	clusters := []string{"c1", "c2", "c3"}
+	forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "c1", TargetClusters: []string{"c2"}},
+		{SourceCluster: "c2", TargetClusters: []string{"c3"}},
+	}
+	
+	pairs, err := service.resolveRestrictedTopology(clusters, forbiddenEdges)
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+}
+
+func TestBuildForbiddenSet_MultipleTargets(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	forbiddenEdges := []controllerv1alpha1.ForbiddenEdge{
+		{SourceCluster: "c1", TargetClusters: []string{"c2", "c3"}},
+	}
+	
+	forbidden := service.buildForbiddenSet(forbiddenEdges)
+	require.Len(t, forbidden, 2)
+	require.True(t, forbidden["c1-c2"])
+	require.True(t, forbidden["c1-c3"])
+}
+
+func TestFilterForbiddenPairs_BidirectionalFiltering(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	pairs := []util.GatewayPair{
+		{Source: "c1", Target: "c2"},
+		{Source: "c2", Target: "c1"},
+		{Source: "c1", Target: "c3"},
+		{Source: "c3", Target: "c1"},
+	}
+	
+	forbidden := map[string]bool{
+		"c1-c3": true,
+	}
+	
+	filtered := service.filterForbiddenPairs(pairs, forbidden)
+	require.Len(t, filtered, 2)
+	
+	for _, p := range filtered {
+		require.False(t, (p.Source == "c1" && p.Target == "c3") || (p.Source == "c3" && p.Target == "c1"))
+	}
+}
+
+func TestFilterForbiddenPairs_ReverseForbidden(t *testing.T) {
+	service := &SliceConfigService{}
+	
+	pairs := []util.GatewayPair{
+		{Source: "c1", Target: "c2"},
+	}
+	
+	forbidden := map[string]bool{
+		"c2-c1": true,
+	}
+	
+	filtered := service.filterForbiddenPairs(pairs, forbidden)
+	require.Empty(t, filtered)
+}
