@@ -180,7 +180,7 @@ func (e *ClusterLeaderElector) StartLeaseRenewal(ctx context.Context) error {
 		case <-ctx.Done():
 			e.setLeader(false)
 			e.log.Infow("lease renewal stopped", "reason", ctx.Err())
-			return ctx.Err()
+			return nil
 		case <-ticker.C:
 			_ = e.renewOnce(ctx)
 		}
@@ -231,7 +231,7 @@ func (e *ClusterLeaderElector) WatchRemoteLease(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			e.log.Infow("remote lease watch stopped", "reason", ctx.Err())
-			return ctx.Err()
+			return nil
 		case <-ticker.C:
 			_, _ = e.checkRemoteLeaseOnce(ctx)
 		}

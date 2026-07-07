@@ -33,7 +33,13 @@ import (
 // It is used by the Active's renewal loop (StartLeaseRenewal → renewOnce).
 func acquireOrRenewLease(ctx context.Context, c client.Client, name, namespace, identity string, leaseDuration time.Duration) (*coordinationv1.Lease, error) {
 	now := metav1.NewMicroTime(time.Now())
-	durationSeconds := int32(leaseDuration / time.Second)
+	// Round up to whole seconds and enforce a minimum of 1s. LeaseDurationSeconds
+	// is an int32 count of seconds, so a sub-second duration must not truncate to
+	// 0 (an invalid lease duration that also skews staleness checks).
+	durationSeconds := int32((leaseDuration + time.Second - 1) / time.Second)
+	if durationSeconds < 1 {
+		durationSeconds = 1
+	}
 
 	lease := &coordinationv1.Lease{}
 	err := c.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, lease)

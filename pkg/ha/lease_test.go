@@ -133,3 +133,14 @@ func TestAcquireOrRenewLease_TakeoverBumpsTransitions(t *testing.T) {
 	require.NotNil(t, lease.Spec.LeaseTransitions)
 	assert.Equal(t, int32(1), *lease.Spec.LeaseTransitions, "takeover should increment transitions")
 }
+
+func TestAcquireOrRenewLease_SubSecondDurationClampsToOne(t *testing.T) {
+	ctx := context.Background()
+	c := fakeClient(t)
+
+	lease, err := acquireOrRenewLease(ctx, c, "l", "ns", "hub-a", 500*time.Millisecond)
+	require.NoError(t, err)
+	require.NotNil(t, lease.Spec.LeaseDurationSeconds)
+	assert.Equal(t, int32(1), *lease.Spec.LeaseDurationSeconds,
+		"a sub-second duration must clamp to 1s, not truncate to 0")
+}
