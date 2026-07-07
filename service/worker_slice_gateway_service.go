@@ -595,11 +595,15 @@ func (s *WorkerSliceGatewayService) BuildNetworkAddresses(sliceSubnet, sourceClu
 func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinationCluster *controllerv1alpha1.Cluster,
 	sliceName, namespace, gatewayHostType, gatewayConnType, gatewayProtocol string, labels map[string]string, gatewayNumber int,
 	gatewaySubnet, localVpnAddress, remoteGatewayName, remoteGatewaySubnet, remoteVpnAddress, localGatewayName string) *v1alpha1.WorkerSliceGateway {
-	labels["worker-cluster"] = sourceCluster.Name
-	labels["remote-cluster"] = destinationCluster.Name
-	labels["kubeslice-manager"] = "controller"
-	labels["project-namespace"] = namespace
-	labels["original-slice-name"] = sliceName
+	gatewayLabels := make(map[string]string, len(labels)+2)
+	for key, value := range labels {
+		gatewayLabels[key] = value
+	}
+	gatewayLabels["kubeslice-manager"] = "controller"
+	gatewayLabels["project-namespace"] = namespace
+	gatewayLabels["original-slice-name"] = sliceName
+	gatewayLabels["worker-cluster"] = sourceCluster.Name
+	gatewayLabels["remote-cluster"] = destinationCluster.Name
 	sourceClusterNodeIPs := sourceCluster.Spec.NodeIPs
 	destinationClusterNodeIPs := destinationCluster.Spec.NodeIPs
 
@@ -615,7 +619,7 @@ func (s *WorkerSliceGatewayService) buildMinimumGateway(sourceCluster, destinati
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf(gatewayName, sliceName, sourceCluster.Name, destinationCluster.Name),
 			Namespace: namespace,
-			Labels:    labels,
+			Labels:    gatewayLabels,
 		},
 		Spec: v1alpha1.WorkerSliceGatewaySpec{
 			SliceName: sliceName,
