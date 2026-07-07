@@ -76,6 +76,7 @@ var ClusterTestbed = map[string]func(*testing.T){
 	"TestReconcileClusterDeletionFailureAfterWorkerFailedToRemoveFinalizer": testReconcileClusterDeletionFailureAfterWorkerFailedToRemoveFinalizer,
 	"TestReconcileClusterDeletionDeregisterFailed":                          testReconcileClusterDeletionDeregisterFailed,
 	"TestReconcileClusterDeletionDeregisterSuccess":                         testReconcileClusterDeletionDeregisterSuccess,
+	"TestReconcileClusterDeletionDeregisterStatusUpdateFail":                testReconcileClusterDeletionDeregisterStatusUpdateFail,
 }
 
 func testReconcileClusterClusterNotFound(t *testing.T) {
@@ -845,6 +846,57 @@ func testReconcileClusterDeletionFailureAfterWorkerFailedToRemoveFinalizer(t *te
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	_, err = clusterService.ReconcileCluster(ctx, requestObj)
 	// require.True(t, result.Requeue)
+	require.NotNil(t, err)
+	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
+}
+
+func testReconcileClusterDeletionDeregisterStatusUpdateFail(t *testing.T) {
+	nsServiceMock := &mocks.INamespaceService{}
+	acsService := &mocks.IAccessControlService{}
+	mMock := &metricMock.IMetricRecorder{}
+	clusterService := ClusterService{
+		ns:  nsServiceMock,
+		acs: acsService,
+		mf:  mMock,
+	}
+
+	clusterName := types.NamespacedName{
+		Namespace: "cisco",
+		Name:      "cluster-1",
+	}
+	requestObj := ctrl.Request{
+		clusterName,
+	}
+	clientMock := &utilmock.Client{}
+	cluster := &controllerv1alpha1.Cluster{}
+	nsResource := &corev1.Namespace{}
+	scheme := runtime.NewScheme()
+	controllerv1alpha1.AddToScheme(scheme)
+	ctx := prepareTestContext(context.Background(), clientMock, scheme)
+	timeStamp := kubemachine.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	clientMock.On("Get", ctx, requestObj.NamespacedName, cluster).Return(nil).Once().Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.Cluster)
+		arg.ObjectMeta.DeletionTimestamp = &timeStamp
+		arg.ObjectMeta.Finalizers = []string{ClusterFinalizer, ClusterDeregisterFinalizer}
+	})
+	clientMock.On("Get", ctx, client.ObjectKey{
+		Name: requestObj.Namespace,
+	}, nsResource).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", requestObj.Namespace)
+		arg.Name = "cisco"
+	})
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	statusUpdateErr := errors.New("status update failed")
+	clientMock.On("Status").Return(clientMock)
+	clientMock.On("Update", mock.Anything, mock.Anything).Return(statusUpdateErr)
+	result, err := clusterService.ReconcileCluster(ctx, requestObj)
+	require.False(t, result.Requeue)
 	require.NotNil(t, err)
 	clientMock.AssertExpectations(t)
 	mMock.AssertExpectations(t)
