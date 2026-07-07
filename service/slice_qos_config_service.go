@@ -175,7 +175,7 @@ func (q *SliceQoSConfigService) DeleteSliceQoSConfig(ctx context.Context, namesp
 			q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 				map[string]string{
 					"action":      "deletion_failed",
-					"event":       string(events.EventSliceConfigDeletionFailed),
+					"event":       string(events.EventSliceQoSConfigDeletionFailed),
 					"object_name": sliceQoSConfig.Name,
 					"object_kind": metricKindSliceQoSConfig,
 				},
@@ -187,7 +187,7 @@ func (q *SliceQoSConfigService) DeleteSliceQoSConfig(ctx context.Context, namesp
 		q.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
 			map[string]string{
 				"action":      "deleted",
-				"event":       string(events.EventSliceConfigDeleted),
+				"event":       string(events.EventSliceQoSConfigDeleted),
 				"object_name": sliceQoSConfig.Name,
 				"object_kind": metricKindSliceQoSConfig,
 			},
