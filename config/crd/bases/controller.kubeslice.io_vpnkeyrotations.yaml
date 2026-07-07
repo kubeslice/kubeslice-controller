@@ -88,6 +88,10 @@ spec:
                   type: object
                 description: This is map of gateway name to the current rotation state
                 type: object
+              rotationInProgress:
+                description: RotationInProgress indicates that cert-generation jobs
+                  have been triggered for this slice and are not yet complete.
+                type: boolean
               statusHistory:
                 additionalProperties:
                   items:
