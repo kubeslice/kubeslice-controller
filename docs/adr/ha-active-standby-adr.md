@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Status | Proposed |
-| Author | Sumanth  D|
+| Author | Sumanth D |
 | Mentors | Gourish Biradar, Prabhu Navali, Rahul Kumar |
 | Date | 2026-06-24 |
 | Issue | #293 |
