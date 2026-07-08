@@ -119,6 +119,7 @@ func initialize(services *service.Services) {
 	var haMode string
 	var haIdentity string
 	var haActiveKubeconfig string
+	var haLeaseNamespace string
 	var haLeaseDuration time.Duration
 	var haRenewDeadline time.Duration
 	var haRetryPeriod time.Duration
@@ -155,6 +156,7 @@ func initialize(services *service.Services) {
 	flag.StringVar(&haMode, "ha-mode", "standalone", `Cross-cluster HA mode: "active", "standby", or "standalone" (default).`)
 	flag.StringVar(&haIdentity, "ha-identity", "", "Stable per-cluster identity recorded in the Lease (defaults to the hostname).")
 	flag.StringVar(&haActiveKubeconfig, "ha-active-kubeconfig", "", "Path to the Active hub kubeconfig; required in standby mode.")
+	flag.StringVar(&haLeaseNamespace, "ha-lease-namespace", os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"), "Namespace for the HA Lease; defaults to the controller's own namespace (KUBESLICE_CONTROLLER_MANAGER_NAMESPACE), where the leader-election Role grants leases. Empty falls back to the pkg/ha default.")
 	flag.DurationVar(&haLeaseDuration, "ha-lease-duration", ha.DefaultLeaseDuration, "HA Lease duration.")
 	flag.DurationVar(&haRenewDeadline, "ha-renew-deadline", ha.DefaultRenewDeadline, "Deadline for the Active to renew its Lease before releasing leadership.")
 	flag.DurationVar(&haRetryPeriod, "ha-retry-period", ha.DefaultRetryPeriod, "Interval between Lease renew/watch attempts.")
@@ -330,6 +332,7 @@ func initialize(services *service.Services) {
 	leaderElector := ha.NewClusterLeaderElector(localHAClient, remoteHAClient, ha.Options{
 		Mode:           haRunMode,
 		Identity:       haIdentity,
+		LeaseNamespace: haLeaseNamespace,
 		LeaseDuration:  haLeaseDuration,
 		RenewDeadline:  haRenewDeadline,
 		RetryPeriod:    haRetryPeriod,
