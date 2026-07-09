@@ -242,4 +242,4 @@ Controller → aggregates statuses → TopologyConverged=True; hubs edits unlock
 - Hub health-based failover (accepted single-hub SPOF risk for this term)
 - Any topology mode other than `HubAndSpoke` and `FullMesh`
 
---- 
+---
