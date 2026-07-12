@@ -35,7 +35,7 @@ import (
 // reconciliation result for no-requeue.
 // If the finalizers list is non-empty after the removal, the function returns the
 // reconciliation result for delayed requeue.
-func RemoveWorkerFinalizers(ctx context.Context, object client.Object, workerFinalizerName string) ctrl.Result {
+func RemoveWorkerFinalizers(ctx context.Context, object client.Object, workerFinalizerName string) (ctrl.Result, error) {
 	logger := util.CtxLogger(ctx)
 	finalizers := object.GetFinalizers()
 	additionalFinalizers := make([]string, 0)
@@ -52,7 +52,7 @@ func RemoveWorkerFinalizers(ctx context.Context, object client.Object, workerFin
 				result.Requeue = true
 				result.RequeueAfter = KubesliceWorkerDeleteRequeueTime * time.Minute
 				logger.Debugf("Found additional finalizers: %v. Requeuing with Reconciliation Result: %+v", additionalFinalizers, result)
-				return result
+				return result, nil
 			} else {
 				logger.Debugf("Cleaning up additional finalizers: %v because deletion grace period has exceeded", additionalFinalizers)
 			}
@@ -63,9 +63,11 @@ func RemoveWorkerFinalizers(ctx context.Context, object client.Object, workerFin
 	object.SetFinalizers(make([]string, 0))
 	if err := util.UpdateResource(ctx, object); err != nil {
 		logger.With(zap.Error(err)).Errorf("Failed to cleanup finalizers")
+		return result, err
 	}
-	return result
+	return result, nil
 }
+
 
 // get Slice gateway service type for each cluster registered with given slice
 func getSliceGwSvcTypes(sliceConfig *v1alpha1.SliceConfig) map[string]*v1alpha1.SliceGatewayServiceType {

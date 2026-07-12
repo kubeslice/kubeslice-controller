@@ -85,7 +85,10 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 		}
 	} else {
 		logger.Debugf("starting delete for WorkerServiceImport %v", req.NamespacedName)
-		result := RemoveWorkerFinalizers(ctx, workerServiceImport, WorkerServiceImportFinalizer)
+		result, err := RemoveWorkerFinalizers(ctx, workerServiceImport, WorkerServiceImportFinalizer)
+		if err != nil {
+			return result, err
+		}
 		if result.Requeue {
 			return result, nil
 		}

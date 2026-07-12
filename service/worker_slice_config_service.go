@@ -87,7 +87,10 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 		}
 	} else {
 		logger.Debug("starting delete for WorkerSliceConfig", req.NamespacedName)
-		result := RemoveWorkerFinalizers(ctx, workerSliceConfig, WorkerSliceConfigFinalizer)
+		result, err := RemoveWorkerFinalizers(ctx, workerSliceConfig, WorkerSliceConfigFinalizer)
+		if err != nil {
+			return result, err
+		}
 		if result.Requeue {
 			return result, nil
 		}

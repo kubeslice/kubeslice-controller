@@ -102,7 +102,10 @@ func (s *WorkerSliceGatewayService) ReconcileWorkerSliceGateways(ctx context.Con
 		}
 	} else {
 		logger.Infof("WorkerSliceGateway %v is being deleted", req.NamespacedName)
-		result := RemoveWorkerFinalizers(ctx, workerSliceGateway, WorkerSliceGatewayFinalizer)
+		result, err := RemoveWorkerFinalizers(ctx, workerSliceGateway, WorkerSliceGatewayFinalizer)
+		if err != nil {
+			return result, err
+		}
 		if result.Requeue {
 			return result, nil
 		}
