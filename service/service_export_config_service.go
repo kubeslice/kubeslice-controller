@@ -165,13 +165,16 @@ func (s *ServiceExportConfigService) cleanUpServiceExportConfigResources(ctx con
 		list, err := s.ses.ListWorkerServiceImport(ctx, ownershipLabel, serviceExportConfig.Namespace)
 		if err != nil {
 			logger.With(zap.Error(err)).Errorf("failed to list worker service imports with labels %v", ownershipLabel)
+			return ctrl.Result{}, err
 		}
 		err = s.ses.ForceReconciliation(ctx, list)
 		if err != nil {
 			logger.With(zap.Error(err)).Errorf("failed to queue worker service imports for reconciliation with labels %v", ownershipLabel)
+			return ctrl.Result{}, err
 		}
 	}
 	return ctrl.Result{}, nil
+
 }
 
 // DeleteServiceExportConfigs is a function to delete the export configs
