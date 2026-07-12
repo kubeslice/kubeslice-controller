@@ -200,16 +200,15 @@ Rejects on CREATE and UPDATE:
 | # | Validation Rule | Error Message |
 |---|---|---|
 | 1 | `mode: HubAndSpoke` AND `hubs` is empty or absent | `HubAndSpoke topology requires at least one hub` |
-| 2 | `mode: HubAndSpoke` AND a name in `hubs` is not in `spec.clusters` | `Hub "X" is not a member of spec.clusters` |
+| 2 | `mode: HubAndSpoke` AND a name in `hubs` is not in `spec.clusters` | `hub is not a member of spec.clusters` |
 | 3 | `mode: HubAndSpoke` AND all clusters are listed as hubs (no spokes) | `HubAndSpoke topology requires at least one spoke cluster` |
 | 4 | `mode: FullMesh` AND `hubs` is non-empty | `hubs must be empty when mode is FullMesh` |
-| 5 | `hubs` contains duplicate cluster names | `Duplicate hub entry: "X"` |
-| 6 | `mode` is set to an unrecognized value | `Unknown topology mode "X"; valid values: FullMesh, HubAndSpoke` |
+| 5 | `hubs` contains duplicate cluster names | `duplicate hub entry: X` |
+| 6 | `mode` is set to an unrecognized value | `unknown topology mode; valid values: FullMesh, HubAndSpoke` |
 | 7 | `mode: HubAndSpoke` AND `len(spec.clusters) < 2` | `HubAndSpoke topology requires at least 2 clusters` |
 | 8 | `len(spec.clusters) > MaxClusters` (delegates to the existing `MaxClusters` validation; HubAndSpoke does not bypass it) | `participating clusters cannot be greater than MaxClusterCount :X` |
 | 9 | `hubs` is non-empty AND `topology.mode` is absent | `mode must be set to HubAndSpoke when hubs is specified` |
 | 10 | `mode: HubAndSpoke` AND `len(hubs) > 1` | `only one hub is supported in this release` |
-| 11 | `mode: HubAndSpoke` AND the designated hub's `Cluster.Status.NodeIPs` is empty (no externally reachable endpoint) | `Hub "X" has no NodeIPs; a hub must have an external endpoint configured` |
 
 ---
 
