@@ -162,7 +162,10 @@ func (s *WorkerSliceConfigService) ReconcileWorkerSliceConfig(ctx context.Contex
 	}
 	octet := workerSliceConfig.Spec.Octet
 	clusterSubnetCIDR := workerSliceConfig.Spec.ClusterSubnetCIDR
-	slice := s.copySpecFromSliceConfigToWorkerSlice(ctx, *sliceConfig)
+	slice, err := s.copySpecFromSliceConfigToWorkerSlice(ctx, *sliceConfig)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	workerSliceConfig.Spec = slice.Spec
 
 	// add missing project label to sliceConfig
@@ -684,11 +687,11 @@ func (s *WorkerSliceConfigService) cleanUpSlices(ctx context.Context, label map[
 }
 
 // copySpecFromSliceConfigToWorkerSlice is a function to copy configuration from slice to worker slice
-func (s *WorkerSliceConfigService) copySpecFromSliceConfigToWorkerSlice(ctx context.Context, sliceConfig controllerv1alpha1.SliceConfig) workerv1alpha1.WorkerSliceConfig {
+func (s *WorkerSliceConfigService) copySpecFromSliceConfigToWorkerSlice(ctx context.Context, sliceConfig controllerv1alpha1.SliceConfig) (workerv1alpha1.WorkerSliceConfig, error) {
 	slice := workerv1alpha1.WorkerSliceConfig{}
 	err := copier.Copy(&slice.Spec, &sliceConfig.Spec)
 	if err != nil {
-		return workerv1alpha1.WorkerSliceConfig{}
+		return workerv1alpha1.WorkerSliceConfig{}, fmt.Errorf("failed to copy SliceConfig spec to WorkerSliceConfig: %w", err)
 	}
-	return slice
+	return slice, nil
 }
