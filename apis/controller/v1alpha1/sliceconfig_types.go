@@ -95,9 +95,9 @@ type TopologySpec struct {
 	Mode TopologyMode `json:"mode,omitempty"`
 	// Hubs lists the clusters acting as hubs when Mode is HubAndSpoke.
 	// Each entry must be a member of spec.clusters. All non-hub members
-	// become spokes.
+	// become spokes. Exactly one hub is supported in this release.
 	//+optional
-	//+kubebuilder:validation:MaxItems=2
+	//+kubebuilder:validation:MaxItems=1
 	Hubs []string `json:"hubs,omitempty"`
 }
 

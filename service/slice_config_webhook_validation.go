@@ -371,11 +371,16 @@ func validateHubAndSpokeTopology(sliceConfig *controllerv1alpha1.SliceConfig, to
 	if len(topology.Hubs) == 0 {
 		return field.Required(topologyPath.Child("Hubs"), "HubAndSpoke topology requires at least one hub")
 	}
-	if duplicate, value := util.CheckDuplicateInArray(topology.Hubs); duplicate {
-		return field.Duplicate(topologyPath.Child("Hubs"), "duplicate hub entry: "+strings.Join(value, ", "))
-	}
+	// The next two checks are defense-in-depth: the CRD schema pins Hubs to
+	// MaxItems=1, so structural validation already rejects >1 (and therefore
+	// any duplicate) before admission reaches this webhook. They remain as a
+	// safety net and stay meaningful if the schema limit is raised for
+	// multi-hub. The single-hub check is ordered first so it wins when both apply.
 	if len(topology.Hubs) > 1 {
 		return field.Invalid(topologyPath.Child("Hubs"), topology.Hubs, "only one hub is supported in this release")
+	}
+	if duplicate, value := util.CheckDuplicateInArray(topology.Hubs); duplicate {
+		return field.Duplicate(topologyPath.Child("Hubs"), "duplicate hub entry: "+strings.Join(value, ", "))
 	}
 	members := make(map[string]bool, len(sliceConfig.Spec.Clusters))
 	for _, clusterName := range sliceConfig.Spec.Clusters {
@@ -394,6 +399,8 @@ func validateHubAndSpokeTopology(sliceConfig *controllerv1alpha1.SliceConfig, to
 			spokes++
 		}
 	}
+	// spokes == 0 is unreachable today (1 hub max + >=2 clusters => >=1 spoke),
+	// but guards against regressions when the hub count limit is raised.
 	if spokes == 0 {
 		return field.Invalid(topologyPath.Child("Hubs"), topology.Hubs, "HubAndSpoke topology requires at least one spoke cluster")
 	}

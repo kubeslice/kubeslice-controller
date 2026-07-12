@@ -2360,7 +2360,7 @@ func test_validateTopology(t *testing.T) {
 			errContains: "is not a member of spec.clusters",
 		},
 		{
-			name:        "all clusters as hubs leaves no spokes and is rejected",
+			name:        "single-cluster HubAndSpoke is rejected (needs at least 2 clusters)",
 			clusters:    []string{"cluster-1"},
 			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1"}},
 			wantErr:     true,
@@ -2374,11 +2374,11 @@ func test_validateTopology(t *testing.T) {
 			errContains: "hubs must be empty when mode is FullMesh",
 		},
 		{
-			name:        "duplicate hub entries are rejected",
+			name:        "more than one hub is rejected (single-hub MVP)",
 			clusters:    clusters,
-			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1", "cluster-1"}},
+			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1", "cluster-2"}},
 			wantErr:     true,
-			errContains: "duplicate hub entry",
+			errContains: "only one hub is supported in this release",
 		},
 		{
 			name:        "unknown mode is rejected",
