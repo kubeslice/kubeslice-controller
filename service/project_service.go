@@ -166,9 +166,10 @@ func (t *ProjectService) ReconcileProject(ctx context.Context, req ctrl.Request)
 	}
 
 	// Step 7: adding ProjectNamespace in labels
-	labels := make(map[string]string)
-	labels["kubeslice-project-namespace"] = projectNamespace
-	project.Labels = labels
+	if project.Labels == nil {
+		project.Labels = make(map[string]string)
+	}
+	project.Labels["kubeslice-project-namespace"] = projectNamespace
 
 	err = util.UpdateResource(ctx, project)
 	if err != nil {
