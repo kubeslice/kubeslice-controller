@@ -110,7 +110,7 @@ Spokes: `[a, b, c]`
 Total edges = |H| × |S| + (|H| × (|H| - 1)) / 2
 ```
 
-**MVP scope note:** the algorithm above is written for a general `|H|`, but the MVP caps `hubs` at one entry via webhook rule 10. Hub↔hub edges, Example 2, and the multi-hub terms of the formula document the design's generality and are not reachable this term; enabling multi-hub later means removing that webhook rule, with no schema or algorithm change.
+**MVP scope note:** the algorithm above is written for a general `|H|`, but the MVP caps `hubs` at one entry — both in the CRD schema (`+kubebuilder:validation:MaxItems=1`) and, as defense-in-depth, in the webhook (rule 10). Hub↔hub edges, Example 2, and the multi-hub terms of the formula document the design's generality and are not reachable this term; enabling multi-hub later means raising the schema `MaxItems` and relaxing the webhook rule, with no algorithm change.
 
 **Units, precisely:** the counts above are *logical link* counts. Each link is realized as one `WorkerSliceGateway` Server/Client pair, which the worker-operator turns into gateway Deployments (with HA pod redundancy) on each side. So the actual object count and pod count are each a constant multiple of the link count above — the reduction claim in this ADR is measured in links/`WorkerSliceGateway` pairs, not pods or Deployments.
 
