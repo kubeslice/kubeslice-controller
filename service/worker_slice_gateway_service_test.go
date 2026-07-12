@@ -57,15 +57,16 @@ func TestWorkerSliceGatewaySuite(t *testing.T) {
 }
 
 var WorkerSliceGatewayTestbed = map[string]func(*testing.T){
-	"TestWorkerSliceGatewayReconciliation_Success":               testWorkerSliceGatewayReconciliationSuccess,
-	"TestWorkerSliceGatewayReconciliation_IfSliceConfigNotFound": testWorkerSliceGatewayReconciliationIfSliceConfigNotFound,
-	"TestWorkerSliceGatewayReconciliation_IfGatewayNotFound":     testWorkerSliceGatewayReconciliationIfGatewayNotFound,
-	"TestWorkerSliceGatewayReconciliation_Delete":                testWorkerSliceGatewayReconciliationDelete,
-	"TestWorkerSliceGatewayReconciliation_DeleteForcefully":      testWorkerSliceGatewayReconciliationDeleteForcefully,
-	"TestCreateMinimumWorkerSliceGateways_IfAlreadyExists":       testCreateMinimumWorkerSliceGatewaysAlreadyExists,
-	"TestCreateMinimumWorkerSliceGateways_IfNotExists":           testCreateMinimumWorkerSliceGatewaysNotExists,
-	"TestDeleteWorkerSliceGatewaysByLabel_IfExists":              testDeleteWorkerSliceGatewaysByLabelExists,
-	"TestNodeIpReconciliationOfWorkerSliceGateways_IfExists":     testNodeIpReconciliationOfWorkerSliceGatewaysExists,
+	"TestWorkerSliceGatewayReconciliation_Success":                      testWorkerSliceGatewayReconciliationSuccess,
+	"TestWorkerSliceGatewayReconciliation_IfSliceConfigNotFound":        testWorkerSliceGatewayReconciliationIfSliceConfigNotFound,
+	"TestWorkerSliceGatewayReconciliation_IfGatewayNotFound":            testWorkerSliceGatewayReconciliationIfGatewayNotFound,
+	"TestWorkerSliceGatewayReconciliation_Delete":                       testWorkerSliceGatewayReconciliationDelete,
+	"TestWorkerSliceGatewayReconciliation_DeleteForcefully":             testWorkerSliceGatewayReconciliationDeleteForcefully,
+	"TestCreateMinimumWorkerSliceGateways_IfAlreadyExists":              testCreateMinimumWorkerSliceGatewaysAlreadyExists,
+	"TestCreateMinimumWorkerSliceGateways_HubAndSpokeSkipsSpokeToSpoke": testCreateMinimumWorkerSliceGatewaysHubAndSpokeSkipsSpokeToSpoke,
+	"TestCreateMinimumWorkerSliceGateways_IfNotExists":                  testCreateMinimumWorkerSliceGatewaysNotExists,
+	"TestDeleteWorkerSliceGatewaysByLabel_IfExists":                     testDeleteWorkerSliceGatewaysByLabelExists,
+	"TestNodeIpReconciliationOfWorkerSliceGateways_IfExists":            testNodeIpReconciliationOfWorkerSliceGatewaysExists,
 }
 
 func testWorkerSliceGatewayReconciliationSuccess(t *testing.T) {
@@ -324,6 +325,45 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
+	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
+}
+
+// testCreateMinimumWorkerSliceGatewaysHubAndSpokeSkipsSpokeToSpoke verifies that
+// for a HubAndSpoke slice with hub=cluster-1 and three clusters, only the two
+// hub<->spoke edges are processed (cluster-1<->cluster-2, cluster-1<->cluster-3)
+// and the spoke<->spoke pair (cluster-2<->cluster-3) is never created. The proof
+// is in the mock call counts: exactly 3 cluster fetches and exactly 4 gateway
+// existence checks (2 pairs x server+client); a spoke<->spoke edge would add two
+// more gateway checks and exceed these expectations.
+func testCreateMinimumWorkerSliceGatewaysHubAndSpokeSkipsSpokeToSpoke(t *testing.T) {
+	_, _, _, workerSliceGatewayService, requestObj, clientMock, _, ctx, mMock := setupWorkerSliceGatewayTest("slice_gateway", "namespace")
+	label := map[string]string{}
+	clusterNames := []string{"cluster-1", "cluster-2", "cluster-3"}
+	clusterMap := map[string]int{
+		"cluster-1": 1,
+		"cluster-2": 2,
+		"cluster-3": 3,
+	}
+	topology := &controllerv1alpha1.TopologySpec{
+		Mode: controllerv1alpha1.TopologyModeHubAndSpoke,
+		Hubs: []string{"cluster-1"},
+	}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	// cleanup pass: no existing gateways to remove
+	pairWorkerSliceGateway := &workerv1alpha1.WorkerSliceGatewayList{}
+	clientMock.On("List", ctx, pairWorkerSliceGateway, mock.Anything, client.InNamespace(requestObj.Namespace)).Return(nil).Once()
+	// create pass: clusters participating in the two desired edges are fetched
+	cluster := &controllerv1alpha1.Cluster{}
+	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Times(3)
+	// gateway existence checks: exactly 2 hub<->spoke pairs (server+client each),
+	// all found -> nothing created. A spoke<->spoke pair would exceed 4 checks.
+	gateway := &workerv1alpha1.WorkerSliceGateway{}
+	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), gateway).Return(nil).Times(4)
+
+	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil, topology)
+	require.Equal(t, ctrl.Result{}, result)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 	mMock.AssertExpectations(t)
