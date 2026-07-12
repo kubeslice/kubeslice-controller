@@ -37,6 +37,20 @@ func TestNewClusterLeaderElector_DefaultsToStandalone(t *testing.T) {
 	assert.True(t, e.IsLeader())
 }
 
+func TestNewClusterLeaderElector_LeaseNamespacePrefersDownwardAPIEnvVar(t *testing.T) {
+	t.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", "kubeslice-avesha")
+	e := NewClusterLeaderElector(fakeClient(t), nil, Options{Log: testLog()})
+	assert.Equal(t, "kubeslice-avesha", e.leaseNS,
+		"an empty LeaseNamespace must prefer the controller's own runtime namespace over the hard-coded default")
+}
+
+func TestNewClusterLeaderElector_LeaseNamespaceFallsBackWhenEnvVarUnset(t *testing.T) {
+	t.Setenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE", "")
+	e := NewClusterLeaderElector(fakeClient(t), nil, Options{Log: testLog()})
+	assert.Equal(t, DefaultLeaseNamespace, e.leaseNS,
+		"with no env var and no explicit Options.LeaseNamespace, must fall back to DefaultLeaseNamespace")
+}
+
 func TestActive_BecomesLeaderAfterRenew(t *testing.T) {
 	e := NewClusterLeaderElector(fakeClient(t), nil, Options{Mode: ModeActive, Log: testLog()})
 	assert.False(t, e.IsLeader(), "active is not leader until it renews")

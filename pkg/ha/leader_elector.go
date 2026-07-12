@@ -42,11 +42,18 @@ const (
 )
 
 // Options configures a ClusterLeaderElector. Zero-valued fields fall back to the
-// Default* constants (or the OS hostname, for Identity).
+// Default* constants (or the OS hostname, for Identity; the downward-API
+// KUBESLICE_CONTROLLER_MANAGER_NAMESPACE env var, for LeaseNamespace).
 type Options struct {
-	Mode           HAMode
-	Identity       string
-	LeaseName      string
+	Mode      HAMode
+	Identity  string
+	LeaseName string
+	// LeaseNamespace, if empty, defaults to KUBESLICE_CONTROLLER_MANAGER_NAMESPACE
+	// (the controller's own namespace, injected via the downward API) so the
+	// Lease always lands where the leader-election Role grants access to it,
+	// regardless of which namespace the controller is actually deployed into.
+	// Only falls back to DefaultLeaseNamespace when that env var is unset too
+	// (e.g. running outside a pod).
 	LeaseNamespace string
 	LeaseDuration  time.Duration
 	RenewDeadline  time.Duration
@@ -97,7 +104,11 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 		opts.LeaseName = DefaultLeaseName
 	}
 	if opts.LeaseNamespace == "" {
-		opts.LeaseNamespace = DefaultLeaseNamespace
+		if ns := os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"); ns != "" {
+			opts.LeaseNamespace = ns
+		} else {
+			opts.LeaseNamespace = DefaultLeaseNamespace
+		}
 	}
 	if opts.LeaseDuration == 0 {
 		opts.LeaseDuration = DefaultLeaseDuration
