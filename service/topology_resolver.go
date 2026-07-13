@@ -67,3 +67,32 @@ func ResolveTopologyEdges(clusters []string, topology *controllerv1alpha1.Topolo
 	}
 	return edges
 }
+
+// TopologyEdgeSet answers direction-insensitive membership questions about a
+// set of desired edges: the two WorkerSliceGateway objects of a pair (the
+// server side and the client side) belong to the same logical edge.
+type TopologyEdgeSet struct {
+	members map[[2]string]bool
+}
+
+// NewTopologyEdgeSet builds a TopologyEdgeSet from resolved edges.
+func NewTopologyEdgeSet(edges []TopologyEdge) TopologyEdgeSet {
+	members := make(map[[2]string]bool, len(edges))
+	for _, edge := range edges {
+		members[edgeKey(edge.ServerCluster, edge.ClientCluster)] = true
+	}
+	return TopologyEdgeSet{members: members}
+}
+
+// Contains reports whether the given cluster pair, in either order, is a
+// desired edge.
+func (s TopologyEdgeSet) Contains(clusterA, clusterB string) bool {
+	return s.members[edgeKey(clusterA, clusterB)]
+}
+
+func edgeKey(clusterA, clusterB string) [2]string {
+	if clusterA > clusterB {
+		clusterA, clusterB = clusterB, clusterA
+	}
+	return [2]string{clusterA, clusterB}
+}

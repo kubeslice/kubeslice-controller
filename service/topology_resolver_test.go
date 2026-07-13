@@ -78,3 +78,22 @@ func TestResolveTopologyEdges(t *testing.T) {
 		})
 	}
 }
+
+func TestTopologyEdgeSetContains(t *testing.T) {
+	// hub-and-spoke edges: hub=worker-1, spokes worker-2/worker-3
+	set := NewTopologyEdgeSet(ResolveTopologyEdges(
+		[]string{"worker-1", "worker-2", "worker-3"},
+		&controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"worker-1"}},
+	))
+	// desired hub<->spoke edges, both directions
+	if !set.Contains("worker-1", "worker-2") || !set.Contains("worker-2", "worker-1") {
+		t.Fatal("expected worker-1<->worker-2 to be a desired edge (either direction)")
+	}
+	if !set.Contains("worker-1", "worker-3") {
+		t.Fatal("expected worker-1<->worker-3 to be a desired edge")
+	}
+	// spoke<->spoke is NOT desired
+	if set.Contains("worker-2", "worker-3") || set.Contains("worker-3", "worker-2") {
+		t.Fatal("did not expect worker-2<->worker-3 (spoke-to-spoke) to be a desired edge")
+	}
+}

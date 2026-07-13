@@ -352,7 +352,8 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 	sliceSubnet string, clusterCidr string, sliceGwSvcTypeMap map[string]*controllerv1alpha1.SliceGatewayServiceType,
 	topology *controllerv1alpha1.TopologySpec) (ctrl.Result, error) {
 
-	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap)
+	desiredEdges := ResolveTopologyEdges(clusterNames, topology)
+	err := s.cleanupObsoleteGateways(ctx, namespace, label, clusterNames, clusterMap, NewTopologyEdgeSet(desiredEdges))
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -360,7 +361,6 @@ func (s *WorkerSliceGatewayService) CreateMinimumWorkerSliceGateways(ctx context
 		return ctrl.Result{}, nil
 	}
 
-	desiredEdges := ResolveTopologyEdges(clusterNames, topology)
 	_, err = s.createMinimumGatewaysIfNotExists(ctx, sliceName, desiredEdges, namespace, label, clusterMap, sliceSubnet, clusterCidr, sliceGwSvcTypeMap)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -381,7 +381,7 @@ func (s *WorkerSliceGatewayService) ListWorkerSliceGateways(ctx context.Context,
 
 // cleanupObsoleteGateways is a function delete outdated gateways
 func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context, namespace string, ownerLabel map[string]string,
-	clusters []string, clusterMap map[string]int) error {
+	clusters []string, clusterMap map[string]int, desiredEdges TopologyEdgeSet) error {
 
 	gateways, err := s.ListWorkerSliceGateways(ctx, ownerLabel, namespace)
 	if err != nil {
@@ -408,7 +408,10 @@ func (s *WorkerSliceGatewayService) cleanupObsoleteGateways(ctx context.Context,
 		clusterSource := gateway.Spec.LocalGatewayConfig.ClusterName
 		clusterDestination := gateway.Spec.RemoteGatewayConfig.ClusterName
 		gatewayExpectedNumber := s.calculateGatewayNumber(clusterMap[clusterSource], clusterMap[clusterDestination])
-		if !clusterExistMap[clusterSource] || !clusterExistMap[clusterDestination] || gatewayExpectedNumber != gateway.Spec.GatewayNumber {
+		// Delete a gateway when either cluster left the slice, its gateway number
+		// changed, or its edge is no longer in the desired topology (e.g. a
+		// spoke<->spoke link after a FullMesh->HubAndSpoke change).
+		if !clusterExistMap[clusterSource] || !clusterExistMap[clusterDestination] || gatewayExpectedNumber != gateway.Spec.GatewayNumber || !desiredEdges.Contains(clusterSource, clusterDestination) {
 			err = util.DeleteResource(ctx, &gateway)
 			if err != nil {
 				//Register an event for worker slice gateway deletion failure
