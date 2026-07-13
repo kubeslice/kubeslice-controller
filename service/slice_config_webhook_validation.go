@@ -380,7 +380,7 @@ func validateHubAndSpokeTopology(sliceConfig *controllerv1alpha1.SliceConfig, to
 		return field.Invalid(topologyPath.Child("Hubs"), topology.Hubs, "only one hub is supported in this release")
 	}
 	if duplicate, value := util.CheckDuplicateInArray(topology.Hubs); duplicate {
-		return field.Duplicate(topologyPath.Child("Hubs"), "duplicate hub entry: "+strings.Join(value, ", "))
+		return field.Duplicate(topologyPath.Child("Hubs"), strings.Join(value, ", "))
 	}
 	members := make(map[string]bool, len(sliceConfig.Spec.Clusters))
 	for _, clusterName := range sliceConfig.Spec.Clusters {

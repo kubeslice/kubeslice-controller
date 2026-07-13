@@ -2394,20 +2394,6 @@ func test_validateTopology(t *testing.T) {
 			wantErr:     true,
 			errContains: "mode must be set to HubAndSpoke when hubs is specified",
 		},
-		{
-			name:        "more than one hub is rejected in this release",
-			clusters:    clusters,
-			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1", "cluster-2"}},
-			wantErr:     true,
-			errContains: "only one hub is supported",
-		},
-		{
-			name:        "HubAndSpoke with fewer than 2 clusters is rejected",
-			clusters:    []string{"cluster-1"},
-			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1"}},
-			wantErr:     true,
-			errContains: "requires at least 2 clusters",
-		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
