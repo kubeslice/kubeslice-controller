@@ -23,12 +23,15 @@ import (
 	"go.uber.org/zap"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // SliceConfigReconciler reconciles a SliceConfig object
@@ -46,9 +49,25 @@ func (r *SliceConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return r.SliceConfigService.ReconcileSliceConfig(kubeSliceCtx, req)
 }
 
+// sliceConfigForGateway maps a WorkerSliceGateway to a reconcile request for the
+// SliceConfig that owns it, so a change in a gateway's connectivity status
+// re-triggers aggregation of the slice's TopologyConverged condition. The
+// gateway carries its slice name in spec.SliceName and lives in the same
+// (project) namespace as the SliceConfig.
+func (r *SliceConfigReconciler) sliceConfigForGateway(ctx context.Context, obj client.Object) []ctrl.Request {
+	gateway, ok := obj.(*workerv1alpha1.WorkerSliceGateway)
+	if !ok || gateway.Spec.SliceName == "" {
+		return nil
+	}
+	return []ctrl.Request{
+		{NamespacedName: types.NamespacedName{Name: gateway.Spec.SliceName, Namespace: gateway.Namespace}},
+	}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *SliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&controllerv1alpha1.SliceConfig{}).
+		Watches(&workerv1alpha1.WorkerSliceGateway{}, handler.EnqueueRequestsFromMapFunc(r.sliceConfigForGateway)).
 		Complete(r)
 }

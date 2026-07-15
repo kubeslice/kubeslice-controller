@@ -28,7 +28,9 @@ import (
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -238,7 +240,43 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		}
 	}
 
+	// Step 9: Aggregate per-gateway connectivity into the slice's TopologyConverged condition.
+	if err := s.reconcileTopologyStatus(ctx, sliceConfig, req.Namespace, ownershipLabel); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// reconcileTopologyStatus lists the slice's WorkerSliceGateway objects, aggregates
+// their connectivity into the TopologyConverged condition on SliceConfig.status,
+// and persists it only when the condition changed (so LastTransitionTime and the
+// status subresource are not churned on every reconcile).
+func (s *SliceConfigService) reconcileTopologyStatus(ctx context.Context, sliceConfig *v1alpha1.SliceConfig, namespace string, ownershipLabel map[string]string) error {
+	gateways, err := s.sgs.ListWorkerSliceGateways(ctx, ownershipLabel, namespace)
+	if err != nil {
+		return err
+	}
+	condition := buildTopologyConvergedCondition(gateways, sliceConfig.Generation)
+	// The SliceConfig has already been mutated earlier in this reconcile (finalizer,
+	// labels), and the WorkerSliceGateway watch can drive concurrent reconciles, so
+	// the in-memory copy may be stale. Re-fetch the latest object and retry on a
+	// write conflict rather than failing the whole reconcile.
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest := &v1alpha1.SliceConfig{}
+		found, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceConfig.Name, Namespace: namespace}, latest)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return nil
+		}
+		condition.ObservedGeneration = latest.Generation
+		if !apimeta.SetStatusCondition(&latest.Status.Conditions, condition) {
+			return nil
+		}
+		return util.UpdateStatus(ctx, latest)
+	})
 }
 
 // checkForProjectNamespace is a function to check the namespace is in proper format
