@@ -23,6 +23,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestNewClusterLeaderElector_StandaloneIsAlwaysLeader(t *testing.T) {
@@ -91,4 +94,114 @@ func TestStandby_NeverLeaderEvenWhenLeaseStale(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, stale2, "old renewTime should read as stale")
 	assert.False(t, e2.IsLeader(), "standby must not promote in #294 (promotion is #297)")
+}
+
+func TestCheckRemoteLeaseOnce_PropagatesGetError(t *testing.T) {
+	remote := fakeClient(t) // the Active's lease is not present on the remote
+	e := NewClusterLeaderElector(fakeClient(t), remote, Options{Mode: ModeStandby, Log: testLog()})
+
+	stale, err := e.checkRemoteLeaseOnce(context.Background())
+	require.Error(t, err, "a missing remote lease must surface as an error, not silently report fresh")
+	assert.False(t, stale)
+}
+
+func TestRenewOnce_KeepsLeadershipWithinRenewDeadline(t *testing.T) {
+	e := NewClusterLeaderElector(failingWriteClient(t), nil, Options{
+		Mode:          ModeActive,
+		RenewDeadline: time.Hour,
+		Log:           testLog(),
+	})
+	e.isLeader.Store(true)
+	e.lastRenew = time.Now() // just renewed, well within the deadline
+
+	err := e.renewOnce(context.Background())
+	require.Error(t, err, "a failed renew attempt must still surface an error to the caller")
+	assert.True(t, e.IsLeader(), "leadership must be kept while still within renewDeadline (transient failure)")
+}
+
+func TestSetLeader_LogsOnlyOnTransition(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	log := zap.New(core).Sugar()
+
+	e := NewClusterLeaderElector(fakeClient(t), nil, Options{Mode: ModeActive, Identity: "hub-a", Log: log})
+
+	e.setLeader(true)
+	e.setLeader(true) // no transition; must not log again
+	e.setLeader(false)
+	e.setLeader(false) // no transition; must not log again
+
+	assert.Equal(t, 1, logs.FilterMessage("LeadershipAcquired").Len(),
+		"LeadershipAcquired must be logged exactly once per actual transition")
+	assert.Equal(t, 1, logs.FilterMessage("LeadershipLost").Len(),
+		"LeadershipLost must be logged exactly once per actual transition")
+}
+
+func TestStartLeaseRenewal_NoopWhenNotActive(t *testing.T) {
+	for _, mode := range []HAMode{ModeStandby, ModeStandalone} {
+		e := NewClusterLeaderElector(fakeClient(t), fakeClient(t), Options{Mode: mode, Log: testLog()})
+		err := e.StartLeaseRenewal(context.Background())
+		assert.NoError(t, err, "StartLeaseRenewal must be a no-op outside active mode")
+	}
+}
+
+func TestStartLeaseRenewal_ReturnsNilOnContextCancellation(t *testing.T) {
+	e := NewClusterLeaderElector(fakeClient(t), nil, Options{
+		Mode:        ModeActive,
+		RetryPeriod: 20 * time.Millisecond,
+		Log:         testLog(),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- e.StartLeaseRenewal(ctx) }()
+
+	require.Eventually(t, e.IsLeader, time.Second, 5*time.Millisecond,
+		"elector should acquire leadership before shutdown")
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err, "a graceful shutdown (context cancellation) must not be reported as an error")
+	case <-time.After(time.Second):
+		t.Fatal("StartLeaseRenewal did not return after context cancellation")
+	}
+	assert.False(t, e.IsLeader(), "leadership must be released on shutdown")
+}
+
+func TestWatchRemoteLease_NoopWhenNotStandby(t *testing.T) {
+	for _, mode := range []HAMode{ModeActive, ModeStandalone} {
+		e := NewClusterLeaderElector(fakeClient(t), nil, Options{Mode: mode, Log: testLog()})
+		err := e.WatchRemoteLease(context.Background())
+		assert.NoError(t, err, "WatchRemoteLease must be a no-op outside standby mode")
+	}
+}
+
+func TestWatchRemoteLease_RequiresRemoteClientInStandbyMode(t *testing.T) {
+	e := NewClusterLeaderElector(fakeClient(t), nil, Options{Mode: ModeStandby, Log: testLog()})
+	err := e.WatchRemoteLease(context.Background())
+	assert.Error(t, err, "standby mode without a remote client must fail fast instead of watching nothing")
+}
+
+func TestWatchRemoteLease_ReturnsNilOnContextCancellation(t *testing.T) {
+	remote := fakeClient(t, newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now()))
+	e := NewClusterLeaderElector(fakeClient(t), remote, Options{
+		Mode:        ModeStandby,
+		RetryPeriod: 20 * time.Millisecond,
+		Log:         testLog(),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- e.WatchRemoteLease(ctx) }()
+
+	time.Sleep(50 * time.Millisecond) // let at least one watch tick fire
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err, "a graceful shutdown (context cancellation) must not be reported as an error")
+	case <-time.After(time.Second):
+		t.Fatal("WatchRemoteLease did not return after context cancellation")
+	}
 }

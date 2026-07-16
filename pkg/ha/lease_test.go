@@ -144,3 +144,9 @@ func TestAcquireOrRenewLease_SubSecondDurationClampsToOne(t *testing.T) {
 	assert.Equal(t, int32(1), *lease.Spec.LeaseDurationSeconds,
 		"a sub-second duration must clamp to 1s, not truncate to 0")
 }
+
+func TestGetLease_NotFoundReturnsError(t *testing.T) {
+	c := fakeClient(t)
+	_, err := getLease(context.Background(), c, "missing", "ns")
+	assert.Error(t, err, "a missing lease must surface as an error, not a nil/zero value")
+}
