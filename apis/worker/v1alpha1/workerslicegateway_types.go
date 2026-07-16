@@ -41,6 +41,12 @@ type WorkerSliceGatewaySpec struct {
 	LocalGatewayConfig  SliceGatewayConfig `json:"localGatewayConfig,omitempty"`
 	RemoteGatewayConfig SliceGatewayConfig `json:"remoteGatewayConfig,omitempty"`
 	GatewayNumber       int                `json:"gatewayNumber,omitempty"`
+	// RouteEntireSliceSubnet, when true, tells the worker to route the whole
+	// slice subnet (not just the peer gateway's subnet) via this gateway. The
+	// controller sets it on a spoke's gateway to the hub in HubAndSpoke topology,
+	// so a spoke forwards all slice-internal traffic (including traffic destined
+	// for other spokes) to the hub, which relays it.
+	RouteEntireSliceSubnet bool `json:"routeEntireSliceSubnet,omitempty"`
 }
 
 type SliceGatewayConfig struct {

@@ -473,7 +473,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		}
 		logger.Debugf("setting gwConType in create_minwsg %s", sliceGwSvcType)
 		logger.Debugf("setting gwProto in create_minwsg %s", gwSvcProtocol)
-		err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses)
+		err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses, edge.HubSpoke)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -485,7 +485,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx context.Context,
 	sourceCluster *controllerv1alpha1.Cluster, destinationCluster *controllerv1alpha1.Cluster,
 	sliceName, namespace, gatewayConnType, gatewayProtocol string, label map[string]string, gatewayNumber int,
-	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error {
+	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses, routeEntireSliceSubnet bool) error {
 	serverGatewayName := fmt.Sprintf(gatewayName, sliceName, sourceCluster.Name, destinationCluster.Name)
 	clientGatewayName := fmt.Sprintf(gatewayName, sliceName, destinationCluster.Name, sourceCluster.Name)
 	gateway := v1alpha1.WorkerSliceGateway{}
@@ -548,6 +548,10 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 		clientGateway, gatewayConnType, gatewayProtocol, label, gatewayNumber,
 		gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress,
 		serverGatewayName, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName)
+	// For a hub-and-spoke edge the client side is the spoke; tell the worker to
+	// route the entire slice subnet via this gateway so spoke-to-spoke traffic is
+	// relayed through the hub.
+	clientGatewayObject.Spec.RouteEntireSliceSubnet = routeEntireSliceSubnet
 	err = util.CreateResource(ctx, clientGatewayObject)
 	if err != nil {
 		//Register an event for worker slice gateway creation failure
