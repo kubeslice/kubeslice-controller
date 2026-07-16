@@ -187,7 +187,9 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 					logger.Info("Waiting for worker-operator charts to uninstall")
 					// setting IsDeregisterInProgress to true to avoid requeuing
 					cluster.Status.IsDeregisterInProgress = true
-					util.UpdateStatus(ctx, cluster)
+					if err := util.UpdateStatus(ctx, cluster); err != nil {
+						return ctrl.Result{}, err
+					}
 					// Event for worker-operator chart uninstallation in progress [ClusterDeregistrationInProgress]
 					util.RecordEvent(ctx, eventRecorder, cluster, nil, events.EventClusterDeregistrationInProgress)
 					c.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
