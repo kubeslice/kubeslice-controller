@@ -1,0 +1,65 @@
+---
+# Least-privilege grant for the identity behind the Standby's
+# --ha-active-kubeconfig, applied ON THE ACTIVE CLUSTER — not part of this
+# repo's own config/rbac (that governs the local cluster's own ClusterRole)
+# and not referenced by config/rbac/kustomization.yaml or
+# config/default/kustomization.yaml, so it is never auto-applied to the
+# Standby's own cluster, where it would be meaningless.
+#
+# See config/ha/README.md for how and where to apply this.
+#
+# Scope: read-only (get/list/watch) on Namespace plus every type in
+# pkg/ha.CRDMirrorSet. RemoteSyncer never writes to the Active cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeslice-ha-standby-reader
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - controller.kubeslice.io
+    resources:
+      - projects
+      - clusters
+      - sliceconfigs
+      - serviceexportconfigs
+      - sliceqosconfigs
+      - vpnkeyrotations
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - worker.kubeslice.io
+    resources:
+      - workersliceconfigs
+      - workerslicegateways
+      - workerserviceimports
+    verbs:
+      - get
+      - list
+      - watch
+---
+# Template only — the subject is deployment-specific (a ServiceAccount if the
+# Standby dials the Active in-cluster, a cert CN if it uses client-cert auth
+# via a flattened kubeconfig) and can't be hardcoded here. Fill in `subjects`
+# before applying.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubeslice-ha-standby-reader-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeslice-ha-standby-reader
+subjects:
+  - kind: User # or ServiceAccount — see README.md
+    name: CHANGEME
+    apiGroup: rbac.authorization.k8s.io
