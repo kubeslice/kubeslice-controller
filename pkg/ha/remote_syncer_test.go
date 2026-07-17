@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,10 +28,15 @@ import (
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/kubeslice/kubeslice-controller/util"
 )
 
 // stubRemote is a remoteGetFunc backend the retry-engine tests drive
@@ -85,9 +91,44 @@ func buildSyncer(t *testing.T, remote *stubRemote) *RemoteSyncer {
 		queue: workqueue.NewTypedRateLimitingQueue[syncKey](
 			workqueue.NewTypedItemExponentialFailureRateLimiter[syncKey](time.Millisecond, time.Second),
 		),
-		enqueuedAt: map[syncKey]time.Time{},
-		log:        testLog(),
+		handlerRegistered: map[schema.GroupVersionKind]bool{},
+		enqueuedAt:        map[syncKey]time.Time{},
+		log:               testLog(),
 	}
+}
+
+// stubInformer is a minimal cache.Informer fake that only counts
+// AddEventHandlerWithResyncPeriod calls; every other method panics via the
+// embedded nil interface if exercised (registerInformersOnce never touches
+// them).
+type stubInformer struct {
+	cache.Informer
+	addCalls int
+}
+
+func (i *stubInformer) AddEventHandlerWithResyncPeriod(_ toolscache.ResourceEventHandler, _ time.Duration) (toolscache.ResourceEventHandlerRegistration, error) {
+	i.addCalls++
+	return nil, nil
+}
+
+// stubCache is a minimal cache.Cache fake that only implements GetInformer,
+// letting tests drive registerInformersOnce's retry/dedup behaviour without a
+// real *rest.Config.
+type stubCache struct {
+	cache.Cache
+	informer         *stubInformer
+	failGVKs         map[schema.GroupVersionKind]int // remaining failures before success, per GVK
+	getInformerCalls map[schema.GroupVersionKind]int
+}
+
+func (c *stubCache) GetInformer(_ context.Context, obj client.Object, _ ...cache.InformerGetOption) (cache.Informer, error) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	c.getInformerCalls[gvk]++
+	if c.failGVKs[gvk] > 0 {
+		c.failGVKs[gvk]--
+		return nil, fmt.Errorf("simulated GetInformer failure for %s", gvk)
+	}
+	return c.informer, nil
 }
 
 func TestRemoteSyncer_ReconcileKey_FoundMirrorsCreate(t *testing.T) {
@@ -185,4 +226,82 @@ func TestNewRemoteSyncer_StandbyRequiresRemoteConfig(t *testing.T) {
 	c := mirrorFakeClient(t)
 	_, err := NewRemoteSyncer(c, nil, testScheme(t), ModeStandby, RemoteSyncerOptions{Log: testLog()})
 	assert.Error(t, err)
+}
+
+func TestNamespaceMirrorSelector_MatchesOnlyProjectNamespaces(t *testing.T) {
+	sel := namespaceMirrorSelector()
+	assert.True(t, sel.Matches(labels.Set(util.LabelsKubeSliceController)),
+		"selector must match the labels NamespaceService.ReconcileProjectNamespace actually stamps on project namespaces")
+	assert.False(t, sel.Matches(labels.Set{"kubernetes.io/metadata.name": "kube-system"}),
+		"selector must not match an unrelated system namespace that happens to exist on the Active hub")
+}
+
+func TestRegisterInformers_RetriesUntilSuccess(t *testing.T) {
+	s := buildSyncer(t, newStubRemote())
+	s.setupRetryPeriod = time.Millisecond
+
+	var calls int32
+	s.register = func(_ context.Context) error {
+		if atomic.AddInt32(&calls, 1) < 3 {
+			return fmt.Errorf("simulated transient informer setup failure")
+		}
+		return nil
+	}
+
+	ok := s.registerInformers(context.Background())
+	assert.True(t, ok, "registerInformers must keep retrying instead of giving up on the first failure")
+	assert.GreaterOrEqual(t, atomic.LoadInt32(&calls), int32(3))
+}
+
+func TestRegisterInformersOnce_SkipsAlreadyRegisteredHandlersOnRetry(t *testing.T) {
+	resA := MirroredResource{GVK: schema.GroupVersionKind{Group: groupController, Version: "v1alpha1", Kind: "Cluster"}}
+	resB := MirroredResource{GVK: schema.GroupVersionKind{Group: groupController, Version: "v1alpha1", Kind: "Project"}}
+
+	informer := &stubInformer{}
+	sc := &stubCache{
+		informer:         informer,
+		failGVKs:         map[schema.GroupVersionKind]int{resB.GVK: 1}, // fails once, then succeeds
+		getInformerCalls: map[schema.GroupVersionKind]int{},
+	}
+
+	s := buildSyncer(t, newStubRemote())
+	s.resources = []MirroredResource{resA, resB}
+	s.remoteCache = sc
+
+	// First attempt: resA succeeds and its handler gets registered; resB
+	// fails at GetInformer, so registerInformersOnce returns an error before
+	// reaching the end of the resource list.
+	err := s.registerInformersOnce(context.Background())
+	require.Error(t, err)
+	assert.Equal(t, 1, informer.addCalls, "resA's handler should be registered exactly once after the first (partial) attempt")
+
+	// Second attempt (what registerInformers' retry loop would do): resA
+	// must NOT be re-registered — AddEventHandlerWithResyncPeriod is not
+	// idempotent, so a naive from-scratch retry would double resA's event
+	// and resync load. resB now succeeds and gets registered for the first time.
+	err = s.registerInformersOnce(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 2, informer.addCalls, "retry must add resB's handler but must not double-register resA's")
+}
+
+func TestRegisterInformers_StopsRetryingOnContextCancel(t *testing.T) {
+	s := buildSyncer(t, newStubRemote())
+	s.setupRetryPeriod = 50 * time.Millisecond
+	s.register = func(_ context.Context) error {
+		return fmt.Errorf("always fails")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan bool, 1)
+	go func() { done <- s.registerInformers(ctx) }()
+
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+
+	select {
+	case ok := <-done:
+		assert.False(t, ok, "registerInformers must report failure when ctx is cancelled mid-retry")
+	case <-time.After(2 * time.Second):
+		t.Fatal("registerInformers did not return after context cancellation")
+	}
 }

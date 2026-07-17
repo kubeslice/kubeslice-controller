@@ -23,8 +23,10 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,7 +43,25 @@ import (
 const (
 	DefaultSyncWorkers          = 4
 	DefaultInformerResyncPeriod = 10 * time.Minute
+	// DefaultInformerSetupRetryPeriod is how long Start waits between retries
+	// when wiring up the remote informers fails (e.g. the Active hub is
+	// briefly unreachable, or its RBAC from config/ha hasn't been applied
+	// yet at the moment the Standby pod starts).
+	DefaultInformerSetupRetryPeriod = 5 * time.Second
 )
+
+// namespaceMirrorSelector scopes the Namespace informer to only the
+// namespaces this controller itself manages — every project namespace
+// NamespaceService.ReconcileProjectNamespace creates carries this label (see
+// util.LabelsKubeSliceController). Without it, the informer would watch
+// every namespace on the Active hub cluster-wide (kube-system, kube-public,
+// unrelated infra namespaces), and mirrorDelete (mirror.go) would delete any
+// of those incidentally-mirrored namespaces — cascading to delete everything
+// inside them on the Standby — the moment the Active hub deletes its copy
+// for a completely unrelated reason.
+func namespaceMirrorSelector() labels.Selector {
+	return labels.SelectorFromSet(util.LabelsKubeSliceController)
+}
 
 // opDelete extends mirror.go's opCreate/opUpdate for use in this file's
 // metrics/logging; mirrorDelete itself has no ambiguity about which
@@ -63,7 +83,10 @@ type RemoteSyncerOptions struct {
 	Resources []MirroredResource
 	// Workers is the number of goroutines draining the mirror workqueue.
 	Workers int
-	Log     *zap.SugaredLogger
+	// SetupRetryPeriod is how long Start waits between retries when wiring up
+	// the remote informers fails.
+	SetupRetryPeriod time.Duration
+	Log              *zap.SugaredLogger
 }
 
 // RemoteSyncer mirrors a fixed set of resources from the Active hub onto the
@@ -82,8 +105,24 @@ type RemoteSyncer struct {
 	resources []MirroredResource
 	byGVK     map[schema.GroupVersionKind]MirroredResource
 
-	workers int
-	queue   workqueue.TypedRateLimitingInterface[syncKey]
+	workers          int
+	setupRetryPeriod time.Duration
+	queue            workqueue.TypedRateLimitingInterface[syncKey]
+	// register performs one attempt at wiring informer event handlers for
+	// every mirrored resource. Kept as a field (rather than calling
+	// registerInformersOnce directly) so tests can exercise the retry loop
+	// in Start without a real *rest.Config, the same reason remoteGet exists.
+	register func(ctx context.Context) error
+	// handlerRegistered tracks which GVKs already have their event handler
+	// wired up, so a retried registerInformersOnce (after a later resource in
+	// the list failed) skips the ones that already succeeded instead of
+	// calling AddEventHandlerWithResyncPeriod on them again. Informer.
+	// AddEventHandlerWithResyncPeriod adds an independent handler on every
+	// call — it is not idempotent like GetInformer — so without this guard a
+	// retry would double (or triple, ...) that resource's event and resync
+	// load for the rest of the process's lifetime. Only ever touched from
+	// Start's single call path, so it needs no locking.
+	handlerRegistered map[schema.GroupVersionKind]bool
 
 	// enqueuedAt tracks first-enqueue time per key, so update/delete lag
 	// reflects total time since the triggering change even after a
@@ -104,6 +143,9 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 	if opts.Workers == 0 {
 		opts.Workers = DefaultSyncWorkers
 	}
+	if opts.SetupRetryPeriod == 0 {
+		opts.SetupRetryPeriod = DefaultInformerSetupRetryPeriod
+	}
 	if opts.Log == nil {
 		opts.Log = util.NewLogger().With("name", "ha-remote-syncer")
 	}
@@ -114,21 +156,31 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 	}
 
 	s := &RemoteSyncer{
-		mode:        mode,
-		localClient: localClient,
-		resources:   opts.Resources,
-		byGVK:       byGVK,
-		workers:     opts.Workers,
-		queue:       workqueue.NewTypedRateLimitingQueue[syncKey](workqueue.DefaultTypedControllerRateLimiter[syncKey]()),
-		enqueuedAt:  make(map[syncKey]time.Time),
-		log:         opts.Log,
+		mode:              mode,
+		localClient:       localClient,
+		resources:         opts.Resources,
+		byGVK:             byGVK,
+		workers:           opts.Workers,
+		setupRetryPeriod:  opts.SetupRetryPeriod,
+		queue:             workqueue.NewTypedRateLimitingQueue[syncKey](workqueue.DefaultTypedControllerRateLimiter[syncKey]()),
+		handlerRegistered: make(map[schema.GroupVersionKind]bool, len(opts.Resources)),
+		enqueuedAt:        make(map[syncKey]time.Time),
+		log:               opts.Log,
 	}
+	s.register = s.registerInformersOnce
 
 	if mode == ModeStandby {
 		if remoteCfg == nil {
 			return nil, fmt.Errorf("standby mode requires a remote config for the active hub")
 		}
-		remoteCache, err := cache.New(remoteCfg, cache.Options{Scheme: scheme})
+		remoteCache, err := cache.New(remoteCfg, cache.Options{
+			Scheme: scheme,
+			ByObject: map[client.Object]cache.ByObject{
+				// Namespace is cluster-scoped and otherwise unfiltered; see
+				// namespaceMirrorSelector's doc comment for why this matters.
+				&corev1.Namespace{}: {Label: namespaceMirrorSelector()},
+			},
+		})
 		if err != nil {
 			return nil, fmt.Errorf("building remote cache: %w", err)
 		}
@@ -148,16 +200,8 @@ func (s *RemoteSyncer) Start(ctx context.Context) error {
 		return nil
 	}
 
-	for _, res := range s.resources {
-		u := &unstructured.Unstructured{}
-		u.SetGroupVersionKind(res.GVK)
-		inf, err := s.remoteCache.GetInformer(ctx, u)
-		if err != nil {
-			return fmt.Errorf("remote syncer: getting informer for %s: %w", res.GVK, err)
-		}
-		if _, err := inf.AddEventHandlerWithResyncPeriod(s.handlersFor(res.GVK), DefaultInformerResyncPeriod); err != nil {
-			return fmt.Errorf("remote syncer: adding handler for %s: %w", res.GVK, err)
-		}
+	if !s.registerInformers(ctx) {
+		return nil // ctx cancelled while retrying informer setup
 	}
 
 	var wg sync.WaitGroup
@@ -174,6 +218,55 @@ func (s *RemoteSyncer) Start(ctx context.Context) error {
 	s.queue.ShutDown()
 	wg.Wait()
 	return err
+}
+
+// registerInformers wires up an event handler for every mirrored resource,
+// retrying with backoff via s.register on failure — e.g. the Active hub
+// briefly unreachable at Standby startup, or its config/ha RBAC not yet
+// applied — instead of giving up after one attempt. Without this, a single
+// transient failure here would return an error from Start and permanently
+// disable mirroring for the process's lifetime (main.go only logs that
+// error; nothing restarts the goroutine), unlike StartLeaseRenewal and
+// WatchRemoteLease, which retry every tick regardless of error. Returns
+// false only if ctx is cancelled before setup succeeds.
+func (s *RemoteSyncer) registerInformers(ctx context.Context) bool {
+	for {
+		err := s.register(ctx)
+		if err == nil {
+			return true
+		}
+		s.log.Warnw("remote syncer: informer setup failed; retrying",
+			"error", err, "retryAfter", s.setupRetryPeriod)
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(s.setupRetryPeriod):
+		}
+	}
+}
+
+// registerInformersOnce is register's real implementation: a single attempt
+// at wiring an event handler for every mirrored resource onto the remote
+// cache. Resources whose handler already got registered by an earlier,
+// partially-failed attempt are skipped — see handlerRegistered's doc comment
+// for why that matters.
+func (s *RemoteSyncer) registerInformersOnce(ctx context.Context) error {
+	for _, res := range s.resources {
+		if s.handlerRegistered[res.GVK] {
+			continue
+		}
+		u := &unstructured.Unstructured{}
+		u.SetGroupVersionKind(res.GVK)
+		inf, err := s.remoteCache.GetInformer(ctx, u)
+		if err != nil {
+			return fmt.Errorf("remote syncer: getting informer for %s: %w", res.GVK, err)
+		}
+		if _, err := inf.AddEventHandlerWithResyncPeriod(s.handlersFor(res.GVK), DefaultInformerResyncPeriod); err != nil {
+			return fmt.Errorf("remote syncer: adding handler for %s: %w", res.GVK, err)
+		}
+		s.handlerRegistered[res.GVK] = true
+	}
+	return nil
 }
 
 // handlersFor returns the informer callbacks for one GVK. They only enqueue a
