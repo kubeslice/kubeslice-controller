@@ -4,7 +4,9 @@
 identity behind a Standby's `--ha-active-kubeconfig` flag: read-only
 (`get`/`list`/`watch`) access to `Namespace` plus every resource type in
 `pkg/ha.CRDMirrorSet` (`RemoteSyncer` never writes to the Active cluster —
-only reads).
+only reads), plus the Active's own `coordination.k8s.io/v1` `Lease` —
+the same kubeconfig is also used by #294's `WatchRemoteLease` to read the
+Active's Lease directly, not just by `RemoteSyncer` to mirror CRDs.
 
 ## This is not applied by this repo's own deploy flow
 
