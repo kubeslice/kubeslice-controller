@@ -146,6 +146,49 @@ func TestMirrorCreateOrUpdate_StripOwnerRefsOnlyWhenConfigured(t *testing.T) {
 	assert.Len(t, got2.GetOwnerReferences(), 1, "StripOwnerRefs=false must leave ownerReferences untouched")
 }
 
+func TestMirrorCreateOrUpdate_StripsDeletionTimestampFromTerminatingSource(t *testing.T) {
+	ctx := context.Background()
+	gracePeriod := int64(0)
+	terminating := func(u *unstructured.Unstructured) {
+		now := metav1.Now()
+		u.SetDeletionTimestamp(&now)
+		u.SetDeletionGracePeriodSeconds(&gracePeriod)
+	}
+
+	t.Run("update path", func(t *testing.T) {
+		key := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "sc-1"}
+		existing := newTestUnstructured(testGVK, key.Namespace, key.Name)
+		existing.SetLabels(map[string]string{LabelSyncedFromActive: LabelValueActive})
+		c := mirrorFakeClient(t, existing)
+
+		src := newTestUnstructured(testGVK, key.Namespace, key.Name)
+		terminating(src)
+
+		op, err := mirrorCreateOrUpdate(ctx, c, key, MirroredResource{GVK: testGVK}, src)
+		require.NoError(t, err, "an Active-side object mid-Terminating must not fail mirroring")
+		assert.Equal(t, opUpdate, op)
+
+		got := getUnstructured(t, c, key)
+		assert.Nil(t, got.GetDeletionTimestamp(), "the Standby mirror must never carry a deletionTimestamp copied from a Terminating Active-side object")
+		assert.Nil(t, got.GetDeletionGracePeriodSeconds())
+	})
+
+	t.Run("create path", func(t *testing.T) {
+		key := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "sc-2"}
+		c := mirrorFakeClient(t)
+
+		src := newTestUnstructured(testGVK, key.Namespace, key.Name)
+		terminating(src)
+
+		op, err := mirrorCreateOrUpdate(ctx, c, key, MirroredResource{GVK: testGVK}, src)
+		require.NoError(t, err, "creating a mirror from an already-Terminating source must not fail")
+		assert.Equal(t, opCreate, op)
+
+		got := getUnstructured(t, c, key)
+		assert.Nil(t, got.GetDeletionTimestamp())
+	})
+}
+
 func TestMirrorCreateOrUpdate_MirrorsStatusExplicitly(t *testing.T) {
 	ctx := context.Background()
 	key := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "sc-1"}
@@ -160,6 +203,25 @@ func TestMirrorCreateOrUpdate_MirrorsStatusExplicitly(t *testing.T) {
 	phase, ok, _ := unstructured.NestedString(got.Object, "status", "phase")
 	require.True(t, ok, "status.phase must be present after mirroring — a plain Update() alone would have dropped it")
 	assert.Equal(t, "Ready", phase)
+}
+
+func TestMirrorCreateOrUpdate_SkipsStatusMirrorWhenSourceIsTerminating(t *testing.T) {
+	ctx := context.Background()
+	key := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "sc-1"}
+	c := mirrorFakeClient(t)
+
+	src := newTestUnstructured(testGVK, key.Namespace, key.Name)
+	now := metav1.Now()
+	src.SetDeletionTimestamp(&now)
+	require.NoError(t, unstructured.SetNestedField(src.Object, "Terminating", "status", "phase"))
+
+	op, err := mirrorCreateOrUpdate(ctx, c, key, MirroredResource{GVK: testGVK}, src)
+	require.NoError(t, err, "mirroring a Terminating source must not fail trying to write an invalid status combination")
+	assert.Equal(t, opCreate, op)
+
+	got := getUnstructured(t, c, key)
+	_, ok, _ := unstructured.NestedString(got.Object, "status", "phase")
+	assert.False(t, ok, "status must not be mirrored while the source is Terminating — see mirror.go for the real API-server validation rule this avoids")
 }
 
 func TestMirrorDelete_IdempotentOnNotFound(t *testing.T) {

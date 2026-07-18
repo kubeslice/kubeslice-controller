@@ -56,6 +56,24 @@ func mirrorCreateOrUpdate(ctx context.Context, localClient client.Client, key sy
 	payload.SetUID("")
 	payload.SetManagedFields(nil)
 	payload.SetFinalizers(nil)
+	// While an Active-side object is Terminating (deletionTimestamp set,
+	// contents still being garbage-collected), the informer delivers it as
+	// an ordinary Update, not a Delete yet — copying that onto a Standby
+	// copy that isn't itself terminating fails immutable-field validation
+	// on a real API server (confirmed live: "field is immutable" on both
+	// deletionTimestamp and deletionGracePeriodSeconds). Its status is
+	// dropped from payload too, explicitly rather than relying on a real
+	// API server silently ignoring .status on the main resource endpoint:
+	// for at least one type (confirmed live: Namespace), a stray
+	// status.Phase="Terminating" is itself invalid once deletionTimestamp
+	// is empty. The Standby converges correctly once Active reports
+	// NotFound and mirrorDelete takes over; there's nothing useful to
+	// reflect about the in-between Terminating state.
+	if src.GetDeletionTimestamp() != nil {
+		delete(payload.Object, "status")
+	}
+	payload.SetDeletionTimestamp(nil)
+	payload.SetDeletionGracePeriodSeconds(nil)
 	if res.StripOwnerRefs {
 		payload.SetOwnerReferences(nil)
 	}
@@ -105,10 +123,20 @@ func mirrorCreateOrUpdate(ctx context.Context, localClient client.Client, key sy
 	// registered — true for every entry in CRDMirrorSet. Mirror it
 	// explicitly, matching this repo's own UpdateStatus/CleanupUpdateStatus
 	// convention (util/reconciliation_utility.go, util/cleanup_utility.go).
-	if status, ok, _ := unstructured.NestedFieldNoCopy(src.Object, "status"); ok {
-		payload.Object["status"] = status
-		if err := localClient.Status().Update(ctx, payload); err != nil {
-			return op, fmt.Errorf("mirroring status of %s %s/%s: %w", key.GVK.Kind, key.Namespace, key.Name, err)
+	//
+	// Skipped while src is itself Terminating: its status is about to become
+	// meaningless anyway, and for at least one type (confirmed live:
+	// Namespace) copying a Terminating status onto a payload whose
+	// deletionTimestamp was just stripped above fails a real API server
+	// validation rule — status.Phase can only be "Terminating" if
+	// deletionTimestamp is set. The Standby converges correctly once Active
+	// reports NotFound and mirrorDelete takes over.
+	if src.GetDeletionTimestamp() == nil {
+		if status, ok, _ := unstructured.NestedFieldNoCopy(src.Object, "status"); ok {
+			payload.Object["status"] = status
+			if err := localClient.Status().Update(ctx, payload); err != nil {
+				return op, fmt.Errorf("mirroring status of %s %s/%s: %w", key.GVK.Kind, key.Namespace, key.Name, err)
+			}
 		}
 	}
 	return op, nil
