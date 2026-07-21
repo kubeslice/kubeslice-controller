@@ -41,13 +41,15 @@ const opPrune mirrorOp = "prune"
 // call. Overridable in tests, the same seam pattern as remoteGetFunc.
 type remoteListFunc func(ctx context.Context, gvk schema.GroupVersionKind) (map[syncKey]struct{}, error)
 
-// runPrune periodically removes Standby-side drift the informers never
-// reported: a mirrored object whose Active-side original was deleted while
-// this process wasn't watching (e.g. between two Standby runs) never gets a
-// Delete event — cold-start informers only deliver what currently exists —
-// so its mirror would otherwise survive as an orphan forever. The workqueue
-// owns retry-on-transient-failure and the informers' periodic resync
-// self-heals missed updates; pruning orphans is this loop's only job.
+// runPrune periodically reconciles drift between the Standby's mirrors and
+// the Active hub that the informers never reported. Forward direction: a
+// mirrored object whose Active-side original was deleted while this process
+// wasn't watching (e.g. between two Standby runs) never gets a Delete event
+// — cold-start informers only deliver what currently exists — so its mirror
+// would otherwise survive as an orphan forever. Reverse direction: an
+// Active-side object with no Standby mirror is re-enqueued (see pruneOnce
+// for the cases that produces). The workqueue still owns
+// retry-on-transient-failure; this loop only feeds it.
 //
 // It blocks until the remote cache has synced before the first pass: an
 // unsynced cache lists empty, and an empty "Active" view would read as
@@ -99,15 +101,31 @@ func (s *RemoteSyncer) pruneOnce(ctx context.Context) {
 			continue
 		}
 
+		localKeys := make(map[syncKey]struct{}, len(local.Items))
 		for i := range local.Items {
 			item := &local.Items[i]
 			key := syncKey{GVK: res.GVK, Namespace: item.GetNamespace(), Name: item.GetName()}
+			localKeys[key] = struct{}{}
 			if _, onActive := activeKeys[key]; onActive {
 				continue
 			}
 			s.log.Infow("prune: enqueuing orphaned mirror",
 				"kind", key.GVK.Kind, "namespace", key.Namespace, "name", key.Name)
 			s.enqueue(key)
+		}
+
+		// Reverse diff: an Active-side object with no mirror on the Standby.
+		// Usually a create this loop's forward pass can't see — a mirror
+		// someone deleted directly on the Standby, an object whose skip
+		// verdict was decided before its namespace had synced (see
+		// namespaceIsMirrored), or a key stuck deep in retry backoff.
+		// Re-enqueueing is always safe: the worker re-reads Active and runs
+		// the full Skip/namespace/conflict-guard chain, so objects that
+		// should not mirror simply no-op again.
+		for key := range activeKeys {
+			if _, mirrored := localKeys[key]; !mirrored {
+				s.enqueue(key)
+			}
 		}
 	}
 }

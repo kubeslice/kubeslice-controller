@@ -119,6 +119,49 @@ func TestPruneOnce_SkipsKindWhenRemoteListFails(t *testing.T) {
 	assert.Equal(t, 0, s.queue.Len(), "a failed list must not be read as \"everything was deleted on Active\"")
 }
 
+func TestPruneOnce_ReverseDiffEnqueuesActiveObjectsMissingLocally(t *testing.T) {
+	ctx := context.Background()
+	missing := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "sc-missing"}
+
+	// Active has an object the Standby has no mirror of — a create the
+	// forward (orphan) pass can't see: a mirror deleted directly on the
+	// Standby, a skip decided before the namespace informer synced, or a key
+	// stuck deep in retry backoff.
+	s := buildSyncer(t, newStubRemote())
+	s.remoteList = stubRemoteList([]syncKey{missing}, nil)
+
+	s.pruneOnce(ctx)
+
+	require.Equal(t, 1, s.queue.Len())
+	got, _ := s.queue.Get()
+	assert.Equal(t, missing, got)
+}
+
+func TestPruneOnce_ReverseDiffCannotOverrideConflictGuard(t *testing.T) {
+	ctx := context.Background()
+	key := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "hand-created"}
+
+	// The object exists on both sides, but the Standby's copy is not
+	// syncer-owned (no sync label) — so it is absent from the forward pass's
+	// labeled listing and the reverse diff re-enqueues it every round. That
+	// must stay harmless: the worker's conflict guard refuses the write.
+	remote := newStubRemote()
+	remote.objects[key] = newTestUnstructured(testGVK, key.Namespace, key.Name)
+	s := buildSyncer(t, remote)
+	require.NoError(t, s.localClient.Create(ctx, newTestUnstructured(testGVK, key.Namespace, key.Name)))
+	s.remoteList = stubRemoteList([]syncKey{key}, nil)
+
+	s.pruneOnce(ctx)
+	k, shutdown := s.queue.Get()
+	require.False(t, shutdown)
+	require.Equal(t, key, k)
+	s.processOnce(ctx, k)
+
+	got := getUnstructured(t, s.localClient, key)
+	assert.NotEqual(t, LabelValueActive, got.GetLabels()[LabelSyncedFromActive],
+		"a hand-created Standby object must never be adopted by the mirror, even via the prune loop")
+}
+
 func TestRunPrune_DoesNotPruneBeforeCacheSync(t *testing.T) {
 	s := buildSyncer(t, newStubRemote())
 	s.pruneInterval = time.Millisecond
