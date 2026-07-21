@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 )
 
@@ -89,6 +91,11 @@ type RemoteSyncerOptions struct {
 	// PruneInterval is how often the prune backstop diffs Standby mirrors
 	// against the Active hub and removes orphans (see prune.go).
 	PruneInterval time.Duration
+	// EventRecorder, if set, gets an HAMirrorSyncFailed event on the first
+	// failure of each mirror-failure episode, attached to the object that
+	// failed to sync. Nil disables event emission (metrics and retries are
+	// unaffected).
+	EventRecorder events.EventRecorder
 	Log           *zap.SugaredLogger
 }
 
@@ -139,7 +146,8 @@ type RemoteSyncer struct {
 	mu         sync.Mutex
 	enqueuedAt map[syncKey]time.Time
 
-	log *zap.SugaredLogger
+	eventRecorder events.EventRecorder
+	log           *zap.SugaredLogger
 }
 
 // NewRemoteSyncer builds a RemoteSyncer. remoteCfg and scheme are only used
@@ -178,6 +186,7 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 		queue:             workqueue.NewTypedRateLimitingQueue[syncKey](workqueue.DefaultTypedControllerRateLimiter[syncKey]()),
 		handlerRegistered: make(map[schema.GroupVersionKind]bool, len(opts.Resources)),
 		enqueuedAt:        make(map[syncKey]time.Time),
+		eventRecorder:     opts.EventRecorder,
 		log:               opts.Log,
 	}
 	s.register = s.registerInformersOnce
@@ -356,6 +365,33 @@ func (s *RemoteSyncer) processOnce(ctx context.Context, key syncKey) {
 		s.log.Warnw("mirror sync failed; will retry", "kind", key.GVK.Kind,
 			"namespace", key.Namespace, "name", key.Name,
 			"attempt", s.queue.NumRequeues(key), "error", err)
+		// One HAMirrorSyncFailed event per failure episode (NumRequeues is
+		// still 0 here on the first failure; Forget resets it on success).
+		// The retries that follow are milliseconds apart under early
+		// backoff, and although the recorder aggregates repeats into one
+		// Event's Count, every call is still an API-server write —
+		// per-attempt emission would turn each outage into a write storm
+		// while ha_sync_errors_total already counts every attempt.
+		// The recorder is called directly rather than through
+		// util.RecordEvent: that helper logs via util.CtxLogger, which
+		// panics on any context that didn't pass through a reconciler's
+		// PrepareKubeSliceControllersRequestContext — and Start's context
+		// (main.go's signal-handler context) never does.
+		if s.eventRecorder != nil && s.queue.NumRequeues(key) == 0 {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(key.GVK)
+			obj.SetNamespace(key.Namespace)
+			obj.SetName(key.Name)
+			if recErr := s.eventRecorder.RecordEvent(ctx, &events.Event{
+				Object:            obj,
+				ReportingInstance: util.InstanceController,
+				Name:              ossEvents.EventHAMirrorSyncFailed,
+			}); recErr != nil {
+				s.log.Warnw("failed to record mirror-sync-failed event",
+					"kind", key.GVK.Kind, "namespace", key.Namespace,
+					"name", key.Name, "error", recErr)
+			}
+		}
 		s.queue.AddRateLimited(key)
 		return
 	}

@@ -539,3 +539,9 @@ events:
     type: Warning
     reportingController: controller
     message: Warning - Certificate Creation job Failed
+  - name: HAMirrorSyncFailed
+    reason: HAMirrorSyncFailed
+    action: HAMirrorSync
+    type: Warning
+    reportingController: controller
+    message: Failed to mirror a resource from the Active hub onto the Standby; the syncer will retry.

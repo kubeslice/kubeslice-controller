@@ -355,6 +355,7 @@ func initialize(services *service.Services) {
 	remoteSyncer, err := ha.NewRemoteSyncer(localHAClient, remoteHACfg, scheme, haRunMode, ha.RemoteSyncerOptions{
 		Workers:       haSyncWorkers,
 		PruneInterval: haSyncInterval,
+		EventRecorder: eventRecorder,
 		Log:           controllerLog.With("name", "ha-remote-syncer"),
 	})
 	if err != nil {
