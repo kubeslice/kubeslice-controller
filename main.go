@@ -353,6 +353,7 @@ func initialize(services *service.Services) {
 	// the same remote config and local client the elector above already
 	// built rather than loading the kubeconfig twice.
 	remoteSyncer, err := ha.NewRemoteSyncer(localHAClient, remoteHACfg, scheme, haRunMode, ha.RemoteSyncerOptions{
+		Resources:     ha.FullMirrorSet(),
 		Workers:       haSyncWorkers,
 		PruneInterval: haSyncInterval,
 		EventRecorder: eventRecorder,

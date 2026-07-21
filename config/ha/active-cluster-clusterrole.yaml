@@ -9,12 +9,12 @@
 # See config/ha/README.md for how and where to apply this.
 #
 # Scope: read-only (get/list/watch) on Namespace plus every type in
-# pkg/ha.CRDMirrorSet, plus the Active's own HA Lease — the same
-# --ha-active-kubeconfig identity is also used by #294's WatchRemoteLease to
-# read the Active's coordination.k8s.io/v1 Lease (checkRemoteLeaseOnce),
-# not just by RemoteSyncer. Confirmed live: without this, the Standby can
-# mirror CRDs fine but permanently fails to read the Active's Lease,
-# so it can never observe staleness in the first place.
+# pkg/ha.CRDMirrorSet and pkg/ha.CredentialMirrorSet, plus the Active's own
+# HA Lease — the same --ha-active-kubeconfig identity is also used by #294's
+# WatchRemoteLease to read the Active's coordination.k8s.io/v1 Lease
+# (checkRemoteLeaseOnce), not just by RemoteSyncer. Confirmed live: without
+# this, the Standby can mirror CRDs fine but permanently fails to read the
+# Active's Lease, so it can never observe staleness in the first place.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -55,6 +55,36 @@ rules:
       - workersliceconfigs
       - workerslicegateways
       - workerserviceimports
+    verbs:
+      - get
+      - list
+      - watch
+  # Credential mirroring (pkg/ha.CredentialMirrorSet). SECURITY TRADEOFF,
+  # named rather than buried: RBAC cannot scope Secret access by .type or by
+  # namespace *label*, and a ClusterRole+ClusterRoleBinding grants reads
+  # CLUSTER-WIDE — so this rule lets the Standby's identity read every
+  # Secret on the Active hub, not just the gateway certificates RemoteSyncer
+  # actually mirrors (the syncer's own field selector and mirrored-namespace
+  # gate narrow what is COPIED, but not what this identity COULD read).
+  # Treat the --ha-active-kubeconfig credential accordingly. To narrow the
+  # grant itself, replace this rule with per-namespace RoleBindings in each
+  # kubeslice project namespace — at the cost of maintaining them as
+  # projects come and go, which is cross-cluster provisioning tooling this
+  # repo deliberately does not ship.
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - serviceaccounts
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - roles
+      - rolebindings
     verbs:
       - get
       - list

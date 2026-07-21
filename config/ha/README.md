@@ -3,10 +3,11 @@
 `active-cluster-clusterrole.yaml` is a least-privilege grant for the
 identity behind a Standby's `--ha-active-kubeconfig` flag: read-only
 (`get`/`list`/`watch`) access to `Namespace` plus every resource type in
-`pkg/ha.CRDMirrorSet` (`RemoteSyncer` never writes to the Active cluster —
-only reads), plus the Active's own `coordination.k8s.io/v1` `Lease` —
-the same kubeconfig is also used by #294's `WatchRemoteLease` to read the
-Active's Lease directly, not just by `RemoteSyncer` to mirror CRDs.
+`pkg/ha.CRDMirrorSet` and `pkg/ha.CredentialMirrorSet` (`RemoteSyncer`
+never writes to the Active cluster — only reads), plus the Active's own
+`coordination.k8s.io/v1` `Lease` — the same kubeconfig is also used by
+#294's `WatchRemoteLease` to read the Active's Lease directly, not just by
+`RemoteSyncer` to mirror resources.
 
 ## This is not applied by this repo's own deploy flow
 
@@ -36,13 +37,23 @@ Nothing in this repo automates applying this to a real Active cluster —
 that's cross-cluster provisioning, out of scope for a single controller
 repo. Logged as a follow-up, not built.
 
-## Credential mirroring (a later PR)
+## Credential mirroring and the Secret-read tradeoff
 
-If/when `pkg/ha.CredentialMirrorSet` (Secrets, ServiceAccounts, Roles,
-RoleBindings — for #297's post-promotion use) is wired in, this
-`ClusterRole` will need `secrets`/`serviceaccounts`/`roles`/`rolebindings`
-appended. Worth knowing ahead of time: RBAC cannot scope `Secret` access by
-`.type`, so that addition grants read access to **every** Secret in the
-project namespaces on the Active cluster, not just the credential ones
-`RemoteSyncer` actually mirrors — a real credential-exposure tradeoff to
-weigh when that lands, not just an implementation detail.
+`pkg/ha.CredentialMirrorSet` (Secrets with the SA-token type filtered out,
+ServiceAccounts, Roles, RoleBindings — for #297's post-promotion use) is
+wired in, and this `ClusterRole` grants the reads it needs. Weigh the
+Secret rule before applying it: RBAC cannot scope `Secret` access by
+`.type` or by namespace *label*, and a `ClusterRole` +
+`ClusterRoleBinding` is cluster-wide — so the Standby's identity can read
+**every** Secret on the Active hub, not just the gateway-certificate
+Secrets `RemoteSyncer` actually mirrors. The syncer itself only *copies*
+credential objects whose namespace it also mirrors (the label-scoped
+project-namespace boundary — notably excluding the controller's own
+namespace, whose name can match the project-namespace prefix) and
+excludes SA-token Secrets from the watch entirely, but none of that
+narrows what the identity *could* read if the kubeconfig leaked —
+protect it like the credential it is. The narrower alternative — per-namespace `RoleBinding`s in each
+project namespace instead of the cluster-wide binding — works with the
+same `ClusterRole`, at the cost of maintaining those bindings as projects
+come and go (cross-cluster provisioning tooling this repo deliberately
+does not ship).
