@@ -126,6 +126,7 @@ func initialize(services *service.Services) {
 	var haRetryPeriod time.Duration
 	var haPaddingSeconds time.Duration
 	var haSyncWorkers int
+	var haSyncInterval time.Duration
 
 	flag.StringVar(&rbacResourcePrefix, "rbac-resource-prefix", service.RbacResourcePrefix, "RBAC resource prefix")
 	flag.StringVar(&projectNameSpacePrefixFromCustomer, "project-namespace-prefix", service.ProjectNamespacePrefix, fmt.Sprintf("Overrides the default %s kubeslice namespace", service.ProjectNamespacePrefix))
@@ -164,6 +165,7 @@ func initialize(services *service.Services) {
 	flag.DurationVar(&haRetryPeriod, "ha-retry-period", ha.DefaultRetryPeriod, "Interval between Lease renew/watch attempts.")
 	flag.DurationVar(&haPaddingSeconds, "ha-padding-seconds", ha.DefaultPaddingSeconds, "Extra buffer a Standby waits before treating the Active Lease as stale.")
 	flag.IntVar(&haSyncWorkers, "ha-sync-workers", ha.DefaultSyncWorkers, "Number of workers draining the Standby's remote-mirror workqueue.")
+	flag.DurationVar(&haSyncInterval, "ha-sync-interval", ha.DefaultPruneInterval, "How often the Standby prunes mirrored objects that no longer exist on the Active hub.")
 
 	flag.Parse()
 
@@ -351,8 +353,9 @@ func initialize(services *service.Services) {
 	// the same remote config and local client the elector above already
 	// built rather than loading the kubeconfig twice.
 	remoteSyncer, err := ha.NewRemoteSyncer(localHAClient, remoteHACfg, scheme, haRunMode, ha.RemoteSyncerOptions{
-		Workers: haSyncWorkers,
-		Log:     controllerLog.With("name", "ha-remote-syncer"),
+		Workers:       haSyncWorkers,
+		PruneInterval: haSyncInterval,
+		Log:           controllerLog.With("name", "ha-remote-syncer"),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to build HA remote syncer")

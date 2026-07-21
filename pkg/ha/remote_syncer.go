@@ -86,7 +86,10 @@ type RemoteSyncerOptions struct {
 	// SetupRetryPeriod is how long Start waits between retries when wiring up
 	// the remote informers fails.
 	SetupRetryPeriod time.Duration
-	Log              *zap.SugaredLogger
+	// PruneInterval is how often the prune backstop diffs Standby mirrors
+	// against the Active hub and removes orphans (see prune.go).
+	PruneInterval time.Duration
+	Log           *zap.SugaredLogger
 }
 
 // RemoteSyncer mirrors a fixed set of resources from the Active hub onto the
@@ -107,6 +110,12 @@ type RemoteSyncer struct {
 
 	workers          int
 	setupRetryPeriod time.Duration
+	pruneInterval    time.Duration
+	// remoteList and waitForCacheSync back the prune loop (prune.go); like
+	// remoteGet, they are fields so tests can drive pruning without a real
+	// *rest.Config.
+	remoteList       remoteListFunc
+	waitForCacheSync func(ctx context.Context) bool
 	queue            workqueue.TypedRateLimitingInterface[syncKey]
 	// register performs one attempt at wiring informer event handlers for
 	// every mirrored resource. Kept as a field (rather than calling
@@ -146,6 +155,9 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 	if opts.SetupRetryPeriod == 0 {
 		opts.SetupRetryPeriod = DefaultInformerSetupRetryPeriod
 	}
+	if opts.PruneInterval == 0 {
+		opts.PruneInterval = DefaultPruneInterval
+	}
 	if opts.Log == nil {
 		opts.Log = util.NewLogger().With("name", "ha-remote-syncer")
 	}
@@ -162,6 +174,7 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 		byGVK:             byGVK,
 		workers:           opts.Workers,
 		setupRetryPeriod:  opts.SetupRetryPeriod,
+		pruneInterval:     opts.PruneInterval,
 		queue:             workqueue.NewTypedRateLimitingQueue[syncKey](workqueue.DefaultTypedControllerRateLimiter[syncKey]()),
 		handlerRegistered: make(map[schema.GroupVersionKind]bool, len(opts.Resources)),
 		enqueuedAt:        make(map[syncKey]time.Time),
@@ -186,6 +199,8 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 		}
 		s.remoteCache = remoteCache
 		s.remoteGet = s.getFromRemoteCache
+		s.remoteList = s.listFromRemoteCache
+		s.waitForCacheSync = remoteCache.WaitForCacheSync
 	}
 
 	return s, nil
@@ -212,9 +227,20 @@ func (s *RemoteSyncer) Start(ctx context.Context) error {
 			s.runWorker(ctx)
 		}()
 	}
+	// The prune loop only watches its context, unlike the workers (which exit
+	// on queue shutdown) — cancel it explicitly so wg.Wait can't hang if the
+	// cache ever stops with an error before ctx itself is cancelled.
+	pruneCtx, cancelPrune := context.WithCancel(ctx)
+	defer cancelPrune()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.runPrune(pruneCtx)
+	}()
 
-	s.log.Infow("remote syncer started", "resources", len(s.resources), "workers", s.workers)
+	s.log.Infow("remote syncer started", "resources", len(s.resources), "workers", s.workers, "pruneInterval", s.pruneInterval)
 	err := s.remoteCache.Start(ctx) // blocks until ctx.Done(); returns nil on graceful shutdown
+	cancelPrune()
 	s.queue.ShutDown()
 	wg.Wait()
 	return err
@@ -285,15 +311,21 @@ func (s *RemoteSyncer) handlersFor(objGVK schema.GroupVersionKind) toolscache.Re
 			s.log.Warnw("remote syncer: unexpected informer object type", "type", fmt.Sprintf("%T", obj))
 			return
 		}
-		key := syncKey{GVK: objGVK, Namespace: u.GetNamespace(), Name: u.GetName()}
-		s.markEnqueued(key)
-		s.queue.Add(key)
+		s.enqueue(syncKey{GVK: objGVK, Namespace: u.GetNamespace(), Name: u.GetName()})
 	}
 	return toolscache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { enqueue(obj) },
 		UpdateFunc: func(_, newObj interface{}) { enqueue(newObj) },
 		DeleteFunc: func(obj interface{}) { enqueue(obj) },
 	}
+}
+
+// enqueue hands one key to the worker pool, stamping its first-enqueue time
+// for the lag metric. Both the informer handlers and the prune loop go
+// through here, so every mirror write shares one queue and one retry policy.
+func (s *RemoteSyncer) enqueue(key syncKey) {
+	s.markEnqueued(key)
+	s.queue.Add(key)
 }
 
 func (s *RemoteSyncer) runWorker(ctx context.Context) {
