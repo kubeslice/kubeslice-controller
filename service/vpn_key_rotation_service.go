@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -45,7 +45,7 @@ type IVpnKeyRotationService interface {
 type VpnKeyRotationService struct {
 	wsgs                  IWorkerSliceGatewayService
 	wscs                  IWorkerSliceConfigService
-	jobCreationInProgress atomic.Bool
+	jobCreationInProgress sync.Map
 }
 
 // JobStatus represents the status of a job.
@@ -266,14 +266,16 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 
 	} else {
 		if now.After(copyVpnConfig.Spec.CertificateExpiryTime.Time) {
-			if !v.jobCreationInProgress.Load() {
+			sliceKey := s.Namespace + "/" + s.Name
+			inProgress, _ := v.jobCreationInProgress.Load(sliceKey)
+			if inProgress != true {
 				if err := v.triggerJobsForCertCreation(ctx, copyVpnConfig, s); err != nil {
 					logger.Error("error creating new certs", err)
 					// register an event
 					util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventCertificateJobCreationFailed)
 					return ctrl.Result{}, nil, err
 				}
-				v.jobCreationInProgress.Store(true)
+				v.jobCreationInProgress.Store(sliceKey, true)
 				logger.Debugf("jobs triggered for creating new certs for slice %s", s.Name)
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil, nil
 			}
@@ -303,7 +305,7 @@ func (v *VpnKeyRotationService) reconcileVpnKeyRotationConfig(ctx context.Contex
 				return ctrl.Result{}, nil, err
 			}
 			// restore the variable jobCreationInProgress to false
-			v.jobCreationInProgress.Store(false)
+			v.jobCreationInProgress.Store(sliceKey, false)
 			//register an event
 			util.RecordEvent(ctx, eventRecorder, copyVpnConfig, nil, events.EventVPNKeyRotationStart)
 		}
