@@ -331,11 +331,50 @@ func validateClustersOnCreate(ctx context.Context, sliceConfig *controllerv1alph
 	return nil
 }
 
+// checkClusterRemovalSafety blocks removal of a cluster from a slice while its
+// WorkerSliceConfig still has onboarded or pending-deboard namespaces.
+func checkClusterRemovalSafety(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, removedCluster string) *field.Error {
+	workerSlices := &workerv1alpha1.WorkerSliceConfigList{}
+	labels := map[string]string{
+		"original-slice-name": sliceConfig.Name,
+		"worker-cluster":      removedCluster,
+	}
+	if err := util.ListResources(ctx, workerSlices, client.MatchingLabels(labels), client.InNamespace(sliceConfig.Namespace)); err != nil {
+		return nil
+	}
+	for _, slice := range workerSlices.Items {
+		if len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces) > 0 {
+			return &field.Error{
+				Type:     field.ErrorTypeForbidden,
+				Field:    field.NewPath("Spec").Child("Clusters").String(),
+				BadValue: removedCluster,
+				Detail:   fmt.Sprintf("deboard namespaces from cluster %q before removal: %d namespace(s) still configured", removedCluster, len(slice.Spec.NamespaceIsolationProfile.ApplicationNamespaces)),
+			}
+		}
+		if len(slice.Status.OnboardedAppNamespaces) > 0 {
+			return &field.Error{
+				Type:     field.ErrorTypeInternal,
+				Field:    field.NewPath("Spec").Child("Clusters").String(),
+				BadValue: removedCluster,
+				Detail:   fmt.Sprintf("namespace deboarding in progress for cluster %q: %d namespace(s) still onboarded, please try after some time", removedCluster, len(slice.Status.OnboardedAppNamespaces)),
+			}
+		}
+	}
+	return nil
+}
+
 // validateClustersOnUpdate is function to validate the cluster specification
 func validateClustersOnUpdate(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig, old runtime.Object) *field.Error {
 	oldSc := old.(*controllerv1alpha1.SliceConfig)
 	if duplicate, value := util.CheckDuplicateInArray(sliceConfig.Spec.Clusters); duplicate {
 		return field.Duplicate(field.NewPath("Spec").Child("Clusters"), strings.Join(value, ", "))
+	}
+	// Guard cluster removal: block if the outgoing cluster still has active namespaces.
+	removedClusters := util.DifferenceOfArray(oldSc.Spec.Clusters, sliceConfig.Spec.Clusters)
+	for _, clusterName := range removedClusters {
+		if err := checkClusterRemovalSafety(ctx, sliceConfig, clusterName); err != nil {
+			return err
+		}
 	}
 	newlyAddedClusters := util.DifferenceOfArray(sliceConfig.Spec.Clusters, oldSc.Spec.Clusters)
 	for _, clusterName := range newlyAddedClusters {
