@@ -1363,3 +1363,4 @@ func runReconcileVpnKeyRotation(t *testing.T, tc reconcileVpnKeyRotationTestCase
 	require.Equal(t, tc.expectedResponse, gotResp)
 
 }
+

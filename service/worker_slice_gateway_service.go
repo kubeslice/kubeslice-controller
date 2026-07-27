@@ -445,8 +445,11 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 	for _, clusterName := range clusterNames {
 		cluster := controllerv1alpha1.Cluster{}
 		found, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: namespace}, &cluster)
-		if !found || err != nil {
+		if err != nil {
 			return ctrl.Result{}, err
+		}
+		if !found {
+			return ctrl.Result{}, fmt.Errorf("cluster %s not found in namespace %s", clusterName, namespace)
 		}
 		clusterMapping[clusterName] = &cluster
 	}
