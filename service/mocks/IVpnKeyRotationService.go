@@ -80,6 +80,20 @@ func (_m *IVpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, r
 	return r0, r1
 }
 
+// DeleteVpnKeyRotationConfig provides a mock function with given fields: ctx, sliceName, namespace
+func (_m *IVpnKeyRotationService) DeleteVpnKeyRotationConfig(ctx context.Context, sliceName string, namespace string) error {
+	ret := _m.Called(ctx, sliceName, namespace)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, sliceName, namespace)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewIVpnKeyRotationService interface {
 	mock.TestingT
 	Cleanup(func())

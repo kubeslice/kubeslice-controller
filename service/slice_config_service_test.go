@@ -70,6 +70,7 @@ var SliceConfigTestBed = map[string]func(*testing.T){
 	"SliceConfig_ErrorOnDeleteWorkerSliceGatewaysByLabel":        SliceConfigErrorOnDeleteWorkerSliceGatewaysByLabel,
 	"SliceConfig_ErrorOnDeleteWorkerSliceConfigByLabel":          SliceConfigErrorOnDeleteWorkerSliceConfigByLabel,
 	"SliceConfig_ErrorOnDeleteWorkerSliceGatewayRecyclerByLabel": SliceConfigErrorOnDeleteWorkerSliceGatewayRecyclerByLabel,
+	"SliceConfig_ErrorOnDeleteVpnKeyRotationConfig":              SliceConfigErrorOnDeleteVpnKeyRotationConfig,
 	"SliceConfig_ErrorOnUpdatingTheFinalizer":                    SliceConfigErrorOnUpdatingTheFinalizer,
 	"SliceConfig_RemoveFinalizerErrorOnUpdate":                   SliceConfigRemoveFinalizerErrorOnUpdate,
 	"SliceConfig_RemoveFinalizerErrorOnGetAfterUpdate":           SliceConfigRemoveFinalizerErrorOnGetAfterUpdate,
@@ -81,7 +82,7 @@ var SliceConfigTestBed = map[string]func(*testing.T){
 }
 
 func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, _, workerServiceImportMock, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, _, workerServiceImportMock, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -133,7 +134,7 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 }
 
 func SliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
-	_, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	_, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
@@ -166,7 +167,7 @@ func SliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
 }
 
 func SliceConfigGetObjectErrorOtherThanNotFound(t *testing.T) {
-	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, _ := setupSliceConfigTest("slice_config", "namespace")
+	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, _, _ := setupSliceConfigTest("slice_config", "namespace")
 	err1 := errors.New("internal_error")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(err1).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
@@ -179,7 +180,7 @@ func SliceConfigGetObjectErrorOtherThanNotFound(t *testing.T) {
 }
 
 func SliceConfigGetObjectErrorNotFound(t *testing.T) {
-	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, _ := setupSliceConfigTest("slice_config", "namespace")
+	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, _, _ := setupSliceConfigTest("slice_config", "namespace")
 	notFoundError := k8sError.NewNotFound(util.Resource("SliceConfigTest"), "isNotFound")
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(notFoundError).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
@@ -192,7 +193,7 @@ func SliceConfigGetObjectErrorNotFound(t *testing.T) {
 }
 
 func SliceConfigDeleteTheObjectHappyCase(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, vpnMock := setupSliceConfigTest("slice_config", "namespace")
 	time := metav1.Now()
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
@@ -206,6 +207,7 @@ func SliceConfigDeleteTheObjectHappyCase(t *testing.T) {
 		"slice_name": requestObj.Name,
 	}
 	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
+	vpnMock.On("DeleteVpnKeyRotationConfig", ctx, requestObj.Name, requestObj.Namespace).Return(nil).Once()
 	// remove finalizer
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
@@ -224,7 +226,7 @@ func SliceConfigDeleteTheObjectHappyCase(t *testing.T) {
 }
 
 func SliceConfigObjectNamespaceNotFound(t *testing.T) {
-	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -250,7 +252,7 @@ func SliceConfigObjectNamespaceNotFound(t *testing.T) {
 }
 
 func SliceConfigObjectNotInProjectNamespace(t *testing.T) {
-	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -275,7 +277,7 @@ func SliceConfigObjectNotInProjectNamespace(t *testing.T) {
 }
 
 func SliceConfigObjectWithDuplicateClustersInSpec(t *testing.T) {
-	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
@@ -295,7 +297,7 @@ func SliceConfigObjectWithDuplicateClustersInSpec(t *testing.T) {
 }
 
 func SliceConfigErrorOnCreateWorkerSliceConfig(t *testing.T) {
-	_, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	_, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -328,7 +330,7 @@ func SliceConfigErrorOnCreateWorkerSliceConfig(t *testing.T) {
 }
 
 func SliceConfigErrorOnCreateWorkerSliceGateway(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -364,7 +366,7 @@ func SliceConfigErrorOnCreateWorkerSliceGateway(t *testing.T) {
 }
 
 func SliceConfigErrorOnDeleteWorkerSliceGatewaysByLabel(t *testing.T) {
-	workerSliceGatewayMock, _, serviceExportConfigMock, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, _, serviceExportConfigMock, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	time := metav1.Now()
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
@@ -386,7 +388,7 @@ func SliceConfigErrorOnDeleteWorkerSliceGatewaysByLabel(t *testing.T) {
 }
 
 func SliceConfigErrorOnDeleteWorkerSliceConfigByLabel(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	time := metav1.Now()
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
@@ -410,7 +412,7 @@ func SliceConfigErrorOnDeleteWorkerSliceConfigByLabel(t *testing.T) {
 }
 
 func SliceConfigErrorOnDeleteWorkerSliceGatewayRecyclerByLabel(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	time := metav1.Now()
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
@@ -438,8 +440,39 @@ func SliceConfigErrorOnDeleteWorkerSliceGatewayRecyclerByLabel(t *testing.T) {
 	mMock.AssertExpectations(t)
 }
 
+func SliceConfigErrorOnDeleteVpnKeyRotationConfig(t *testing.T) {
+	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, vpnMock := setupSliceConfigTest("slice_config", "namespace")
+	time := metav1.Now()
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
+		arg.Name = requestObj.Name
+		arg.ObjectMeta.DeletionTimestamp = &time
+	}).Once()
+	workerSliceGatewayMock.On("DeleteWorkerSliceGatewaysByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
+	workerSliceConfigMock.On("DeleteWorkerSliceConfigByLabel", ctx, mock.Anything, requestObj.Namespace).Return(nil).Once()
+	recyclerLabel := map[string]string{
+		"slice_name": requestObj.Name,
+	}
+	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
+	err1 := errors.New("internal_error")
+	vpnMock.On("DeleteVpnKeyRotationConfig", ctx, requestObj.Name, requestObj.Namespace).Return(err1).Once()
+	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
+	expectedResult := ctrl.Result{}
+	require.Error(t, err2)
+	require.Equal(t, expectedResult, result)
+	require.Equal(t, err1, err2)
+	require.False(t, result.Requeue)
+	clientMock.AssertExpectations(t)
+	serviceExportConfigMock.AssertExpectations(t)
+	workerSliceGatewayMock.AssertExpectations(t)
+	workerSliceConfigMock.AssertExpectations(t)
+	vpnMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
+}
+
 func SliceConfigErrorOnUpdatingTheFinalizer(t *testing.T) {
-	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
 	err1 := errors.New("internal_error")
@@ -455,7 +488,7 @@ func SliceConfigErrorOnUpdatingTheFinalizer(t *testing.T) {
 }
 
 func SliceConfigRemoveFinalizerErrorOnUpdate(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, vpnMock := setupSliceConfigTest("slice_config", "namespace")
 	time := metav1.Now()
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
@@ -469,6 +502,7 @@ func SliceConfigRemoveFinalizerErrorOnUpdate(t *testing.T) {
 		"slice_name": requestObj.Name,
 	}
 	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
+	vpnMock.On("DeleteVpnKeyRotationConfig", ctx, requestObj.Name, requestObj.Namespace).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
@@ -487,7 +521,7 @@ func SliceConfigRemoveFinalizerErrorOnUpdate(t *testing.T) {
 }
 
 func SliceConfigRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, _, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, vpnMock := setupSliceConfigTest("slice_config", "namespace")
 	time := metav1.Now()
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
@@ -501,6 +535,7 @@ func SliceConfigRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
 		"slice_name": requestObj.Name,
 	}
 	workerSliceGatewayRecyclerMock.On("DeleteWorkerSliceGatewayRecyclersByLabel", ctx, recyclerLabel, requestObj.Namespace).Return(nil).Once()
+	vpnMock.On("DeleteVpnKeyRotationConfig", ctx, requestObj.Name, requestObj.Namespace).Return(nil).Once()
 	err1 := errors.New("internal_error")
 	clientMock.On("Update", ctx, mock.Anything).Return(err1).Once()
 	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
@@ -521,7 +556,7 @@ func SliceConfigRemoveFinalizerErrorOnGetAfterUpdate(t *testing.T) {
 func SliceConfigDeleteHappyCase(t *testing.T) {
 	name := "slice-1"
 	namespace := "namespace"
-	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest(name, namespace)
+	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest(name, namespace)
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("List", ctx, &controllerv1alpha1.SliceConfigList{}, client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*controllerv1alpha1.SliceConfigList)
@@ -551,7 +586,7 @@ func SliceConfigDeleteHappyCase(t *testing.T) {
 func SliceConfigDeleteErrorOnList(t *testing.T) {
 	name := "slice-1"
 	namespace := "namespace"
-	_, _, _, _, _, clientMock, _, ctx, sliceConfigService, requestObj, _ := setupSliceConfigTest(name, namespace)
+	_, _, _, _, _, clientMock, _, ctx, sliceConfigService, requestObj, _, _ := setupSliceConfigTest(name, namespace)
 	err1 := errors.New("internal_error")
 	clientMock.On("List", ctx, &controllerv1alpha1.SliceConfigList{}, client.InNamespace(requestObj.Namespace)).Return(err1).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*controllerv1alpha1.SliceConfigList)
@@ -576,7 +611,7 @@ func SliceConfigDeleteErrorOnList(t *testing.T) {
 func SliceConfigDeleteErrorOnDelete(t *testing.T) {
 	name := "slice-1"
 	namespace := "namespace"
-	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest(name, namespace)
+	_, _, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest(name, namespace)
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("List", ctx, &controllerv1alpha1.SliceConfigList{}, client.InNamespace(requestObj.Namespace)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*controllerv1alpha1.SliceConfigList)
@@ -606,7 +641,7 @@ func SliceConfigDeleteErrorOnDelete(t *testing.T) {
 }
 
 func SliceConfigErrorOnListingServiceExport(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -646,7 +681,7 @@ func SliceConfigErrorOnListingServiceExport(t *testing.T) {
 }
 
 func SliceConfigErrorOnCreateOrUpdateServiceImport(t *testing.T) {
-	workerSliceGatewayMock, workerSliceConfigMock, _, workerServiceImportMock, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, _, workerServiceImportMock, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, _ := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Once()
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
@@ -698,14 +733,14 @@ func SliceConfigErrorOnCreateOrUpdateServiceImport(t *testing.T) {
 	mMock.AssertExpectations(t)
 }
 
-func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGatewayService, *mocks.IWorkerSliceConfigService, *mocks.IServiceExportConfigService, *mocks.IWorkerServiceImportService, *mocks.IWorkerSliceGatewayRecyclerService, *utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context, SliceConfigService, ctrl.Request, *metricMock.IMetricRecorder) {
+func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGatewayService, *mocks.IWorkerSliceConfigService, *mocks.IServiceExportConfigService, *mocks.IWorkerServiceImportService, *mocks.IWorkerSliceGatewayRecyclerService, *utilMock.Client, *controllerv1alpha1.SliceConfig, context.Context, SliceConfigService, ctrl.Request, *metricMock.IMetricRecorder, *mocks.IVpnKeyRotationService) {
 	workerSliceGatewayMock := &mocks.IWorkerSliceGatewayService{}
 	workerSliceConfigMock := &mocks.IWorkerSliceConfigService{}
 	serviceExportConfigMock := &mocks.IServiceExportConfigService{}
 	workerServiceImportMock := &mocks.IWorkerServiceImportService{}
 	workerSliceGatewayRecyclerMock := &mocks.IWorkerSliceGatewayRecyclerService{}
 	mMock := &metricMock.IMetricRecorder{}
-	vpn := mocks.IVpnKeyRotationService{}
+	vpn := &mocks.IVpnKeyRotationService{}
 	sliceConfigService := SliceConfigService{
 		sgs:   workerSliceGatewayMock,
 		ms:    workerSliceConfigMock,
@@ -713,7 +748,7 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 		si:    workerServiceImportMock,
 		wsgrs: workerSliceGatewayRecyclerMock,
 		mf:    mMock,
-		vpn:   &vpn,
+		vpn:   vpn,
 	}
 	namespacedName := types.NamespacedName{
 		Name:      name,
@@ -735,5 +770,5 @@ func setupSliceConfigTest(name string, namespace string) (*mocks.IWorkerSliceGat
 	vpn.On("CreateMinimalVpnKeyRotationConfig", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	vpn.On("ReconcileClusters", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, scheme, "SliceConfigServiceTest", &eventRecorder)
-	return workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, workerServiceImportMock, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock
+	return workerSliceGatewayMock, workerSliceConfigMock, serviceExportConfigMock, workerServiceImportMock, workerSliceGatewayRecyclerMock, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock, vpn
 }

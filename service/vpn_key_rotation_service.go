@@ -40,6 +40,7 @@ type IVpnKeyRotationService interface {
 	CreateMinimalVpnKeyRotationConfig(ctx context.Context, sliceName, namespace string, r int) error
 	ReconcileClusters(ctx context.Context, sliceName, namespace string, clusters []string) (*controllerv1alpha1.VpnKeyRotation, error)
 	ReconcileVpnKeyRotation(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
+	DeleteVpnKeyRotationConfig(ctx context.Context, sliceName, namespace string) error
 }
 
 type VpnKeyRotationService struct {
@@ -164,6 +165,10 @@ func (v *VpnKeyRotationService) ReconcileVpnKeyRotation(ctx context.Context, req
 	if err != nil {
 		logger.Errorf("Err getting sliceconfig: %s", err.Error())
 		return ctrl.Result{}, err
+	}
+	if s == nil {
+		logger.Infof("SliceConfig %s not found, VpnKeyRotation CR will be garbage collected", req.Name)
+		return ctrl.Result{}, nil
 	}
 	if vpnKeyRotationConfig.GetOwnerReferences() == nil {
 		if err := controllerutil.SetControllerReference(s, vpnKeyRotationConfig, util.GetKubeSliceControllerRequestContext(ctx).Scheme); err != nil {
@@ -378,7 +383,7 @@ func (v *VpnKeyRotationService) listWorkerSliceGateways(ctx context.Context, lab
 	return &workerSliceGatewaysList, nil
 }
 
-// getSliceConfig
+// getSliceConfig returns the named SliceConfig, or (nil, nil) when it does not exist.
 func (v *VpnKeyRotationService) getSliceConfig(ctx context.Context, name, namespace string) (*controllerv1alpha1.SliceConfig, error) {
 	s := controllerv1alpha1.SliceConfig{}
 	found, err := util.GetResourceIfExist(ctx, types.NamespacedName{
@@ -389,9 +394,34 @@ func (v *VpnKeyRotationService) getSliceConfig(ctx context.Context, name, namesp
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("sliceconfig %s not found", name)
+		return nil, nil
 	}
 	return &s, nil
+}
+
+// DeleteVpnKeyRotationConfig deletes the VpnKeyRotation CR for the given slice if it exists.
+func (v *VpnKeyRotationService) DeleteVpnKeyRotationConfig(ctx context.Context, sliceName, namespace string) error {
+	logger := util.CtxLogger(ctx).
+		With("name", "DeleteVpnKeyRotationConfig").
+		With("reconciler", "VpnKeyRotationConfig")
+
+	vpnKeyRotationConfig := controllerv1alpha1.VpnKeyRotation{}
+	found, err := util.GetResourceIfExist(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      sliceName,
+	}, &vpnKeyRotationConfig)
+	if err != nil {
+		logger.Errorf("error fetching vpnKeyRotationConfig %s. Err: %s", sliceName, err.Error())
+		return err
+	}
+	if found {
+		if err := util.DeleteResource(ctx, &vpnKeyRotationConfig); err != nil {
+			logger.Errorf("error deleting vpnKeyRotationConfig %s. Err: %s", sliceName, err.Error())
+			return err
+		}
+		logger.Debugf("deleted vpnKeyRotationConfig %s", sliceName)
+	}
+	return nil
 }
 
 func (v *VpnKeyRotationService) listClientPairGateway(wl *workerv1alpha1.WorkerSliceGatewayList, clientGatewayName string) (*workerv1alpha1.WorkerSliceGateway, error) {
