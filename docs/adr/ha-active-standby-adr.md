@@ -162,7 +162,45 @@ If the Active's own API server is down it can't renew and can't write — natura
 
 ### 5. What triggers promotion?
 
-**The Active's Lease `renewTime` not updating within `leaseDuration + paddingSeconds`.** On detecting a stale Lease, the Standby does one final dial to the Active's API server; if it's reachable and the Lease is live, it aborts (transient blip). Otherwise it acquires the Lease on its own cluster, sets `mode = Active`, enables reconcilers, stops `StateMirror`, sets the `activeController` marker on the worker `Cluster` CRs, and emits a Kubernetes Event and increments `ha_failover_total`.
+**The newest `renewTime` the Standby has ever successfully read from the Active's Lease being older than `leaseDuration + paddingSeconds`.**
+
+The Standby retains the last `Lease` object it read successfully. On each poll a successful read replaces it; a failed read leaves it untouched and logs a warning. Promotion triggers when that retained timestamp ages past the deadline — **whether the Standby currently sees a stale Lease or simply cannot read the Lease at all.**
+
+Those two cases are deliberately not distinguished, because they are the same event. A controller pod that stops renewing (Lease readable, `renewTime` frozen) and an API server that stops responding (Lease unreadable, so the newest `renewTime` the Standby holds is frozen) both mean *the Active's newest proof of life has stopped advancing*; the difference is only in how the freeze manifests at the transport layer. A retained stale Lease ages on its own — its `renewTime` is fixed in the past while local time keeps moving — so a single comparison covers both, with one threshold and no second timer. Decision 1 places the Lease on the Active precisely so that both failures fence it identically; an earlier draft of this decision described only the readable-but-stale case, which would leave the loss of an entire hub undetectable.
+
+**Three conditions must hold before the Standby promotes:**
+
+- **(a) It has read the Active's Lease successfully at least once since startup.** This separates *"it worked, then it stopped"* — evidence of a failure — from *"it never worked"*, which is evidence of a configuration bug. Without it, a bad kubeconfig, a missing RBAC grant, or a mistyped namespace is indistinguishable from a dead Active, and the Standby promotes itself the moment it boots: a guaranteed split brain caused by a typo.
+- **(b) Its own API server is reachable**, confirmed by a bounded read of the Standby's own Lease through the local client. A failure of the Standby's own networking produces observations byte-identical to the Active having died, and this is the only cheap probe that tells them apart. A `NotFound` response counts as **healthy** — the API server answered, which is the thing being tested, and on a first-ever promotion no local Lease exists yet.
+- **(c) A single timeout-bounded final read of the Active's Lease does not return a live Lease.** Polling is periodic, so the Active may have renewed moments after the last poll; this closes that race.
+
+**Condition (a) has a known cost:** a Standby that restarts *during* an outage starts unarmed, can never arm — the Active is already gone — and therefore will not promote. This is accepted for MVP as the safer failure, since a false promotion causes silent dual writes while a missed one causes downtime an operator can resolve. It is recorded alongside the split-brain non-goal rather than left implicit in code. Persisting the retained Lease across restarts, or an explicit cold-promotion override, is a deliberate follow-up.
+
+**Condition (c) narrows a polling race; it does not prevent split-brain.** In a genuine network partition the final read travels the same broken path as every other read, fails in the same way, and the Standby promotes regardless. In the unreachable case the real safety comes from *duration* — a sustained failure across the full `leaseDuration + paddingSeconds` budget rather than one bad read — and from condition (a). Split-brain remains the explicit non-goal of Decision 8.
+
+**Every refusal to promote is counted** (`ha_promotions_aborted_total{reason}`), so these branches are visible in production rather than silent.
+
+**Clock dependency, stated explicitly.** The comparison comes from a remote `renewTime` against local time, so a Standby clock running ahead of the Active's by more than `paddingSeconds` reads a healthy Lease as stale. This is a property of the staleness check itself and not of this decision, but it makes reasonably synchronised clocks — NTP on both hubs — an operational requirement of running HA, documented with the Standby's other deployment requirements.
+
+**The promotion sequence, in order:**
+
+1. Enter promotion: the write fence is held **shut** for the whole sequence, and entry is guarded so two concurrent polls cannot both run it.
+2. Evaluate conditions (a), (b) and (c); abort on any refusal without discarding the retained Lease — the next poll re-evaluates from scratch.
+3. **Stop `StateMirror` and wait for it to confirm it has exited.**
+4. Stop watching the Active's Lease.
+5. Acquire the Lease on this hub's own cluster.
+6. Set `mode = Active`.
+7. Publish `status.activeController` on this hub's own `Cluster` CRs, within `promotionGracePeriod`; on expiry proceed anyway, log loudly, and keep retrying in the background.
+8. **Open the write fence.**
+9. Start renewing the local Lease.
+10. Re-enqueue every object of every reconciled type.
+11. Emit a Kubernetes Event (`reason=PromotedToActive`) in the controller's own namespace, with the newly-acquired HA `Lease` as the involved object, and increment `ha_failover_total`.
+
+**Step 3 must precede step 8, and an earlier draft of this decision had it the other way around.** In the most common real trigger — the Active's controller pod dies while its API server stays healthy — `StateMirror`'s watches are still fully live at the moment of promotion. Because every mirrored object is labelled as mirror-owned and the mirror is entitled to overwrite exactly those objects, a hub that opens its write fence while the mirror is still running is fighting itself: the mirror overwrites what the newly-promoted reconcilers write, and the periodic resync's reverse diff re-creates anything they legitimately delete. Leadership must not be granted until the mirror has stopped.
+
+**Step 10 is not optional.** Because the Decision 4 fence *drops* rather than requeues reconcile requests while a hub is Standby, flipping the fence causes no reconcile at all — every request dropped during the Standby period is gone, not parked, and nothing fires again until an object changes or the informer resync period elapses (10 hours by default). Promotion must therefore explicitly re-enqueue every object of every reconciled type once leadership is granted; otherwise pre-existing mirrored state — which per Decision 6 carries no finalizers until a reconciler re-adds them — sits unreconciled on a hub that reports itself healthy. Note that a newly created object generates a fresh event and reconciles normally either way, so an acceptance test that only creates new objects will pass without this step.
+
+**On step 6's phrasing.** Neither `mode` nor the fence "enables reconcilers": per Decision 4's table, all nine reconcilers' watch loops run continuously on both roles. What changes is whether their bodies write. Flipping the fence changes what the *next* reconcile does; it does not cause one — which is why step 10 exists.
 
 ### 6. Which resources are mirrored, and how?
 
@@ -183,6 +221,8 @@ Mirroring only the KubeSlice CRDs is not enough — a promoted hub also needs th
 
 **Exception:** hub-issued SA **tokens** are not mirrored. A token signed by the Active is invalid on the Standby, so the mirror carries the `ServiceAccount` + RBAC (the identity and authorization) and each hub mints its own token (Decision 7).
 
+**What "each hub mints its own token" requires of the registration path.** This is a requirement on the implementation, not a property it already has. The registration path must make the token `Secret`'s creation conditional on **that Secret's** existence, not on the `ServiceAccount`'s: a mirrored `ServiceAccount` arrives on the Standby *without* its token Secret, so a routine that only mints one inside its `ServiceAccount`-not-found branch will find the account already present, skip the branch, and never mint a token there at all. A promoted hub then fails every reconcile of every registered cluster, permanently, while reporting a successful promotion. The same correction independently repairs any standalone hub whose token Secret was removed by hand, which today has no recovery path.
+
 ### 7. How do workers find the new Active after failover?
 
 **Workers are provisioned with access to both hubs up front, and detect failover by pulling their `Cluster` CR.**
@@ -192,19 +232,33 @@ At registration a worker is given `endpoint` + `ca.crt` + `token` for **both** h
 The authoritative "who is Active" signal is `status.activeController` on the worker's `Cluster` CR (`endpoint` / `caBundle` / `activeIdentity`), kept converged by the mirror. The worker-operator watches this; on promotion the new Active sets `activeController` to itself, and the worker calls `reconnectToHub()` — switching to its pre-held credentials for the new Active. worker-operator #467 re-architects the hub-client construction from a start-time `HUB_HOST_ENDPOINT` env var into a live watch that rebuilds the client without a pod restart, and surfaces the signal locally as a `ClusterController` CR so non-HA deployments (field absent/static) see no behavior change.
 
 ```yaml
-# Cluster CR status, set by the promoted hub; mirrored to both hubs
+# Cluster CR status, written locally by whichever hub currently holds
+# leadership, about itself; mirrored to the other hub
 status:
   activeController:
     endpoint: "https://<new-active>.example.com:6443"
     caBundle: "<base64 CA cert>"
     activeIdentity: "<new-active-identity>"
+    lastUpdated: "<RFC3339 timestamp>"
 ```
+
+**The field is published continuously, not only at promotion.** If only a *promoted* hub ever wrote it, a worker would have no way to identify the Active before any failover had happened — and Open Issue 4's resolution rule depends on each hub self-declaring while it holds leadership. So this is not merely a step in the promotion sequence: a small publisher runs on whichever hub is currently leader, listing the hub's own `Cluster` CRs and writing the field where it differs. It converges independently of reconciler traffic, which matters because reconciler traffic is exactly what is absent immediately after a promotion (Decision 5, step 10). Promotion additionally triggers one immediate pass so failover latency is not tied to the publisher's period.
+
+**The write is local.** Each hub writes to its own API server about itself; no hub ever dials a worker cluster's API server, and no new cross-cluster credentials are introduced. The Standby's copy of the field, populated by `StateMirror` from the Active, therefore names *the Active* rather than the Standby — which is the property Open Issue 4's worker-side rule relies on.
+
+`lastUpdated` is carried so the worker has a freshness signal available for Open Issue 4's tie-break sub-question without having to read Leases across clusters. Whether worker-operator #467 uses it is left to that issue.
+
+**The endpoint must be explicitly configured.** It reuses the controller's existing endpoint setting — the same value already handed to workers in their registration credentials, so there is one source of truth — but that setting ships with a placeholder default. A hub whose endpoint is still the placeholder **refuses to publish and logs the refusal**, rather than advertising an unreachable address as the failover target. It does not treat this as fatal; a misconfigured endpoint should not prevent the process from starting.
 
 DNS failover was rejected (external DNS control; unpredictable TTL). Start-time env vars were rejected (need a pod restart; can't carry the credential switch).
 
 ### 8. Split-brain
 
 **Explicit non-goal for MVP.** If a network partition isolates the two healthy hubs from each other, the Active keeps renewing its local Lease while the Standby can't see it and promotes — both would write to workers. This is documented as a known limitation; on partition heal an operator demotes one hub. Likewise, a recovered failed hub re-joins as Standby by manual redeploy rather than automatically.
+
+**Why a recovered Active cannot be demoted automatically.** The two hubs' Leases are separate objects on separate API servers — the Active's on the Active's cluster, the promoted Standby's on its own. There is **no shared record of who won.** A recovered old Active reads *its own* Lease, sees itself as the holder, and simply resumes; it has no mechanism by which to learn it was replaced. Closing this needs a third-party arbiter with quorum (an external store, or a third witness cluster), which is a substantially larger design than this ADR covers. It is why manual demotion is the MVP answer rather than an oversight.
+
+**The mirrored failure this design accepts in the other direction.** Decision 5's condition (a) means a Standby that restarts *during* an outage never arms and therefore never promotes. Both limitations trade the same way and for the same reason: silent dual writes are harder to detect and to recover from than an outage that stays visibly an outage.
 
 ---
 
@@ -237,12 +291,15 @@ sequenceDiagram
     participant W as Worker
 
     Note over A: crash / API-server / node failure
-    A--xL: renewTime stops updating
-    S->>L: poll renewTime
-    L-->>S: stale beyond leaseDuration + padding
-    S->>A: one final dial (abort if reachable + Lease live)
-    S->>S: acquire local Lease, mode=Active, enable reconcilers, stop StateMirror
-    S->>S: set status.activeController on worker Cluster CRs
+    A--xL: renewTime stops updating (or becomes unreadable)
+    S->>L: poll
+    L-->>S: retained renewTime now older than leaseDuration + padding
+    S->>S: self-health check — can I reach my own API server?
+    S->>A: one final bounded dial (abort if reachable + Lease live)
+    S->>S: stop StateMirror, WAIT for it to exit
+    S->>S: acquire local Lease, mode=Active
+    S->>S: publish status.activeController on its OWN Cluster CRs
+    S->>S: open write fence, start renewing, re-enqueue every object
     Note over W: already holds Standby creds, watching Cluster CR
     W->>S: reconnectToHub() → new-Active endpoint + token + CA
     W-->>S: status updates resume
@@ -260,11 +317,15 @@ sequenceDiagram
 | `--ha-lease-duration` | `15s` | Lease TTL |
 | `--ha-renew-deadline` | `10s` | Give up on renewal after this |
 | `--ha-retry-period` | `2s` | Lease acquire/renew poll interval |
-| `--ha-padding-seconds` | `5s` | Extra buffer before promotion |
-| `--ha-promotion-grace-period` | `10s` | Grace period around promotion |
+| `--ha-padding-seconds` | `5s` | **Staleness buffer.** How far past `leaseDuration` the newest `renewTime` the Standby has read must age before the Active is treated as dead. A *detection* threshold |
+| `--ha-promotion-grace-period` | `10s` | **Post-acquire settle budget.** Maximum time promotion waits to publish `status.activeController` before opening the write fence anyway. A *sequencing* budget, unrelated to detection |
+| `--ha-promotion-dial-timeout` | `5s` | Bound on the two pre-promotion reads (the Standby's self-health check and the final dial to the Active). Without a bound, a black-holed API server hangs until the OS TCP timeout, far past the failover budget |
+| `--ha-self-ca-bundle-path` | `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` | The hub's own API-server CA, published in `status.activeController.caBundle`. If unreadable, publication proceeds without it and logs |
 | `--ha-active-kubeconfig` | `""` | Path to Active's kubeconfig (Standby only) |
 | `--ha-sync-interval` | `60s` | StateMirror periodic resync period |
 | `ENABLE_WEBHOOKS` (env) | `true` | Set `false` on the Standby Deployment |
+
+The two promotion-related durations above do genuinely different jobs and an earlier draft described both in near-synonymous terms (*"extra buffer before promotion"* / *"grace period around promotion"*), which invited them to be read as one setting under two names. `--ha-padding-seconds` decides *when the Active is considered dead*; `--ha-promotion-grace-period` decides *how long promotion waits on its own publication step before proceeding regardless*. Issue #297's `--ha-promotion-grace` is an alias of the former and is deliberately not implemented — the name shipped with the leader-election work is `--ha-padding-seconds`, and the failover arithmetic is unchanged: `leaseDuration (15s) + padding (5s) = 20s`.
 
 ---
 
