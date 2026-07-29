@@ -38,6 +38,14 @@ const (
 	// wait for this tick — promotion runs one synchronous PublishOnce.
 	DefaultActivePublishInterval = 30 * time.Second
 
+	// DefaultLeadershipPollInterval is how often a hub that is not (yet) the
+	// leader re-checks whether it has become one. It is deliberately much shorter
+	// than the publish interval: an Active acquires its Lease a second or two
+	// after start-up, and waiting a full publish interval to notice would leave a
+	// freshly started hub unadvertised for that whole window. Costs nothing while
+	// idle — a non-leader returns before touching the API server.
+	DefaultLeadershipPollInterval = 2 * time.Second
+
 	// DefaultSelfCABundlePath is where a pod finds its own API server's CA.
 	DefaultSelfCABundlePath = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
@@ -70,7 +78,10 @@ type ActivePublisherOptions struct {
 	// CABundlePath is this hub's own API server CA, read once at startup.
 	CABundlePath string
 	Interval     time.Duration
-	Log          *zap.SugaredLogger
+	// LeadershipPollInterval is how often to re-check for leadership while this
+	// hub does not hold it. Defaults to DefaultLeadershipPollInterval.
+	LeadershipPollInterval time.Duration
+	Log                    *zap.SugaredLogger
 }
 
 // ActivePublisher keeps status.activeController current on every Cluster CR on
@@ -84,9 +95,10 @@ type ActivePublisher struct {
 	localClient client.Client
 	elector     leadership
 
-	endpoint string
-	caBundle string
-	interval time.Duration
+	endpoint   string
+	caBundle   string
+	interval   time.Duration
+	leaderPoll time.Duration
 
 	log *zap.SugaredLogger
 }
@@ -101,6 +113,9 @@ func NewActivePublisher(local client.Client, elector leadership, opts ActivePubl
 	if opts.Interval == 0 {
 		opts.Interval = DefaultActivePublishInterval
 	}
+	if opts.LeadershipPollInterval == 0 {
+		opts.LeadershipPollInterval = DefaultLeadershipPollInterval
+	}
 	if opts.CABundlePath == "" {
 		opts.CABundlePath = DefaultSelfCABundlePath
 	}
@@ -113,6 +128,7 @@ func NewActivePublisher(local client.Client, elector leadership, opts ActivePubl
 		elector:     elector,
 		endpoint:    opts.Endpoint,
 		interval:    opts.Interval,
+		leaderPoll:  opts.LeadershipPollInterval,
 		log:         opts.Log,
 	}
 
@@ -131,20 +147,32 @@ func (p *ActivePublisher) Start(ctx context.Context) error {
 	p.log.Infow("starting activeController publisher",
 		"endpoint", p.endpoint, "interval", p.interval, "haveCABundle", p.caBundle != "")
 
-	if err := p.PublishOnce(ctx); err != nil {
-		p.log.Warnw("initial activeController publication failed; will retry", "error", err)
-	}
-	ticker := time.NewTicker(p.interval)
-	defer ticker.Stop()
 	for {
+		// The wait is chosen from what this pass actually did, not from a second
+		// IsLeader() read: leadership arriving between the two would otherwise
+		// still cost a full publish interval.
+		//
+		// While this hub is not the leader there is nothing to publish, but
+		// leadership can arrive at any moment — on an Active, a second or two
+		// after start-up; on a Standby, at promotion. Re-checking on the short
+		// interval is what makes a freshly started or freshly promoted hub
+		// advertise itself promptly. Verified live: on the publish interval
+		// alone a fresh Active took 31s to appear.
+		wasLeader, err := p.publishOnce(ctx)
+		if err != nil {
+			p.log.Warnw("activeController publication failed; will retry", "error", err)
+		}
+		wait := p.interval
+		if !wasLeader {
+			wait = p.leaderPoll
+		}
+		timer := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			p.log.Infow("activeController publisher stopped", "reason", ctx.Err())
 			return nil
-		case <-ticker.C:
-			if err := p.PublishOnce(ctx); err != nil {
-				p.log.Warnw("activeController publication failed; will retry", "error", err)
-			}
+		case <-timer.C:
 		}
 	}
 }
@@ -156,20 +184,27 @@ func (p *ActivePublisher) Start(ctx context.Context) error {
 // the field is owned by the state mirror, and a Standby writing its own identity
 // there would break the very rule workers use to tell the two hubs apart.
 func (p *ActivePublisher) PublishOnce(ctx context.Context) error {
+	_, err := p.publishOnce(ctx)
+	return err
+}
+
+// publishOnce is PublishOnce, additionally reporting whether this hub held
+// leadership for the pass. Start uses that to decide how long to wait next.
+func (p *ActivePublisher) publishOnce(ctx context.Context) (leader bool, err error) {
 	if !p.elector.IsLeader() {
 		p.log.Debugw("not the leader; skipping activeController publication")
-		return nil
+		return false, nil
 	}
 	if err := p.validEndpoint(); err != nil {
 		// Deliberately not fatal. A hub that cannot describe itself should keep
 		// reconciling; it just must not advertise an address nobody can reach.
 		p.log.Errorw("refusing to publish activeController", "endpoint", p.endpoint, "error", err)
-		return nil
+		return true, nil
 	}
 
 	clusters := &controllerv1alpha1.ClusterList{}
 	if err := p.localClient.List(ctx, clusters); err != nil {
-		return fmt.Errorf("listing clusters to publish activeController: %w", err)
+		return true, fmt.Errorf("listing clusters to publish activeController: %w", err)
 	}
 
 	desired := controllerv1alpha1.ActiveControllerInfo{
@@ -198,7 +233,7 @@ func (p *ActivePublisher) PublishOnce(ctx context.Context) error {
 		p.log.Infow("published activeController",
 			"clusters", updated, "identity", desired.ActiveIdentity, "endpoint", desired.Endpoint)
 	}
-	return errors.Join(errs...)
+	return true, errors.Join(errs...)
 }
 
 // validEndpoint rejects the two values that must never reach a worker: nothing,

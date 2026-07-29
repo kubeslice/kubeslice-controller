@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -269,6 +270,51 @@ func TestPublishOnce_ContinuesAfterOneClusterFails(t *testing.T) {
 	got := getCluster(t, c, "worker-2", "kubeslice-avesha")
 	assert.NotNil(t, got.Status.ActiveController,
 		"one cluster failing must not stop the others being published")
+}
+
+// lateLeadership becomes the leader only after IsLeader has been asked a few
+// times, standing in for an Active whose Lease renewal lands a second or two
+// after start-up.
+type lateLeadership struct {
+	mu     sync.Mutex
+	checks int
+	after  int
+}
+
+func (l *lateLeadership) IsLeader() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.checks++
+	return l.checks > l.after
+}
+func (l *lateLeadership) Identity() string { return "hub-a" }
+
+// TestStart_PublishesPromptlyWhenLeadershipArrivesLate pins the fix for a defect
+// found in live testing: Start's first pass runs before the elector has acquired
+// its Lease, so it skipped, and the next attempt was a full publish interval
+// away — a fresh Active took 31s to advertise itself. While not the leader the
+// loop must poll on the much shorter leadership interval instead.
+func TestStart_PublishesPromptlyWhenLeadershipArrivesLate(t *testing.T) {
+	c := clusterClient(t, newCluster("worker-1", "kubeslice-avesha"))
+	p := NewActivePublisher(c, &lateLeadership{after: 3}, ActivePublisherOptions{
+		Endpoint: "https://hub-a.example.com:6443",
+		// A publish interval far longer than the test's patience: if the loop
+		// waits this out before retrying, the test fails.
+		Interval:               time.Hour,
+		LeadershipPollInterval: 5 * time.Millisecond,
+		CABundlePath:           filepath.Join(t.TempDir(), "absent-ca.crt"),
+		Log:                    testLog(),
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = p.Start(ctx) }()
+
+	require.Eventually(t, func() bool {
+		return getCluster(t, c, "worker-1", "kubeslice-avesha").Status.ActiveController != nil
+	}, 2*time.Second, 5*time.Millisecond,
+		"a hub that becomes leader after start-up must publish on the leadership poll interval, "+
+			"not wait out a full publish interval")
 }
 
 func TestStart_ReturnsNilOnContextCancel(t *testing.T) {
