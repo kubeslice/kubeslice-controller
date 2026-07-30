@@ -127,6 +127,7 @@ func initialize(services *service.Services) {
 	var haPaddingSeconds time.Duration
 	var haSyncWorkers int
 	var haSyncInterval time.Duration
+	var haSelfCABundlePath string
 
 	flag.StringVar(&rbacResourcePrefix, "rbac-resource-prefix", service.RbacResourcePrefix, "RBAC resource prefix")
 	flag.StringVar(&projectNameSpacePrefixFromCustomer, "project-namespace-prefix", service.ProjectNamespacePrefix, fmt.Sprintf("Overrides the default %s kubeslice namespace", service.ProjectNamespacePrefix))
@@ -166,6 +167,7 @@ func initialize(services *service.Services) {
 	flag.DurationVar(&haPaddingSeconds, "ha-padding-seconds", ha.DefaultPaddingSeconds, "Extra buffer a Standby waits before treating the Active Lease as stale.")
 	flag.IntVar(&haSyncWorkers, "ha-sync-workers", ha.DefaultSyncWorkers, "Number of workers draining the Standby's remote-mirror workqueue.")
 	flag.DurationVar(&haSyncInterval, "ha-sync-interval", ha.DefaultPruneInterval, "How often the Standby prunes mirrored objects that no longer exist on the Active hub.")
+	flag.StringVar(&haSelfCABundlePath, "ha-self-ca-bundle-path", ha.DefaultSelfCABundlePath, "Path to this hub's own API server CA, published in status.activeController.caBundle. Unreadable is not fatal; publication continues without it.")
 
 	flag.Parse()
 
@@ -534,6 +536,25 @@ func initialize(services *service.Services) {
 		go func() {
 			if err := remoteSyncer.Start(ctx); err != nil {
 				setupLog.Error(err, "HA remote syncer exited")
+			}
+		}()
+	}
+
+	// Publish status.activeController for as long as this hub holds leadership
+	// (ADR #293 Decision 7), so workers can identify the Active by watching both
+	// hubs. Deliberately not started in standalone mode: a non-HA deployment must
+	// leave the field absent, which is what keeps an existing worker's behaviour
+	// unchanged. A Standby starts it too — the publisher no-ops while it is not
+	// the leader, so promotion needs no extra wiring here.
+	if haRunMode != ha.ModeStandalone {
+		activePublisher := ha.NewActivePublisher(localHAClient, leaderElector, ha.ActivePublisherOptions{
+			Endpoint:     controllerEndpoint,
+			CABundlePath: haSelfCABundlePath,
+			Log:          controllerLog.With("name", "ha-active-publisher"),
+		})
+		go func() {
+			if err := activePublisher.Start(ctx); err != nil {
+				setupLog.Error(err, "HA activeController publisher exited")
 			}
 		}()
 	}

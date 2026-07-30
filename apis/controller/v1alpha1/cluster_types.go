@@ -139,6 +139,30 @@ type ClusterStatus struct {
 	// StorageCapabilities contains auto-detected storage capabilities reported by the worker operator.
 	// Populated only when the worker operator's storage-capability reconciler is active.
 	StorageCapabilities *StorageCapabilities `json:"storageCapabilities,omitempty"`
+	// ActiveController identifies the hub controller that currently holds leadership.
+	// Populated only on an Active/Standby HA deployment; absent otherwise, so a
+	// non-HA worker sees no behaviour change.
+	ActiveController *ActiveControllerInfo `json:"activeController,omitempty"`
+}
+
+// ActiveControllerInfo describes the hub controller currently holding leadership.
+//
+// Each hub writes this field about itself, on its own API server, and only while
+// it holds leadership. A Standby's copy is populated by the state mirror from the
+// Active, so it names the Active rather than itself — which lets a worker watching
+// both hubs identify the Active by the rule "trust whichever endpoint is reachable
+// and reports an ActiveIdentity matching that endpoint's own identity", without
+// needing to know which role either hub currently holds. See ADR #293 Decision 7.
+type ActiveControllerInfo struct {
+	// Endpoint is the API server endpoint of the hub currently holding leadership
+	Endpoint string `json:"endpoint,omitempty"`
+	// CABundle is the base64-encoded PEM CA bundle for Endpoint
+	CABundle string `json:"caBundle,omitempty"`
+	// ActiveIdentity is the HA identity of the hub that wrote this field about itself
+	ActiveIdentity string `json:"activeIdentity,omitempty"`
+	// LastUpdated is the timestamp when this declaration was last written. It gives
+	// a consumer a deterministic tie-break if both hubs self-declare simultaneously.
+	LastUpdated metav1.Time `json:"lastUpdated,omitempty"`
 }
 
 // StorageCapabilities holds auto-detected RWX-capable storage classes on the worker cluster.
