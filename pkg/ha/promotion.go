@@ -33,8 +33,11 @@ import (
 // run the sequence in a unit test, and it is why the elector needs no knowledge
 // of what a RemoteSyncer or a reconciler even is.
 type PromotionHooks struct {
-	// StopMirror cancels the RemoteSyncer and MUST NOT return until it has
-	// fully stopped writing. See step 3 in promote for why waiting matters.
+	// StopMirror cancels the RemoteSyncer and must not return until it has
+	// fully stopped writing, or until ctx expires — whichever comes first.
+	// Returning early, before the mirror has confirmed it stopped, is what step
+	// 3 of promote exists to prevent; returning an error on expiry is correct
+	// and aborts the promotion. Bounded by promotionGracePeriod.
 	StopMirror func(ctx context.Context) error
 
 	// PublishActiveController writes status.activeController on this hub's own
@@ -107,6 +110,18 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 		}
 	}()
 
+	// A precondition rather than a guard, stated because it is otherwise
+	// implicit: without a client to the Active there is no way to have observed
+	// it alive, so there is nothing that could justify concluding it is gone.
+	// WatchRemoteLease refuses to start without one and the arming rule cannot
+	// be satisfied without one either, so this is unreachable from the loop —
+	// but promote is a method, and a future caller (a forced-promotion path, for
+	// instance) would otherwise crash inside the final dial rather than be told
+	// no.
+	if e.remoteClient == nil {
+		return false, fmt.Errorf("cannot promote without a client to the active hub")
+	}
+
 	e.log.Infow("promotion sequence starting", "identity", e.identity, "lease", e.leaseName)
 
 	// Step 2.
@@ -126,11 +141,25 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// the new Active legitimately deletes gets resurrected within one sync
 	// interval. Opening the fence first means promoting into a hub that is
 	// fighting itself.
+	//
+	// The wait is bounded, and that bound matters more than it looks. Waiting
+	// indefinitely is the tempting choice, because proceeding without a stopped
+	// mirror is exactly the dual-writer state above. But the watch loop calls
+	// promote synchronously, so an unbounded wait on a mirror that never exits
+	// blocks the loop: no further polls, no further staleness evaluation, no
+	// failover ever, and nothing logged after the sequence started. Choosing
+	// "never promote into a dual writer" that way silently buys "never promote
+	// at all", which is strictly worse. Bounded, expiry aborts the attempt
+	// loudly and the next tick retries — so a mirror that is merely slow costs
+	// one tick, and a mirror that is genuinely stuck is visible instead of mute.
 	if e.hooks.StopMirror != nil {
-		if err := e.hooks.StopMirror(ctx); err != nil {
-			// Refuse rather than continue. A half-stopped mirror is exactly the
-			// dual-writer state this step exists to prevent, so the safe move is
-			// to stay a Standby and retry on the next tick.
+		stopCtx, cancel := context.WithTimeout(ctx, e.promotionGracePeriod)
+		err := e.hooks.StopMirror(stopCtx)
+		cancel()
+		if err != nil {
+			// Abort rather than continue. A mirror that has not confirmed it
+			// stopped is the dual-writer state this step exists to prevent, so
+			// the safe move is to stay a fenced Standby and retry next tick.
 			return false, fmt.Errorf("stopping the state mirror before promotion: %w", err)
 		}
 		e.log.Infow("state mirror stopped and confirmed exited")
@@ -193,8 +222,19 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// Ordered after step 8 on purpose: a kick delivered while the fence was
 	// still shut would be dropped without requeue, which is the exact failure it
 	// exists to fix.
+	//
+	// Bounded like the steps before it, for a reason specific to how the kick
+	// will be implemented: it pushes one event per object into a channel per
+	// reconciled type, and those channels are only drained once the manager is
+	// running. main.go starts this watch loop before mgr.Start, so a kick that
+	// arrives in that window has nothing reading the other end. Unbounded, it
+	// would block here forever on an already-promoted hub — leadership taken,
+	// fence open, and the promotion never finishing or reporting itself.
 	if e.hooks.KickReconcilers != nil {
-		if err := e.hooks.KickReconcilers(ctx); err != nil {
+		kickCtx, cancel := context.WithTimeout(ctx, e.promotionGracePeriod)
+		err := e.hooks.KickReconcilers(kickCtx)
+		cancel()
+		if err != nil {
 			e.log.Errorw("could not re-enqueue objects after promotion; pre-existing state may "+
 				"stay unreconciled until the informer resync period", "error", err)
 		} else {
@@ -205,7 +245,10 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// Step 11.
 	haFailoverTotal.Inc()
 	if e.hooks.EmitPromotedEvent != nil {
-		if err := e.hooks.EmitPromotedEvent(ctx, lease); err != nil {
+		eventCtx, cancel := context.WithTimeout(ctx, e.promotionGracePeriod)
+		err := e.hooks.EmitPromotedEvent(eventCtx, lease)
+		cancel()
+		if err != nil {
 			e.log.Errorw("could not emit PromotedToActive event", "error", err)
 		}
 	}

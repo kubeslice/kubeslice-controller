@@ -514,3 +514,148 @@ func TestPromote_AttachesTheAcquiredLeaseToTheEvent(t *testing.T) {
 	assert.Equal(t, DefaultLeaseName, got.Name)
 	assert.Equal(t, "hub-b", leaseHolder(got), "the lease must already name this hub as holder")
 }
+
+// TestPromote_BoundsTheMirrorStop is a regression test for a gap found by
+// auditing the failure paths rather than the happy one.
+//
+// Waiting indefinitely for the mirror to stop looks like the safe choice, since
+// proceeding without it is the dual-writer state step 3 exists to prevent. It
+// is not. The watch loop calls promote synchronously, so an unbounded wait on a
+// mirror that never exits blocks the loop: no further polls, no further
+// staleness evaluation, no failover ever, and nothing logged after the sequence
+// started. "Never promote into a dual writer" silently becomes "never promote",
+// which is strictly worse — and invisible.
+//
+// Bounded, expiry aborts loudly and the next tick retries.
+func TestPromote_BoundsTheMirrorStop(t *testing.T) {
+	e := NewClusterLeaderElector(fakeClient(t), failingReadClient(t), Options{
+		Mode:                 ModeStandby,
+		Identity:             "hub-b",
+		PromotionGracePeriod: 50 * time.Millisecond,
+		Log:                  testLog(),
+	})
+	e.lastSeenLease = newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now().Add(-time.Hour))
+
+	stopCalled := make(chan struct{}, 1)
+	e.SetPromotionHooks(PromotionHooks{
+		// Exactly what main.go's hook does when the syncer never exits: wait for
+		// the mirror to confirm, or for the context to give up.
+		StopMirror: func(ctx context.Context) error {
+			stopCalled <- struct{}{}
+			<-ctx.Done()
+			return ctx.Err()
+		},
+	})
+
+	done := make(chan struct{})
+	var promoted bool
+	var err error
+	go func() {
+		defer close(done)
+		promoted, err = e.promote(context.Background())
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("promote blocked on a mirror that never stopped — an unbounded wait here " +
+			"silently disables failover entirely, which is worse than the dual-writer state it avoids")
+	}
+
+	require.Len(t, stopCalled, 1, "the mirror stop must actually have been attempted")
+	require.Error(t, err, "a mirror that never confirms must abort the promotion loudly")
+	assert.False(t, promoted)
+
+	// And the hub must be left able to try again.
+	assert.False(t, e.IsLeader(), "the fence must stay shut")
+	assert.Equal(t, ModeStandby, e.Mode())
+	assert.False(t, e.promoting.Load(), "the latch must be released so the next tick can retry")
+	assert.NotNil(t, e.lastSeenLease, "and the hub must stay armed")
+}
+
+// TestPromote_RefusesWithoutARemoteClient states a precondition that is
+// otherwise implicit. Without a client to the Active there is no way to have
+// observed it alive, so nothing could justify concluding it is gone. It is
+// unreachable from the watch loop — which refuses to start without one, and
+// could not arm without one either — but promote is a method, and before this
+// guard a caller reaching it that way crashed inside the final dial rather than
+// being told no.
+func TestPromote_RefusesWithoutARemoteClient(t *testing.T) {
+	e := NewClusterLeaderElector(fakeClient(t), nil, Options{
+		Mode: ModeStandby, Identity: "hub-b", Log: testLog(),
+	})
+	e.lastSeenLease = newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now().Add(-time.Hour))
+
+	promoted, err := e.promote(context.Background())
+	require.Error(t, err, "the precondition must be reported, not hit as a nil dereference")
+	assert.False(t, promoted)
+	assert.False(t, e.IsLeader())
+	assert.False(t, e.promoting.Load(), "the latch must still be released")
+}
+
+// TestPromote_BoundsThePostFenceHooks covers the two steps that run after
+// leadership has already been taken. A hang there cannot cost the failover —
+// the hub is Active and writing by then — but it can cost the promotion ever
+// finishing or reporting itself, and it leaks the watch goroutine.
+//
+// The kick is the one that matters in practice: it pushes into a channel per
+// reconciled type, and those are only drained once the manager is running,
+// while main.go starts the watch loop before mgr.Start. A kick landing in that
+// window has nothing reading the other end.
+func TestPromote_BoundsThePostFenceHooks(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		build func(chan struct{}) PromotionHooks
+	}{
+		{"kick", func(block chan struct{}) PromotionHooks {
+			return PromotionHooks{KickReconcilers: func(ctx context.Context) error {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-block:
+					return nil
+				}
+			}}
+		}},
+		{"event", func(block chan struct{}) PromotionHooks {
+			return PromotionHooks{EmitPromotedEvent: func(ctx context.Context, l *coordinationv1.Lease) error {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-block:
+					return nil
+				}
+			}}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			block := make(chan struct{})
+			defer close(block)
+
+			e := NewClusterLeaderElector(fakeClient(t), failingReadClient(t), Options{
+				Mode:                 ModeStandby,
+				Identity:             "hub-b",
+				PromotionGracePeriod: 50 * time.Millisecond,
+				Log:                  testLog(),
+			})
+			e.lastSeenLease = newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now().Add(-time.Hour))
+			e.SetPromotionHooks(tc.build(block))
+
+			done := make(chan struct{})
+			var promoted bool
+			go func() {
+				defer close(done)
+				promoted, _ = e.promote(context.Background())
+			}()
+
+			select {
+			case <-done:
+			case <-time.After(3 * time.Second):
+				t.Fatalf("promote blocked on a hung %s hook; the fence is already open, so this "+
+					"leaves a promoted hub whose promotion never finishes or reports itself", tc.name)
+			}
+			assert.True(t, promoted, "a hung post-fence hook must not undo a completed takeover")
+			assert.True(t, e.IsLeader())
+		})
+	}
+}

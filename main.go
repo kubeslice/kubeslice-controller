@@ -170,8 +170,8 @@ func initialize(services *service.Services) {
 	flag.DurationVar(&haPaddingSeconds, "ha-padding-seconds", ha.DefaultPaddingSeconds, "Extra buffer a Standby waits before treating the Active Lease as stale.")
 	flag.IntVar(&haSyncWorkers, "ha-sync-workers", ha.DefaultSyncWorkers, "Number of workers draining the Standby's remote-mirror workqueue.")
 	flag.DurationVar(&haSyncInterval, "ha-sync-interval", ha.DefaultPruneInterval, "How often the Standby prunes mirrored objects that no longer exist on the Active hub.")
-	flag.DurationVar(&haPromotionDialTimeout, "ha-promotion-dial-timeout", ha.DefaultPromotionDialTimeout, "Bound on each of the two reads a Standby makes before promoting (its own API server, then a final dial to the Active). Unbounded, a black-holed API server would hang past the failover budget.")
-	flag.DurationVar(&haPromotionGracePeriod, "ha-promotion-grace-period", ha.DefaultPromotionGracePeriod, "How long promotion waits to publish status.activeController before opening the write fence anyway. A sequencing budget, unrelated to --ha-padding-seconds.")
+	flag.DurationVar(&haPromotionDialTimeout, "ha-promotion-dial-timeout", ha.DefaultPromotionDialTimeout, "Bound on every read a Standby makes of a Lease over the network: each periodic poll of the Active's Lease, its own self-health check, and the final dial. Unbounded, an API server that accepts the connection and then stops answering blocks the watch loop and stalls detection entirely.")
+	flag.DurationVar(&haPromotionGracePeriod, "ha-promotion-grace-period", ha.DefaultPromotionGracePeriod, "Bound on each step of the promotion sequence that waits on another component: stopping the mirror, publishing status.activeController, re-enqueuing objects, and emitting the event. A sequencing budget, unrelated to --ha-padding-seconds.")
 	flag.StringVar(&haSelfCABundlePath, "ha-self-ca-bundle-path", ha.DefaultSelfCABundlePath, "Path to this hub's own API server CA, published in status.activeController.caBundle. Unreadable is not fatal; publication continues without it.")
 
 	flag.Parse()
