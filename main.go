@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -128,6 +129,8 @@ func initialize(services *service.Services) {
 	var haSyncWorkers int
 	var haSyncInterval time.Duration
 	var haSelfCABundlePath string
+	var haPromotionDialTimeout time.Duration
+	var haPromotionGracePeriod time.Duration
 
 	flag.StringVar(&rbacResourcePrefix, "rbac-resource-prefix", service.RbacResourcePrefix, "RBAC resource prefix")
 	flag.StringVar(&projectNameSpacePrefixFromCustomer, "project-namespace-prefix", service.ProjectNamespacePrefix, fmt.Sprintf("Overrides the default %s kubeslice namespace", service.ProjectNamespacePrefix))
@@ -167,6 +170,8 @@ func initialize(services *service.Services) {
 	flag.DurationVar(&haPaddingSeconds, "ha-padding-seconds", ha.DefaultPaddingSeconds, "Extra buffer a Standby waits before treating the Active Lease as stale.")
 	flag.IntVar(&haSyncWorkers, "ha-sync-workers", ha.DefaultSyncWorkers, "Number of workers draining the Standby's remote-mirror workqueue.")
 	flag.DurationVar(&haSyncInterval, "ha-sync-interval", ha.DefaultPruneInterval, "How often the Standby prunes mirrored objects that no longer exist on the Active hub.")
+	flag.DurationVar(&haPromotionDialTimeout, "ha-promotion-dial-timeout", ha.DefaultPromotionDialTimeout, "Bound on each of the two reads a Standby makes before promoting (its own API server, then a final dial to the Active). Unbounded, a black-holed API server would hang past the failover budget.")
+	flag.DurationVar(&haPromotionGracePeriod, "ha-promotion-grace-period", ha.DefaultPromotionGracePeriod, "How long promotion waits to publish status.activeController before opening the write fence anyway. A sequencing budget, unrelated to --ha-padding-seconds.")
 	flag.StringVar(&haSelfCABundlePath, "ha-self-ca-bundle-path", ha.DefaultSelfCABundlePath, "Path to this hub's own API server CA, published in status.activeController.caBundle. Unreadable is not fatal; publication continues without it.")
 
 	flag.Parse()
@@ -339,14 +344,16 @@ func initialize(services *service.Services) {
 		}
 	}
 	leaderElector := ha.NewClusterLeaderElector(localHAClient, remoteHAClient, ha.Options{
-		Mode:           haRunMode,
-		Identity:       haIdentity,
-		LeaseNamespace: haLeaseNamespace,
-		LeaseDuration:  haLeaseDuration,
-		RenewDeadline:  haRenewDeadline,
-		RetryPeriod:    haRetryPeriod,
-		PaddingSeconds: haPaddingSeconds,
-		Log:            controllerLog.With("name", "ha"),
+		Mode:                 haRunMode,
+		Identity:             haIdentity,
+		LeaseNamespace:       haLeaseNamespace,
+		LeaseDuration:        haLeaseDuration,
+		RenewDeadline:        haRenewDeadline,
+		RetryPeriod:          haRetryPeriod,
+		PaddingSeconds:       haPaddingSeconds,
+		PromotionDialTimeout: haPromotionDialTimeout,
+		PromotionGracePeriod: haPromotionGracePeriod,
+		Log:                  controllerLog.With("name", "ha"),
 	})
 	setupLog.Info("high availability configured", "mode", haRunMode, "identity", leaderElector.Identity())
 
@@ -518,6 +525,26 @@ func initialize(services *service.Services) {
 
 	ctx := ctrl.SetupSignalHandler()
 
+	// Publish status.activeController for as long as this hub holds leadership
+	// (ADR #293 Decision 7), so workers can identify the Active by watching both
+	// hubs. Deliberately not started in standalone mode: a non-HA deployment must
+	// leave the field absent, which is what keeps an existing worker's behaviour
+	// unchanged. A Standby starts it too — the publisher no-ops while it is not
+	// the leader, so promotion needs no extra wiring here.
+	var activePublisher *ha.ActivePublisher
+	if haRunMode != ha.ModeStandalone {
+		activePublisher = ha.NewActivePublisher(localHAClient, leaderElector, ha.ActivePublisherOptions{
+			Endpoint:     controllerEndpoint,
+			CABundlePath: haSelfCABundlePath,
+			Log:          controllerLog.With("name", "ha-active-publisher"),
+		})
+		go func() {
+			if err := activePublisher.Start(ctx); err != nil {
+				setupLog.Error(err, "HA activeController publisher exited")
+			}
+		}()
+	}
+
 	// Start the HA background loop for the configured mode. Standalone starts
 	// nothing (it is always the leader).
 	switch haRunMode {
@@ -528,33 +555,49 @@ func initialize(services *service.Services) {
 			}
 		}()
 	case ha.ModeStandby:
+		// The syncer gets its own cancellable context so promotion can stop the
+		// mirror without tearing down everything else that hangs off ctx.
+		syncerCtx, stopSyncer := context.WithCancel(ctx)
+		syncerDone := make(chan struct{})
 		go func() {
-			if err := leaderElector.WatchRemoteLease(ctx); err != nil {
-				setupLog.Error(err, "HA remote lease watch loop exited")
-			}
-		}()
-		go func() {
-			if err := remoteSyncer.Start(ctx); err != nil {
+			defer close(syncerDone)
+			if err := remoteSyncer.Start(syncerCtx); err != nil {
 				setupLog.Error(err, "HA remote syncer exited")
 			}
 		}()
-	}
 
-	// Publish status.activeController for as long as this hub holds leadership
-	// (ADR #293 Decision 7), so workers can identify the Active by watching both
-	// hubs. Deliberately not started in standalone mode: a non-HA deployment must
-	// leave the field absent, which is what keeps an existing worker's behaviour
-	// unchanged. A Standby starts it too — the publisher no-ops while it is not
-	// the leader, so promotion needs no extra wiring here.
-	if haRunMode != ha.ModeStandalone {
-		activePublisher := ha.NewActivePublisher(localHAClient, leaderElector, ha.ActivePublisherOptions{
-			Endpoint:     controllerEndpoint,
-			CABundlePath: haSelfCABundlePath,
-			Log:          controllerLog.With("name", "ha-active-publisher"),
+		// Promotion's effects outside the elector (issue #297). Wired here rather
+		// than at construction because the syncer, the publisher and the manager
+		// are all built after the elector.
+		leaderElector.SetPromotionHooks(ha.PromotionHooks{
+			// Cancel the mirror and WAIT for it to confirm it has stopped. The
+			// wait is the point: RemoteSyncer.Start already drains its workqueue
+			// and prune goroutine before returning, so returning from it is a
+			// sufficient and already-correct barrier. Without the wait, a hub can
+			// open its write fence while the mirror is still writing — and in the
+			// most common failover trigger (the Active's pod dies, its API server
+			// does not) the mirror is very much still alive at that moment.
+			StopMirror: func(promoteCtx context.Context) error {
+				stopSyncer()
+				select {
+				case <-syncerDone:
+					return nil
+				case <-promoteCtx.Done():
+					return fmt.Errorf("timed out waiting for the state mirror to stop: %w", promoteCtx.Err())
+				}
+			},
+			PublishActiveController: func(promoteCtx context.Context) error {
+				if activePublisher == nil {
+					return nil
+				}
+				return activePublisher.PublishOnce(promoteCtx)
+			},
+			EmitPromotedEvent: ha.PromotedToActiveEmitter(eventRecorder),
 		})
+
 		go func() {
-			if err := activePublisher.Start(ctx); err != nil {
-				setupLog.Error(err, "HA activeController publisher exited")
+			if err := leaderElector.WatchRemoteLease(ctx); err != nil {
+				setupLog.Error(err, "HA remote lease watch loop exited")
 			}
 		}()
 	}
