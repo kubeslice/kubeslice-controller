@@ -205,3 +205,97 @@ func TestWatchRemoteLease_ReturnsNilOnContextCancellation(t *testing.T) {
 		t.Fatal("WatchRemoteLease did not return after context cancellation")
 	}
 }
+
+// --- issue #297: detection ---------------------------------------------------
+
+// TestNeverArmed_NeverBecomesCandidate is the regression test for the single
+// most dangerous mistake available in this file. isLeaseStale(nil, ...) returns
+// TRUE, so folding the lastSeenLease nil check into that call would make a
+// Standby that has never once read the Active's Lease promote itself on its
+// first tick — turning a broken kubeconfig or a missing RBAC grant into a
+// guaranteed split brain. If someone "simplifies" the two conditions into one,
+// this test fails.
+func TestNeverArmed_NeverBecomesCandidate(t *testing.T) {
+	// A remote client with no Lease at all: every read fails, so the elector
+	// never arms.
+	e := NewClusterLeaderElector(fakeClient(t), fakeClient(t), Options{Mode: ModeStandby, Log: testLog()})
+
+	for i := 0; i < 5; i++ {
+		candidate, err := e.checkRemoteLeaseOnce(context.Background())
+		require.Error(t, err, "the read must genuinely be failing for this test to mean anything")
+		assert.False(t, candidate,
+			"an elector that has never read the Active's lease must never become a promotion candidate, "+
+				"however long it waits — that is a configuration failure, not a dead Active")
+	}
+	assert.Nil(t, e.lastSeenLease, "a failed read must not populate the cached lease")
+}
+
+// TestUnreadableLease_RetainsCacheAndGoesStale is the whole point of #297's
+// detection change: an Active whose API server dies (reads fail) must be
+// detected exactly like an Active whose pod dies (reads succeed, renewTime
+// frozen). Before this, a read failure reported "not stale" forever and the
+// loss of an entire hub was undetectable.
+func TestUnreadableLease_RetainsCacheAndGoesStale(t *testing.T) {
+	// Arm against a fresh lease.
+	fresh := newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now())
+	e := NewClusterLeaderElector(fakeClient(t), fakeClient(t, fresh), Options{Mode: ModeStandby, Log: testLog()})
+
+	candidate, err := e.checkRemoteLeaseOnce(context.Background())
+	require.NoError(t, err)
+	require.False(t, candidate, "a fresh lease is not a candidate")
+	require.NotNil(t, e.lastSeenLease, "a successful read must arm the elector")
+
+	// Now the Active's API server dies: every subsequent read fails.
+	e.remoteClient = fakeClient(t)
+
+	candidate, err = e.checkRemoteLeaseOnce(context.Background())
+	require.Error(t, err)
+	assert.False(t, candidate, "the retained lease is still fresh; a failed read alone proves nothing")
+	assert.NotNil(t, e.lastSeenLease, "a failed read must retain the last good view, not clear it")
+
+	// Age the retained view past leaseDuration + padding. This is what a real
+	// clock does on its own while reads keep failing.
+	e.lastSeenLease = newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now().Add(-time.Hour))
+
+	candidate, err = e.checkRemoteLeaseOnce(context.Background())
+	require.Error(t, err, "reads are still failing")
+	assert.True(t, candidate,
+		"an unreachable Active whose newest known renewTime has aged out must become a candidate — "+
+			"this is the case that was previously undetectable")
+}
+
+// TestReadFailure_DoesNotRefreshLastGoodRead guards the other half of the
+// retention rule: a failed read must not advance any freshness marker.
+func TestReadFailure_DoesNotRefreshLastGoodRead(t *testing.T) {
+	fresh := newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now())
+	e := NewClusterLeaderElector(fakeClient(t), fakeClient(t, fresh), Options{Mode: ModeStandby, Log: testLog()})
+
+	_, err := e.checkRemoteLeaseOnce(context.Background())
+	require.NoError(t, err)
+	armedAt := e.lastGoodRead
+	require.False(t, armedAt.IsZero())
+
+	e.remoteClient = fakeClient(t)
+	_, err = e.checkRemoteLeaseOnce(context.Background())
+	require.Error(t, err)
+	assert.Equal(t, armedAt, e.lastGoodRead, "a failed read must not count as a good read")
+}
+
+// TestSuccessfulRead_ReplacesCachedLease covers the recovery direction: an
+// Active that comes back must clear the candidacy, not leave a stale verdict
+// latched.
+func TestSuccessfulRead_ReplacesCachedLease(t *testing.T) {
+	stale := newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now().Add(-time.Hour))
+	e := NewClusterLeaderElector(fakeClient(t), fakeClient(t, stale), Options{Mode: ModeStandby, Log: testLog()})
+
+	candidate, err := e.checkRemoteLeaseOnce(context.Background())
+	require.NoError(t, err)
+	require.True(t, candidate, "an old renewTime reads as stale")
+
+	// The Active recovers and renews.
+	e.remoteClient = fakeClient(t, newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now()))
+
+	candidate, err = e.checkRemoteLeaseOnce(context.Background())
+	require.NoError(t, err)
+	assert.False(t, candidate, "a recovered Active must clear candidacy on the next successful read")
+}

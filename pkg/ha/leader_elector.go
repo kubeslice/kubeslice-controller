@@ -87,6 +87,26 @@ type ClusterLeaderElector struct {
 	// renewal goroutine reads and writes it.
 	lastRenew time.Time
 
+	// lastSeenLease is the newest Lease successfully read from the Active hub,
+	// and nil until the very first successful read. It is the whole of the
+	// promotion trigger (issue #297).
+	//
+	// A failed read deliberately leaves it untouched rather than clearing it or
+	// treating the failure as health. "The Active's controller stopped renewing"
+	// and "the Active's API server stopped answering" are the same event from
+	// here — in both, the newest proof of life this hub holds stops advancing —
+	// so a retained stale Lease ages on its own against a moving clock and one
+	// comparison covers both. Before this, a read failure reported "not stale",
+	// which made the loss of an entire hub undetectable.
+	//
+	// Only WatchRemoteLease's single goroutine touches this and lastGoodRead.
+	lastSeenLease *coordinationv1.Lease
+	// lastGoodRead is the local wall-clock time of that read. Not used by the
+	// verdict, which anchors on the Lease's own renewTime; carried so an
+	// optional local-only staleness floor stays available without a redesign
+	// if clock skew between hubs ever becomes a practical problem.
+	lastGoodRead time.Time
+
 	log *zap.SugaredLogger
 }
 
@@ -249,22 +269,50 @@ func (e *ClusterLeaderElector) WatchRemoteLease(ctx context.Context) error {
 	}
 }
 
-// checkRemoteLeaseOnce reads the Active's Lease once and reports whether it is
-// stale. It never changes leadership in issue #294: a Standby stays a Standby.
-func (e *ClusterLeaderElector) checkRemoteLeaseOnce(ctx context.Context) (stale bool, err error) {
+// checkRemoteLeaseOnce reads the Active's Lease once, updates the cached view,
+// and reports whether this hub is now a promotion *candidate*. It never changes
+// leadership itself — the guards and the promotion sequence are separate, so
+// that "we think the Active is gone" and "we took over" stay independently
+// testable.
+//
+// err is the read error, returned for logging and tests; the verdict does not
+// depend on it. A read that fails is not evidence of health, it is the absence
+// of new evidence — see lastSeenLease.
+func (e *ClusterLeaderElector) checkRemoteLeaseOnce(ctx context.Context) (candidate bool, err error) {
 	lease, err := getLease(ctx, e.remoteClient, e.leaseName, e.leaseNS)
 	if err != nil {
-		e.log.Warnw("could not read active hub lease", "error", err)
+		e.log.Warnw("could not read active hub lease; retaining last known view",
+			"error", err, "armed", e.lastSeenLease != nil)
+	} else {
+		e.lastSeenLease = lease
+		e.lastGoodRead = time.Now()
+	}
+
+	// ⚠️ This nil check MUST stay a separate statement and must never be folded
+	// into the isLeaseStale call below. isLeaseStale(nil, ...) returns TRUE
+	// (lease.go) — correct for its original caller, where a Lease that does not
+	// exist on your own cluster is stale and should be created. Here it would
+	// mean a Standby that has never once read the Active's Lease concludes the
+	// Active is dead and promotes on its very first tick: a broken kubeconfig,
+	// a missing RBAC grant or a mistyped namespace would each become a
+	// guaranteed split brain. TestNeverArmed_NeverBecomesCandidate pins this.
+	if e.lastSeenLease == nil {
+		e.log.Warnw("the active hub's lease has never been read successfully; refusing to consider promotion",
+			"lease", e.leaseName, "namespace", e.leaseNS,
+			"hint", "check --ha-active-kubeconfig, RBAC for coordination.k8s.io/leases, and the lease namespace")
 		return false, err
 	}
-	if isLeaseStale(lease, e.padding, time.Now()) {
-		e.log.Warnw("active hub lease is STALE; promotion would trigger here (implemented in #297)",
-			"lease", e.leaseName, "holder", leaseHolder(lease), "renewTime", leaseRenewStr(lease))
-		return true, nil
+
+	if !isLeaseStale(e.lastSeenLease, e.padding, time.Now()) {
+		e.log.Debugw("active hub lease is fresh",
+			"lease", e.leaseName, "holder", leaseHolder(e.lastSeenLease), "renewTime", leaseRenewStr(e.lastSeenLease))
+		return false, err
 	}
-	e.log.Debugw("active hub lease is fresh",
-		"lease", e.leaseName, "holder", leaseHolder(lease), "renewTime", leaseRenewStr(lease))
-	return false, nil
+
+	e.log.Warnw("active hub lease is STALE; evaluating promotion",
+		"lease", e.leaseName, "holder", leaseHolder(e.lastSeenLease),
+		"renewTime", leaseRenewStr(e.lastSeenLease), "readable", err == nil)
+	return true, err
 }
 
 // setLeader updates the leadership flag and logs LeadershipAcquired /
