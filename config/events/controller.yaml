@@ -545,3 +545,9 @@ events:
     type: Warning
     reportingController: controller
     message: Failed to mirror a resource from the Active hub onto the Standby; the syncer will retry.
+  - name: HAPromotedToActive
+    reason: PromotedToActive
+    action: HAPromotion
+    type: Normal
+    reportingController: controller
+    message: This hub was promoted from Standby to Active after the previous Active hub's lease went stale.
