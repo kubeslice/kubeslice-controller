@@ -26,6 +26,9 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func TestNewClusterLeaderElector_StandaloneIsAlwaysLeader(t *testing.T) {
@@ -298,4 +301,77 @@ func TestSuccessfulRead_ReplacesCachedLease(t *testing.T) {
 	candidate, err = e.checkRemoteLeaseOnce(context.Background())
 	require.NoError(t, err)
 	assert.False(t, candidate, "a recovered Active must clear candidacy on the next successful read")
+}
+
+// TestCheckRemoteLeaseOnce_BoundsTheRead is a regression test for a bug found
+// by live-testing an Active whose API server was shut down: a single poll
+// blocked for ~12 seconds, and because the watch loop calls this synchronously,
+// no staleness was evaluated for that whole window. A graceful container
+// shutdown eventually breaks the connection; a powered-off node or a
+// dropped-packet partition does not, and the read would hang for the transport
+// timeout — minutes — blowing the failover budget by waiting rather than by
+// deciding.
+func TestCheckRemoteLeaseOnce_BoundsTheRead(t *testing.T) {
+	blocked := make(chan struct{})
+	defer close(blocked)
+
+	hanging := fake.NewClientBuilder().WithScheme(testScheme(t)).WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-blocked:
+				return nil
+			}
+		},
+	}).Build()
+
+	e := NewClusterLeaderElector(fakeClient(t), hanging, Options{
+		Mode:                 ModeStandby,
+		PromotionDialTimeout: 50 * time.Millisecond,
+		Log:                  testLog(),
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, err := e.checkRemoteLeaseOnce(context.Background())
+		assert.Error(t, err, "a timed-out read must surface as an error, not as a fresh lease")
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("checkRemoteLeaseOnce did not bound its read — an unresponsive API server would " +
+			"block the watch loop and stall staleness evaluation entirely")
+	}
+}
+
+// TestCheckRemoteLeaseOnce_TimedOutReadStillAgesTheCache: the bound must not
+// change the verdict logic. A read that times out is a failed read, so the
+// retained view is kept and continues to age exactly as it would if the read
+// had failed outright.
+func TestCheckRemoteLeaseOnce_TimedOutReadStillAgesTheCache(t *testing.T) {
+	blocked := make(chan struct{})
+	defer close(blocked)
+
+	hanging := fake.NewClientBuilder().WithScheme(testScheme(t)).WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			<-ctx.Done()
+			return ctx.Err()
+		},
+	}).Build()
+
+	e := NewClusterLeaderElector(fakeClient(t), hanging, Options{
+		Mode:                 ModeStandby,
+		PromotionDialTimeout: 20 * time.Millisecond,
+		Log:                  testLog(),
+	})
+	e.lastSeenLease = newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now().Add(-time.Hour))
+
+	candidate, err := e.checkRemoteLeaseOnce(context.Background())
+	require.Error(t, err)
+	assert.True(t, candidate,
+		"a timed-out read is still just a failed read: the retained view ages and the hub becomes a candidate")
+	assert.NotNil(t, e.lastSeenLease, "and the retained view must survive the timeout")
 }

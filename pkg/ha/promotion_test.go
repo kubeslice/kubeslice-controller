@@ -382,3 +382,135 @@ func TestWatchRemoteLease_NeverArmedNeverPromotes(t *testing.T) {
 	assert.Equal(t, ModeStandby, e.Mode())
 	assert.Empty(t, rec.order(), "the promotion sequence must never have started")
 }
+
+// TestPromote_ConcurrentAttemptsRunTheSequenceOnce exercises the latch under
+// real concurrency rather than trusting the comment on it. Two goroutines enter
+// promote at the same time; exactly one may run the sequence, and neither may
+// see a half-promoted hub.
+func TestPromote_ConcurrentAttemptsRunTheSequenceOnce(t *testing.T) {
+	e := standbyReadyToPromote(t)
+	rec := newPromotionRecorder()
+
+	// Hold the sequence open inside the first hook so the second caller is
+	// guaranteed to arrive while the first is still mid-flight.
+	release := make(chan struct{})
+	entered := make(chan struct{}, 1)
+	hooks := rec.hooks(e)
+	inner := hooks.StopMirror
+	hooks.StopMirror = func(ctx context.Context) error {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		<-release
+		return inner(ctx)
+	}
+	e.SetPromotionHooks(hooks)
+
+	results := make(chan bool, 2)
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ok, err := e.promote(context.Background())
+		results <- ok
+		errs <- err
+	}()
+
+	<-entered // the first caller is inside the sequence, holding the latch
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ok, err := e.promote(context.Background())
+		results <- ok
+		errs <- err
+	}()
+	// Give the second caller time to hit the latch and bail before releasing.
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	wg.Wait()
+	close(results)
+	close(errs)
+
+	for err := range errs {
+		require.NoError(t, err, "a rejected concurrent attempt is not an error")
+	}
+	promotedCount := 0
+	for ok := range results {
+		if ok {
+			promotedCount++
+		}
+	}
+	assert.Equal(t, 1, promotedCount,
+		"exactly one of two concurrent attempts may report having promoted")
+	assert.Equal(t, []string{"stopMirror", "publish", "kick", "event"}, rec.order(),
+		"the sequence must have run exactly once, not twice and not partially")
+	assert.True(t, e.IsLeader())
+}
+
+// TestPromote_LeaseAcquisitionFailureAborts covers the one step whose failure
+// means the hub genuinely cannot lead: without the Lease there is nothing
+// fencing the old Active, so opening the write fence anyway would be the
+// dual-writer state the whole design exists to prevent.
+func TestPromote_LeaseAcquisitionFailureAborts(t *testing.T) {
+	// Reads succeed (so self-health passes) but writes fail, so the Lease
+	// cannot be created.
+	e := NewClusterLeaderElector(failingWriteClient(t), failingReadClient(t), Options{
+		Mode: ModeStandby, Identity: "hub-b", Log: testLog(),
+	})
+	e.lastSeenLease = newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now().Add(-time.Hour))
+	rec := newPromotionRecorder()
+	e.SetPromotionHooks(rec.hooks(e))
+
+	promoted, err := e.promote(context.Background())
+	require.Error(t, err, "failing to take the lease must surface")
+	assert.False(t, promoted)
+
+	assert.False(t, e.IsLeader(), "the write fence must stay shut without a lease")
+	assert.Equal(t, ModeStandby, e.Mode(), "mode must not have flipped")
+	assert.False(t, e.promoting.Load(), "the latch must be released so the next tick can retry")
+	assert.Equal(t, []string{"stopMirror"}, rec.order(),
+		"nothing past the lease acquisition may run")
+}
+
+// TestPromote_EventFailureStillPromotes: the Event is a report, not a step. A
+// hub that took over but could not say so is still the Active.
+func TestPromote_EventFailureStillPromotes(t *testing.T) {
+	e := standbyReadyToPromote(t)
+	rec := newPromotionRecorder()
+	hooks := rec.hooks(e)
+	hooks.EmitPromotedEvent = func(ctx context.Context, lease *coordinationv1.Lease) error {
+		rec.record("event", e)
+		return fmt.Errorf("simulated: event recorder unavailable")
+	}
+	e.SetPromotionHooks(hooks)
+
+	promoted, err := e.promote(context.Background())
+	require.NoError(t, err)
+	assert.True(t, promoted, "failing to report a promotion must not undo it")
+	assert.True(t, e.IsLeader())
+}
+
+// TestPromote_AttachesTheAcquiredLeaseToTheEvent: the Event must describe the
+// Lease this hub just took, not some other object — that is what puts it in the
+// controller's own namespace.
+func TestPromote_AttachesTheAcquiredLeaseToTheEvent(t *testing.T) {
+	e := standbyReadyToPromote(t)
+	rec := newPromotionRecorder()
+	hooks := rec.hooks(e)
+	var got *coordinationv1.Lease
+	hooks.EmitPromotedEvent = func(ctx context.Context, lease *coordinationv1.Lease) error {
+		got = lease
+		return nil
+	}
+	e.SetPromotionHooks(hooks)
+
+	_, err := e.promote(context.Background())
+	require.NoError(t, err)
+
+	require.NotNil(t, got, "the event hook must receive the acquired lease")
+	assert.Equal(t, DefaultLeaseName, got.Name)
+	assert.Equal(t, "hub-b", leaseHolder(got), "the lease must already name this hub as holder")
+}

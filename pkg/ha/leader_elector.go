@@ -368,7 +368,23 @@ func (e *ClusterLeaderElector) WatchRemoteLease(ctx context.Context) error {
 // depend on it. A read that fails is not evidence of health, it is the absence
 // of new evidence — see lastSeenLease.
 func (e *ClusterLeaderElector) checkRemoteLeaseOnce(ctx context.Context) (candidate bool, err error) {
-	lease, err := getLease(ctx, e.remoteClient, e.leaseName, e.leaseNS)
+	// ⚠️ Bounded, for the same reason the guards' reads are. The watch loop calls
+	// this synchronously, so a read that blocks blocks the loop — and while it is
+	// blocked no staleness is evaluated at all. main.go builds the remote client
+	// with a plain uncached client.New and no timeout, so an API server that
+	// accepts the connection and then stops answering leaves the read hanging
+	// until the transport gives up: minutes against a black-holed host.
+	//
+	// This is not hypothetical. Live-testing an Active whose API server was shut
+	// down showed a single read blocking for ~12s, with no staleness evaluated in
+	// the whole window, before the connection finally broke. That was a graceful
+	// container shutdown; a powered-off node or a dropped-packet partition has
+	// nothing to break the connection at all, and the failover budget would be
+	// blown by an unbounded wait rather than by the detection rule.
+	readCtx, cancel := context.WithTimeout(ctx, e.promotionDialTimeout)
+	defer cancel()
+
+	lease, err := getLease(readCtx, e.remoteClient, e.leaseName, e.leaseNS)
 	if err != nil {
 		e.log.Warnw("could not read active hub lease; retaining last known view",
 			"error", err, "armed", e.lastSeenLease != nil)
