@@ -90,10 +90,23 @@ type ClusterLeaderElector struct {
 	localClient  client.Client // own cluster — create and renew the Lease
 	remoteClient client.Client // Standby only — read the Active's Lease (may be nil otherwise)
 
-	mode      HAMode
+	// mode is an atomic.Value holding an HAMode, not a plain field, because
+	// promotion mutates it from its own goroutine while Mode(), StartLeaseRenewal
+	// and WatchRemoteLease read it from theirs — a plain field would be a data
+	// race, and -race would rightly say so.
+	mode      atomic.Value
 	identity  string
 	leaseName string
 	leaseNS   string
+
+	// promoting is held for the whole promotion sequence. IsLeader() reports
+	// false while it is set, regardless of isLeader, so the write fence stays
+	// shut from the first step until the last — see promote().
+	promoting atomic.Bool
+
+	// hooks are promotion's effects outside the elector. Injected so pkg/ha
+	// stays independent of the mirror, the publisher and the manager.
+	hooks PromotionHooks
 
 	leaseDuration time.Duration
 	renewDeadline time.Duration
@@ -185,7 +198,6 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 	e := &ClusterLeaderElector{
 		localClient:          local,
 		remoteClient:         remote,
-		mode:                 opts.Mode,
 		identity:             opts.Identity,
 		leaseName:            opts.LeaseName,
 		leaseNS:              opts.LeaseNamespace,
@@ -199,7 +211,10 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 	}
 	// Standalone is always the leader: no Lease, no remote watch — identical to
 	// the controller's behaviour before HA (the no-regression guarantee).
-	if e.mode == ModeStandalone {
+	e.mode.Store(opts.Mode)
+	// Standalone is always the leader: no Lease, no remote watch — identical to
+	// the controller's behaviour before HA (the no-regression guarantee).
+	if opts.Mode == ModeStandalone {
 		e.isLeader.Store(true)
 	}
 	return e
@@ -209,13 +224,38 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 // now. It reads an in-memory flag kept current by the background loops, so it is
 // cheap enough to call at the top of every Reconcile. The value reflects live
 // leadership (refreshed every retryPeriod), never a value frozen at startup.
+// It also reports false for the whole of a promotion sequence, regardless of
+// isLeader: steps 0 and 8 of promote() bracket the sequence with the promoting
+// latch, so the write fence stays shut until the new Active has stopped the
+// mirror, taken its Lease and published who it is. That is what gives "the
+// reconcilers are not live until promotion finishes" real teeth without any
+// external status surface.
 func (e *ClusterLeaderElector) IsLeader() bool {
-	return e.isLeader.Load()
+	return e.isLeader.Load() && !e.promoting.Load()
 }
 
-// Mode returns the configured HA mode.
+// Mode returns the current HA mode. It is read live rather than captured at
+// startup, because promotion changes it.
 func (e *ClusterLeaderElector) Mode() HAMode {
-	return e.mode
+	mode, _ := e.mode.Load().(HAMode)
+	return mode
+}
+
+// setMode swaps the running mode. Only promote() calls it.
+func (e *ClusterLeaderElector) setMode(mode HAMode) {
+	e.mode.Store(mode)
+	e.log.Infow("HA mode changed", "mode", mode, "identity", e.identity)
+}
+
+// SetPromotionHooks installs the effects promotion has outside the elector.
+// Called from main.go once the mirror, publisher and manager exist — they are
+// constructed after the elector, so they cannot be constructor arguments.
+//
+// A Standby with no hooks still promotes correctly in the narrow sense (it
+// takes the Lease and opens the fence); the hooks are what make the promotion
+// safe and complete.
+func (e *ClusterLeaderElector) SetPromotionHooks(hooks PromotionHooks) {
+	e.hooks = hooks
 }
 
 // Identity returns this instance's Lease holder identity.
@@ -226,8 +266,8 @@ func (e *ClusterLeaderElector) Identity() string {
 // StartLeaseRenewal runs the Active's renewal loop until ctx is cancelled. It is
 // a no-op in any other mode. It renews immediately, then every retryPeriod.
 func (e *ClusterLeaderElector) StartLeaseRenewal(ctx context.Context) error {
-	if e.mode != ModeActive {
-		e.log.Infow("lease renewal not started; not in active mode", "mode", e.mode)
+	if e.Mode() != ModeActive {
+		e.log.Infow("lease renewal not started; not in active mode", "mode", e.Mode())
 		return nil
 	}
 	e.log.Infow("starting lease renewal",
@@ -273,13 +313,16 @@ func (e *ClusterLeaderElector) renewOnce(ctx context.Context) error {
 	return nil
 }
 
-// WatchRemoteLease runs the Standby's watch loop until ctx is cancelled. It reads
-// the Active's Lease every retryPeriod and logs whether it is fresh or stale. In
-// issue #294 it does not promote — detecting staleness and acquiring leadership
-// is issue #297.
+// WatchRemoteLease runs the Standby's watch loop until ctx is cancelled. It
+// reads the Active's Lease every retryPeriod and, once that Lease has aged past
+// leaseDuration + padding, runs the promotion sequence (issue #297).
+//
+// It returns as soon as promotion succeeds: this hub is an Active now, and
+// there is no longer any Active to watch. Promotion has already started the
+// renewal loop that replaces it.
 func (e *ClusterLeaderElector) WatchRemoteLease(ctx context.Context) error {
-	if e.mode != ModeStandby {
-		e.log.Infow("remote lease watch not started; not in standby mode", "mode", e.mode)
+	if e.Mode() != ModeStandby {
+		e.log.Infow("remote lease watch not started; not in standby mode", "mode", e.Mode())
 		return nil
 	}
 	if e.remoteClient == nil {
@@ -295,7 +338,22 @@ func (e *ClusterLeaderElector) WatchRemoteLease(ctx context.Context) error {
 			e.log.Infow("remote lease watch stopped", "reason", ctx.Err())
 			return nil
 		case <-ticker.C:
-			_, _ = e.checkRemoteLeaseOnce(ctx)
+			candidate, _ := e.checkRemoteLeaseOnce(ctx)
+			if !candidate {
+				continue
+			}
+			promoted, err := e.promote(ctx)
+			if err != nil {
+				// Stay a Standby and try again next tick. Every failure path in
+				// promote() leaves the hub exactly as it was — still fenced,
+				// still armed — so retrying is safe rather than merely tolerable.
+				e.log.Errorw("promotion attempt failed; remaining standby", "error", err)
+				continue
+			}
+			if promoted {
+				e.log.Infow("remote lease watch stopping; this hub is now the active")
+				return nil
+			}
 		}
 	}
 }
