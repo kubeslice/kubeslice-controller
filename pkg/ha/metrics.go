@@ -46,8 +46,41 @@ var (
 		Name:      "ha_sync_errors_total",
 		Help:      "Count of mirror sync failures, by kind and operation.",
 	}, []string{"kind", "operation"})
+
+	// haFailoverTotal counts completed promotions. A Standby that takes over
+	// increments this exactly once, after the write fence has opened.
+	haFailoverTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "kubeslice_controller",
+		Name:      "ha_failover_total",
+		Help:      "Count of completed promotions from Standby to Active.",
+	})
+
+	// haPromotionsAbortedTotal counts the times a Standby decided the Active
+	// looked gone and then refused to promote anyway. Without it every guard is
+	// invisible in production: a hub that correctly declines to take over looks
+	// identical to one that never noticed anything. These are the branches worth
+	// demonstrating, because they are what stops a configuration mistake or a
+	// local network failure from becoming a split brain.
+	haPromotionsAbortedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "kubeslice_controller",
+		Name:      "ha_promotions_aborted_total",
+		Help:      "Count of promotions considered and then refused, by reason.",
+	}, []string{"reason"})
+)
+
+// Reasons recorded on haPromotionsAbortedTotal.
+const (
+	// abortSelfUnhealthy: this hub could not reach its own API server, so the
+	// evidence for the Active being gone is equally consistent with this hub
+	// being the broken one.
+	abortSelfUnhealthy = "self_unhealthy"
+	// abortLeaseLive: the final read found a live Lease — the Active renewed
+	// between polls, so the staleness verdict was a polling race.
+	abortLeaseLive = "lease_live"
+	// abortAlreadyPromoting: a concurrent tick is already running the sequence.
+	abortAlreadyPromoting = "already_promoting"
 )
 
 func init() {
-	prometheus.MustRegister(haSyncLagSeconds, haSyncErrorsTotal)
+	prometheus.MustRegister(haSyncLagSeconds, haSyncErrorsTotal, haFailoverTotal, haPromotionsAbortedTotal)
 }

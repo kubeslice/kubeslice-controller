@@ -39,6 +39,21 @@ const (
 	DefaultRenewDeadline  = 10 * time.Second
 	DefaultRetryPeriod    = 2 * time.Second
 	DefaultPaddingSeconds = 5 * time.Second
+
+	// DefaultPromotionDialTimeout bounds the two reads a Standby makes before
+	// promoting: the self-health check against its own API server, and the final
+	// dial to the Active's. Both must be bounded — main.go builds the remote
+	// client with a plain uncached client.New and no timeout, so a dial to a
+	// black-holed API server blocks until the OS TCP timeout, which is minutes
+	// and far outside the failover budget.
+	DefaultPromotionDialTimeout = 5 * time.Second
+
+	// DefaultPromotionGracePeriod bounds step 7 of the promotion sequence:
+	// publishing status.activeController before the write fence opens. On expiry
+	// promotion proceeds anyway and the publisher's own loop keeps retrying —
+	// this is a budget, not a precondition. Distinct from PaddingSeconds, which
+	// is a detection threshold and has nothing to do with sequencing.
+	DefaultPromotionGracePeriod = 10 * time.Second
 )
 
 // Options configures a ClusterLeaderElector. Zero-valued fields fall back to the
@@ -59,7 +74,12 @@ type Options struct {
 	RenewDeadline  time.Duration
 	RetryPeriod    time.Duration
 	PaddingSeconds time.Duration
-	Log            *zap.SugaredLogger
+	// PromotionDialTimeout bounds each of the two pre-promotion reads.
+	PromotionDialTimeout time.Duration
+	// PromotionGracePeriod bounds the activeController publication step of the
+	// promotion sequence.
+	PromotionGracePeriod time.Duration
+	Log                  *zap.SugaredLogger
 }
 
 // ClusterLeaderElector coordinates leadership between two hub clusters. Unlike
@@ -79,6 +99,9 @@ type ClusterLeaderElector struct {
 	renewDeadline time.Duration
 	retryPeriod   time.Duration
 	padding       time.Duration
+
+	promotionDialTimeout time.Duration
+	promotionGracePeriod time.Duration
 
 	// isLeader is the single source of truth read by IsLeader(). The background
 	// renewal loop keeps it current, so readers never touch the API server.
@@ -142,6 +165,12 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 	if opts.PaddingSeconds == 0 {
 		opts.PaddingSeconds = DefaultPaddingSeconds
 	}
+	if opts.PromotionDialTimeout == 0 {
+		opts.PromotionDialTimeout = DefaultPromotionDialTimeout
+	}
+	if opts.PromotionGracePeriod == 0 {
+		opts.PromotionGracePeriod = DefaultPromotionGracePeriod
+	}
 	if opts.Identity == "" {
 		if hostname, err := os.Hostname(); err == nil {
 			opts.Identity = hostname
@@ -154,17 +183,19 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 	}
 
 	e := &ClusterLeaderElector{
-		localClient:   local,
-		remoteClient:  remote,
-		mode:          opts.Mode,
-		identity:      opts.Identity,
-		leaseName:     opts.LeaseName,
-		leaseNS:       opts.LeaseNamespace,
-		leaseDuration: opts.LeaseDuration,
-		renewDeadline: opts.RenewDeadline,
-		retryPeriod:   opts.RetryPeriod,
-		padding:       opts.PaddingSeconds,
-		log:           opts.Log,
+		localClient:          local,
+		remoteClient:         remote,
+		mode:                 opts.Mode,
+		identity:             opts.Identity,
+		leaseName:            opts.LeaseName,
+		leaseNS:              opts.LeaseNamespace,
+		leaseDuration:        opts.LeaseDuration,
+		renewDeadline:        opts.RenewDeadline,
+		retryPeriod:          opts.RetryPeriod,
+		padding:              opts.PaddingSeconds,
+		promotionDialTimeout: opts.PromotionDialTimeout,
+		promotionGracePeriod: opts.PromotionGracePeriod,
+		log:                  opts.Log,
 	}
 	// Standalone is always the leader: no Lease, no remote watch — identical to
 	// the controller's behaviour before HA (the no-regression guarantee).
