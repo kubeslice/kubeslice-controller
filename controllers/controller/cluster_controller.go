@@ -54,10 +54,15 @@ type ClusterReconciler struct {
 
 // SetupWithManager sets up the controller with the Manager.
 func (c *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&controllerv1alpha1.Cluster{}).
-		WatchesRawSource(source.Channel(c.PromotionKick, &handler.EnqueueRequestForObject{})).
-		Complete(c)
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&controllerv1alpha1.Cluster{})
+	// Registered only when set. source.Channel rejects a nil channel when the
+	// manager starts it, so an unconditional watch would break every caller that
+	// does not wire the kick — the envtest suite among them.
+	if c.PromotionKick != nil {
+		b = b.WatchesRawSource(source.Channel(c.PromotionKick, &handler.EnqueueRequestForObject{}))
+	}
+	return b.Complete(c)
 }
 
 // Reconcile is a function to reconcile the cluster , ClusterReconciler implements it

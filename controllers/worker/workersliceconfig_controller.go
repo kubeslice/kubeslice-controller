@@ -55,10 +55,15 @@ type WorkerSliceConfigReconciler struct {
 
 // SetupWithManager sets up the controller with the Manager.
 func (c *WorkerSliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&workerv1alpha1.WorkerSliceConfig{}).
-		WatchesRawSource(source.Channel(c.PromotionKick, &handler.EnqueueRequestForObject{})).
-		Complete(c)
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&workerv1alpha1.WorkerSliceConfig{})
+	// Registered only when set. source.Channel rejects a nil channel when the
+	// manager starts it, so an unconditional watch would break every caller that
+	// does not wire the kick — the envtest suite among them.
+	if c.PromotionKick != nil {
+		b = b.WatchesRawSource(source.Channel(c.PromotionKick, &handler.EnqueueRequestForObject{}))
+	}
+	return b.Complete(c)
 }
 
 // Reconcile is a function to reconcilation of WorkerSliceconfig, WorkerSliceConfigReconciler implements it

@@ -55,10 +55,15 @@ type SliceQoSConfigReconciler struct {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SliceQoSConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&controllerv1alpha1.SliceQoSConfig{}).
-		WatchesRawSource(source.Channel(r.PromotionKick, &handler.EnqueueRequestForObject{})).
-		Complete(r)
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&controllerv1alpha1.SliceQoSConfig{})
+	// Registered only when set. source.Channel rejects a nil channel when the
+	// manager starts it, so an unconditional watch would break every caller that
+	// does not wire the kick — the envtest suite among them.
+	if r.PromotionKick != nil {
+		b = b.WatchesRawSource(source.Channel(r.PromotionKick, &handler.EnqueueRequestForObject{}))
+	}
+	return b.Complete(r)
 }
 
 // Reconcile is a function to reconcile the qos_profile, SliceQoSConfigReconciler implements it

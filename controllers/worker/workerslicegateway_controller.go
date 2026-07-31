@@ -67,8 +67,13 @@ func (r *WorkerSliceGatewayReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *WorkerSliceGatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.WorkerSliceGateway{}).
-		WatchesRawSource(source.Channel(r.PromotionKick, &handler.EnqueueRequestForObject{})).
-		Complete(r)
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&v1alpha1.WorkerSliceGateway{})
+	// Registered only when set. source.Channel rejects a nil channel when the
+	// manager starts it, so an unconditional watch would break every caller that
+	// does not wire the kick — the envtest suite among them.
+	if r.PromotionKick != nil {
+		b = b.WatchesRawSource(source.Channel(r.PromotionKick, &handler.EnqueueRequestForObject{}))
+	}
+	return b.Complete(r)
 }
