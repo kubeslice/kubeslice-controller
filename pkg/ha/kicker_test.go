@@ -150,13 +150,26 @@ func TestKick_DoesNotBlockOnAFullChannel(t *testing.T) {
 		"the channel should have filled to its buffer and the rest dropped")
 }
 
+// TestKick_RespectsContextCancellation must hold on every run, not most of
+// them. Written first with ctx.Done() as a select case beside the send, it
+// passed and failed at random: both cases are ready whenever the channel has
+// room, and select chooses among ready cases uniformly. -shuffle surfaced it.
 func TestKick_RespectsContextCancellation(t *testing.T) {
-	k := NewReconcileKicker(kickClient(t, newClusterObj("worker-1", "kubeslice-avesha")),
-		[]schema.GroupVersionKind{GVKCluster}, testLog())
+	var objs []client.Object
+	for i := 0; i < 20; i++ {
+		objs = append(objs, newClusterObj(fmt.Sprintf("worker-%d", i), "kubeslice-avesha"))
+	}
+	k := NewReconcileKicker(kickClient(t, objs...), []schema.GroupVersionKind{GVKCluster}, testLog())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	assert.Error(t, k.Kick(ctx))
+
+	for i := 0; i < 50; i++ {
+		require.Error(t, k.Kick(ctx),
+			"a cancelled context must abort the kick deterministically, not on a coin flip")
+	}
+	assert.Empty(t, drain(k.Source(GVKCluster)),
+		"and nothing may have been delivered after cancellation")
 }
 
 func TestSource_UnknownTypeIsNil(t *testing.T) {

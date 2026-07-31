@@ -146,6 +146,15 @@ func (k *ReconcileKicker) Kick(ctx context.Context) error {
 		failed  []string
 	)
 	for gvk, ch := range k.channels {
+		// Checked explicitly rather than as a select case alongside the send
+		// below. Both would be ready whenever the channel has room, and select
+		// chooses randomly among ready cases, so cancellation would only be
+		// honoured by chance — which is exactly how this was written first, and
+		// what -shuffle caught.
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("kicking reconcilers: %w", err)
+		}
+
 		list := &unstructured.UnstructuredList{}
 		list.SetGroupVersionKind(gvk.GroupVersion().WithKind(gvk.Kind + "List"))
 		if err := k.localClient.List(ctx, list); err != nil {
@@ -156,11 +165,11 @@ func (k *ReconcileKicker) Kick(ctx context.Context) error {
 		}
 
 		for i := range list.Items {
-			obj := &list.Items[i]
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("kicking reconcilers: %w", err)
+			}
 			select {
-			case <-ctx.Done():
-				return fmt.Errorf("kicking reconcilers: %w", ctx.Err())
-			case ch <- event.GenericEvent{Object: obj}:
+			case ch <- event.GenericEvent{Object: &list.Items[i]}:
 				total++
 			default:
 				dropped++
