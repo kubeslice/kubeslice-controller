@@ -427,11 +427,41 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 					"object_kind": metricKindServiceAccount,
 				},
 			)
+		}
+
+		// The token Secret's existence is checked independently of the
+		// ServiceAccount's, and must stay that way. Creating it only inside the
+		// branch above assumes the two are always absent together, which is true
+		// when this routine created both — and false as soon as a ServiceAccount
+		// arrives by any other means. A cross-cluster HA Standby is the case that
+		// exposes it: the state mirror copies ServiceAccounts but deliberately not
+		// their tokens, since a token signed by one cluster is invalid on another,
+		// so a promoted hub finds the account present, skips the branch, never
+		// mints a token, and then fails every reconcile of every registered
+		// cluster on the missing Secret. The requeue guard in
+		// ClusterService.ReconcileCluster does not catch it either, because the
+		// ServiceAccount is built with its Secrets reference already populated and
+		// therefore claims a Secret that does not exist.
+		//
+		// This is behaviour-neutral on a hub that has only ever created its own
+		// accounts, where the Secret is always present whenever the account is. It
+		// also repairs any cluster whose token Secret was deleted by hand, which
+		// today has no recovery path.
+		secretNamespacedName := client.ObjectKey{
+			Namespace: namespace,
+			Name:      serviceAccountNamespacedName.Name,
+		}
+		foundSecret, err := util.GetResourceIfExist(ctx, secretNamespacedName, &corev1.Secret{})
+		if err != nil {
+			logger.With(zap.Error(err)).Errorf("Couldnt fetch service account secret")
+			return ctrl.Result{}, err
+		}
+		if !foundSecret {
 			// create secret for the service account
 			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        expectedServiceAccount.Name,
-					Annotations: map[string]string{"kubernetes.io/service-account.name": expectedServiceAccount.Name},
+					Name:        serviceAccountNamespacedName.Name,
+					Annotations: map[string]string{"kubernetes.io/service-account.name": serviceAccountNamespacedName.Name},
 					Namespace:   namespace,
 				},
 				Type: "kubernetes.io/service-account-token",
