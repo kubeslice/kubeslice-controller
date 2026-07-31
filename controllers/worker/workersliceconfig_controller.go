@@ -30,10 +30,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // WorkerSliceConfigReconciler reconciles a Cluster object
 type WorkerSliceConfigReconciler struct {
+	// PromotionKick, when set, delivers one event per existing object after a
+	// promotion. The HA write fence drops reconcile requests rather than
+	// requeuing them, so flipping it reconciles nothing that already existed;
+	// this is what wakes that state up. Nil outside HA, which registers no
+	// extra watch and leaves behaviour unchanged.
+	PromotionKick <-chan event.GenericEvent
 	client.Client
 	Scheme             *runtime.Scheme
 	WorkerSliceService service.IWorkerSliceConfigService
@@ -48,6 +57,7 @@ type WorkerSliceConfigReconciler struct {
 func (c *WorkerSliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&workerv1alpha1.WorkerSliceConfig{}).
+		WatchesRawSource(source.Channel(c.PromotionKick, &handler.EnqueueRequestForObject{})).
 		Complete(c)
 }
 

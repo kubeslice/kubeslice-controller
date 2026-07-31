@@ -30,10 +30,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // SliceConfigReconciler reconciles a SliceConfig object
 type SliceConfigReconciler struct {
+	// PromotionKick, when set, delivers one event per existing object after a
+	// promotion. The HA write fence drops reconcile requests rather than
+	// requeuing them, so flipping it reconciles nothing that already existed;
+	// this is what wakes that state up. Nil outside HA, which registers no
+	// extra watch and leaves behaviour unchanged.
+	PromotionKick <-chan event.GenericEvent
 	client.Client
 	Scheme             *runtime.Scheme
 	SliceConfigService service.ISliceConfigService
@@ -60,5 +69,6 @@ func (r *SliceConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func (r *SliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&controllerv1alpha1.SliceConfig{}).
+		WatchesRawSource(source.Channel(r.PromotionKick, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }

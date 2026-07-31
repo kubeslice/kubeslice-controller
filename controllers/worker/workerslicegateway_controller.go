@@ -27,6 +27,9 @@ import (
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,6 +38,12 @@ import (
 // WorkerSliceGatewayReconciler reconciles a SliceConfig object
 type WorkerSliceGatewayReconciler struct {
 	client.Client
+	// PromotionKick, when set, delivers one event per existing object after a
+	// promotion. The HA write fence drops reconcile requests rather than
+	// requeuing them, so flipping it reconciles nothing that already existed;
+	// this is what wakes that state up. Nil outside HA, which registers no
+	// extra watch and leaves behaviour unchanged.
+	PromotionKick             <-chan event.GenericEvent
 	Scheme                    *runtime.Scheme
 	WorkerSliceGatewayService service.IWorkerSliceGatewayService
 	Log                       *zap.SugaredLogger
@@ -60,5 +69,6 @@ func (r *WorkerSliceGatewayReconciler) Reconcile(ctx context.Context, req ctrl.R
 func (r *WorkerSliceGatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.WorkerSliceGateway{}).
+		WatchesRawSource(source.Channel(r.PromotionKick, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }
