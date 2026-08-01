@@ -46,10 +46,17 @@ type MirroredResource struct {
 	// Standby's garbage collector would see a dangling reference and delete
 	// the object shortly after the mirror creates it.
 	StripOwnerRefs bool
-	// Skip, if set, excludes an object from mirroring based on its content —
-	// e.g. filtering out kubernetes.io/service-account-token Secrets in the
-	// credential mirror set.
+	// Skip, if set, excludes an object from mirroring based on its content.
 	Skip func(u *unstructured.Unstructured) bool
+	// CreateOnly, if set, reports objects the engine may create on the Standby
+	// but must never overwrite once they exist there — the Standby's copy is
+	// seeded from the Active and then owned locally. See the Secret row in
+	// CredentialMirrorSet for the case this exists for.
+	CreateOnly func(u *unstructured.Unstructured) bool
+	// Sanitize, if set, strips fields from the payload after the engine's own
+	// normalisation and before the write. It receives the payload copy, never
+	// the informer's cached object.
+	Sanitize func(payload *unstructured.Unstructured)
 	// RequireMirroredNamespace restricts mirroring to objects whose namespace
 	// the syncer itself mirrors — i.e. the namespace is present in the remote
 	// cache's label-scoped Namespace view (see namespaceMirrorSelector). Set
@@ -94,14 +101,50 @@ var CRDMirrorSet = []MirroredResource{
 	{GVK: gvk(groupWorker, "WorkerServiceImport")},
 }
 
-// skipServiceAccountTokenSecret excludes kubernetes.io/service-account-token
-// Secrets from mirroring. SA tokens are signed by the issuing cluster's own
-// service-account key, so an Active-minted token is cryptographically invalid
-// on the Standby; mirroring the ServiceAccount itself is what matters — the
-// Standby's token controller mints its own, locally-valid token for it.
-func skipServiceAccountTokenSecret(u *unstructured.Unstructured) bool {
+// isServiceAccountTokenSecret reports whether u is a
+// kubernetes.io/service-account-token Secret.
+func isServiceAccountTokenSecret(u *unstructured.Unstructured) bool {
 	secretType, _, _ := unstructured.NestedString(u.Object, "type")
 	return secretType == string(corev1.SecretTypeServiceAccountToken)
+}
+
+// sanitizeSecret reduces a service-account-token Secret to its shell before
+// the mirror writes it: everything that identifies which ServiceAccount the
+// token is for, and nothing that is (or names) the token itself. Other Secret
+// types pass through untouched.
+//
+// Two things have to go, for unrelated reasons:
+//
+//   - .data, because an SA token is signed by the issuing cluster's own
+//     service-account key and is therefore cryptographically invalid on the
+//     Standby. Mirroring it would ship a credential that silently fails to
+//     authenticate — worse than none, since its presence masks the absence of
+//     a real one. The Standby's own token controller populates the empty
+//     shell with a locally valid token, which is the entire point of carrying
+//     the shell across.
+//   - the kubernetes.io/service-account.uid annotation, which the token
+//     controller adds when it populates the Active's copy and then validates
+//     against the local ServiceAccount's UID, deleting the Secret on
+//     mismatch. A mirrored ServiceAccount is created fresh on the Standby and
+//     never shares the Active's UID (see mirrorCreateOrUpdate, which clears
+//     it), so a copied annotation never matches: the Standby's token
+//     controller would delete the Secret, prune's reverse diff would restore
+//     it, and the two would chase each other indefinitely.
+//
+// The kubernetes.io/service-account.name annotation is deliberately kept — it
+// is how the token controller knows which account to mint for, and it is the
+// only link between the shell and the mirrored ServiceAccount.
+func sanitizeSecret(payload *unstructured.Unstructured) {
+	if !isServiceAccountTokenSecret(payload) {
+		return
+	}
+	delete(payload.Object, "data")
+	annotations := payload.GetAnnotations()
+	if annotations == nil {
+		return
+	}
+	delete(annotations, corev1.ServiceAccountUIDKey)
+	payload.SetAnnotations(annotations)
 }
 
 // FullMirrorSet is everything a production Standby mirrors: CRDMirrorSet
@@ -117,8 +160,9 @@ func FullMirrorSet() []MirroredResource {
 // Standby so a promoted Standby can serve its worker clusters without manual
 // re-provisioning: worker-identity RBAC (Role/RoleBinding/ServiceAccount, the
 // only RBAC kinds access_control_service.go ever creates — no ClusterRole or
-// ClusterRoleBinding, despite ADR Decision 6's broader wording) and Secrets
-// such as the gateway certificates the ovpn job generates.
+// ClusterRoleBinding, despite ADR Decision 6's broader wording) and Secrets:
+// the gateway certificates the ovpn job generates, and the shells of the
+// worker service-account token Secrets.
 //
 // Every row sets RequireMirroredNamespace — see that field's doc comment for
 // why the boundary is the mirrored-namespace set and not a name pattern —
@@ -128,10 +172,21 @@ func FullMirrorSet() []MirroredResource {
 // credential objects are also written by actors outside this repo (the
 // token controller, the cert-generator job), so no such audit can hold here.
 var CredentialMirrorSet = []MirroredResource{
+	// Secrets cover two unrelated cases. Gateway certificates and the like are
+	// ordinary mirrored objects. Service-account-token Secrets are carried as
+	// empty shells (Sanitize) that the Standby's own token controller fills
+	// in, which is what gives a Standby a worker credential valid on itself
+	// before any failover has happened — see ADR Decision 6 and #297's
+	// Blocker 4. Those shells are CreateOnly because the engine's update path
+	// is an unconditional full write: a payload with no .data would clear the
+	// locally minted token on every informer resync, and the token controller
+	// would mint a fresh one, invalidating whatever copy a worker had already
+	// been given. Seed it once and leave it alone.
 	{
 		GVK:                      schema.GroupVersionKind{Version: "v1", Kind: "Secret"},
 		StripOwnerRefs:           true,
-		Skip:                     skipServiceAccountTokenSecret,
+		CreateOnly:               isServiceAccountTokenSecret,
+		Sanitize:                 sanitizeSecret,
 		RequireMirroredNamespace: true,
 	},
 	{

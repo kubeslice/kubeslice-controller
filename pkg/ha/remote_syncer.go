@@ -28,7 +28,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -78,12 +77,26 @@ func namespaceMirrorSelector() labels.Selector {
 //     ReconcileProjectNamespace and on every credential object the
 //     controller creates via util.GetOwnerLabel (which embeds the same
 //     key/value pair).
-//   - Secret: cannot be label-scoped — gateway certificate Secrets are
-//     created by the external cert-generator job, unlabeled. Scoped instead
-//     with a field selector excluding SA-token Secrets (the API server
-//     supports "type" as a Secret field selector), the highest-volume
-//     class; the project-namespace boundary stays client-side in
-//     CredentialMirrorSet's Skip predicate.
+//   - Secret: cannot be scoped either way. Not by label — gateway certificate
+//     Secrets are created by the external cert-generator job, unlabeled. No
+//     longer by field either: this cache previously excluded SA-token Secrets
+//     with a "type" field selector, but the Standby now needs their shells in
+//     order to hold a worker credential valid on itself (CredentialMirrorSet,
+//     ADR Decision 6), and no single selector admits both those and the
+//     unlabeled certificate Secrets. So Secrets are cached cluster-wide and
+//     the project-namespace boundary stays client-side, in the row's
+//     RequireMirroredNamespace gate — a Secret in kube-system is cached but
+//     never written to the Standby.
+//
+//     What that widening does *not* do is widen access: the Standby's remote
+//     identity already holds cluster-wide Secret read (config/ha, which says
+//     so in as many words), because RBAC cannot scope Secrets by type or by
+//     namespace label. The field selector narrowed what this process cached,
+//     not what it was allowed to fetch. It does mean Active-side token bytes
+//     would now pass through this process, so they are stripped on the way
+//     into the cache by sanitizeCachedSecret below, before anything can read
+//     them — the mirror's own Sanitize is the correctness layer, this is
+//     defence in depth.
 func mirrorCacheByObject() map[client.Object]cache.ByObject {
 	controllerManaged := namespaceMirrorSelector()
 	return map[client.Object]cache.ByObject{
@@ -91,9 +104,43 @@ func mirrorCacheByObject() map[client.Object]cache.ByObject {
 		&corev1.ServiceAccount{}: {Label: controllerManaged},
 		&rbacv1.Role{}:           {Label: controllerManaged},
 		&rbacv1.RoleBinding{}:    {Label: controllerManaged},
-		&corev1.Secret{}: {
-			Field: fields.OneTermNotEqualSelector("type", string(corev1.SecretTypeServiceAccountToken)),
-		},
+		&corev1.Secret{}:         {Transform: sanitizeCachedSecret},
+	}
+}
+
+// sanitizeCachedSecret drops the token bytes of every service-account-token
+// Secret on their way into the remote cache, so an Active-minted token is
+// never held in this process at all. Applied to both typed and unstructured
+// informers (controller-runtime resolves cache.ByObject by GVK), which is what
+// makes it a real boundary rather than a courtesy: the syncer reads through
+// the unstructured path.
+//
+// Only .data is dropped here. The service-account.uid annotation has to
+// survive into the cache — prune diffs against this view, and stripping
+// identity from the cached copy would make the diff lie — so it is dropped in
+// the payload instead, by sanitizeSecret. Anything that is not an SA-token
+// Secret, and anything that is not a Secret at all, passes through untouched.
+func sanitizeCachedSecret(obj any) (any, error) {
+	switch secret := obj.(type) {
+	case *corev1.Secret:
+		if secret.Type != corev1.SecretTypeServiceAccountToken || secret.Data == nil {
+			return obj, nil
+		}
+		stripped := secret.DeepCopy()
+		stripped.Data = nil
+		return stripped, nil
+	case *unstructured.Unstructured:
+		if !isServiceAccountTokenSecret(secret) {
+			return obj, nil
+		}
+		if _, found, _ := unstructured.NestedFieldNoCopy(secret.Object, "data"); !found {
+			return obj, nil
+		}
+		stripped := secret.DeepCopy()
+		delete(stripped.Object, "data")
+		return stripped, nil
+	default:
+		return obj, nil
 	}
 }
 
