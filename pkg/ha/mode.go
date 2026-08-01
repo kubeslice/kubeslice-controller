@@ -21,7 +21,10 @@
 // coordinates multiple pods sharing a single API server. See ADR #293.
 package ha
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // HAMode identifies the high-availability role this controller instance plays.
 type HAMode string
@@ -40,9 +43,34 @@ const (
 	ModeStandalone HAMode = "standalone"
 )
 
-// ParseHAMode converts a flag/env string into an HAMode. Empty or unrecognised
-// values map to ModeStandalone so that a misconfiguration fails safe to today's
-// behaviour rather than silently disabling writes.
+// ParseHAModeStrict converts a flag/env string into an HAMode, rejecting a
+// non-empty value that names no known mode. Empty still means ModeStandalone,
+// which is what every deployment that passes no --ha-mode at all gets.
+//
+// Coercing a typo to standalone looks like failing safe and is the opposite.
+// Standalone is unconditionally the leader, so a hub started with
+// --ha-mode=stanby does not become an inert Standby: it becomes a second
+// unfenced writer alongside the real Active, reconciling the same worker
+// clusters. That is the dual-writer state the whole design exists to prevent,
+// reached silently, from one transposed letter in a chart value. A hub that
+// refuses to start is recoverable in a way that one is not.
+func ParseHAModeStrict(s string) (HAMode, error) {
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return ModeStandalone, nil
+	}
+	mode := HAMode(strings.ToLower(trimmed))
+	if !mode.IsValid() {
+		return ModeStandalone, fmt.Errorf(
+			"unknown --ha-mode %q: expected %q, %q or %q", s, ModeActive, ModeStandby, ModeStandalone)
+	}
+	return mode, nil
+}
+
+// ParseHAMode converts a flag/env string into an HAMode, mapping empty or
+// unrecognised values to ModeStandalone. Callers acting on operator input
+// should prefer ParseHAModeStrict, which reports the unrecognised value instead
+// of guessing; see its comment for why guessing is unsafe here.
 func ParseHAMode(s string) HAMode {
 	switch HAMode(strings.ToLower(strings.TrimSpace(s))) {
 	case ModeActive:

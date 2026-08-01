@@ -318,7 +318,14 @@ func initialize(services *service.Services) {
 	// Set up cross-cluster HA leader election (ADR #293 / issue #294). In
 	// standalone mode (the default) the elector is always the leader, so the
 	// reconciler write-fence is a no-op and behaviour is unchanged.
-	haRunMode := ha.ParseHAMode(haMode)
+	// Rejected rather than coerced: a mistyped mode that silently became
+	// standalone would start a second unconditionally-unfenced writer against
+	// the same worker clusters as the real Active.
+	haRunMode, err := ha.ParseHAModeStrict(haMode)
+	if err != nil {
+		setupLog.Error(err, "invalid HA configuration")
+		os.Exit(1)
+	}
 	localHAClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: scheme})
 	if err != nil {
 		setupLog.Error(err, "unable to build HA local client")
