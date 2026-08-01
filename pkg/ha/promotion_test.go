@@ -25,6 +25,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	coordinationv1 "k8s.io/api/coordination/v1"
 )
 
@@ -117,7 +120,7 @@ func TestPromote_HappyPath(t *testing.T) {
 }
 
 // TestPromote_StopsMirrorBeforeOpeningTheFence is the ordering bug that both
-// issue #297 and an earlier draft of ADR Decision 5 got wrong. In the most
+// issue #297's own sequence gets wrong. In the most
 // common trigger — the Active's pod dies while its API server stays healthy —
 // the mirror is still live at this moment. Because every mirrored object
 // carries the syncer's label and the mirror's conflict guard only skips objects
@@ -232,6 +235,52 @@ func TestPromote_MirrorStopFailureAborts(t *testing.T) {
 	assert.Equal(t, ModeStandby, e.Mode())
 	assert.False(t, e.promoting.Load(), "the latch must be released so the next tick can retry")
 	assert.Equal(t, []string{"stopMirror"}, rec.order(), "nothing after the mirror stop may run")
+}
+
+// TestPromote_AbortAfterMirrorStopIsLoud pins the one exit path that does NOT
+// restore the hub to exactly its prior state. Stopping the mirror is one-way —
+// nothing in this package can start it again — so a promotion that aborts after
+// step 3 leaves a Standby that no longer mirrors. That is recoverable on a later
+// promotion but permanent if the Active recovers instead, and the only thing
+// standing between an operator and a silently diverging Standby is this log
+// line. If the message moves, the failure mode goes back to being invisible.
+func TestPromote_AbortAfterMirrorStopIsLoud(t *testing.T) {
+	core, logs := observer.New(zapcore.ErrorLevel)
+
+	e := standbyReadyToPromote(t)
+	e.log = zap.New(core).Sugar()
+	rec := newPromotionRecorder()
+	rec.stopMirror = fmt.Errorf("simulated: syncer did not stop")
+	e.SetPromotionHooks(rec.hooks(e))
+
+	promoted, err := e.promote(context.Background())
+	require.Error(t, err)
+	require.False(t, promoted)
+
+	assert.Equal(t, 1, logs.FilterMessageSnippet("no longer mirroring").Len(),
+		"aborting after the mirror was stopped must be reported at error level")
+}
+
+// TestPromote_AbortBeforeMirrorStopIsQuiet is the other half: a guard refusal
+// happens before step 3, the mirror is untouched, and warning about a dead
+// mirror there would be noise on the most ordinary abort there is.
+func TestPromote_AbortBeforeMirrorStopIsQuiet(t *testing.T) {
+	core, logs := observer.New(zapcore.ErrorLevel)
+
+	e := standbyReadyToPromote(t)
+	e.log = zap.New(core).Sugar()
+	// A live Active: the final-dial guard refuses before the mirror is stopped.
+	e.remoteClient = fakeClient(t, newLease(DefaultLeaseName, DefaultLeaseNamespace, "hub-a", time.Now()))
+	rec := newPromotionRecorder()
+	e.SetPromotionHooks(rec.hooks(e))
+
+	promoted, err := e.promote(context.Background())
+	require.NoError(t, err)
+	require.False(t, promoted)
+
+	assert.Empty(t, rec.order(), "no hook may run once a guard has refused")
+	assert.Equal(t, 0, logs.FilterMessageSnippet("no longer mirroring").Len(),
+		"the mirror was never stopped, so nothing may claim it was")
 }
 
 // TestPromote_PublishFailureStillPromotes: publication is a budget, not a

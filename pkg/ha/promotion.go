@@ -60,9 +60,9 @@ type PromotionHooks struct {
 // leadership was actually taken; a guard refusal returns (false, nil), because
 // declining to promote is a correct outcome and not an error.
 //
-// The order below is deliberate and two steps of it are load-bearing enough to
-// be worth stating up front, because both issue #297 and an earlier draft of
-// ADR Decision 5 got them wrong:
+// The order below is deliberate, and two steps of it are load-bearing enough to
+// state up front — the sequence sketched in issue #297 has them in an order that
+// opens the write fence while the mirror may still be writing:
 //
 //  0. take the promotion latch — the write fence is held SHUT from here
 //  1. (caller) staleness verdict
@@ -101,12 +101,37 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 		e.promoting.Store(false)
 		return true, nil
 	}
-	// Until step 8 succeeds, any exit path must put the hub back exactly as it
-	// was: still a fenced Standby, still armed, free to try again next tick.
+	// Until step 8 succeeds, every exit path returns the hub to a fenced,
+	// still-armed Standby that is free to try again next tick — with one
+	// deliberate exception, called out here because it is otherwise invisible.
+	//
+	// Step 3 stops the state mirror, and nothing in this package can start it
+	// again: main.go owns the syncer's lifecycle and hands promotion only a
+	// one-way StopMirror hook. So an abort *after* step 3 leaves a Standby that
+	// no longer mirrors. Every later attempt still works — StopMirror is
+	// idempotent and returns immediately once the syncer has exited, so a hub
+	// whose local API server was briefly unwritable promotes on a subsequent
+	// tick. The bad case is an abort after step 3 followed by the Active
+	// recovering: the guards then correctly refuse to promote, and this hub
+	// stays a Standby whose mirror is dead, drifting further from the Active
+	// until the process restarts.
+	//
+	// That is narrow — it needs the local Lease write to fail in the window
+	// between the guards passing and the Active coming back — but it is silent,
+	// so it is logged at error level rather than left to be discovered from a
+	// stale mirror much later. Restarting the mirror in place would mean giving
+	// promotion a two-way handle on a component it deliberately does not own.
 	promoted := false
+	mirrorStopped := false
 	defer func() {
-		if !promoted {
-			e.promoting.Store(false)
+		if promoted {
+			return
+		}
+		e.promoting.Store(false)
+		if mirrorStopped {
+			e.log.Errorw("promotion aborted after the state mirror was stopped; this hub is a " +
+				"standby that is no longer mirroring the active hub, and will not resume until it " +
+				"promotes or the process restarts")
 		}
 	}()
 
@@ -154,6 +179,10 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// one tick, and a mirror that is genuinely stuck is visible instead of mute.
 	if e.hooks.StopMirror != nil {
 		stopCtx, cancel := context.WithTimeout(ctx, e.promotionGracePeriod)
+		// Set before the call, not after: cancellation has already been
+		// delivered by the time this returns, so a timeout leaves the mirror
+		// stopping regardless of the error.
+		mirrorStopped = true
 		err := e.hooks.StopMirror(stopCtx)
 		cancel()
 		if err != nil {
@@ -169,7 +198,7 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// takes the Lease unconditionally, which stays correct here because this
 	// Lease lives on the promoting hub's own cluster, where last-writer-wins is
 	// the right rule. Judging whether the *other* hub is still alive is the
-	// remote read's job, and it already happened in step 2. (#294 follow-up F3.)
+	// remote read's job, and it already happened in step 2.
 	lease, err := acquireOrRenewLease(ctx, e.localClient, e.leaseName, e.leaseNS, e.identity, e.leaseDuration)
 	if err != nil {
 		return false, fmt.Errorf("acquiring the lease on this hub: %w", err)
