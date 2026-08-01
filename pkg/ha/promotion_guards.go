@@ -49,7 +49,7 @@ import (
 // no new client and no new RBAC: config/rbac/leader_election_role.yaml already
 // grants leases in the controller's own namespace.
 //
-// ⚠️ NotFound counts as HEALTHY, and getting this backwards would block every
+// NotFound counts as HEALTHY, and getting this backwards would block every
 // real first failover. On a first-ever promotion no Lease exists on this hub
 // yet, and a NotFound response means the API server answered — which is
 // precisely the thing being tested. Only transport errors, timeouts and server
@@ -81,7 +81,7 @@ func (e *ClusterLeaderElector) selfHealthy(ctx context.Context) bool {
 //     sustained run of failed reads, and it only catches an outage that ended
 //     within the last tick.
 //
-// ⚠️ It is NOT a split-brain guard, and nothing in this codebase should imply
+// It is NOT a split-brain guard, and nothing in this codebase should imply
 // otherwise. In a genuine sustained partition this read travels the same broken
 // path as every other read, fails in the same way, and the Standby promotes
 // regardless. What actually provides safety on the unreachable path is
@@ -89,7 +89,7 @@ func (e *ClusterLeaderElector) selfHealthy(ctx context.Context) bool {
 // budget rather than one bad read — and the arming rule. Split-brain remains
 // the explicit non-goal of ADR #293 Decision 8.
 //
-// ⚠️ The bound is not optional. main.go builds the remote client with a plain
+// The bound is not optional. main.go builds the remote client with a plain
 // uncached client.New and no timeout, so a dial to a black-holed API server
 // (packets dropped, no RST) blocks until the OS TCP timeout — minutes, far
 // outside the failover budget. Every call here is wrapped.

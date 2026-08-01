@@ -83,7 +83,7 @@ func TestCredentialMirrorSet_ShapeAndDefenses(t *testing.T) {
 			"%s: core types exist cluster-wide; every row must be gated on the mirrored-namespace boundary", res.GVK.Kind)
 	}
 	assert.ElementsMatch(t, []schema.GroupVersionKind{secretGVK, saGVK, roleGVK, rbGVK}, gvks,
-		"credential set is Secret/ServiceAccount/Role/RoleBinding only — access_control_service never creates ClusterRole/ClusterRoleBinding, despite the ADR's broader wording")
+		"credential set is Secret/ServiceAccount/Role/RoleBinding only — access_control_service never creates ClusterRole/ClusterRoleBinding, despite ADR #293 Decision 6's broader wording")
 }
 
 func TestIsServiceAccountTokenSecret(t *testing.T) {
@@ -230,11 +230,11 @@ func newActiveTokenSecret(t *testing.T, key syncKey) *unstructured.Unstructured 
 	return src
 }
 
-// TestReconcileKey_MirrorsServiceAccountTokenSecretAsShell is the controller
-// side of #297's Blocker 4: the Standby has to hold a worker credential valid
-// on *itself* before any failover, and it cannot mint one from a fenced
-// reconciler. Carrying the empty shell across lets its own token controller do
-// it. What must not cross is the Active's token.
+// TestReconcileKey_MirrorsServiceAccountTokenSecretAsShell covers the hub side
+// of the worker's dual-hub credential: the Standby has to hold a worker
+// credential valid on *itself* before any failover, and it cannot mint one from
+// a fenced reconciler. Carrying the empty shell across lets its own token
+// controller do it. What must not cross is the Active's token.
 func TestReconcileKey_MirrorsServiceAccountTokenSecretAsShell(t *testing.T) {
 	ctx := context.Background()
 	key := syncKey{GVK: secretGVK, Namespace: "kubeslice-avesha", Name: "kubeslice-rbac-worker-w1"}

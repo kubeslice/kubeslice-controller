@@ -72,10 +72,10 @@ const DefaultKickChannelBuffer = 256
 // this runs a delete on the promoted hub skips its cleanup entirely and the
 // object simply vanishes.
 //
-// Note for anyone reading the acceptance criteria: "a new Slice created on the
-// Standby reconciles successfully" passes without any of this, because a new
-// object generates its own event. It is the pre-existing mirrored state that
-// stays frozen.
+// Note the narrowness of the symptom: an object created on the promoted hub
+// after the fence opens reconciles fine without any of this, because it
+// generates its own event. Only pre-existing mirrored state stays frozen, which
+// is why the gap is easy to miss in a smoke test.
 type ReconcileKicker struct {
 	// channels is one channel per GVK, each wired into that type's controller
 	// through source.Channel.

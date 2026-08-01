@@ -40,19 +40,24 @@ const (
 	DefaultRetryPeriod    = 2 * time.Second
 	DefaultPaddingSeconds = 5 * time.Second
 
-	// DefaultPromotionDialTimeout bounds the two reads a Standby makes before
-	// promoting: the self-health check against its own API server, and the final
-	// dial to the Active's. Both must be bounded — main.go builds the remote
-	// client with a plain uncached client.New and no timeout, so a dial to a
-	// black-holed API server blocks until the OS TCP timeout, which is minutes
-	// and far outside the failover budget.
+	// DefaultPromotionDialTimeout bounds every read a Standby makes of a Lease
+	// over the network: each periodic poll of the Active's Lease, the
+	// self-health check against its own API server, and the final dial. All
+	// must be bounded — main.go builds the remote client with a plain uncached
+	// client.New and no timeout, so a read from a black-holed API server blocks
+	// until the OS TCP timeout, which is minutes and far outside the failover
+	// budget. The periodic poll matters most: the watch loop calls it
+	// synchronously, so a blocked read stalls detection entirely.
 	DefaultPromotionDialTimeout = 5 * time.Second
 
-	// DefaultPromotionGracePeriod bounds step 7 of the promotion sequence:
-	// publishing status.activeController before the write fence opens. On expiry
-	// promotion proceeds anyway and the publisher's own loop keeps retrying —
-	// this is a budget, not a precondition. Distinct from PaddingSeconds, which
-	// is a detection threshold and has nothing to do with sequencing.
+	// DefaultPromotionGracePeriod bounds each step of the promotion sequence
+	// that waits on another component: stopping the mirror, publishing
+	// status.activeController, re-enqueuing objects, and emitting the event.
+	// Expiry aborts the promotion only for the mirror stop, where proceeding
+	// would mean two writers; the rest log and continue, because a hub that
+	// cannot publish or emit is still a better Active than none. Distinct from
+	// PaddingSeconds, which is a detection threshold and has nothing to do with
+	// sequencing.
 	DefaultPromotionGracePeriod = 10 * time.Second
 )
 
@@ -74,10 +79,11 @@ type Options struct {
 	RenewDeadline  time.Duration
 	RetryPeriod    time.Duration
 	PaddingSeconds time.Duration
-	// PromotionDialTimeout bounds each of the two pre-promotion reads.
+	// PromotionDialTimeout bounds every networked Lease read: the periodic poll
+	// of the Active's Lease and both pre-promotion guard reads.
 	PromotionDialTimeout time.Duration
-	// PromotionGracePeriod bounds the activeController publication step of the
-	// promotion sequence.
+	// PromotionGracePeriod bounds each promotion step that waits on another
+	// component.
 	PromotionGracePeriod time.Duration
 	Log                  *zap.SugaredLogger
 }
@@ -119,8 +125,10 @@ type ClusterLeaderElector struct {
 	// isLeader is the single source of truth read by IsLeader(). The background
 	// renewal loop keeps it current, so readers never touch the API server.
 	isLeader atomic.Bool
-	// lastRenew is the time of the last successful Lease renewal. Only the
-	// renewal goroutine reads and writes it.
+	// lastRenew is the time of the last successful Lease renewal. It is written
+	// once by promote() when it takes the Lease, before it starts the renewal
+	// goroutine, and from then on only that goroutine reads and writes it — so
+	// there is exactly one writer at any time and no lock is needed.
 	lastRenew time.Time
 
 	// lastSeenLease is the newest Lease successfully read from the Active hub,
@@ -148,10 +156,8 @@ type ClusterLeaderElector struct {
 
 // NewClusterLeaderElector builds an elector. local is a client to this
 // controller's own cluster; remote is a client to the Active hub and is required
-// only in Standby mode (it may be nil otherwise).
-//
-// Note: issue #294 sketches a three-argument constructor, but the ADR lists the
-// Lease timings as configurable, so configuration is passed through Options.
+// only in Standby mode (it may be nil otherwise). Everything else is passed
+// through Options, because the Lease timings are operator-configurable flags.
 func NewClusterLeaderElector(local, remote client.Client, opts Options) *ClusterLeaderElector {
 	if opts.Mode == "" {
 		opts.Mode = ModeStandalone
@@ -209,8 +215,6 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 		promotionGracePeriod: opts.PromotionGracePeriod,
 		log:                  opts.Log,
 	}
-	// Standalone is always the leader: no Lease, no remote watch — identical to
-	// the controller's behaviour before HA (the no-regression guarantee).
 	e.mode.Store(opts.Mode)
 	// Standalone is always the leader: no Lease, no remote watch — identical to
 	// the controller's behaviour before HA (the no-regression guarantee).
@@ -292,7 +296,7 @@ func (e *ClusterLeaderElector) StartLeaseRenewal(ctx context.Context) error {
 // renewOnce performs a single acquire/renew attempt and updates leadership state.
 // On success it (re)acquires leadership. On failure it keeps leadership until
 // renewDeadline elapses without any successful renewal, then releases it — the
-// natural-fencing behaviour from the ADR: a dead API server means no renewal and
+// natural-fencing behaviour ADR #293 relies on: a dead API server means no renewal and
 // therefore no writes.
 func (e *ClusterLeaderElector) renewOnce(ctx context.Context) error {
 	if _, err := acquireOrRenewLease(ctx, e.localClient, e.leaseName, e.leaseNS, e.identity, e.leaseDuration); err != nil {
@@ -368,7 +372,7 @@ func (e *ClusterLeaderElector) WatchRemoteLease(ctx context.Context) error {
 // depend on it. A read that fails is not evidence of health, it is the absence
 // of new evidence — see lastSeenLease.
 func (e *ClusterLeaderElector) checkRemoteLeaseOnce(ctx context.Context) (candidate bool, err error) {
-	// ⚠️ Bounded, for the same reason the guards' reads are. The watch loop calls
+	// Bounded, for the same reason the guards' reads are. The watch loop calls
 	// this synchronously, so a read that blocks blocks the loop — and while it is
 	// blocked no staleness is evaluated at all. main.go builds the remote client
 	// with a plain uncached client.New and no timeout, so an API server that
@@ -393,7 +397,7 @@ func (e *ClusterLeaderElector) checkRemoteLeaseOnce(ctx context.Context) (candid
 		e.lastGoodRead = time.Now()
 	}
 
-	// ⚠️ This nil check MUST stay a separate statement and must never be folded
+	// This nil check MUST stay a separate statement and must never be folded
 	// into the isLeaseStale call below. isLeaseStale(nil, ...) returns TRUE
 	// (lease.go) — correct for its original caller, where a Lease that does not
 	// exist on your own cluster is stale and should be created. Here it would

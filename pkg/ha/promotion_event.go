@@ -34,7 +34,7 @@ import (
 // Event lands beside the controller that emitted it, discoverable with a plain
 // `kubectl get events -n <controller namespace>`.
 //
-// ⚠️ Not kubeslice-system. Issue #297 asks for the Event on that namespace, but
+// Not kubeslice-system. Issue #297 asks for the Event on that namespace, but
 // it does not exist on a hub cluster: per ADR #293 Decision 1 it is a *worker*
 // namespace (worker-operator, NSM, gateways, DNS), and the hub's is
 // kubeslice-controller / $KUBESLICE_CONTROLLER_MANAGER_NAMESPACE. The trap is
@@ -43,7 +43,7 @@ import (
 // for. The recorder derives the Event's namespace from the involved object, so
 // passing the Lease is what puts it in the right place.
 //
-// ⚠️ recorder.RecordEvent is called directly, never util.RecordEvent. That
+// recorder.RecordEvent is called directly, never util.RecordEvent. That
 // helper's first statement is util.CtxLogger(ctx), which nil-panics on any
 // context that has not been through PrepareKubeSliceControllersRequestContext —
 // and promotion runs on main.go's signal-handler context, which has not. This

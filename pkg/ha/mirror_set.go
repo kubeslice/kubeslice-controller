@@ -160,7 +160,7 @@ func FullMirrorSet() []MirroredResource {
 // Standby so a promoted Standby can serve its worker clusters without manual
 // re-provisioning: worker-identity RBAC (Role/RoleBinding/ServiceAccount, the
 // only RBAC kinds access_control_service.go ever creates — no ClusterRole or
-// ClusterRoleBinding, despite ADR Decision 6's broader wording) and Secrets:
+// ClusterRoleBinding, despite ADR #293 Decision 6's broader wording) and Secrets:
 // the gateway certificates the ovpn job generates, and the shells of the
 // worker service-account token Secrets.
 //
@@ -176,8 +176,8 @@ var CredentialMirrorSet = []MirroredResource{
 	// ordinary mirrored objects. Service-account-token Secrets are carried as
 	// empty shells (Sanitize) that the Standby's own token controller fills
 	// in, which is what gives a Standby a worker credential valid on itself
-	// before any failover has happened — see ADR Decision 6 and #297's
-	// Blocker 4. Those shells are CreateOnly because the engine's update path
+	// before any failover has happened — see ADR #293 Decision 6. Those shells
+	// are CreateOnly because the engine's update path
 	// is an unconditional full write: a payload with no .data would clear the
 	// locally minted token on every informer resync, and the token controller
 	// would mint a fresh one, invalidating whatever copy a worker had already

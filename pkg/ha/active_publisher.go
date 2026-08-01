@@ -255,7 +255,7 @@ func (p *ActivePublisher) validEndpoint() error {
 // Note what is deliberately absent: nothing ever clears this field. A hub only
 // stops publishing by losing leadership, which in practice means it stopped
 // renewing its Lease — it is unreachable, so a worker cannot read the stale
-// declaration anyway. Auto-demotion of a recovered hub is an explicit ADR
+// declaration anyway. Auto-demotion of a recovered hub is an explicit ADR #293
 // non-goal (Decision 8); LastUpdated is what lets a consumer prefer the fresher
 // of two claims if it ever does see both.
 func activeControllerUpToDate(current *controllerv1alpha1.ActiveControllerInfo, desired controllerv1alpha1.ActiveControllerInfo) bool {
