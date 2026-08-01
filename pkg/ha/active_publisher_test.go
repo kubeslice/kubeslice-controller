@@ -112,6 +112,51 @@ func getCluster(t *testing.T, c client.Client, name, namespace string) *controll
 	return got
 }
 
+// TestPublishOnce_WritesWhileTheWriteFenceIsShut is the regression test for a
+// bug live testing caught: promotion calls PublishOnce at step 7, between
+// taking the Lease and opening the write fence, and IsLeader() reports false
+// for that entire window because promote() holds the fence latch across its
+// whole sequence. Gating PublishOnce on IsLeader() therefore made step 7 a
+// guaranteed no-op that still logged success, and status.activeController kept
+// naming the dead hub until the periodic loop happened to run.
+//
+// The gate belongs on the periodic loop (see publishOnce), not here.
+func TestPublishOnce_WritesWhileTheWriteFenceIsShut(t *testing.T) {
+	c := clusterClient(t, newCluster("worker-1", "kubeslice-avesha"))
+	p := testPublisher(t, c, stubLeadership{leader: false, identity: "hub-b"}, "https://hub-b.example.com:6443")
+
+	require.NoError(t, p.PublishOnce(context.Background()))
+
+	got := getCluster(t, c, "worker-1", "kubeslice-avesha")
+	require.NotNil(t, got.Status.ActiveController,
+		"promotion must be able to publish before it opens the fence")
+	assert.Equal(t, "hub-b", got.Status.ActiveController.ActiveIdentity)
+	assert.Equal(t, "https://hub-b.example.com:6443", got.Status.ActiveController.Endpoint)
+}
+
+// TestPublishOnce_PeriodicLoopStillSkipsWhenNotLeader is the other half, and
+// carries the invariant that matters: a Standby must never write its own
+// identity here. The mirror owns a Standby's copy of the field, and a worker
+// tells the two hubs apart by which one names itself — so the loop that runs
+// continuously in standby mode has to stay gated, and a hub that has lost its
+// Lease has to stop advertising itself.
+//
+// Ungating PublishOnce does not weaken that: the only caller is the promotion
+// sequence, which reaches it after taking the Lease and setting mode Active, at
+// which point the hub is not a Standby any more.
+func TestPublishOnce_PeriodicLoopStillSkipsWhenNotLeader(t *testing.T) {
+	c := clusterClient(t, newCluster("worker-1", "kubeslice-avesha"))
+	p := testPublisher(t, c, stubLeadership{leader: false, identity: "hub-b"}, "https://hub-b.example.com:6443")
+
+	leader, err := p.publishOnce(context.Background())
+	require.NoError(t, err)
+	assert.False(t, leader, "the loop must report it did not hold leadership")
+
+	got := getCluster(t, c, "worker-1", "kubeslice-avesha")
+	assert.Nil(t, got.Status.ActiveController,
+		"a hub that does not hold leadership must not advertise itself from the periodic loop")
+}
+
 func TestPublishOnce_WritesActiveControllerToEveryCluster(t *testing.T) {
 	c := clusterClient(t, newCluster("worker-1", "kubeslice-avesha"), newCluster("worker-2", "kubeslice-avesha"))
 	p := testPublisher(t, c, stubLeadership{leader: true, identity: "hub-a"}, "https://hub-a.example.com:6443")
@@ -125,18 +170,6 @@ func TestPublishOnce_WritesActiveControllerToEveryCluster(t *testing.T) {
 		assert.Equal(t, "hub-a", got.Status.ActiveController.ActiveIdentity)
 		assert.False(t, got.Status.ActiveController.LastUpdated.IsZero(), "LastUpdated must be stamped")
 	}
-}
-
-func TestPublishOnce_NoopWhenNotLeader(t *testing.T) {
-	c := clusterClient(t, newCluster("worker-1", "kubeslice-avesha"))
-	p := testPublisher(t, c, stubLeadership{leader: false, identity: "hub-b"}, "https://hub-b.example.com:6443")
-
-	require.NoError(t, p.PublishOnce(context.Background()))
-
-	got := getCluster(t, c, "worker-1", "kubeslice-avesha")
-	assert.Nil(t, got.Status.ActiveController,
-		"a Standby must never write its own identity here — the mirror owns its copy, and a worker "+
-			"tells the hubs apart by which one names itself")
 }
 
 func TestPublishOnce_SecondPassWritesNothing(t *testing.T) {
