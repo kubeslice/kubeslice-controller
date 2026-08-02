@@ -18,6 +18,7 @@ package ha
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"testing"
 	"time"
@@ -33,6 +34,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	"github.com/kubeslice/kubeslice-controller/util"
+)
+
+// Secret .data values are base64 in the serialised form these tests build, so
+// the fixtures are encoded from readable plaintext instead of being written as
+// literals. A bare base64 blob in a file about credentials makes a reviewer
+// stop and decode it to satisfy themselves it is not a real token, which is a
+// poor thing to put in front of someone reading security-adjacent code.
+func b64(plain string) string { return base64.StdEncoding.EncodeToString([]byte(plain)) }
+
+var (
+	activeSignedToken  = b64("active-signed-token")
+	standbyMintedToken = b64("standby-minted-token")
+	gatewayCertData    = b64("cert-data")
+	oldGatewayCert     = b64("old-cert")
+	newGatewayCert     = b64("new-cert")
+	shortToken         = b64("token")
 )
 
 var (
@@ -106,7 +123,7 @@ func TestIsServiceAccountTokenSecret(t *testing.T) {
 func TestSanitizeSecret_ReducesTokenSecretToItsShell(t *testing.T) {
 	saToken := newTestUnstructured(secretGVK, "proj", "kubeslice-rbac-worker-w1")
 	require.NoError(t, unstructured.SetNestedField(saToken.Object, string(corev1.SecretTypeServiceAccountToken), "type"))
-	require.NoError(t, unstructured.SetNestedField(saToken.Object, "YWN0aXZlLXNpZ25lZC10b2tlbg==", "data", corev1.ServiceAccountTokenKey))
+	require.NoError(t, unstructured.SetNestedField(saToken.Object, activeSignedToken, "data", corev1.ServiceAccountTokenKey))
 	saToken.SetAnnotations(map[string]string{
 		corev1.ServiceAccountNameKey: "kubeslice-rbac-worker-w1",
 		corev1.ServiceAccountUIDKey:  "11111111-2222-3333-4444-555555555555",
@@ -126,12 +143,12 @@ func TestSanitizeSecret_ReducesTokenSecretToItsShell(t *testing.T) {
 	// Other Secret types are none of this function's business.
 	opaque := newTestUnstructured(secretGVK, "proj", "gateway-cert")
 	require.NoError(t, unstructured.SetNestedField(opaque.Object, string(corev1.SecretTypeOpaque), "type"))
-	require.NoError(t, unstructured.SetNestedField(opaque.Object, "Y2VydC1kYXRh", "data", "ovpn.crt"))
+	require.NoError(t, unstructured.SetNestedField(opaque.Object, gatewayCertData, "data", "ovpn.crt"))
 	sanitizeSecret(opaque)
 	data, found, err := unstructured.NestedString(opaque.Object, "data", "ovpn.crt")
 	require.NoError(t, err)
 	require.True(t, found)
-	assert.Equal(t, "Y2VydC1kYXRh", data)
+	assert.Equal(t, gatewayCertData, data)
 }
 
 // TestSanitizeCachedSecret_StripsTokenBytesOnTheWayIntoTheCache covers the
@@ -159,7 +176,7 @@ func TestSanitizeCachedSecret_StripsTokenBytesOnTheWayIntoTheCache(t *testing.T)
 
 	unstructuredToken := newTestUnstructured(secretGVK, "proj", "sa-token")
 	require.NoError(t, unstructured.SetNestedField(unstructuredToken.Object, string(corev1.SecretTypeServiceAccountToken), "type"))
-	require.NoError(t, unstructured.SetNestedField(unstructuredToken.Object, "dG9rZW4=", "data", corev1.ServiceAccountTokenKey))
+	require.NoError(t, unstructured.SetNestedField(unstructuredToken.Object, shortToken, "data", corev1.ServiceAccountTokenKey))
 	out, err = sanitizeCachedSecret(unstructuredToken)
 	require.NoError(t, err)
 	_, found, err := unstructured.NestedFieldNoCopy(out.(*unstructured.Unstructured).Object, "data")
@@ -197,7 +214,7 @@ func TestReconcileKey_MirrorsOpaqueSecretWithData(t *testing.T) {
 
 	src := newTestUnstructured(secretGVK, key.Namespace, key.Name)
 	require.NoError(t, unstructured.SetNestedField(src.Object, string(corev1.SecretTypeOpaque), "type"))
-	require.NoError(t, unstructured.SetNestedField(src.Object, "Y2VydC1kYXRh", "data", "ovpn.crt"))
+	require.NoError(t, unstructured.SetNestedField(src.Object, gatewayCertData, "data", "ovpn.crt"))
 
 	remote := newStubRemote()
 	remote.objects[key] = src
@@ -213,7 +230,7 @@ func TestReconcileKey_MirrorsOpaqueSecretWithData(t *testing.T) {
 	data, found, err := unstructured.NestedString(got.Object, "data", "ovpn.crt")
 	require.NoError(t, err)
 	require.True(t, found)
-	assert.Equal(t, "Y2VydC1kYXRh", data, "the mirrored Secret must carry the source's data through unchanged")
+	assert.Equal(t, gatewayCertData, data, "the mirrored Secret must carry the source's data through unchanged")
 }
 
 // newActiveTokenSecret builds an SA-token Secret as it looks on the Active
@@ -222,7 +239,7 @@ func newActiveTokenSecret(t *testing.T, key syncKey) *unstructured.Unstructured 
 	t.Helper()
 	src := newTestUnstructured(secretGVK, key.Namespace, key.Name)
 	require.NoError(t, unstructured.SetNestedField(src.Object, string(corev1.SecretTypeServiceAccountToken), "type"))
-	require.NoError(t, unstructured.SetNestedField(src.Object, "YWN0aXZlLXNpZ25lZC10b2tlbg==", "data", corev1.ServiceAccountTokenKey))
+	require.NoError(t, unstructured.SetNestedField(src.Object, activeSignedToken, "data", corev1.ServiceAccountTokenKey))
 	src.SetAnnotations(map[string]string{
 		corev1.ServiceAccountNameKey: key.Name,
 		corev1.ServiceAccountUIDKey:  "11111111-2222-3333-4444-555555555555",
@@ -281,7 +298,7 @@ func TestReconcileKey_NeverOverwritesAMintedTokenSecret(t *testing.T) {
 
 	// Stand in for the Standby's token controller populating the shell.
 	minted := getUnstructured(t, s.localClient, key)
-	require.NoError(t, unstructured.SetNestedField(minted.Object, "c3RhbmRieS1taW50ZWQtdG9rZW4=", "data", corev1.ServiceAccountTokenKey))
+	require.NoError(t, unstructured.SetNestedField(minted.Object, standbyMintedToken, "data", corev1.ServiceAccountTokenKey))
 	require.NoError(t, s.localClient.Update(ctx, minted))
 
 	// A resync delivers the Active's copy again.
@@ -293,7 +310,7 @@ func TestReconcileKey_NeverOverwritesAMintedTokenSecret(t *testing.T) {
 	token, found, err := unstructured.NestedString(got.Object, "data", corev1.ServiceAccountTokenKey)
 	require.NoError(t, err)
 	require.True(t, found, "the locally minted token must survive a resync")
-	assert.Equal(t, "c3RhbmRieS1taW50ZWQtdG9rZW4=", token)
+	assert.Equal(t, standbyMintedToken, token)
 }
 
 // TestReconcileKey_StillUpdatesNonTokenSecretsOnResync pins CreateOnly as a
@@ -305,7 +322,7 @@ func TestReconcileKey_StillUpdatesNonTokenSecretsOnResync(t *testing.T) {
 
 	src := newTestUnstructured(secretGVK, key.Namespace, key.Name)
 	require.NoError(t, unstructured.SetNestedField(src.Object, string(corev1.SecretTypeOpaque), "type"))
-	require.NoError(t, unstructured.SetNestedField(src.Object, "b2xkLWNlcnQ=", "data", "ovpn.crt"))
+	require.NoError(t, unstructured.SetNestedField(src.Object, oldGatewayCert, "data", "ovpn.crt"))
 
 	remote := newStubRemote()
 	remote.objects[key] = src
@@ -317,7 +334,7 @@ func TestReconcileKey_StillUpdatesNonTokenSecretsOnResync(t *testing.T) {
 	require.Equal(t, opCreate, op)
 
 	rotated := src.DeepCopy()
-	require.NoError(t, unstructured.SetNestedField(rotated.Object, "bmV3LWNlcnQ=", "data", "ovpn.crt"))
+	require.NoError(t, unstructured.SetNestedField(rotated.Object, newGatewayCert, "data", "ovpn.crt"))
 	remote.objects[key] = rotated
 
 	op, _, err = s.reconcileKey(ctx, key)
@@ -328,7 +345,7 @@ func TestReconcileKey_StillUpdatesNonTokenSecretsOnResync(t *testing.T) {
 	cert, found, err := unstructured.NestedString(got.Object, "data", "ovpn.crt")
 	require.NoError(t, err)
 	require.True(t, found)
-	assert.Equal(t, "bmV3LWNlcnQ=", cert, "certificate rotation on the Active must still reach the Standby")
+	assert.Equal(t, newGatewayCert, cert, "certificate rotation on the Active must still reach the Standby")
 }
 
 // TestPruneOnce_LeavesAMintedTokenSecretAlone closes the loop with the prune
@@ -350,7 +367,7 @@ func TestPruneOnce_LeavesAMintedTokenSecretAlone(t *testing.T) {
 	require.Equal(t, opCreate, op)
 
 	minted := getUnstructured(t, s.localClient, key)
-	require.NoError(t, unstructured.SetNestedField(minted.Object, "c3RhbmRieS1taW50ZWQtdG9rZW4=", "data", corev1.ServiceAccountTokenKey))
+	require.NoError(t, unstructured.SetNestedField(minted.Object, standbyMintedToken, "data", corev1.ServiceAccountTokenKey))
 	require.NoError(t, s.localClient.Update(ctx, minted))
 
 	s.remoteList = stubRemoteList([]syncKey{key}, nil)
@@ -361,7 +378,7 @@ func TestPruneOnce_LeavesAMintedTokenSecretAlone(t *testing.T) {
 	token, found, err := unstructured.NestedString(got.Object, "data", corev1.ServiceAccountTokenKey)
 	require.NoError(t, err)
 	require.True(t, found)
-	assert.Equal(t, "c3RhbmRieS1taW50ZWQtdG9rZW4=", token)
+	assert.Equal(t, standbyMintedToken, token)
 }
 
 // TestReconcileKey_SkipsCredentialsInUnmirroredNamespaces pins the boundary
