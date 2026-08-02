@@ -427,11 +427,40 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 					"object_kind": metricKindServiceAccount,
 				},
 			)
+		}
+
+		// The token Secret's existence is checked independently of the
+		// ServiceAccount's, and must stay that way. Creating it only inside the
+		// branch above assumes the two are always absent together, which is true
+		// when this routine created both — and false as soon as one of them is
+		// removed on its own, or the ServiceAccount arrives by any other means.
+		// A cluster whose token Secret is deleted by hand then has no recovery
+		// path: the account is still there, so the branch above is skipped, no
+		// token is ever minted, and every reconcile of that cluster fails on the
+		// missing Secret from then on.
+		//
+		// The requeue guard in ClusterService.ReconcileCluster does not catch it
+		// either, and the reason is easy to miss: the ServiceAccount is built
+		// with its Secrets reference already populated, so it claims a Secret
+		// that does not exist and the check passes.
+		//
+		// Checking for the Secret itself is behaviour-neutral in the ordinary
+		// case, where the Secret is present whenever the account is.
+		secretNamespacedName := client.ObjectKey{
+			Namespace: namespace,
+			Name:      serviceAccountNamespacedName.Name,
+		}
+		foundSecret, err := util.GetResourceIfExist(ctx, secretNamespacedName, &corev1.Secret{})
+		if err != nil {
+			logger.With(zap.Error(err)).Errorf("Couldnt fetch service account secret")
+			return ctrl.Result{}, err
+		}
+		if !foundSecret {
 			// create secret for the service account
 			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        expectedServiceAccount.Name,
-					Annotations: map[string]string{"kubernetes.io/service-account.name": expectedServiceAccount.Name},
+					Name:        serviceAccountNamespacedName.Name,
+					Annotations: map[string]string{"kubernetes.io/service-account.name": serviceAccountNamespacedName.Name},
 					Namespace:   namespace,
 				},
 				Type: "kubernetes.io/service-account-token",
