@@ -139,8 +139,25 @@ spec:
             properties:
               clusterInsertionIndex:
                 type: integer
+              connectionState:
+                description: 'ConnectionState is the connectivity state of this gateway
+                  link as reported by the worker: Connected, NotConnected or Pending.
+                  Empty means Pending.'
+                type: string
               gatewayNumber:
                 type: integer
+              lastTransitionTime:
+                description: LastTransitionTime is the time ConnectionState last changed.
+                format: date-time
+                type: string
+              message:
+                description: Message is a human-readable description of the current
+                  ConnectionState.
+                type: string
+              reason:
+                description: Reason is a short, machine-readable reason for the current
+                  ConnectionState.
+                type: string
             type: object
         type: object
     served: true
