@@ -502,6 +502,17 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 			return err
 		}
 		if found {
+			// The gateway pair already exists. On a topology change the surviving
+			// spoke<->hub edge is not recreated, so RouteEntireSliceSubnet would go
+			// stale (e.g. a FullMesh->HubAndSpoke switch would leave it false and
+			// silently break spoke-to-spoke). Reconcile it on the existing client
+			// gateway instead of returning early.
+			if gateway.Spec.RouteEntireSliceSubnet != routeEntireSliceSubnet {
+				gateway.Spec.RouteEntireSliceSubnet = routeEntireSliceSubnet
+				if err = util.UpdateResource(ctx, &gateway); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 	}

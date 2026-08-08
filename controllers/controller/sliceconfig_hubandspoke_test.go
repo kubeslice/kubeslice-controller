@@ -205,4 +205,69 @@ var _ = Describe("SliceConfig HubAndSpoke topology (partial mesh)", Ordered, fun
 		_ = k8sClient.Update(ctx, slice)
 		_ = k8sClient.Delete(ctx, slice)
 	})
+
+	It("reconciles RouteEntireSliceSubnet when the topology changes on an existing slice", func() {
+		// A slice that starts as FullMesh and is later switched to HubAndSpoke.
+		// The spoke<->hub edge exists in both topologies, so its gateway is NOT
+		// recreated on the change. This guards the bug where RouteEntireSliceSubnet
+		// was only written at creation and left stale on the surviving gateway,
+		// which silently breaks spoke-to-spoke on an upgraded slice.
+		const tName = "shift-slice"
+		key := types.NamespacedName{Name: tName, Namespace: nsName}
+		gwName := tName + "-worker-2-worker-1" // spoke-2 -> worker-1 (hub-to-be)
+
+		slice := &v1alpha1.SliceConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: tName, Namespace: nsName},
+			Spec: v1alpha1.SliceConfigSpec{
+				Clusters:    []string{"worker-1", "worker-2", "worker-3"},
+				MaxClusters: 4,
+				SliceSubnet: "10.9.0.0/16",
+				SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayType: "OpenVPN",
+					SliceCaType:      "Local",
+				},
+				SliceIpamType: "Local",
+				SliceType:     "Application",
+				Topology:      &v1alpha1.TopologySpec{Mode: v1alpha1.TopologyModeFullMesh},
+				QosProfileDetails: &v1alpha1.QOSProfile{
+					BandwidthCeilingKbps: 5120,
+					DscpClass:            "AF11",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+
+		// full mesh: the gateway exists and does not route the entire subnet
+		Eventually(func() bool { return gatewayExists(gwName) }, timeout, interval).Should(BeTrue())
+		Expect(getGateway(gwName).Spec.RouteEntireSliceSubnet).To(BeFalse())
+		uidBefore := getGateway(gwName).UID
+
+		// switch to HubAndSpoke with worker-1 as the hub
+		latest := &v1alpha1.SliceConfig{}
+		Expect(k8sClient.Get(ctx, key, latest)).Should(Succeed())
+		latest.Spec.Topology = &v1alpha1.TopologySpec{Mode: v1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"worker-1"}}
+		Expect(k8sClient.Update(ctx, latest)).Should(Succeed())
+
+		// the surviving spoke->hub gateway must now route the entire slice subnet
+		Eventually(func() bool {
+			return getGateway(gwName).Spec.RouteEntireSliceSubnet
+		}, timeout, interval).Should(BeTrue())
+		// and it must be the same object, reconciled in place, not recreated
+		Expect(getGateway(gwName).UID).To(Equal(uidBefore))
+
+		// switch back to FullMesh: the flag must be cleared again
+		Expect(k8sClient.Get(ctx, key, latest)).Should(Succeed())
+		latest.Spec.Topology = &v1alpha1.TopologySpec{Mode: v1alpha1.TopologyModeFullMesh}
+		Expect(k8sClient.Update(ctx, latest)).Should(Succeed())
+		Eventually(func() bool {
+			return getGateway(gwName).Spec.RouteEntireSliceSubnet
+		}, timeout, interval).Should(BeFalse())
+
+		// cleanup (best-effort)
+		if k8sClient.Get(ctx, key, latest) == nil {
+			latest.Spec.Clusters = []string{}
+			_ = k8sClient.Update(ctx, latest)
+			_ = k8sClient.Delete(ctx, latest)
+		}
+	})
 })
