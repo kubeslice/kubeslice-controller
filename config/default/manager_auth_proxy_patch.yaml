@@ -24,6 +24,19 @@ spec:
           args:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=127.0.0.1:8080"
+            # Required for the kube-rbac-proxy sidecar above to be able to scrape
+            # this manager at all. --metrics-secure defaults to TRUE, which makes
+            # controller-runtime serve the metrics endpoint over TLS *and* wrap it
+            # in its own authn/authz filter — while the sidecar is configured with
+            # "--upstream=http://127.0.0.1:8080/", plain HTTP. Left at the default
+            # the proxy speaks HTTP to a TLS listener and /metrics is unreachable
+            # through the only path the Service exposes.
+            #
+            # Plain HTTP on loopback is the intended kube-rbac-proxy arrangement,
+            # not a weakening of it: the endpoint is bound to 127.0.0.1 so nothing
+            # outside the pod can reach it directly, and the sidecar is what
+            # terminates TLS on 8443 and authorizes callers by SubjectAccessReview.
+            - "--metrics-secure=false"
             - "--leader-elect"
             - "--log-level=debug"
             - "--rbac-resource-prefix=kubeslice-rbac"
