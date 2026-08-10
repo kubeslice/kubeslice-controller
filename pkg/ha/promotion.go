@@ -91,7 +91,7 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 	if !e.promoting.CompareAndSwap(false, true) {
-		haPromotionsAbortedTotal.WithLabelValues(abortAlreadyPromoting).Inc()
+		e.abortPromotion(ctx, abortAlreadyPromoting)
 		e.log.Warnw("promotion already in progress; ignoring concurrent attempt")
 		return false, nil
 	}
@@ -121,9 +121,22 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// so it is logged at error level rather than left to be discovered from a
 	// stale mirror much later. Restarting the mirror in place would mean giving
 	// promotion a two-way handle on a component it deliberately does not own.
+	//
+	// Timed from here rather than from the top of the function, so that the two
+	// early returns above stay out of the histogram. Neither is an attempt: an
+	// already-Active hub and a hub whose latch is held by a concurrent tick both
+	// return in nanoseconds, and a pile of near-zero observations labelled
+	// "aborted" would drag the aborted quantiles toward zero and hide the abort
+	// that actually matters — the one that spent a whole grace period first.
+	start := time.Now()
 	promoted := false
 	mirrorStopped := false
 	defer func() {
+		outcome := outcomeAborted
+		if promoted {
+			outcome = outcomePromoted
+		}
+		haPromotionDurationSeconds.WithLabelValues(outcome).Observe(time.Since(start).Seconds())
 		if promoted {
 			return
 		}
@@ -144,6 +157,7 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// instance) would otherwise crash inside the final dial rather than be told
 	// no.
 	if e.remoteClient == nil {
+		e.abortPromotion(ctx, abortNoRemoteClient)
 		return false, fmt.Errorf("cannot promote without a client to the active hub")
 	}
 
@@ -183,12 +197,15 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 		// delivered by the time this returns, so a timeout leaves the mirror
 		// stopping regardless of the error.
 		mirrorStopped = true
+		stepStart := time.Now()
 		err := e.hooks.StopMirror(stopCtx)
 		cancel()
+		observeStep(stepStopMirror, stepStart)
 		if err != nil {
 			// Abort rather than continue. A mirror that has not confirmed it
 			// stopped is the dual-writer state this step exists to prevent, so
 			// the safe move is to stay a fenced Standby and retry next tick.
+			e.abortPromotion(ctx, abortMirrorNotStopped)
 			return false, fmt.Errorf("stopping the state mirror before promotion: %w", err)
 		}
 		e.log.Infow("state mirror stopped and confirmed exited")
@@ -199,11 +216,15 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// Lease lives on the promoting hub's own cluster, where last-writer-wins is
 	// the right rule. Judging whether the *other* hub is still alive is the
 	// remote read's job, and it already happened in step 2.
+	acquireStart := time.Now()
 	lease, err := acquireOrRenewLease(ctx, e.localClient, e.leaseName, e.leaseNS, e.identity, e.leaseDuration)
+	observeStep(stepAcquireLease, acquireStart)
 	if err != nil {
+		e.abortPromotion(ctx, abortLeaseAcquireFailed)
 		return false, fmt.Errorf("acquiring the lease on this hub: %w", err)
 	}
 	e.lastRenew = time.Now()
+	haLeaseLastRenewTime.WithLabelValues(string(ModeActive)).Set(float64(e.lastRenew.Unix()))
 	e.log.Infow("acquired lease on this hub", "lease", e.leaseName, "namespace", e.leaseNS)
 
 	// Step 6.
@@ -214,9 +235,12 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// retrying afterwards. Failing here would strand the cluster with no writer.
 	if e.hooks.PublishActiveController != nil {
 		pubCtx, cancel := context.WithTimeout(ctx, e.promotionGracePeriod)
+		stepStart := time.Now()
 		err := e.hooks.PublishActiveController(pubCtx)
 		cancel()
+		observeStep(stepPublishActive, stepStart)
 		if err != nil {
+			haActivePublishErrorsTotal.Inc()
 			e.log.Errorw("could not publish activeController within the promotion grace period; "+
 				"continuing anyway, the publisher loop will retry",
 				"error", err, "gracePeriod", e.promotionGracePeriod)
@@ -261,8 +285,10 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 	// fence open, and the promotion never finishing or reporting itself.
 	if e.hooks.KickReconcilers != nil {
 		kickCtx, cancel := context.WithTimeout(ctx, e.promotionGracePeriod)
+		stepStart := time.Now()
 		err := e.hooks.KickReconcilers(kickCtx)
 		cancel()
+		observeStep(stepKickReconcilers, stepStart)
 		if err != nil {
 			e.log.Errorw("could not re-enqueue objects after promotion; pre-existing state may "+
 				"stay unreconciled until the informer resync period", "error", err)
@@ -273,10 +299,26 @@ func (e *ClusterLeaderElector) promote(ctx context.Context) (bool, error) {
 
 	// Step 11.
 	haFailoverTotal.Inc()
+	haLastPromotionTimestamp.WithLabelValues(string(ModeActive)).Set(float64(time.Now().Unix()))
+	// Drop the Standby-scoped series. This hub no longer watches a remote hub, so
+	// leaving them behind would publish a frozen remote-lease age for a remote it
+	// has stopped reading -- indistinguishable, to an age-based alert, from a
+	// Standby whose Active is perfectly healthy.
+	haRemoteLeaseAgeSeconds.DeleteLabelValues(string(ModeStandby))
+	// Detection is measured to `start`, not to now: it is the time from the
+	// Active's last observed proof of life to the moment this hub committed to
+	// taking over, and everything after `start` is the sequence's own cost, which
+	// ha_promotion_duration_seconds already reports. Keeping them disjoint is
+	// what lets the two be added into a total no-writer window.
+	if age, ok := remoteLeaseAge(e.lastSeenLease, start); ok {
+		haFailoverDetectionSeconds.Observe(age.Seconds())
+	}
 	if e.hooks.EmitPromotedEvent != nil {
 		eventCtx, cancel := context.WithTimeout(ctx, e.promotionGracePeriod)
+		stepStart := time.Now()
 		err := e.hooks.EmitPromotedEvent(eventCtx, lease)
 		cancel()
+		observeStep(stepEmitPromoted, stepStart)
 		if err != nil {
 			e.log.Errorw("could not emit PromotedToActive event", "error", err)
 		}
