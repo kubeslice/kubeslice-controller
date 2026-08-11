@@ -72,7 +72,7 @@ func (c *ClusterService) ReconcileCluster(ctx context.Context, req ctrl.Request)
 	found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
 		Name: req.Namespace,
 	}, projectNs)
-	if !found || !c.checkForProjectNamespace(projectNs) {
+	if !found || !util.CheckForProjectNamespace(projectNs) {
 		logger.Infof("Created Cluster %v is not in project namespace. Returning from reconciliation loop.", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
@@ -331,11 +331,6 @@ func (c *ClusterService) cleanUpClusterResources(ctx context.Context, req ctrl.R
 		return result, reconErr
 	}
 	return ctrl.Result{}, nil
-}
-
-// checkForProjectNamespace is function to check the project if the namespace is in proper format
-func (c *ClusterService) checkForProjectNamespace(namespace *corev1.Namespace) bool {
-	return namespace.Labels[util.LabelName] == fmt.Sprintf(util.LabelValue, "Project", namespace.Name)
 }
 
 // DeleteClusters is function to delete the clusters
