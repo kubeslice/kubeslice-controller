@@ -107,6 +107,8 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"SliceConfigWebhookValidation_DeleteValidateSliceConfigWithServiceExportsNotEmpty":                                         DeleteValidateSliceConfigWithServiceExportsNotEmpty,
 	"SliceConfigWebhookValidation_ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent":                     ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent,
 	"SliceConfigWebhookValidation_ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent":                  ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent,
+	"SliceConfigWebhookValidation_CreateValidateSliceConfigBothQosFieldsOnNoNetSlice":                                          CreateValidateSliceConfigBothQosFieldsOnNoNetSlice,
+	"SliceConfigWebhookValidation_UpdateValidateSliceConfigBothQosFieldsOnNoNetSlice":                                          UpdateValidateSliceConfigBothQosFieldsOnNoNetSlice,
 	"SliceConfigWebhookValidation_ValidateQosProfileStandardQosProfileNameDoesNotExist":                                        ValidateQosProfileStandardQosProfileNameDoesNotExist,
 	"SliceConfigWebhookValidation_ValidateMaxCluster":                                                                          ValidateMaxCluster,
 	"SliceConfigWebhookValidation_ValidateMaxClusterForParticipatingCluster":                                                   ValidateMaxClusterForParticipatingCluster,
@@ -1847,9 +1849,9 @@ func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsPresent(t *
 	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{
 		QueueType: "someType",
 	}
-	err := validateQosProfile(ctx, sliceConfig)
+	err := validateQosMutualExclusion(sliceConfig)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "StandardQosProfileName cannot be set when QosProfileDetails is set")
+	require.Contains(t, err.Error(), "StandardQosProfileName and QosProfileDetails are mutually exclusive")
 	clientMock.AssertExpectations(t)
 }
 
@@ -1860,6 +1862,47 @@ func ValidateQosProfileBothStandardQosProfileNameAndQosProfileDetailsNotPresent(
 	err := validateQosProfile(ctx, sliceConfig)
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Either StandardQosProfileName or QosProfileDetails is required")
+	clientMock.AssertExpectations(t)
+}
+
+func CreateValidateSliceConfigBothQosFieldsOnNoNetSlice(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	clientMock, sliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	clientMock.On("Get", ctx, client.ObjectKey{Name: namespace}, &corev1.Namespace{}).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*corev1.Namespace)
+		if arg.Labels == nil {
+			arg.Labels = make(map[string]string)
+		}
+		arg.Name = namespace
+		arg.Labels[util.LabelName] = fmt.Sprintf(util.LabelValue, "Project", namespace)
+	}).Once()
+	sliceConfig.Spec.MaxClusters = 2
+	sliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	sliceConfig.Spec.StandardQosProfileName = "testQos"
+	sliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{QueueType: "someType"}
+	_, err := ValidateSliceConfigCreate(ctx, sliceConfig)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "mutually exclusive")
+	clientMock.AssertExpectations(t)
+}
+
+func UpdateValidateSliceConfigBothQosFieldsOnNoNetSlice(t *testing.T) {
+	name := "slice_config"
+	namespace := "namespace"
+	oldSliceConfig := &controllerv1alpha1.SliceConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: controllerv1alpha1.SliceConfigSpec{
+			OverlayNetworkDeploymentMode: controllerv1alpha1.NONET,
+		},
+	}
+	clientMock, newSliceConfig, ctx := setupSliceConfigWebhookValidationTest(name, namespace)
+	newSliceConfig.Spec.OverlayNetworkDeploymentMode = controllerv1alpha1.NONET
+	newSliceConfig.Spec.StandardQosProfileName = "testQos"
+	newSliceConfig.Spec.QosProfileDetails = &controllerv1alpha1.QOSProfile{QueueType: "someType"}
+	_, err := ValidateSliceConfigUpdate(ctx, newSliceConfig, runtime.Object(oldSliceConfig))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "mutually exclusive")
 	clientMock.AssertExpectations(t)
 }
 

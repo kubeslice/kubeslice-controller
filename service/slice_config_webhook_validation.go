@@ -59,6 +59,9 @@ func ValidateSliceConfigCreate(ctx context.Context, sliceConfig *controllerv1alp
 	if err := validateMaxClusterCount(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
+	if err := validateQosMutualExclusion(sliceConfig); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode != controllerv1alpha1.NONET {
 		if err := validateSliceSubnet(sliceConfig); err != nil {
 			return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
@@ -104,6 +107,9 @@ func ValidateSliceConfigUpdate(ctx context.Context, sliceConfig *controllerv1alp
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	if err := validateNamespaceIsolationProfile(sliceConfig); err != nil {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
+	}
+	if err := validateQosMutualExclusion(sliceConfig); err != nil {
 		return nil, apierrors.NewInvalid(schema.GroupKind{Group: apiGroupKubeSliceControllers, Kind: "SliceConfig"}, sliceConfig.Name, field.ErrorList{err})
 	}
 	// Validate single/multi overlay network deployment mode specific fields
@@ -453,11 +459,17 @@ func preventUpdate(ctx context.Context, sc *controllerv1alpha1.SliceConfig, old 
 	return nil
 }
 
+// validateQosMutualExclusion rejects slices that have both QoS fields set simultaneously.
+// Called for all overlay network modes; validateQosProfile handles the non-NONET requirements.
+func validateQosMutualExclusion(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
+	if sliceConfig.Spec.StandardQosProfileName != "" && sliceConfig.Spec.QosProfileDetails != nil {
+		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "StandardQosProfileName and QosProfileDetails are mutually exclusive")
+	}
+	return nil
+}
+
 // validateQosProfile is a function to validate the Qos(quality of service)profile of slice
 func validateQosProfile(ctx context.Context, sliceConfig *controllerv1alpha1.SliceConfig) *field.Error {
-	if sliceConfig.Spec.StandardQosProfileName != "" && sliceConfig.Spec.QosProfileDetails != nil {
-		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "StandardQosProfileName cannot be set when QosProfileDetails is set")
-	}
 	if sliceConfig.Spec.StandardQosProfileName == "" && sliceConfig.Spec.QosProfileDetails == nil {
 		return field.Invalid(field.NewPath("Spec").Child("StandardQosProfileName"), sliceConfig.Spec.StandardQosProfileName, "Either StandardQosProfileName or QosProfileDetails is required")
 	}

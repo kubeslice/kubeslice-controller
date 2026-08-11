@@ -58,9 +58,9 @@ type SliceConfigSpec struct {
 	//+kubebuilder:default:=Local
 	SliceIpamType          string   `json:"sliceIpamType,omitempty"`
 	Clusters               []string `json:"clusters,omitempty"`
-	StandardQosProfileName string   `json:"standardQosProfileName,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
+	StandardQosProfileName string   `json:"standardQosProfileName,omitempty"`
 	// The custom QOS Profile Details
-	QosProfileDetails         *QOSProfile               `json:"qosProfileDetails,omitempty"` // FIXME: Add OneOf StandardQosProfileName vs QosProfileDetails
+	QosProfileDetails         *QOSProfile               `json:"qosProfileDetails,omitempty"`
 	NamespaceIsolationProfile NamespaceIsolationProfile `json:"namespaceIsolationProfile,omitempty"`
 	ExternalGatewayConfig     []ExternalGatewayConfig   `json:"externalGatewayConfig,omitempty"`
 	//+kubebuilder:validation:Minimum=2
