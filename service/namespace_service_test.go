@@ -82,8 +82,9 @@ func TestReconcileProjectNamespace_NamespaceGetsCreatedWithOwnerLabelAndReturnsR
 
 	projectToCreateWithLabel := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   namespaceName,
-			Labels: labels,
+			Name:        namespaceName,
+			Labels:      labels,
+			Annotations: map[string]string{},
 		},
 	}
 	clientMock.On("Create", ctx, projectToCreateWithLabel).Return(nil)
@@ -177,7 +178,7 @@ func TestDeleteNamespace_DoesNothingIfNamespaceDoNotExist(t *testing.T) {
 	mMock.AssertExpectations(t)
 }
 
-func prepareNamespaceTestContext(ctx context.Context, client util.Client, scheme *runtime.Scheme) context.Context {
+func prepareNamespaceTestContext(ctx context.Context, client client.Client, scheme *runtime.Scheme) context.Context {
 	eventRecorder := events.NewEventRecorder(client, scheme, ossEvents.EventsMap, events.EventRecorderOptions{
 		Version:   "v1alpha1",
 		Cluster:   util.ClusterController,
