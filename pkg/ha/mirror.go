@@ -77,6 +77,16 @@ func mirrorCreateOrUpdate(ctx context.Context, localClient client.Client, key sy
 	if res.StripOwnerRefs {
 		payload.SetOwnerReferences(nil)
 	}
+	// A type we do not mirror the status of should not carry one in the create
+	// body either. A real API server ignores .status on a create for any
+	// resource with a status subresource, so this changes nothing there — but
+	// sending a status we have already decided we do not own is misleading, and
+	// it is the difference between a create that is inert and one that only
+	// happens to be. The status write itself is skipped further down, reading
+	// from src rather than payload, so both are load-bearing.
+	if res.SkipStatus {
+		delete(payload.Object, "status")
+	}
 	if res.Sanitize != nil {
 		res.Sanitize(payload)
 	}
@@ -144,7 +154,13 @@ func mirrorCreateOrUpdate(ctx context.Context, localClient client.Client, key sy
 	// validation rule — status.Phase can only be "Terminating" if
 	// deletionTimestamp is set. The Standby converges correctly once Active
 	// reports NotFound and mirrorDelete takes over.
-	if src.GetDeletionTimestamp() == nil {
+	//
+	// Skipped too for types that set SkipStatus, whose status belongs to the
+	// API server rather than to us — Namespace being the one such type in the
+	// mirror set. Without that, a Namespace's ever-present status.phase made
+	// this branch fire on every pass and fail permanently wherever RBAC
+	// withheld namespaces/status.
+	if src.GetDeletionTimestamp() == nil && !res.SkipStatus {
 		if status, ok, _ := unstructured.NestedFieldNoCopy(src.Object, "status"); ok {
 			payload.Object["status"] = status
 			if err := localClient.Status().Update(ctx, payload); err != nil {
