@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -327,6 +328,104 @@ func (l *lateLeadership) Identity() string { return "hub-a" }
 // its Lease, so it skipped, and the next attempt was a full publish interval
 // away — a fresh Active took 31s to advertise itself. While not the leader the
 // loop must poll on the much shorter leadership interval instead.
+// ---- read-after-write verification (the silently-pruned-field defect) ----
+
+// pruningClusterClient emulates the API server behaviour that made this defect
+// invisible: a Cluster CRD without status.activeController in its schema. The
+// status write is ACCEPTED, and the field is silently dropped. Reads therefore
+// never show it. Also counts Gets, so a test can assert the read-back stops once
+// the field is confirmed.
+func pruningClusterClient(t *testing.T, gets *int, prune bool, objs ...client.Object) client.Client {
+	t.Helper()
+	base := fake.NewClientBuilder().
+		WithScheme(clusterScheme(t)).
+		WithObjects(objs...).
+		WithStatusSubresource(&controllerv1alpha1.Cluster{}).
+		Build()
+	return interceptor.NewClient(base, interceptor.Funcs{
+		SubResourceUpdate: func(ctx context.Context, c client.Client, sub string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+			if prune {
+				if cl, ok := obj.(*controllerv1alpha1.Cluster); ok {
+					cl.Status.ActiveController = nil // the API server drops the unknown field
+				}
+			}
+			return c.SubResource(sub).Update(ctx, obj, opts...)
+		},
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			if gets != nil {
+				*gets++
+			}
+			return c.Get(ctx, key, obj, opts...)
+		},
+	})
+}
+
+// TestPublishOnce_ReportsWhenTheFieldIsSilentlyPruned is the regression this
+// defect deserves. Against a chart-installed hub the publisher logged success
+// every 30s for hours while nothing persisted and no worker could discover the
+// Active. An accepted write is not evidence.
+func TestPublishOnce_ReportsWhenTheFieldIsSilentlyPruned(t *testing.T) {
+	c := pruningClusterClient(t, nil, true, newCluster("worker-1", "kubeslice-avesha"))
+	p := testPublisher(t, c, stubLeadership{leader: true, identity: "hub-a"}, "https://hub-a.example.com:6443")
+
+	err := p.PublishOnce(context.Background())
+	require.Error(t, err, "a write that did not persist must not be reported as a successful publish")
+	assert.Contains(t, err.Error(), "did not persist")
+	assert.Contains(t, err.Error(), "CRD",
+		"the error has to name the likely cause, or an operator cannot act on it")
+	assert.False(t, p.persistenceVerified.Load())
+}
+
+// One error per pass, not one per Cluster CR: every cluster shares the same CRD
+// schema, so the rest would repeat the same message.
+func TestPublishOnce_PruningReportsOncePerPassNotPerCluster(t *testing.T) {
+	c := pruningClusterClient(t, nil, true,
+		newCluster("worker-1", "kubeslice-avesha"),
+		newCluster("worker-2", "kubeslice-avesha"),
+		newCluster("worker-3", "kubeslice-avesha"))
+	p := testPublisher(t, c, stubLeadership{leader: true, identity: "hub-a"}, "https://hub-a.example.com:6443")
+
+	err := p.PublishOnce(context.Background())
+	require.Error(t, err)
+	assert.Equal(t, 1, strings.Count(err.Error(), "did not persist"),
+		"three clusters with the same broken schema must produce one report, not three")
+}
+
+// A hub restarting onto Cluster CRs that already carry its own declaration
+// never writes, so it never reaches the read-back. Reading the value back off
+// the API server is evidence enough on its own.
+func TestPublishOnce_AlreadyConvergedCountsAsVerified(t *testing.T) {
+	existing := newCluster("worker-1", "kubeslice-avesha")
+	existing.Status.ActiveController = &controllerv1alpha1.ActiveControllerInfo{
+		Endpoint:       "https://hub-a.example.com:6443",
+		ActiveIdentity: "hub-a",
+	}
+	c := clusterClient(t, existing)
+	p := testPublisher(t, c, stubLeadership{leader: true, identity: "hub-a"}, "https://hub-a.example.com:6443")
+
+	require.NoError(t, p.PublishOnce(context.Background()))
+	assert.True(t, p.persistenceVerified.Load(),
+		"a field that already reads back as the desired value has demonstrably persisted")
+}
+
+func TestPublishOnce_VerifiesOnceThenStopsReadingBack(t *testing.T) {
+	gets := 0
+	c := pruningClusterClient(t, &gets, false, newCluster("worker-1", "kubeslice-avesha"))
+	p := testPublisher(t, c, stubLeadership{leader: true, identity: "hub-a"}, "https://hub-a.example.com:6443")
+
+	require.NoError(t, p.PublishOnce(context.Background()))
+	assert.True(t, p.persistenceVerified.Load(), "a field that read back correctly must be recorded as verified")
+	afterFirst := gets
+	assert.Greater(t, afterFirst, 0, "the first pass has to read back to confirm anything")
+
+	// Change the identity so the next pass genuinely writes again, and confirm it
+	// does not pay for another read-back: the schema is a settled fact by now.
+	p.elector = stubLeadership{leader: true, identity: "hub-b"}
+	require.NoError(t, p.PublishOnce(context.Background()))
+	assert.Equal(t, afterFirst, gets,
+		"verification is once per process; re-reading every pass would double read traffic to prove a settled fact")
+}
+
 func TestStart_PublishesPromptlyWhenLeadershipArrivesLate(t *testing.T) {
 	c := clusterClient(t, newCluster("worker-1", "kubeslice-avesha"))
 	p := NewActivePublisher(c, &lateLeadership{after: 3}, ActivePublisherOptions{
