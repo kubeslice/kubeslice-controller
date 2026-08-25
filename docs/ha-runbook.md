@@ -122,6 +122,16 @@ Lease so a single `get events -n kubeslice-controller` shows the lot:
 > name shipped earlier (#295) and is left alone rather than renamed under
 > anyone's existing alerts.
 
+> `config/events/events_config_map.yaml` in this repo is a generated
+> **inventory** of every event the schema knows about (`make generate-events`
+> lists all of them, HA's six included, under `disabledEvents` — that is the
+> template's behaviour for every event, not something specific to HA). It is
+> not what gets deployed: the Helm chart ships its own ConfigMap with an empty
+> `disabledEvents` list, which is why all six HA events fire on a real
+> install. Never `kubectl apply` the repo's copy against a live cluster —
+> check the *deployed* `kubeslice-controller-event-schema-conf` ConfigMap
+> instead if an HA event seems to be missing.
+
 ### How long has this hub been Active
 
 ```
