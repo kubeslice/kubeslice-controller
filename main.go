@@ -161,7 +161,7 @@ func initialize(services *service.Services) {
 
 	// Cross-cluster HA flags. --ha-mode=standalone (default) preserves today's behaviour.
 	flag.StringVar(&haMode, "ha-mode", "standalone", `Cross-cluster HA mode: "active", "standby", or "standalone" (default).`)
-	flag.StringVar(&haIdentity, "ha-identity", "", "Stable per-cluster identity recorded in the Lease (defaults to the hostname).")
+	flag.StringVar(&haIdentity, "ha-identity", "", "Stable per-hub identity recorded in the Lease and published in status.activeController. Defaults to the hostname, which under a Deployment is the pod name and changes on every restart, so pin it in active/standby mode.")
 	flag.StringVar(&haActiveKubeconfig, "ha-active-kubeconfig", "", "Path to the Active hub kubeconfig; required in standby mode.")
 	flag.StringVar(&haLeaseNamespace, "ha-lease-namespace", os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"), "Namespace for the HA Lease; defaults to the controller's own namespace (KUBESLICE_CONTROLLER_MANAGER_NAMESPACE), where the leader-election Role grants leases. Empty falls back to the pkg/ha default.")
 	flag.DurationVar(&haLeaseDuration, "ha-lease-duration", ha.DefaultLeaseDuration, "HA Lease duration.")
