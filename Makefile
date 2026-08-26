@@ -87,6 +87,10 @@ test-local: envtest ## Run tests.
 int-test: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/controller/... -coverprofile cover.out
 
+.PHONY: test-e2e-ha
+test-e2e-ha: ## Run the Active/Standby HA e2e suite (issue #299) against real, disposable Kind clusters.
+	go test -tags e2e -v -timeout 30m ./test/e2e/...
+
 .PHONY: generate-yamls
 generate-yamls: manifests kustomize ## Generates the yaml files
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
