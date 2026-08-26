@@ -456,7 +456,8 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 		}
 		foundSecret, err := util.GetResourceIfExist(ctx, secretNamespacedName, &corev1.Secret{})
 		if err != nil {
-			logger.With(zap.Error(err)).Errorf("Couldnt fetch service account secret")
+			logger.With(zap.Error(err)).Errorw("could not fetch the service account's token Secret",
+				"namespace", secretNamespacedName.Namespace, "name", secretNamespacedName.Name)
 			return ctrl.Result{}, err
 		}
 		if !foundSecret {
