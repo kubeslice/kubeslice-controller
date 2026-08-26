@@ -56,9 +56,11 @@ type WorkerServiceImportReconciler struct {
 // Reconcile is a function to reconcile the workerServiceImport, WorkerServiceImportReconciler implements it
 func (r *WorkerServiceImportReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// HA write fence: only the Active hub (or a standalone controller) writes.
-	// A Standby evaluates this on every call and no-ops.
+	// A Standby evaluates this on every call and no-ops. Debug, not Info: the
+	// Standby's own mirror writes wake this watch, so at Info a healthy Standby
+	// logs a line per mirrored object and buries everything else.
 	if r.LeaderElector != nil && !r.LeaderElector.IsLeader() {
-		r.Log.Info("standby mode, skipping reconcile")
+		r.Log.Debugw("standby mode, skipping reconcile", "request", req.String())
 		return ctrl.Result{}, nil
 	}
 	kubeSliceCtx := util.PrepareKubeSliceControllersRequestContext(ctx, r.Client, r.Scheme, "WorkerServiceImportController", r.EventRecorder)
