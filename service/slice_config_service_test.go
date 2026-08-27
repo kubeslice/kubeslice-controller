@@ -30,6 +30,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
@@ -80,6 +81,26 @@ var SliceConfigTestBed = map[string]func(*testing.T){
 	"SliceConfig_ErrorOnCreateOrUpdateServiceImport":             SliceConfigErrorOnCreateOrUpdateServiceImport,
 }
 
+// fakeStatusWriter is a minimal client.SubResourceWriter for tests that exercise
+// status subresource updates. It records the last object passed to Update so
+// callers may assert on the written status.
+type fakeStatusWriter struct {
+	updated client.Object
+}
+
+func (f *fakeStatusWriter) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+	return nil
+}
+
+func (f *fakeStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	f.updated = obj
+	return nil
+}
+
+func (f *fakeStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	return nil
+}
+
 func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 	workerSliceGatewayMock, workerSliceConfigMock, _, workerServiceImportMock, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
@@ -119,6 +140,10 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 		}
 	}).Once()
 	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, sliceConfig.Spec.Clusters, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	// Step 9 (topology status aggregation): no gateways -> TopologyConverged is set
+	// for the first time, so the condition changes and the status is written.
+	workerSliceGatewayMock.On("ListWorkerSliceGateways", ctx, mock.Anything, requestObj.Namespace).Return([]workerv1alpha1.WorkerSliceGateway{}, nil).Once()
+	clientMock.On("Status").Return(&fakeStatusWriter{})
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.NoError(t, nil)

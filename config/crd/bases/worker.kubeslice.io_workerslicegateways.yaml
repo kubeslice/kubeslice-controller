@@ -135,7 +135,6 @@ spec:
                 type: string
             type: object
           status:
-            description: WorkerSliceGatewayStatus defines the observed state of WorkerSliceGateway
             properties:
               clusterInsertionIndex:
                 type: integer
