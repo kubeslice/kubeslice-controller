@@ -29,6 +29,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/metrics"
 
 	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
@@ -549,7 +550,11 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 		gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress,
 		clientGatewayName, gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress, serverGatewayName)
 	err = util.CreateResource(ctx, serverGatewayObject)
-	if err != nil {
+	// Ignore AlreadyExists: the server gateway can already be present when a prior
+	// pair creation was interrupted after the server but before the client, or on a
+	// parallel reconcile. Falling through lets the missing client be created so the
+	// pair self-heals instead of getting stuck on an AlreadyExists error.
+	if err != nil && !k8sErrors.IsAlreadyExists(err) {
 		//Register an event for worker slice gateway creation failure
 		util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreationFailed)
 		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
@@ -562,16 +567,18 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 		)
 		return err
 	}
-	//Register an event for worker slice gateway creation success
-	util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
-	s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
-		map[string]string{
-			"action":      "created",
-			"event":       string(events.EventWorkerSliceGatewayCreated),
-			"object_name": serverGatewayObject.Name,
-			"object_kind": metricKindWorkerSliceGateway,
-		},
-	)
+	if err == nil {
+		//Register an event for worker slice gateway creation success
+		util.RecordEvent(ctx, eventRecorder, serverGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventWorkerSliceGatewayCreated),
+				"object_name": serverGatewayObject.Name,
+				"object_kind": metricKindWorkerSliceGateway,
+			},
+		)
+	}
 	clientGatewayObject := s.buildMinimumGateway(destinationCluster, sourceCluster, sliceName, namespace,
 		clientGateway, gatewayConnType, gatewayProtocol, label, gatewayNumber,
 		gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress,
@@ -581,7 +588,8 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 	// relayed through the hub.
 	clientGatewayObject.Spec.RouteEntireSliceSubnet = routeEntireSliceSubnet
 	err = util.CreateResource(ctx, clientGatewayObject)
-	if err != nil {
+	// Ignore AlreadyExists for the same idempotency/self-heal reason as the server.
+	if err != nil && !k8sErrors.IsAlreadyExists(err) {
 		//Register an event for worker slice gateway creation failure
 		util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreationFailed)
 		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
@@ -594,16 +602,18 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 		)
 		return err
 	}
-	//Register an event for worker slice gateway creation success
-	util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
-	s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
-		map[string]string{
-			"action":      "created",
-			"event":       string(events.EventWorkerSliceGatewayCreated),
-			"object_name": clientGatewayObject.Name,
-			"object_kind": metricKindWorkerSliceGateway,
-		},
-	)
+	if err == nil {
+		//Register an event for worker slice gateway creation success
+		util.RecordEvent(ctx, eventRecorder, clientGatewayObject, nil, events.EventWorkerSliceGatewayCreated)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "created",
+				"event":       string(events.EventWorkerSliceGatewayCreated),
+				"object_name": clientGatewayObject.Name,
+				"object_kind": metricKindWorkerSliceGateway,
+			},
+		)
+	}
 
 	err = s.GenerateCerts(ctx, sliceName, namespace, gatewayProtocol, serverGatewayObject, clientGatewayObject, gatewayAddresses)
 	if err != nil {

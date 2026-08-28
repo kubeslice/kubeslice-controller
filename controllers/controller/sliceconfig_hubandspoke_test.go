@@ -330,6 +330,62 @@ var _ = Describe("SliceConfig HubAndSpoke topology (partial mesh)", Ordered, fun
 		}
 	})
 
+	It("re-creates a missing client gateway of a partial pair (self-heal)", func() {
+		// Simulates an interrupted pair creation: the server gateway exists but the
+		// client is gone. The reconcile must create the missing client instead of
+		// getting stuck on an AlreadyExists error when it re-touches the server.
+		const psName = "partial-slice"
+		key := types.NamespacedName{Name: psName, Namespace: nsName}
+		serverGw := psName + "-worker-1-worker-2" // hub server side
+		clientGw := psName + "-worker-2-worker-1" // spoke client side
+
+		slice := &v1alpha1.SliceConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: psName, Namespace: nsName},
+			Spec: v1alpha1.SliceConfigSpec{
+				Clusters:    []string{"worker-1", "worker-2", "worker-3"},
+				MaxClusters: 4,
+				SliceSubnet: "10.14.0.0/16",
+				SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayType: "OpenVPN",
+					SliceCaType:      "Local",
+				},
+				SliceIpamType: "Local",
+				SliceType:     "Application",
+				Topology:      &v1alpha1.TopologySpec{Mode: v1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"worker-1"}},
+				QosProfileDetails: &v1alpha1.QOSProfile{
+					BandwidthCeilingKbps: 5120,
+					DscpClass:            "AF11",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+		Eventually(func() bool { return gatewayExists(serverGw) && gatewayExists(clientGw) }, timeout, interval).Should(BeTrue())
+
+		// delete only the client -> partial pair (server present, client missing)
+		cgw := getGateway(clientGw)
+		Expect(k8sClient.Delete(ctx, &cgw)).Should(Succeed())
+
+		// nudge a reconcile and assert the client is re-created (the server, which
+		// still exists, must not block this with AlreadyExists)
+		latest := &v1alpha1.SliceConfig{}
+		Expect(k8sClient.Get(ctx, key, latest)).Should(Succeed())
+		if latest.Labels == nil {
+			latest.Labels = map[string]string{}
+		}
+		latest.Labels["reconcile-nudge"] = "1"
+		Expect(k8sClient.Update(ctx, latest)).Should(Succeed())
+
+		Eventually(func() bool { return gatewayExists(clientGw) }, timeout, interval).Should(BeTrue())
+		Expect(gatewayExists(serverGw)).To(BeTrue())
+
+		// cleanup (best-effort)
+		if k8sClient.Get(ctx, key, latest) == nil {
+			latest.Spec.Clusters = []string{}
+			_ = k8sClient.Update(ctx, latest)
+			_ = k8sClient.Delete(ctx, latest)
+		}
+	})
+
 	It("marks a no-network slice TopologyConverged=True with NoGatewaysRequired", func() {
 		// A no-network (NONET) slice has no gateway links, so it must still report a
 		// TopologyConverged condition (True / NoGatewaysRequired). This guards the

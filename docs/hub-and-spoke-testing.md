@@ -206,7 +206,7 @@ single `TopologyConverged` condition on the SliceConfig. 5 cases:
 ## 4. Controller reconciler tests (envtest)
 
 File: `controllers/controller/sliceconfig_hubandspoke_test.go` (Ginkgo, real API
-server via envtest). 5 specs:
+server via envtest). 6 specs:
 
 - **`builds only hub<->spoke gateways and skips spoke<->spoke`** — applying a
   HubAndSpoke SliceConfig creates the 4 WorkerSliceGateway objects (2 pairs) and
@@ -225,6 +225,9 @@ server via envtest). 5 specs:
 - **`marks a no-network slice TopologyConverged=True with NoGatewaysRequired`** — a
   NONET slice still gets a `TopologyConverged` condition (guards the early-return
   path that previously skipped the status write).
+- **`re-creates a missing client gateway of a partial pair (self-heal)`** — with the
+  server gateway present but the client deleted, the reconcile re-creates the client
+  instead of getting stuck on an AlreadyExists error re-touching the server.
 
 ---
 
