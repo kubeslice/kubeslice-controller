@@ -455,8 +455,14 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 			}
 			cluster := controllerv1alpha1.Cluster{}
 			found, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: clusterName, Namespace: namespace}, &cluster)
-			if !found || err != nil {
+			if err != nil {
 				return ctrl.Result{}, err
+			}
+			if !found {
+				// A slice member's Cluster CR isn't present yet (e.g. registration
+				// lag). Return an error so the reconcile retries instead of silently
+				// skipping gateway creation for this and the remaining edges.
+				return ctrl.Result{}, fmt.Errorf("cluster %q not found while creating gateways for slice %q", clusterName, sliceName)
 			}
 			clusterMapping[clusterName] = &cluster
 		}
