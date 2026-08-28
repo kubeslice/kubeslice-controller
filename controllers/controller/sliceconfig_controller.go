@@ -30,8 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // SliceConfigReconciler reconciles a SliceConfig object
@@ -64,10 +67,28 @@ func (r *SliceConfigReconciler) sliceConfigForGateway(ctx context.Context, obj c
 	}
 }
 
+// gatewayConnectionStateChanged only lets a WorkerSliceGateway event through when
+// it can actually affect the slice's TopologyConverged condition: any create or
+// delete, or an update that changes the gateway's status.ConnectionState. This
+// filters out the frequent status writes that don't move connectivity (latency,
+// rates, message/reason churn) so large or noisy slices don't trigger a
+// SliceConfig reconcile on every gateway heartbeat.
+var gatewayConnectionStateChanged = predicate.Funcs{
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		oldGw, ok1 := e.ObjectOld.(*workerv1alpha1.WorkerSliceGateway)
+		newGw, ok2 := e.ObjectNew.(*workerv1alpha1.WorkerSliceGateway)
+		if !ok1 || !ok2 {
+			return true
+		}
+		return oldGw.Status.ConnectionState != newGw.Status.ConnectionState
+	},
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *SliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&controllerv1alpha1.SliceConfig{}).
-		Watches(&workerv1alpha1.WorkerSliceGateway{}, handler.EnqueueRequestsFromMapFunc(r.sliceConfigForGateway)).
+		Watches(&workerv1alpha1.WorkerSliceGateway{}, handler.EnqueueRequestsFromMapFunc(r.sliceConfigForGateway),
+			builder.WithPredicates(gatewayConnectionStateChanged)).
 		Complete(r)
 }
