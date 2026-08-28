@@ -188,8 +188,16 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
 
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
-		err = s.ms.CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name)
-		return ctrl.Result{}, err
+		if err = s.ms.CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name); err != nil {
+			return ctrl.Result{}, err
+		}
+		// A no-network slice has no gateway links, so its topology is trivially
+		// converged (TopologyConverged=True, reason NoGatewaysRequired). Reconcile
+		// it here since this path returns before Step 9.
+		if err := s.reconcileTopologyStatus(ctx, sliceConfig, req.Namespace, ownershipLabel); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// Step 4: Creation of worker slice Objects and Cluster Labels
