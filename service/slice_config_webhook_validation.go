@@ -365,6 +365,12 @@ func validateTopology(sliceConfig *controllerv1alpha1.SliceConfig) *field.Error 
 // validateHubAndSpokeTopology is function to validate the hub and spoke topology rules
 func validateHubAndSpokeTopology(sliceConfig *controllerv1alpha1.SliceConfig, topologyPath *field.Path) *field.Error {
 	topology := sliceConfig.Spec.Topology
+	// A no-network slice has no gateways, so the controller ignores spec.topology
+	// entirely for it. Reject HubAndSpoke here rather than silently doing nothing,
+	// so the user isn't misled into thinking they configured a partial mesh.
+	if sliceConfig.Spec.OverlayNetworkDeploymentMode == controllerv1alpha1.NONET {
+		return field.Invalid(topologyPath.Child("Mode"), string(topology.Mode), "HubAndSpoke topology is not supported for a no-network slice (overlayNetworkDeploymentMode=no-network has no gateway links)")
+	}
 	if len(sliceConfig.Spec.Clusters) < 2 {
 		return field.Invalid(topologyPath.Child("Mode"), string(topology.Mode), "HubAndSpoke topology requires at least 2 clusters")
 	}

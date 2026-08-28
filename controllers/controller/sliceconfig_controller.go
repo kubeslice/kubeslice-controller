@@ -85,6 +85,12 @@ var gatewayConnectionStateChanged = predicate.Funcs{
 }
 
 // SetupWithManager sets up the controller with the Manager.
+//
+// A gateway connection-state change enqueues the owning SliceConfig, which runs
+// the full reconcile (it recomputes the whole desired state, then the
+// TopologyConverged status). The gatewayConnectionStateChanged predicate keeps
+// this to real Connected/NotConnected transitions, so the full-reconcile cost is
+// paid only on genuine convergence changes, not on every status heartbeat.
 func (r *SliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&controllerv1alpha1.SliceConfig{}).

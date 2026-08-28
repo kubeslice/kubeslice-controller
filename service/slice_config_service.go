@@ -261,6 +261,11 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 // and persists it only when the condition changed (so LastTransitionTime and the
 // status subresource are not churned on every reconcile).
 func (s *SliceConfigService) reconcileTopologyStatus(ctx context.Context, sliceConfig *v1alpha1.SliceConfig, namespace string, ownershipLabel map[string]string) error {
+	// The gateway list is read once outside the retry loop below. On a write
+	// conflict the retry reuses this snapshot, which is benign: any gateway
+	// connectivity change also enqueues a fresh SliceConfig reconcile (via the
+	// WorkerSliceGateway watch), so a slightly stale list self-corrects on the
+	// next pass rather than needing a re-list here.
 	gateways, err := s.sgs.ListWorkerSliceGateways(ctx, ownershipLabel, namespace)
 	if err != nil {
 		return err
