@@ -119,6 +119,7 @@ var SliceConfigWebhookValidationTestBed = map[string]func(*testing.T){
 	"TestValidateRotationInterval_NoChange":                                                                                    TestValidateRotationInterval_NoChange,
 	"SliceConfigWebhookValidation_UpdateValidateSliceConfigUpdatingVPNCipher":                                                  UpdateValidateSliceConfigUpdatingVPNCipher,
 	"Test_validateSlicegatewayServiceType":                                                                                     test_validateSlicegatewayServiceType,
+	"SliceConfigWebhookValidation_validateTopology":                                                                            test_validateTopology,
 }
 
 func test_validateSlicegatewayServiceType(t *testing.T) {
@@ -2315,4 +2316,110 @@ func setupSliceConfigWebhookValidationTest(name string, namespace string) (*util
 
 	ctx := util.PrepareKubeSliceControllersRequestContext(context.Background(), clientMock, nil, "SliceConfigWebhookValidationServiceTest", nil)
 	return clientMock, sliceConfig, ctx
+}
+
+func test_validateTopology(t *testing.T) {
+	clusters := []string{"cluster-1", "cluster-2", "cluster-3"}
+	testCases := []struct {
+		name        string
+		clusters    []string
+		topology    *controllerv1alpha1.TopologySpec
+		overlayMode controllerv1alpha1.NetworkType
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:     "absent topology is valid (full mesh default)",
+			clusters: clusters,
+			topology: nil,
+			wantErr:  false,
+		},
+		{
+			name:     "explicit FullMesh without hubs is valid",
+			clusters: clusters,
+			topology: &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeFullMesh},
+			wantErr:  false,
+		},
+		{
+			name:     "valid HubAndSpoke with one hub",
+			clusters: clusters,
+			topology: &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1"}},
+			wantErr:  false,
+		},
+		{
+			name:        "HubAndSpoke without hubs is rejected",
+			clusters:    clusters,
+			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke},
+			wantErr:     true,
+			errContains: "requires at least one hub",
+		},
+		{
+			name:        "hub not a member of clusters is rejected",
+			clusters:    clusters,
+			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"other-cluster"}},
+			wantErr:     true,
+			errContains: "is not a member of spec.clusters",
+		},
+		{
+			name:        "single-cluster HubAndSpoke is rejected (needs at least 2 clusters)",
+			clusters:    []string{"cluster-1"},
+			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1"}},
+			wantErr:     true,
+			errContains: "requires at least 2 clusters",
+		},
+		{
+			name:        "FullMesh with hubs is rejected",
+			clusters:    clusters,
+			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeFullMesh, Hubs: []string{"cluster-1"}},
+			wantErr:     true,
+			errContains: "hubs must be empty when mode is FullMesh",
+		},
+		{
+			name:        "more than one hub is rejected (single-hub MVP)",
+			clusters:    clusters,
+			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1", "cluster-2"}},
+			wantErr:     true,
+			errContains: "only one hub is supported in this release",
+		},
+		{
+			name:        "unknown mode is rejected",
+			clusters:    clusters,
+			topology:    &controllerv1alpha1.TopologySpec{Mode: "Ring"},
+			wantErr:     true,
+			errContains: "unknown topology mode",
+		},
+		{
+			name:        "hubs without mode is rejected",
+			clusters:    clusters,
+			topology:    &controllerv1alpha1.TopologySpec{Hubs: []string{"cluster-1"}},
+			wantErr:     true,
+			errContains: "mode must be set to HubAndSpoke when hubs is specified",
+		},
+		{
+			name:        "HubAndSpoke on a no-network slice is rejected",
+			clusters:    clusters,
+			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1"}},
+			overlayMode: controllerv1alpha1.NONET,
+			wantErr:     true,
+			errContains: "not supported for a no-network slice",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sliceConfig := &controllerv1alpha1.SliceConfig{
+				Spec: controllerv1alpha1.SliceConfigSpec{
+					Clusters:                     tc.clusters,
+					Topology:                     tc.topology,
+					OverlayNetworkDeploymentMode: tc.overlayMode,
+				},
+			}
+			err := validateTopology(sliceConfig)
+			if tc.wantErr {
+				require.NotNil(t, err)
+				require.Contains(t, err.Error(), tc.errContains)
+			} else {
+				require.Nil(t, err)
+			}
+		})
+	}
 }

@@ -227,6 +227,28 @@ spec:
                 type: string
               standardQosProfileName:
                 type: string
+              topology:
+                description: |-
+                  Topology configures the inter-cluster connection topology for the slice.
+                  When absent, the slice uses full-mesh connectivity (existing behavior).
+                properties:
+                  hubs:
+                    description: |-
+                      Hubs lists the clusters acting as hubs when Mode is HubAndSpoke.
+                      Each entry must be a member of spec.clusters. All non-hub members
+                      become spokes. Exactly one hub is supported in this release.
+                    items:
+                      type: string
+                    maxItems: 1
+                    type: array
+                  mode:
+                    description: Mode selects the connection topology. Absent defaults
+                      to FullMesh.
+                    enum:
+                    - FullMesh
+                    - HubAndSpoke
+                    type: string
+                type: object
               vpnConfig:
                 description: VPNConfiguration defines the additional (optional) VPN
                   Configuration to customise

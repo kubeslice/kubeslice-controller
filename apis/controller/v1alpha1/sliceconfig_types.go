@@ -74,6 +74,31 @@ type SliceConfigSpec struct {
 	// RenewBefore is used for renew now!
 	RenewBefore *metav1.Time      `json:"renewBefore,omitempty"`
 	VPNConfig   *VPNConfiguration `json:"vpnConfig,omitempty"`
+	// Topology configures the inter-cluster connection topology for the slice.
+	// When absent, the slice uses full-mesh connectivity (existing behavior).
+	//+optional
+	Topology *TopologySpec `json:"topology,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=FullMesh;HubAndSpoke
+type TopologyMode string
+
+const (
+	TopologyModeFullMesh    TopologyMode = "FullMesh"
+	TopologyModeHubAndSpoke TopologyMode = "HubAndSpoke"
+)
+
+// TopologySpec defines the inter-cluster connection topology of the slice
+type TopologySpec struct {
+	// Mode selects the connection topology. Absent defaults to FullMesh.
+	//+optional
+	Mode TopologyMode `json:"mode,omitempty"`
+	// Hubs lists the clusters acting as hubs when Mode is HubAndSpoke.
+	// Each entry must be a member of spec.clusters. All non-hub members
+	// become spokes. Exactly one hub is supported in this release.
+	//+optional
+	//+kubebuilder:validation:MaxItems=1
+	Hubs []string `json:"hubs,omitempty"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/
