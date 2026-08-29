@@ -146,7 +146,6 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 	clientMock.On("Status").Return(&fakeStatusWriter{})
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -158,7 +157,7 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 }
 
 func SliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
-	_, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
@@ -178,15 +177,19 @@ func SliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
 
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfigForNoNetworkSlice", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything).Return(nil).Once()
+	// A no-network slice reconciles its TopologyConverged status (zero gateways ->
+	// True/NoGatewaysRequired), which lists gateways and writes the slice status.
+	workerSliceGatewayMock.On("ListWorkerSliceGateways", ctx, mock.Anything, requestObj.Namespace).Return([]workerv1alpha1.WorkerSliceGateway{}, nil).Once()
+	clientMock.On("Status").Return(&fakeStatusWriter{})
 
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerSliceConfigMock.AssertExpectations(t)
+	workerSliceGatewayMock.AssertExpectations(t)
 	mMock.AssertExpectations(t)
 }
 
@@ -209,7 +212,6 @@ func SliceConfigGetObjectErrorNotFound(t *testing.T) {
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(notFoundError).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err2)
 	require.False(t, result.Requeue)
@@ -237,7 +239,6 @@ func SliceConfigDeleteTheObjectHappyCase(t *testing.T) {
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -266,7 +267,6 @@ func SliceConfigObjectNamespaceNotFound(t *testing.T) {
 	}).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -291,7 +291,6 @@ func SliceConfigObjectNotInProjectNamespace(t *testing.T) {
 	}).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -311,7 +310,6 @@ func SliceConfigObjectWithDuplicateClustersInSpec(t *testing.T) {
 	}).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -566,7 +564,6 @@ func SliceConfigDeleteHappyCase(t *testing.T) {
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := sliceConfigService.DeleteSliceConfigs(ctx, requestObj.Namespace)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
