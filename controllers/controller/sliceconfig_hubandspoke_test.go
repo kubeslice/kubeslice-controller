@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -268,6 +269,164 @@ var _ = Describe("SliceConfig HubAndSpoke topology (partial mesh)", Ordered, fun
 			latest.Spec.Clusters = []string{}
 			_ = k8sClient.Update(ctx, latest)
 			_ = k8sClient.Delete(ctx, latest)
+		}
+	})
+
+	It("clears the flag on a gateway that becomes the hub side after a hub change", func() {
+		// Directly exercises the both-sides RouteEntireSliceSubnet reconcile across a
+		// hub change (the higher-risk transition the code comment calls out). With
+		// hub=worker-1, the gateway <slice>-worker-2-worker-1 is the spoke's client
+		// (flag true). Changing the hub to worker-2 makes that same gateway the new
+		// hub's server side, so its flag MUST be cleared to false - otherwise the hub
+		// would route the entire slice and misdirect traffic. Symmetrically,
+		// <slice>-worker-1-worker-2 flips from hub server (false) to spoke client (true).
+		const hcName = "hubchange-slice"
+		key := types.NamespacedName{Name: hcName, Namespace: nsName}
+		becomesServer := hcName + "-worker-2-worker-1" // client(true) now -> server(false) after change
+		becomesClient := hcName + "-worker-1-worker-2" // server(false) now -> client(true) after change
+
+		slice := &v1alpha1.SliceConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: hcName, Namespace: nsName},
+			Spec: v1alpha1.SliceConfigSpec{
+				Clusters:    []string{"worker-1", "worker-2", "worker-3"},
+				MaxClusters: 4,
+				SliceSubnet: "10.12.0.0/16",
+				SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayType: "OpenVPN",
+					SliceCaType:      "Local",
+				},
+				SliceIpamType: "Local",
+				SliceType:     "Application",
+				Topology:      &v1alpha1.TopologySpec{Mode: v1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"worker-1"}},
+				QosProfileDetails: &v1alpha1.QOSProfile{
+					BandwidthCeilingKbps: 5120,
+					DscpClass:            "AF11",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+
+		// initial state (hub=worker-1)
+		Eventually(func() bool { return gatewayExists(becomesServer) && gatewayExists(becomesClient) }, timeout, interval).Should(BeTrue())
+		Eventually(func() bool { return getGateway(becomesServer).Spec.RouteEntireSliceSubnet }, timeout, interval).Should(BeTrue())
+		Expect(getGateway(becomesClient).Spec.RouteEntireSliceSubnet).To(BeFalse())
+
+		// change the hub to worker-2
+		latest := &v1alpha1.SliceConfig{}
+		Expect(k8sClient.Get(ctx, key, latest)).Should(Succeed())
+		latest.Spec.Topology = &v1alpha1.TopologySpec{Mode: v1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"worker-2"}}
+		Expect(k8sClient.Update(ctx, latest)).Should(Succeed())
+
+		// the former client (now the hub server side) must be cleared to false
+		Eventually(func() bool { return getGateway(becomesServer).Spec.RouteEntireSliceSubnet }, timeout, interval).Should(BeFalse())
+		// and the former server (now the spoke client side) must be set to true
+		Eventually(func() bool { return getGateway(becomesClient).Spec.RouteEntireSliceSubnet }, timeout, interval).Should(BeTrue())
+
+		// cleanup (best-effort)
+		if k8sClient.Get(ctx, key, latest) == nil {
+			latest.Spec.Clusters = []string{}
+			_ = k8sClient.Update(ctx, latest)
+			_ = k8sClient.Delete(ctx, latest)
+		}
+	})
+
+	It("re-creates a missing client gateway of a partial pair (self-heal)", func() {
+		// Simulates an interrupted pair creation: the server gateway exists but the
+		// client is gone. The reconcile must create the missing client instead of
+		// getting stuck on an AlreadyExists error when it re-touches the server.
+		const psName = "partial-slice"
+		key := types.NamespacedName{Name: psName, Namespace: nsName}
+		serverGw := psName + "-worker-1-worker-2" // hub server side
+		clientGw := psName + "-worker-2-worker-1" // spoke client side
+
+		slice := &v1alpha1.SliceConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: psName, Namespace: nsName},
+			Spec: v1alpha1.SliceConfigSpec{
+				Clusters:    []string{"worker-1", "worker-2", "worker-3"},
+				MaxClusters: 4,
+				SliceSubnet: "10.14.0.0/16",
+				SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayType: "OpenVPN",
+					SliceCaType:      "Local",
+				},
+				SliceIpamType: "Local",
+				SliceType:     "Application",
+				Topology:      &v1alpha1.TopologySpec{Mode: v1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"worker-1"}},
+				QosProfileDetails: &v1alpha1.QOSProfile{
+					BandwidthCeilingKbps: 5120,
+					DscpClass:            "AF11",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+		Eventually(func() bool { return gatewayExists(serverGw) && gatewayExists(clientGw) }, timeout, interval).Should(BeTrue())
+
+		// delete only the client -> partial pair (server present, client missing)
+		cgw := getGateway(clientGw)
+		Expect(k8sClient.Delete(ctx, &cgw)).Should(Succeed())
+
+		// nudge a reconcile and assert the client is re-created (the server, which
+		// still exists, must not block this with AlreadyExists)
+		latest := &v1alpha1.SliceConfig{}
+		Expect(k8sClient.Get(ctx, key, latest)).Should(Succeed())
+		if latest.Labels == nil {
+			latest.Labels = map[string]string{}
+		}
+		latest.Labels["reconcile-nudge"] = "1"
+		Expect(k8sClient.Update(ctx, latest)).Should(Succeed())
+
+		Eventually(func() bool { return gatewayExists(clientGw) }, timeout, interval).Should(BeTrue())
+		Expect(gatewayExists(serverGw)).To(BeTrue())
+
+		// cleanup (best-effort)
+		if k8sClient.Get(ctx, key, latest) == nil {
+			latest.Spec.Clusters = []string{}
+			_ = k8sClient.Update(ctx, latest)
+			_ = k8sClient.Delete(ctx, latest)
+		}
+	})
+
+	It("marks a no-network slice TopologyConverged=True with NoGatewaysRequired", func() {
+		// A no-network (NONET) slice has no gateway links, so it must still report a
+		// TopologyConverged condition (True / NoGatewaysRequired). This guards the
+		// early-return path that previously skipped the status write entirely.
+		const nnName = "nonet-slice"
+		slice := &v1alpha1.SliceConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: nnName, Namespace: nsName},
+			Spec: v1alpha1.SliceConfigSpec{
+				Clusters:                     []string{"worker-1", "worker-2"},
+				MaxClusters:                  4,
+				SliceSubnet:                  "10.13.0.0/16",
+				OverlayNetworkDeploymentMode: v1alpha1.NONET,
+				SliceGatewayProvider: &v1alpha1.WorkerSliceGatewayProvider{
+					SliceGatewayType: "OpenVPN",
+					SliceCaType:      "Local",
+				},
+				SliceIpamType: "Local",
+				SliceType:     "Application",
+				QosProfileDetails: &v1alpha1.QOSProfile{
+					BandwidthCeilingKbps: 5120,
+					DscpClass:            "AF11",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, slice)).Should(Succeed())
+
+		Eventually(func() bool {
+			s := v1alpha1.SliceConfig{}
+			if k8sClient.Get(ctx, types.NamespacedName{Name: nnName, Namespace: nsName}, &s) != nil {
+				return false
+			}
+			cond := apimeta.FindStatusCondition(s.Status.Conditions, v1alpha1.SliceConditionTypeTopologyConverged)
+			return cond != nil && cond.Status == metav1.ConditionTrue && cond.Reason == v1alpha1.SliceReasonNoGatewaysRequired
+		}, timeout, interval).Should(BeTrue())
+
+		// cleanup (best-effort)
+		nn := v1alpha1.SliceConfig{}
+		if k8sClient.Get(ctx, types.NamespacedName{Name: nnName, Namespace: nsName}, &nn) == nil {
+			nn.Spec.Clusters = []string{}
+			_ = k8sClient.Update(ctx, &nn)
+			_ = k8sClient.Delete(ctx, &nn)
 		}
 	})
 })

@@ -77,7 +77,7 @@ cd worker-operator && go test ./pkg/hub/controllers/ -run 'TestNewMeshGatewayCon
 cd worker-operator && go test ./pkg/hub/controllers/ -run 'TestDeriveGatewayConnectionState|TestReconcileGatewayConnectionStatus|TestReasonMessageForState'
 
 # gateway-sidecar route split + MSS clamp
-cd gateway-sidecar && go test ./pkg/sidecar/sidecarpb/ -run 'TestMoreSpecificHalves|TestTunnelMSSClampCommands'
+cd gateway-sidecar && go test ./pkg/sidecar/sidecarpb/ -run 'TestMoreSpecificHalves|TestTunnelMSSClampCommands|TestStaleTunnelRouteKeys'
 ```
 
 > **Known gate — the controller `service` package.** On `master` today the
@@ -138,7 +138,7 @@ File: `service/slice_config_webhook_validation_test.go` → `test_validateTopolo
 Wired into **both** `ValidateSliceConfigCreate` and `ValidateSliceConfigUpdate`,
 so a topology change on a live slice is validated too.
 
-10 table-driven cases — 3 accepted, 7 rejected (with the exact error text
+11 table-driven cases — 3 accepted, 8 rejected (with the exact error text
 asserted):
 
 | # | Case | Result | Error contains |
@@ -153,6 +153,7 @@ asserted):
 | 8 | more than one hub (single-hub MVP) | reject | `only one hub is supported in this release` |
 | 9 | unknown mode | reject | `unknown topology mode` |
 | 10 | hubs without mode | reject | `mode must be set to HubAndSpoke when hubs is specified` |
+| 11 | HubAndSpoke on a no-network slice | reject | `not supported for a no-network slice` |
 
 Note: the single-hub restriction (case 8) is ordered **before** the duplicate
 check, so `[worker-1, worker-1]` reports "only one hub is supported" (the more
@@ -205,7 +206,7 @@ single `TopologyConverged` condition on the SliceConfig. 5 cases:
 ## 4. Controller reconciler tests (envtest)
 
 File: `controllers/controller/sliceconfig_hubandspoke_test.go` (Ginkgo, real API
-server via envtest). 3 specs:
+server via envtest). 6 specs:
 
 - **`builds only hub<->spoke gateways and skips spoke<->spoke`** — applying a
   HubAndSpoke SliceConfig creates the 4 WorkerSliceGateway objects (2 pairs) and
@@ -216,6 +217,17 @@ server via envtest). 3 specs:
 - **`reconciles RouteEntireSliceSubnet when the topology changes on an existing
   slice`** — switching an existing slice's topology updates the flag on the
   surviving gateways (the control-plane half of the E8/E9 dataplane scenarios).
+- **`clears the flag on a gateway that becomes the hub side after a hub change`** —
+  a hub change turns a former spoke client (flag `true`) into the new hub's server;
+  the flag must be cleared to `false` so the hub doesn't route the whole slice, and
+  set on the gateway that becomes the new spoke client (direct test of the
+  both-sides reconcile).
+- **`marks a no-network slice TopologyConverged=True with NoGatewaysRequired`** — a
+  NONET slice still gets a `TopologyConverged` condition (guards the early-return
+  path that previously skipped the status write).
+- **`re-creates a missing client gateway of a partial pair (self-heal)`** — with the
+  server gateway present but the client deleted, the reconcile re-creates the client
+  instead of getting stuck on an AlreadyExists error re-touching the server.
 
 ---
 
@@ -245,11 +257,20 @@ dataplane reads:
 
 File: `pkg/sidecar/sidecarpb/route_split_test.go`.
 
-**`TestMoreSpecificHalves`** — the route split, 3 cases:
+**`TestMoreSpecificHalves`** — the route split, 5 cases:
 
 - `10.11.0.0/16` → `10.11.0.0/17` + `10.11.128.0/17`
 - `10.11.0.0/20` → `10.11.0.0/21` + `10.11.8.0/21`
 - `10.11.32.3/32` → unchanged (a host route is not split)
+- `10.11.0.0/31` → `10.11.0.0/32` + `10.11.0.1/32` (smallest splittable v4)
+- `fd00::/48` → `fd00::/49` + `fd00:0:0:8000::/49` (IPv6 splits too)
+
+**`TestStaleTunnelRouteKeys`** — the teardown diff. On a topology/subnet change the
+sidecar withdraws the tunnel routes it previously installed that are no longer
+desired (e.g. the entire-slice `/17`s when a slice flips HubAndSpoke→FullMesh),
+so a stale relay route isn't left behind. Verifies the previous-vs-desired set
+difference: full flip (both old routes stale), no-change (nothing stale), and
+partial overlap (only the non-desired key stale).
 
 **Why split at all:** NSM continuously re-asserts a route for the whole slice
 subnet via `nsm0` using the *same* prefix the tunnel wants. A `RouteReplace` on
@@ -273,10 +294,10 @@ worker derives each gateway's tunnel state from its pod statuses and reports it
 onto the hub's `WorkerSliceGateway` status — the write side of the fields
 checked live in [Section 5 E12](#5-dataplane-end-to-end-runbook-openvpn).
 
-- **`TestDeriveGatewayConnectionState`** — 6 cases: no pod status → `Pending`;
+- **`TestDeriveGatewayConnectionState`** — 7 cases: no pod status → `Pending`;
   all pods up → `Connected`; at least one up → `Connected` (HA pair); all down →
   `NotConnected`; unknown/empty pod states are not counted as up; nil pod entries
-  are ignored.
+  are ignored; all-nil pod entries (nothing reported) → `Pending`.
 - **`TestReconcileGatewayConnectionStatus`** — 2 subtests: writes `Connected`
   when a tunnel is up; **no write when the state is unchanged** (idempotent —
   avoids status churn).
