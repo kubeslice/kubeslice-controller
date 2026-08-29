@@ -480,7 +480,7 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 		}
 		logger.Debugf("setting gwConType in create_minwsg %s", sliceGwSvcType)
 		logger.Debugf("setting gwProto in create_minwsg %s", gwSvcProtocol)
-		err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses)
+		err := s.createMinimumGateWayPairIfNotExists(ctx, sourceCluster, destinationCluster, sliceName, namespace, sliceGwSvcType, gwSvcProtocol, ownerLabel, gatewayNumber, gatewayAddresses, edge.HubSpoke)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -488,27 +488,55 @@ func (s *WorkerSliceGatewayService) createMinimumGatewaysIfNotExists(ctx context
 	return ctrl.Result{}, nil
 }
 
+// reconcileRouteEntireSliceSubnet sets a gateway's RouteEntireSliceSubnet flag to
+// the desired value only when it differs, keeping the write idempotent across
+// reconciles. It is used to keep the flag correct on an existing gateway pair
+// after a topology change (see createMinimumGateWayPairIfNotExists).
+func (s *WorkerSliceGatewayService) reconcileRouteEntireSliceSubnet(ctx context.Context, gateway *v1alpha1.WorkerSliceGateway, desired bool) error {
+	if gateway.Spec.RouteEntireSliceSubnet == desired {
+		return nil
+	}
+	gateway.Spec.RouteEntireSliceSubnet = desired
+	return util.UpdateResource(ctx, gateway)
+}
+
 // createMinimumGateWayPairIfNotExists is a function to create the pair of gatways between 2 clusters if not exists
 func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx context.Context,
 	sourceCluster *controllerv1alpha1.Cluster, destinationCluster *controllerv1alpha1.Cluster,
 	sliceName, namespace, gatewayConnType, gatewayProtocol string, label map[string]string, gatewayNumber int,
-	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses) error {
+	gatewayAddresses util.WorkerSliceGatewayNetworkAddresses, routeEntireSliceSubnet bool) error {
 	serverGatewayName := fmt.Sprintf(gatewayName, sliceName, sourceCluster.Name, destinationCluster.Name)
 	clientGatewayName := fmt.Sprintf(gatewayName, sliceName, destinationCluster.Name, sourceCluster.Name)
-	gateway := v1alpha1.WorkerSliceGateway{}
-	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serverGatewayName, Namespace: namespace}, &gateway)
+	serverGw := v1alpha1.WorkerSliceGateway{}
+	found, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: serverGatewayName, Namespace: namespace}, &serverGw)
 	if err != nil {
 		return err
 	}
 	if found {
+		clientGw := v1alpha1.WorkerSliceGateway{}
 		found, err = util.GetResourceIfExist(ctx, client.ObjectKey{
 			Name:      clientGatewayName,
 			Namespace: namespace,
-		}, &gateway)
+		}, &clientGw)
 		if err != nil {
 			return err
 		}
 		if found {
+			// The gateway pair already exists. On a topology change the surviving
+			// edge is not recreated, so RouteEntireSliceSubnet can go stale and
+			// must be reconciled on both sides:
+			//   - the client (spoke) side must be SET to routeEntireSliceSubnet, e.g.
+			//     a FullMesh->HubAndSpoke switch would otherwise leave it false and
+			//     silently break spoke-to-spoke; and
+			//   - the server (hub) side must be CLEARED to false: a hub change can
+			//     turn a former client gateway (flag true) into a server, and a
+			//     server/hub that routes the whole slice would misroute all traffic.
+			if err = s.reconcileRouteEntireSliceSubnet(ctx, &clientGw, routeEntireSliceSubnet); err != nil {
+				return err
+			}
+			if err = s.reconcileRouteEntireSliceSubnet(ctx, &serverGw, false); err != nil {
+				return err
+			}
 			return nil
 		}
 	}
@@ -561,6 +589,10 @@ func (s *WorkerSliceGatewayService) createMinimumGateWayPairIfNotExists(ctx cont
 		clientGateway, gatewayConnType, gatewayProtocol, label, gatewayNumber,
 		gatewayAddresses.ClientSubnet, gatewayAddresses.ClientVpnAddress,
 		serverGatewayName, gatewayAddresses.ServerSubnet, gatewayAddresses.ServerVpnAddress, clientGatewayName)
+	// For a hub-and-spoke edge the client side is the spoke; tell the worker to
+	// route the entire slice subnet via this gateway so spoke-to-spoke traffic is
+	// relayed through the hub.
+	clientGatewayObject.Spec.RouteEntireSliceSubnet = routeEntireSliceSubnet
 	err = util.CreateResource(ctx, clientGatewayObject)
 	// Ignore AlreadyExists for the same idempotency/self-heal reason as the server.
 	if err != nil && !k8sErrors.IsAlreadyExists(err) {

@@ -356,6 +356,13 @@ func testCreateMinimumWorkerSliceGatewaysHubAndSpokeSkipsSpokeToSpoke(t *testing
 	// all found -> nothing created. A spoke<->spoke pair would exceed 4 checks.
 	gateway := &workerv1alpha1.WorkerSliceGateway{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), gateway).Return(nil).Times(4)
+	// each existing hub<->spoke client gateway has its RouteEntireSliceSubnet
+	// reconciled to true (the mock returns the default false), one Update per
+	// hub<->spoke edge; the server side is already false so it is a no-op.
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.WorkerSliceGateway")).Return(nil).Run(func(args mock.Arguments) {
+		gw := args.Get(1).(*workerv1alpha1.WorkerSliceGateway)
+		require.True(t, gw.Spec.RouteEntireSliceSubnet)
+	}).Twice()
 
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil, topology)
 	require.Equal(t, ctrl.Result{}, result)
@@ -419,6 +426,12 @@ func testCreateMinimumWorkerSliceGatewaysHubAndSpokeCleansUpSpokeToSpoke(t *test
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), cluster).Return(nil).Times(3)
 	gateway := &workerv1alpha1.WorkerSliceGateway{}
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), gateway).Return(nil).Times(4)
+	// surviving hub<->spoke client gateways get RouteEntireSliceSubnet reconciled
+	// to true (mock returns default false); server side already false = no-op.
+	clientMock.On("Update", ctx, mock.AnythingOfType("*v1alpha1.WorkerSliceGateway")).Return(nil).Run(func(args mock.Arguments) {
+		gw := args.Get(1).(*workerv1alpha1.WorkerSliceGateway)
+		require.True(t, gw.Spec.RouteEntireSliceSubnet)
+	}).Twice()
 
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil, topology)
 	require.Equal(t, ctrl.Result{}, result)

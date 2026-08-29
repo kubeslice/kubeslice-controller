@@ -27,6 +27,10 @@ import (
 type TopologyEdge struct {
 	ServerCluster string
 	ClientCluster string
+	// HubSpoke is true for a hub<->spoke edge in HubAndSpoke topology (the client
+	// side is a spoke connecting to its hub). It drives spoke-to-spoke routing:
+	// the spoke's gateway is told to route the entire slice subnet via the hub.
+	HubSpoke bool
 }
 
 // ResolveTopologyEdges computes the desired set of gateway connections for a
@@ -57,7 +61,7 @@ func ResolveTopologyEdges(clusters []string, topology *controllerv1alpha1.Topolo
 	}
 	for _, hub := range topology.Hubs {
 		for _, spoke := range spokes {
-			edges = append(edges, TopologyEdge{ServerCluster: hub, ClientCluster: spoke})
+			edges = append(edges, TopologyEdge{ServerCluster: hub, ClientCluster: spoke, HubSpoke: true})
 		}
 	}
 	for i := 0; i < len(topology.Hubs); i++ {

@@ -55,8 +55,8 @@ func TestResolveTopologyEdges(t *testing.T) {
 			clusters: []string{"worker-1", "worker-2", "worker-3"},
 			topology: &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"worker-1"}},
 			want: []TopologyEdge{
-				{ServerCluster: "worker-1", ClientCluster: "worker-2"},
-				{ServerCluster: "worker-1", ClientCluster: "worker-3"},
+				{ServerCluster: "worker-1", ClientCluster: "worker-2", HubSpoke: true},
+				{ServerCluster: "worker-1", ClientCluster: "worker-3", HubSpoke: true},
 			},
 		},
 		{
@@ -64,8 +64,8 @@ func TestResolveTopologyEdges(t *testing.T) {
 			clusters: []string{"worker-1", "worker-2", "worker-3"},
 			topology: &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"worker-2"}},
 			want: []TopologyEdge{
-				{ServerCluster: "worker-2", ClientCluster: "worker-1"},
-				{ServerCluster: "worker-2", ClientCluster: "worker-3"},
+				{ServerCluster: "worker-2", ClientCluster: "worker-1", HubSpoke: true},
+				{ServerCluster: "worker-2", ClientCluster: "worker-3", HubSpoke: true},
 			},
 		},
 	}

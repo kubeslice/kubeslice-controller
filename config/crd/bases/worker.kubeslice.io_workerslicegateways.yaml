@@ -123,6 +123,14 @@ spec:
                   vpnIp:
                     type: string
                 type: object
+              routeEntireSliceSubnet:
+                description: |-
+                  RouteEntireSliceSubnet, when true, tells the worker to route the whole
+                  slice subnet (not just the peer gateway's subnet) via this gateway. The
+                  controller sets it on a spoke's gateway to the hub in HubAndSpoke topology,
+                  so a spoke forwards all slice-internal traffic (including traffic destined
+                  for other spokes) to the hub, which relays it.
+                type: boolean
               sliceName:
                 type: string
             type: object
