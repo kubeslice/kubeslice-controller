@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -87,18 +86,96 @@ func TestCredentialMirrorSet_ShapeAndDefenses(t *testing.T) {
 		"credential set is Secret/ServiceAccount/Role/RoleBinding only — access_control_service never creates ClusterRole/ClusterRoleBinding, despite the ADR's broader wording")
 }
 
-func TestSkipServiceAccountTokenSecret(t *testing.T) {
+func TestIsServiceAccountTokenSecret(t *testing.T) {
 	saToken := newTestUnstructured(secretGVK, "proj", "sa-token")
 	require.NoError(t, unstructured.SetNestedField(saToken.Object, string(corev1.SecretTypeServiceAccountToken), "type"))
-	assert.True(t, skipServiceAccountTokenSecret(saToken),
-		"SA tokens are signed by the issuing cluster's key and are invalid on the Standby")
+	assert.True(t, isServiceAccountTokenSecret(saToken))
 
 	opaque := newTestUnstructured(secretGVK, "proj", "gateway-cert")
 	require.NoError(t, unstructured.SetNestedField(opaque.Object, string(corev1.SecretTypeOpaque), "type"))
-	assert.False(t, skipServiceAccountTokenSecret(opaque))
+	assert.False(t, isServiceAccountTokenSecret(opaque))
 
 	untyped := newTestUnstructured(secretGVK, "proj", "no-type-field")
-	assert.False(t, skipServiceAccountTokenSecret(untyped))
+	assert.False(t, isServiceAccountTokenSecret(untyped))
+}
+
+// TestSanitizeSecret_ReducesTokenSecretToItsShell pins the payload-side half of
+// the SA-token contract: the account name survives (it is what tells the
+// Standby's token controller which account to mint for), the token bytes and
+// the account UID do not.
+func TestSanitizeSecret_ReducesTokenSecretToItsShell(t *testing.T) {
+	saToken := newTestUnstructured(secretGVK, "proj", "kubeslice-rbac-worker-w1")
+	require.NoError(t, unstructured.SetNestedField(saToken.Object, string(corev1.SecretTypeServiceAccountToken), "type"))
+	require.NoError(t, unstructured.SetNestedField(saToken.Object, "YWN0aXZlLXNpZ25lZC10b2tlbg==", "data", corev1.ServiceAccountTokenKey))
+	saToken.SetAnnotations(map[string]string{
+		corev1.ServiceAccountNameKey: "kubeslice-rbac-worker-w1",
+		corev1.ServiceAccountUIDKey:  "11111111-2222-3333-4444-555555555555",
+	})
+
+	sanitizeSecret(saToken)
+
+	_, found, err := unstructured.NestedFieldNoCopy(saToken.Object, "data")
+	require.NoError(t, err)
+	assert.False(t, found,
+		"an Active-signed token is invalid on the Standby; shipping it would mask the absence of a real credential")
+	assert.NotContains(t, saToken.GetAnnotations(), corev1.ServiceAccountUIDKey,
+		"a copied UID annotation never matches the mirrored ServiceAccount's fresh UID, and the Standby's token controller deletes the Secret on mismatch")
+	assert.Equal(t, "kubeslice-rbac-worker-w1", saToken.GetAnnotations()[corev1.ServiceAccountNameKey],
+		"the account name is the only link between the shell and the mirrored ServiceAccount — it must survive")
+
+	// Other Secret types are none of this function's business.
+	opaque := newTestUnstructured(secretGVK, "proj", "gateway-cert")
+	require.NoError(t, unstructured.SetNestedField(opaque.Object, string(corev1.SecretTypeOpaque), "type"))
+	require.NoError(t, unstructured.SetNestedField(opaque.Object, "Y2VydC1kYXRh", "data", "ovpn.crt"))
+	sanitizeSecret(opaque)
+	data, found, err := unstructured.NestedString(opaque.Object, "data", "ovpn.crt")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "Y2VydC1kYXRh", data)
+}
+
+// TestSanitizeCachedSecret_StripsTokenBytesOnTheWayIntoTheCache covers the
+// defence-in-depth layer: with the SA-token field selector gone, Active-minted
+// tokens would otherwise be held in this process's memory. Both the typed and
+// the unstructured path matter — the syncer reads through the latter.
+func TestSanitizeCachedSecret_StripsTokenBytesOnTheWayIntoTheCache(t *testing.T) {
+	typed := &corev1.Secret{
+		Type: corev1.SecretTypeServiceAccountToken,
+		Data: map[string][]byte{corev1.ServiceAccountTokenKey: []byte("active-signed-token")},
+	}
+	out, err := sanitizeCachedSecret(typed)
+	require.NoError(t, err)
+	assert.Nil(t, out.(*corev1.Secret).Data)
+	assert.NotNil(t, typed.Data, "the informer's own object must never be mutated in place")
+
+	// The UID annotation deliberately survives into the cache: prune diffs
+	// against this view, and sanitizeSecret drops it from the payload instead.
+	typedWithAnnotations := &corev1.Secret{Type: corev1.SecretTypeServiceAccountToken}
+	typedWithAnnotations.SetAnnotations(map[string]string{corev1.ServiceAccountUIDKey: "abc"})
+	typedWithAnnotations.Data = map[string][]byte{corev1.ServiceAccountTokenKey: []byte("t")}
+	out, err = sanitizeCachedSecret(typedWithAnnotations)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", out.(*corev1.Secret).GetAnnotations()[corev1.ServiceAccountUIDKey])
+
+	unstructuredToken := newTestUnstructured(secretGVK, "proj", "sa-token")
+	require.NoError(t, unstructured.SetNestedField(unstructuredToken.Object, string(corev1.SecretTypeServiceAccountToken), "type"))
+	require.NoError(t, unstructured.SetNestedField(unstructuredToken.Object, "dG9rZW4=", "data", corev1.ServiceAccountTokenKey))
+	out, err = sanitizeCachedSecret(unstructuredToken)
+	require.NoError(t, err)
+	_, found, err := unstructured.NestedFieldNoCopy(out.(*unstructured.Unstructured).Object, "data")
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	// Certificate Secrets and non-Secrets pass through untouched.
+	opaque := &corev1.Secret{Type: corev1.SecretTypeOpaque, Data: map[string][]byte{"ovpn.crt": []byte("cert")}}
+	out, err = sanitizeCachedSecret(opaque)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("cert"), out.(*corev1.Secret).Data["ovpn.crt"])
+
+	sa := newTestUnstructured(saGVK, "proj", "kubeslice-rbac-worker-w1")
+	out, err = sanitizeCachedSecret(sa)
+	require.NoError(t, err)
+	assert.Same(t, sa, out)
 }
 
 func TestFullMirrorSet_CombinesBothSetsWithoutCollisions(t *testing.T) {
@@ -139,12 +216,96 @@ func TestReconcileKey_MirrorsOpaqueSecretWithData(t *testing.T) {
 	assert.Equal(t, "Y2VydC1kYXRh", data, "the mirrored Secret must carry the source's data through unchanged")
 }
 
-func TestReconcileKey_SkipsServiceAccountTokenSecret(t *testing.T) {
+// newActiveTokenSecret builds an SA-token Secret as it looks on the Active
+// once that cluster's token controller has populated it.
+func newActiveTokenSecret(t *testing.T, key syncKey) *unstructured.Unstructured {
+	t.Helper()
+	src := newTestUnstructured(secretGVK, key.Namespace, key.Name)
+	require.NoError(t, unstructured.SetNestedField(src.Object, string(corev1.SecretTypeServiceAccountToken), "type"))
+	require.NoError(t, unstructured.SetNestedField(src.Object, "YWN0aXZlLXNpZ25lZC10b2tlbg==", "data", corev1.ServiceAccountTokenKey))
+	src.SetAnnotations(map[string]string{
+		corev1.ServiceAccountNameKey: key.Name,
+		corev1.ServiceAccountUIDKey:  "11111111-2222-3333-4444-555555555555",
+	})
+	return src
+}
+
+// TestReconcileKey_MirrorsServiceAccountTokenSecretAsShell is the controller
+// side of #297's Blocker 4: the Standby has to hold a worker credential valid
+// on *itself* before any failover, and it cannot mint one from a fenced
+// reconciler. Carrying the empty shell across lets its own token controller do
+// it. What must not cross is the Active's token.
+func TestReconcileKey_MirrorsServiceAccountTokenSecretAsShell(t *testing.T) {
 	ctx := context.Background()
 	key := syncKey{GVK: secretGVK, Namespace: "kubeslice-avesha", Name: "kubeslice-rbac-worker-w1"}
 
+	remote := newStubRemote()
+	remote.objects[key] = newActiveTokenSecret(t, key)
+	registerMirroredNamespace(remote, key.Namespace)
+	s := buildCredentialSyncer(t, remote)
+
+	op, _, err := s.reconcileKey(ctx, key)
+	require.NoError(t, err)
+	assert.Equal(t, opCreate, op)
+
+	got := getUnstructured(t, s.localClient, key)
+	assert.Equal(t, LabelValueActive, got.GetLabels()[LabelSyncedFromActive])
+	assert.Equal(t, string(corev1.SecretTypeServiceAccountToken), got.Object["type"])
+	_, found, err := unstructured.NestedFieldNoCopy(got.Object, "data")
+	require.NoError(t, err)
+	assert.False(t, found, "an Active-signed token must never land on the Standby")
+	assert.NotContains(t, got.GetAnnotations(), corev1.ServiceAccountUIDKey)
+	assert.Equal(t, key.Name, got.GetAnnotations()[corev1.ServiceAccountNameKey],
+		"without this annotation the Standby's token controller has nothing to mint against")
+}
+
+// TestReconcileKey_NeverOverwritesAMintedTokenSecret is the regression test for
+// the failure mode that makes the shell approach non-trivial. The engine's
+// update path is an unconditional full write and the remote informer resyncs
+// every DefaultInformerResyncPeriod, so without CreateOnly every resync would
+// clear the token the Standby's token controller minted, that controller would
+// mint a fresh one, and any copy already handed to a worker would stop
+// authenticating — on a timer, silently.
+func TestReconcileKey_NeverOverwritesAMintedTokenSecret(t *testing.T) {
+	ctx := context.Background()
+	key := syncKey{GVK: secretGVK, Namespace: "kubeslice-avesha", Name: "kubeslice-rbac-worker-w1"}
+
+	remote := newStubRemote()
+	remote.objects[key] = newActiveTokenSecret(t, key)
+	registerMirroredNamespace(remote, key.Namespace)
+	s := buildCredentialSyncer(t, remote)
+
+	op, _, err := s.reconcileKey(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, opCreate, op)
+
+	// Stand in for the Standby's token controller populating the shell.
+	minted := getUnstructured(t, s.localClient, key)
+	require.NoError(t, unstructured.SetNestedField(minted.Object, "c3RhbmRieS1taW50ZWQtdG9rZW4=", "data", corev1.ServiceAccountTokenKey))
+	require.NoError(t, s.localClient.Update(ctx, minted))
+
+	// A resync delivers the Active's copy again.
+	op, _, err = s.reconcileKey(ctx, key)
+	require.NoError(t, err)
+	assert.Equal(t, mirrorOp(""), op, "a populated token Secret must not be rewritten")
+
+	got := getUnstructured(t, s.localClient, key)
+	token, found, err := unstructured.NestedString(got.Object, "data", corev1.ServiceAccountTokenKey)
+	require.NoError(t, err)
+	require.True(t, found, "the locally minted token must survive a resync")
+	assert.Equal(t, "c3RhbmRieS1taW50ZWQtdG9rZW4=", token)
+}
+
+// TestReconcileKey_StillUpdatesNonTokenSecretsOnResync pins CreateOnly as a
+// per-object predicate rather than a property of the whole Secret row: gateway
+// certificates must keep converging on the Active's content.
+func TestReconcileKey_StillUpdatesNonTokenSecretsOnResync(t *testing.T) {
+	ctx := context.Background()
+	key := syncKey{GVK: secretGVK, Namespace: "kubeslice-avesha", Name: "gateway-cert"}
+
 	src := newTestUnstructured(secretGVK, key.Namespace, key.Name)
-	require.NoError(t, unstructured.SetNestedField(src.Object, string(corev1.SecretTypeServiceAccountToken), "type"))
+	require.NoError(t, unstructured.SetNestedField(src.Object, string(corev1.SecretTypeOpaque), "type"))
+	require.NoError(t, unstructured.SetNestedField(src.Object, "b2xkLWNlcnQ=", "data", "ovpn.crt"))
 
 	remote := newStubRemote()
 	remote.objects[key] = src
@@ -153,12 +314,54 @@ func TestReconcileKey_SkipsServiceAccountTokenSecret(t *testing.T) {
 
 	op, _, err := s.reconcileKey(ctx, key)
 	require.NoError(t, err)
-	assert.Equal(t, mirrorOp(""), op)
+	require.Equal(t, opCreate, op)
 
-	existing := &unstructured.Unstructured{}
-	existing.SetGroupVersionKind(secretGVK)
-	err = s.localClient.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: key.Name}, existing)
-	assert.Error(t, err, "an SA-token Secret must never be written onto the Standby")
+	rotated := src.DeepCopy()
+	require.NoError(t, unstructured.SetNestedField(rotated.Object, "bmV3LWNlcnQ=", "data", "ovpn.crt"))
+	remote.objects[key] = rotated
+
+	op, _, err = s.reconcileKey(ctx, key)
+	require.NoError(t, err)
+	assert.Equal(t, opUpdate, op)
+
+	got := getUnstructured(t, s.localClient, key)
+	cert, found, err := unstructured.NestedString(got.Object, "data", "ovpn.crt")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "bmV3LWNlcnQ=", cert, "certificate rotation on the Active must still reach the Standby")
+}
+
+// TestPruneOnce_LeavesAMintedTokenSecretAlone closes the loop with the prune
+// backstop, the other path that can write to a mirrored object. A shell that
+// exists on both sides is neither an orphan nor missing, so neither diff
+// direction touches it; and if some other round does re-enqueue it, the
+// create-only guard still refuses to overwrite the minted token. Either way the
+// worker's credential survives.
+func TestPruneOnce_LeavesAMintedTokenSecretAlone(t *testing.T) {
+	ctx := context.Background()
+	key := syncKey{GVK: secretGVK, Namespace: "kubeslice-avesha", Name: "kubeslice-rbac-worker-w1"}
+
+	remote := newStubRemote()
+	remote.objects[key] = newActiveTokenSecret(t, key)
+	registerMirroredNamespace(remote, key.Namespace)
+	s := buildCredentialSyncer(t, remote)
+	op, _, err := s.reconcileKey(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, opCreate, op)
+
+	minted := getUnstructured(t, s.localClient, key)
+	require.NoError(t, unstructured.SetNestedField(minted.Object, "c3RhbmRieS1taW50ZWQtdG9rZW4=", "data", corev1.ServiceAccountTokenKey))
+	require.NoError(t, s.localClient.Update(ctx, minted))
+
+	s.remoteList = stubRemoteList([]syncKey{key}, nil)
+	s.pruneOnce(ctx)
+	assert.Equal(t, 0, s.queue.Len(), "a shell present on both sides is neither orphaned nor missing")
+
+	got := getUnstructured(t, s.localClient, key)
+	token, found, err := unstructured.NestedString(got.Object, "data", corev1.ServiceAccountTokenKey)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "c3RhbmRieS1taW50ZWQtdG9rZW4=", token)
 }
 
 // TestReconcileKey_SkipsCredentialsInUnmirroredNamespaces pins the boundary
@@ -235,9 +438,12 @@ func TestMirrorCacheByObject_ScopesCredentialInformers(t *testing.T) {
 		assert.False(t, cfg.Label.Matches(labels.Set{}), "%T: selector must not match unlabeled objects", obj)
 	}
 
-	// Secret can't be label-scoped (cert Secrets come from the external
-	// cert-generator job, unlabeled) — it must be field-scoped to exclude
-	// SA-token Secrets at the watch itself.
+	// Secret can be scoped neither way: cert Secrets come from the external
+	// cert-generator job unlabeled, and the SA-token shells the Standby needs
+	// rule out the "type" field selector that used to exclude them. It is
+	// cached cluster-wide instead, with the project-namespace boundary held
+	// client-side by RequireMirroredNamespace and the token bytes dropped on
+	// the way in.
 	var secretCfg cache.ByObject
 	ok := false
 	for obj, cfg := range byObject {
@@ -246,8 +452,9 @@ func TestMirrorCacheByObject_ScopesCredentialInformers(t *testing.T) {
 		}
 	}
 	require.True(t, ok, "Secret informer must have a ByObject entry")
-	require.NotNil(t, secretCfg.Field)
-	assert.False(t, secretCfg.Field.Matches(fields.Set{"type": string(corev1.SecretTypeServiceAccountToken)}),
-		"the Secret watch itself must exclude SA-token Secrets")
-	assert.True(t, secretCfg.Field.Matches(fields.Set{"type": string(corev1.SecretTypeOpaque)}))
+	assert.Nil(t, secretCfg.Field,
+		"a type-based field selector cannot admit both SA-token shells and unlabeled certificate Secrets")
+	assert.Nil(t, secretCfg.Label)
+	require.NotNil(t, secretCfg.Transform,
+		"caching every Secret cluster-wide is only acceptable because Active-minted tokens are stripped on ingress")
 }

@@ -63,14 +63,19 @@ rules:
   # named rather than buried: RBAC cannot scope Secret access by .type or by
   # namespace *label*, and a ClusterRole+ClusterRoleBinding grants reads
   # CLUSTER-WIDE — so this rule lets the Standby's identity read every
-  # Secret on the Active hub, not just the gateway certificates RemoteSyncer
-  # actually mirrors (the syncer's own field selector and mirrored-namespace
-  # gate narrow what is COPIED, but not what this identity COULD read).
-  # Treat the --ha-active-kubeconfig credential accordingly. To narrow the
-  # grant itself, replace this rule with per-namespace RoleBindings in each
-  # kubeslice project namespace — at the cost of maintaining them as
-  # projects come and go, which is cross-cluster provisioning tooling this
-  # repo deliberately does not ship.
+  # Secret on the Active hub, not just the ones RemoteSyncer actually
+  # mirrors. The syncer's mirrored-namespace gate narrows what is COPIED,
+  # never what this identity COULD read; treat the --ha-active-kubeconfig
+  # credential accordingly. To narrow the grant itself, replace this rule
+  # with per-namespace RoleBindings in each kubeslice project namespace — at
+  # the cost of maintaining them as projects come and go, which is
+  # cross-cluster provisioning tooling this repo deliberately does not ship.
+  #
+  # Service-account-token Secrets are within this grant and are read
+  # deliberately: the Standby mirrors their shells so its own token
+  # controller can mint a worker credential valid on itself before any
+  # failover. The token VALUES never leave the Active — they are dropped on
+  # the way into the Standby's cache and again before any write.
   - apiGroups:
       - ""
     resources:

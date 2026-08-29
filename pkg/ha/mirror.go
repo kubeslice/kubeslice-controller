@@ -77,6 +77,9 @@ func mirrorCreateOrUpdate(ctx context.Context, localClient client.Client, key sy
 	if res.StripOwnerRefs {
 		payload.SetOwnerReferences(nil)
 	}
+	if res.Sanitize != nil {
+		res.Sanitize(payload)
+	}
 
 	labels := payload.GetLabels()
 	if labels == nil {
@@ -109,6 +112,16 @@ func mirrorCreateOrUpdate(ctx context.Context, localClient client.Client, key sy
 		if existing.GetLabels()[LabelSyncedFromActive] != LabelValueActive {
 			// Conflict guard: never overwrite an object the Standby didn't
 			// create itself.
+			return "", nil
+		}
+		if res.CreateOnly != nil && res.CreateOnly(src) {
+			// Seeded from the Active once, owned locally afterwards. The
+			// Standby's copy is deliberately allowed to diverge: for an
+			// SA-token shell it is the local token controller's write that
+			// makes the object useful, and re-applying the Active's version
+			// would undo it. AnnotationSourceRV therefore stays at whatever
+			// the source resourceVersion was at creation, which is harmless —
+			// nothing reads it back, it exists for operators debugging drift.
 			return "", nil
 		}
 		payload.SetResourceVersion(existing.GetResourceVersion())
