@@ -160,6 +160,11 @@ func (p *ActivePublisher) Start(ctx context.Context) error {
 		// alone a fresh Active took 31s to appear.
 		wasLeader, err := p.publishOnce(ctx)
 		if err != nil {
+			// Counted here rather than inside publish(), which promotion also
+			// calls — promotion increments it on its own failure path so that one
+			// failed publication is one increment regardless of which caller made
+			// it. Counting inside publish() would double-count promotion's.
+			haActivePublishErrorsTotal.Inc()
 			p.log.Warnw("activeController publication failed; will retry", "error", err)
 		}
 		wait := p.interval

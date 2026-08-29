@@ -124,10 +124,16 @@ func (s *RemoteSyncer) pruneOnce(ctx context.Context) {
 		// should not mirror simply no-op again.
 		for key := range activeKeys {
 			if _, mirrored := localKeys[key]; !mirrored {
+				haPruneResurrectedTotal.WithLabelValues(key.GVK.Kind).Inc()
 				s.enqueue(key)
 			}
 		}
 	}
+	// After the loop, not inside it: one pass covers every kind, and a per-kind
+	// timestamp would report the last kind processed rather than the last complete
+	// pass. Set even when some kinds were skipped on a failed list — the pass did
+	// run, and the skips are already counted on ha_sync_errors_total.
+	haPruneLastRunTimestamp.WithLabelValues(string(s.mode)).Set(float64(time.Now().Unix()))
 }
 
 // listFromRemoteCache is remoteListFunc's real implementation: a List against

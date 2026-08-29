@@ -126,11 +126,11 @@ func (e *ClusterLeaderElector) activeStillAlive(ctx context.Context) bool {
 // successful read.
 func (e *ClusterLeaderElector) guardsAllowPromotion(ctx context.Context) bool {
 	if !e.selfHealthy(ctx) {
-		haPromotionsAbortedTotal.WithLabelValues(abortSelfUnhealthy).Inc()
+		e.abortPromotion(ctx, abortSelfUnhealthy)
 		return false
 	}
 	if e.activeStillAlive(ctx) {
-		haPromotionsAbortedTotal.WithLabelValues(abortLeaseLive).Inc()
+		e.abortPromotion(ctx, abortLeaseLive)
 		return false
 	}
 	return true

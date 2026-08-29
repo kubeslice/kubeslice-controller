@@ -23,10 +23,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 )
 
@@ -85,7 +87,12 @@ type Options struct {
 	// PromotionGracePeriod bounds each promotion step that waits on another
 	// component.
 	PromotionGracePeriod time.Duration
-	Log                  *zap.SugaredLogger
+	// EventRecorder, if set, enables the HA lifecycle Events of issue #298:
+	// BecameActive / BecameStandby at start-up, LeadershipLost when an Active
+	// gives up its Lease, PromotionAborted when a Standby declines to take over.
+	// Optional — nil records nothing.
+	EventRecorder events.EventRecorder
+	Log           *zap.SugaredLogger
 }
 
 // ClusterLeaderElector coordinates leadership between two hub clusters. Unlike
@@ -113,6 +120,19 @@ type ClusterLeaderElector struct {
 	// hooks are promotion's effects outside the elector. Injected so pkg/ha
 	// stays independent of the mirror, the publisher and the manager.
 	hooks PromotionHooks
+
+	// eventRecorder records the lifecycle Events of issue #298 — the mode this
+	// hub started in, a lost leadership, an abandoned promotion. Optional: nil
+	// disables them and changes nothing else, which is what keeps every existing
+	// test constructing an elector without one.
+	//
+	// Held directly rather than injected as a hook, unlike EmitPromotedEvent.
+	// The distinction is which object the Event hangs off. Promotion's Event
+	// attaches to the Lease it has just acquired, so only promote() can supply
+	// it; these three attach to the Lease as an identifier rather than as an
+	// object, which the elector can name unaided from leaseName and leaseNS.
+	// RemoteSyncer already takes a recorder the same way.
+	eventRecorder events.EventRecorder
 
 	leaseDuration time.Duration
 	renewDeadline time.Duration
@@ -213,6 +233,7 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 		padding:              opts.PaddingSeconds,
 		promotionDialTimeout: opts.PromotionDialTimeout,
 		promotionGracePeriod: opts.PromotionGracePeriod,
+		eventRecorder:        opts.EventRecorder,
 		log:                  opts.Log,
 	}
 	e.mode.Store(opts.Mode)
@@ -220,6 +241,21 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 	// the controller's behaviour before HA (the no-regression guarantee).
 	if opts.Mode == ModeStandalone {
 		e.isLeader.Store(true)
+	}
+
+	// Publish the two gauges whose value at 0 is the alertable condition, so the
+	// series exist from start-up rather than appearing at the first transition.
+	// This matters more than it looks: a Standby that never promotes never calls
+	// setLeader, and a Standby that never reads the Active never arms, so on the
+	// exact hubs an operator most needs to see these, nothing would ever create
+	// the series and `ha_leader_status == 0` would match no rows at all.
+	//
+	// Every other gauge in metrics.go stays deliberately unset until it has a
+	// real value — see the note there on why a zeroed timestamp is worse than a
+	// missing one.
+	haLeaderStatus.Set(boolGauge(e.isLeader.Load()))
+	if opts.Mode == ModeStandby {
+		haArmed.WithLabelValues(string(ModeStandby)).Set(0)
 	}
 	return e
 }
@@ -300,12 +336,21 @@ func (e *ClusterLeaderElector) StartLeaseRenewal(ctx context.Context) error {
 // therefore no writes.
 func (e *ClusterLeaderElector) renewOnce(ctx context.Context) error {
 	if _, err := acquireOrRenewLease(ctx, e.localClient, e.leaseName, e.leaseNS, e.identity, e.leaseDuration); err != nil {
+		haLeaseRenewErrorsTotal.Inc()
 		switch {
 		case e.lastRenew.IsZero():
 			e.log.Warnw("failed to acquire lease", "error", err)
 		case time.Since(e.lastRenew) > e.renewDeadline:
 			e.log.Warnw("failed to renew lease within renew deadline; releasing leadership",
 				"error", err, "renewDeadline", e.renewDeadline, "sinceLastRenew", time.Since(e.lastRenew))
+			// Emitted here rather than inside setLeader, and only on this branch.
+			// setLeader's other caller for a false value is StartLeaseRenewal's
+			// ctx.Done path — an ordinary graceful shutdown, where a Warning
+			// Event would be pure noise and the write would in any case be racing
+			// the pod's own termination. This branch is the one issue #298
+			// describes: renewal has failed for longer than renewDeadline and
+			// leadership is being given up while the process keeps running.
+			e.emitLifecycleEvent(ctx, ossEvents.EventHALeadershipLost)
 			e.setLeader(false)
 		default:
 			e.log.Warnw("failed to renew lease; still within renew deadline, keeping leadership", "error", err)
@@ -313,6 +358,7 @@ func (e *ClusterLeaderElector) renewOnce(ctx context.Context) error {
 		return err
 	}
 	e.lastRenew = time.Now()
+	haLeaseLastRenewTime.WithLabelValues(string(ModeActive)).Set(float64(e.lastRenew.Unix()))
 	e.setLeader(true)
 	return nil
 }
@@ -390,11 +436,22 @@ func (e *ClusterLeaderElector) checkRemoteLeaseOnce(ctx context.Context) (candid
 
 	lease, err := getLease(readCtx, e.remoteClient, e.leaseName, e.leaseNS)
 	if err != nil {
+		haRemoteLeaseReadsTotal.WithLabelValues(readResultError).Inc()
 		e.log.Warnw("could not read active hub lease; retaining last known view",
 			"error", err, "armed", e.lastSeenLease != nil)
 	} else {
+		haRemoteLeaseReadsTotal.WithLabelValues(readResultOK).Inc()
 		e.lastSeenLease = lease
 		e.lastGoodRead = time.Now()
+	}
+	haArmed.WithLabelValues(string(ModeStandby)).Set(boolGauge(e.lastSeenLease != nil))
+	// Deliberately outside the else: the age is published on failed reads too,
+	// and that is the whole value of it as a leading indicator. A retained stale
+	// Lease ageing against a moving clock is exactly how this loop models "no new
+	// evidence of life", so the gauge climbs through an outage rather than
+	// freezing at the last good value and looking healthy.
+	if age, ok := remoteLeaseAge(e.lastSeenLease, time.Now()); ok {
+		haRemoteLeaseAgeSeconds.WithLabelValues(string(ModeStandby)).Set(age.Seconds())
 	}
 
 	// This nil check MUST stay a separate statement and must never be folded
@@ -430,6 +487,7 @@ func (e *ClusterLeaderElector) setLeader(leader bool) {
 	if e.isLeader.Swap(leader) == leader {
 		return
 	}
+	haLeaderStatus.Set(boolGauge(leader))
 	if leader {
 		e.log.Infow("LeadershipAcquired", "identity", e.identity, "lease", e.leaseName)
 	} else {

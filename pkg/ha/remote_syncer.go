@@ -411,6 +411,7 @@ func (s *RemoteSyncer) handlersFor(objGVK schema.GroupVersionKind) toolscache.Re
 func (s *RemoteSyncer) enqueue(key syncKey) {
 	s.markEnqueued(key)
 	s.queue.Add(key)
+	haSyncQueueDepth.Set(float64(s.queue.Len()))
 }
 
 func (s *RemoteSyncer) runWorker(ctx context.Context) {
@@ -429,6 +430,12 @@ func (s *RemoteSyncer) runWorker(ctx context.Context) {
 // queue.AddRateLimited rather than dropped, satisfying issue #295's own
 // acceptance criterion that the syncer retries without crashing.
 func (s *RemoteSyncer) processOnce(ctx context.Context, key syncKey) {
+	// Registered before Done so that it runs after it: defers are LIFO, and
+	// Done is what re-queues a key that was marked dirty while in flight, so
+	// sampling afterwards is what makes the depth include that requeue. Sampled
+	// on the way out as well as on every enqueue, so the gauge falls as a backlog
+	// drains rather than only ever rising.
+	defer func() { haSyncQueueDepth.Set(float64(s.queue.Len())) }()
 	defer s.queue.Done(key)
 
 	op, lagSeconds, err := s.reconcileKey(ctx, key)

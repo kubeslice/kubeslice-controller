@@ -360,6 +360,7 @@ func initialize(services *service.Services) {
 		PaddingSeconds:       haPaddingSeconds,
 		PromotionDialTimeout: haPromotionDialTimeout,
 		PromotionGracePeriod: haPromotionGracePeriod,
+		EventRecorder:        eventRecorder,
 		Log:                  controllerLog.With("name", "ha"),
 	})
 	setupLog.Info("high availability configured", "mode", haRunMode, "identity", leaderElector.Identity())
@@ -567,6 +568,13 @@ func initialize(services *service.Services) {
 			}
 		}()
 	}
+
+	// BecameActive / BecameStandby (issue #298). Emitted here rather than beside
+	// the elector's construction for two reasons: ctx does not exist until
+	// SetupSignalHandler above, and recording an Event is an API-server write that
+	// building an elector should not perform — every unit test constructs one. A
+	// no-op in standalone mode and whenever no recorder is configured.
+	leaderElector.EmitStartupModeEvent(ctx)
 
 	// Start the HA background loop for the configured mode. Standalone starts
 	// nothing (it is always the leader).
