@@ -69,6 +69,23 @@ type MirroredResource struct {
 	// (found live against a Helm-installed Active hub). The label boundary is
 	// the one ReconcileProjectNamespace actually maintains.
 	RequireMirroredNamespace bool
+	// SkipStatus suppresses the status subresource write for this type, for
+	// types whose status is owned by the API server rather than by us.
+	//
+	// Only Namespace needs it. A Namespace always carries a status
+	// (status.phase), so the engine's "mirror status if the source has one"
+	// rule always fires for it, and the write is both meaningless — phase is
+	// derived by the API server from the namespace's own lifecycle, not
+	// something a mirror can set — and a permanent failure wherever the
+	// controller's RBAC does not grant namespaces/status. Found live: on a hub
+	// whose ClusterRole omitted that subresource, every Namespace pass failed
+	// Forbidden and requeued forever, so the sync error rate never returned to
+	// zero even though the namespace bodies mirrored correctly.
+	//
+	// The other core types in CredentialMirrorSet (Secret, ServiceAccount,
+	// Role, RoleBinding) have no status at all, so the rule never fires for
+	// them and they do not need this.
+	SkipStatus bool
 }
 
 const (
@@ -89,7 +106,7 @@ func gvk(group, kind string) schema.GroupVersionKind {
 // owned by the separate worker-operator repo, irrelevant to hub-to-hub
 // mirroring. Verified against apis/controller/v1alpha1 and apis/worker/v1alpha1.
 var CRDMirrorSet = []MirroredResource{
-	{GVK: schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}},
+	{GVK: schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}, SkipStatus: true},
 	{GVK: gvk(groupController, "Project")},
 	{GVK: gvk(groupController, "Cluster")},
 	{GVK: gvk(groupController, "SliceConfig")},

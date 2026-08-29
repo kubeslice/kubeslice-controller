@@ -178,7 +178,12 @@ type ClusterLeaderElector struct {
 // controller's own cluster; remote is a client to the Active hub and is required
 // only in Standby mode (it may be nil otherwise). Everything else is passed
 // through Options, because the Lease timings are operator-configurable flags.
-func NewClusterLeaderElector(local, remote client.Client, opts Options) *ClusterLeaderElector {
+// applyDefaults fills every zero-valued Option from the Default* constants (or
+// the OS hostname / downward-API namespace). Extracted from the constructor so
+// a caller that must read the Lease BEFORE constructing an elector — see
+// ResumeAsActive — resolves the same name, namespace, identity and padding the
+// elector itself would, rather than duplicating the fallbacks and drifting.
+func applyDefaults(opts Options) Options {
 	if opts.Mode == "" {
 		opts.Mode = ModeStandalone
 	}
@@ -220,6 +225,12 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 	if opts.Log == nil {
 		opts.Log = util.NewLogger().With("name", "ha-leader-elector")
 	}
+
+	return opts
+}
+
+func NewClusterLeaderElector(local, remote client.Client, opts Options) *ClusterLeaderElector {
+	opts = applyDefaults(opts)
 
 	e := &ClusterLeaderElector{
 		localClient:          local,

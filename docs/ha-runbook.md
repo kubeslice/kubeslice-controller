@@ -122,6 +122,16 @@ Lease so a single `get events -n kubeslice-controller` shows the lot:
 > name shipped earlier (#295) and is left alone rather than renamed under
 > anyone's existing alerts.
 
+> `config/events/events_config_map.yaml` in this repo is a generated
+> **inventory** of every event the schema knows about (`make generate-events`
+> lists all of them, HA's six included, under `disabledEvents` — that is the
+> template's behaviour for every event, not something specific to HA). It is
+> not what gets deployed: the Helm chart ships its own ConfigMap with an empty
+> `disabledEvents` list, which is why all six HA events fire on a real
+> install. Never `kubectl apply` the repo's copy against a live cluster —
+> check the *deployed* `kubeslice-controller-event-schema-conf` ConfigMap
+> instead if an HA event seems to be missing.
+
 ### How long has this hub been Active
 
 ```
@@ -213,6 +223,30 @@ see §3, which is the same procedure.
 kubectl --context <active-ctx> -n kubeslice-controller \
   scale deploy/kubeslice-controller-manager --replicas=1
 ```
+
+**Also update the promoted hub**, which still says `--ha-mode=standby` on its
+Deployment: promotion is a runtime transition and does not rewrite it. Set it to
+`--ha-mode=active` and drop its `--ha-active-kubeconfig`, so its configuration
+matches what it now is. There is no `kubectl set` for container args, so edit the
+Deployment and change those two entries in the `manager` container's `args`:
+
+```
+kubectl --context <standby-ctx> -n kubeslice-controller \
+  edit deploy/kubeslice-controller-manager
+```
+
+> A promoted hub that restarts before you get to this does **not** silently
+> return as a Standby. At start-up it reads the HA Lease in its own cluster, and
+> if that Lease still names it and has not gone stale it resumes as the Active
+> and logs `resuming as active` with the reason. Only a fast restart qualifies —
+> if the pod was down long enough for the Lease to go stale, the other hub could
+> have taken over, so it defers to the configured mode instead.
+>
+> That is also why a **deliberate** demotion must delete the Lease, not just
+> change the flag: scale to 0, delete `kubeslice-controller-ha`, then bring it
+> back. In practice the reconfiguration takes longer than the Lease duration, so
+> the Lease is stale by then either way — but deleting it makes the intent
+> explicit rather than relying on timing.
 
 > **Objects the demoted hub created itself do not go away, and cannot be deleted
 > while it is a Standby.** They carry reconciler finalizers but no

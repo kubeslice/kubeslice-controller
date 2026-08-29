@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -99,6 +100,12 @@ type ActivePublisher struct {
 	caBundle   string
 	interval   time.Duration
 	leaderPoll time.Duration
+
+	// persistenceVerified records that a write of status.activeController has
+	// been read back at least once and was really stored. Atomic because
+	// promotion calls PublishOnce synchronously while the ticker loop is also
+	// running.
+	persistenceVerified atomic.Bool
 
 	log *zap.SugaredLogger
 }
@@ -238,9 +245,14 @@ func (p *ActivePublisher) publish(ctx context.Context) error {
 
 	var errs []error
 	updated := 0
+	verifySkipped := false
 	for i := range clusters.Items {
 		cluster := &clusters.Items[i]
 		if activeControllerUpToDate(cluster.Status.ActiveController, desired) {
+			// Reading our own desired value back off the API server is itself
+			// proof the field persists here, so this converged case counts as
+			// verification and spares a read-back on some later write.
+			p.persistenceVerified.Store(true)
 			continue
 		}
 		payload := desired
@@ -251,12 +263,63 @@ func (p *ActivePublisher) publish(ctx context.Context) error {
 			continue
 		}
 		updated++
+
+		// An accepted Status().Update is not proof the field was stored. If the
+		// Cluster CRD on this hub predates status.activeController — which is
+		// what the published Helm chart installs — the API server prunes the
+		// unknown field and still returns success. Nothing surfaces: the field
+		// reads back nil, activeControllerUpToDate therefore never converges, so
+		// every tick rewrites every Cluster CR while the hub logs that it
+		// published, and no worker can discover the Active. A failover is
+		// silently unfollowable. Confirmed live against a chart-installed hub.
+		//
+		// So read it back, until it is confirmed once. Once per process, not per
+		// pass: this is a property of the CRD schema rather than of any single
+		// write, and re-reading forever would double the read traffic to prove a
+		// settled fact. Failures are returned, which routes them to
+		// ha_active_publish_errors_total — the metric whose alert already means
+		// "failover may work without any worker noticing".
+		if !p.persistenceVerified.Load() && !verifySkipped {
+			if err := p.verifyPersisted(ctx, cluster, desired); err != nil {
+				errs = append(errs, err)
+				// One report per pass, not one per Cluster CR: they all share the
+				// same schema, so the rest would say the same thing.
+				verifySkipped = true
+				continue
+			}
+			p.persistenceVerified.Store(true)
+			p.log.Infow("activeController persistence confirmed by read-back",
+				"cluster", cluster.Name, "namespace", cluster.Namespace)
+		}
 	}
 	if updated > 0 {
 		p.log.Infow("published activeController",
 			"clusters", updated, "identity", desired.ActiveIdentity, "endpoint", desired.Endpoint)
 	}
 	return errors.Join(errs...)
+}
+
+// verifyPersisted re-reads a Cluster CR and reports whether the activeController
+// it was just given actually survived the write. See the call site for why an
+// accepted write is not sufficient evidence.
+func (p *ActivePublisher) verifyPersisted(ctx context.Context, cluster *controllerv1alpha1.Cluster, desired controllerv1alpha1.ActiveControllerInfo) error {
+	fresh := &controllerv1alpha1.Cluster{}
+	if err := p.localClient.Get(ctx, client.ObjectKeyFromObject(cluster), fresh); err != nil {
+		return fmt.Errorf("verifying activeController persisted on %s/%s: %w",
+			cluster.Namespace, cluster.Name, err)
+	}
+	if activeControllerUpToDate(fresh.Status.ActiveController, desired) {
+		return nil
+	}
+	readBack := "a different value"
+	if fresh.Status.ActiveController == nil {
+		readBack = "empty"
+	}
+	return fmt.Errorf("status.activeController did not persist on %s/%s: the write was "+
+		"accepted but the field read back %s. The Cluster CRD on this hub most likely "+
+		"predates status.activeController, so the API server is pruning it. Apply the "+
+		"updated Cluster CRD; until then no worker can discover this hub and a failover "+
+		"cannot be followed", cluster.Namespace, cluster.Name, readBack)
 }
 
 // validEndpoint rejects the two values that must never reach a worker: nothing,

@@ -224,6 +224,43 @@ func TestMirrorCreateOrUpdate_SkipsStatusMirrorWhenSourceIsTerminating(t *testin
 	assert.False(t, ok, "status must not be mirrored while the source is Terminating — see mirror.go for the real API-server validation rule this avoids")
 }
 
+func TestMirrorCreateOrUpdate_SkipsStatusMirrorWhenSkipStatusSet(t *testing.T) {
+	ctx := context.Background()
+	key := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "sc-1"}
+	c := mirrorFakeClient(t)
+
+	// A live (non-Terminating) source that carries a status, which is exactly
+	// the shape a Namespace always has. Without SkipStatus the engine would
+	// attempt the status write, which is what failed Forbidden forever on a
+	// cluster whose RBAC withheld namespaces/status.
+	src := newTestUnstructured(testGVK, key.Namespace, key.Name)
+	require.NoError(t, unstructured.SetNestedField(src.Object, "Active", "status", "phase"))
+
+	op, err := mirrorCreateOrUpdate(ctx, c, key, MirroredResource{GVK: testGVK, SkipStatus: true}, src)
+	require.NoError(t, err)
+	assert.Equal(t, opCreate, op)
+
+	got := getUnstructured(t, c, key)
+	_, ok, _ := unstructured.NestedString(got.Object, "status", "phase")
+	assert.False(t, ok, "SkipStatus must suppress the status write for types whose status the API server owns")
+}
+
+func TestCRDMirrorSet_NamespaceSkipsStatusAndNothingElseDoes(t *testing.T) {
+	// The defect lived in the mirror set, not the engine: Namespace was listed
+	// like any CRD, so its ever-present status.phase made the engine attempt a
+	// namespaces/status write on every pass. Pin the row here — the engine test
+	// above cannot catch a regression in this table.
+	var skipped []string
+	for _, res := range FullMirrorSet() {
+		if res.SkipStatus {
+			skipped = append(skipped, res.GVK.Kind)
+		}
+	}
+	assert.Equal(t, []string{"Namespace"}, skipped,
+		"Namespace must skip the status write, and it must be the only type that does; "+
+			"any other type gaining SkipStatus needs the same justification written down")
+}
+
 func TestMirrorDelete_IdempotentOnNotFound(t *testing.T) {
 	c := mirrorFakeClient(t)
 	key := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "missing"}

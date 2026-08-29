@@ -331,6 +331,48 @@ func initialize(services *service.Services) {
 		setupLog.Error(err, "unable to build HA local client")
 		os.Exit(1)
 	}
+	haOpts := ha.Options{
+		Mode:                 haRunMode,
+		Identity:             haIdentity,
+		LeaseNamespace:       haLeaseNamespace,
+		LeaseDuration:        haLeaseDuration,
+		RenewDeadline:        haRenewDeadline,
+		RetryPeriod:          haRetryPeriod,
+		PaddingSeconds:       haPaddingSeconds,
+		PromotionDialTimeout: haPromotionDialTimeout,
+		PromotionGracePeriod: haPromotionGracePeriod,
+		EventRecorder:        eventRecorder,
+		Log:                  controllerLog.With("name", "ha"),
+	}
+
+	// A hub that promoted at runtime still carries --ha-mode=standby, because
+	// promotion does not rewrite its Deployment. Ask the Lease whether this hub
+	// is already the Active before believing the flag; see ha.ResumeAsActive for
+	// why the Lease is the right authority and why it only overrides the flag in
+	// the unambiguous case. Bounded by the same timeout as every other Lease
+	// read over a network — this one is local, but start-up must not hang on an
+	// API server that accepts the connection and then stops answering.
+	if haRunMode == ha.ModeStandby {
+		resumeCtx, cancelResume := context.WithTimeout(context.Background(), haPromotionDialTimeout)
+		resume, reason, resumeErr := ha.ResumeAsActive(resumeCtx, localHAClient, haOpts)
+		cancelResume()
+		switch {
+		case resumeErr != nil:
+			// Not fatal, and deliberately not treated as "so start as standby":
+			// the configured mode still applies, and the operator gets told the
+			// check was inconclusive rather than silently getting either answer.
+			setupLog.Error(resumeErr, "could not determine whether this hub is already the Active; starting in the configured mode",
+				"mode", haRunMode)
+		case resume:
+			setupLog.Info("configured as standby, but this hub is already the Active; resuming as active",
+				"reason", reason, "identity", haIdentity)
+			haRunMode = ha.ModeActive
+			haOpts.Mode = haRunMode
+		default:
+			setupLog.Info("starting as standby", "reason", reason)
+		}
+	}
+
 	var remoteHAClient client.Client
 	var remoteHACfg *rest.Config
 	if haRunMode == ha.ModeStandby {
@@ -350,19 +392,7 @@ func initialize(services *service.Services) {
 			os.Exit(1)
 		}
 	}
-	leaderElector := ha.NewClusterLeaderElector(localHAClient, remoteHAClient, ha.Options{
-		Mode:                 haRunMode,
-		Identity:             haIdentity,
-		LeaseNamespace:       haLeaseNamespace,
-		LeaseDuration:        haLeaseDuration,
-		RenewDeadline:        haRenewDeadline,
-		RetryPeriod:          haRetryPeriod,
-		PaddingSeconds:       haPaddingSeconds,
-		PromotionDialTimeout: haPromotionDialTimeout,
-		PromotionGracePeriod: haPromotionGracePeriod,
-		EventRecorder:        eventRecorder,
-		Log:                  controllerLog.With("name", "ha"),
-	})
+	leaderElector := ha.NewClusterLeaderElector(localHAClient, remoteHAClient, haOpts)
 	setupLog.Info("high availability configured", "mode", haRunMode, "identity", leaderElector.Identity())
 
 	// RemoteSyncer mirrors CRDMirrorSet from the Active hub onto this
