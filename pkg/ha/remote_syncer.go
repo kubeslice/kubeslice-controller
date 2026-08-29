@@ -25,8 +25,10 @@ import (
 	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,6 +65,36 @@ const (
 // for a completely unrelated reason.
 func namespaceMirrorSelector() labels.Selector {
 	return labels.SelectorFromSet(util.LabelsKubeSliceController)
+}
+
+// mirrorCacheByObject scopes the remote cache's informers server-side, so
+// unrelated Active-hub objects never reach this process at all — the mirror
+// set's Skip predicates enforce the same boundaries client-side, but for
+// core types that exist cluster-wide (Secrets above all) not watching them
+// in the first place is both the cheaper and the safer layer.
+//
+//   - Namespace, ServiceAccount, Role, RoleBinding: label-scoped to
+//     util.LabelsKubeSliceController — stamped on every project namespace by
+//     ReconcileProjectNamespace and on every credential object the
+//     controller creates via util.GetOwnerLabel (which embeds the same
+//     key/value pair).
+//   - Secret: cannot be label-scoped — gateway certificate Secrets are
+//     created by the external cert-generator job, unlabeled. Scoped instead
+//     with a field selector excluding SA-token Secrets (the API server
+//     supports "type" as a Secret field selector), the highest-volume
+//     class; the project-namespace boundary stays client-side in
+//     CredentialMirrorSet's Skip predicate.
+func mirrorCacheByObject() map[client.Object]cache.ByObject {
+	controllerManaged := namespaceMirrorSelector()
+	return map[client.Object]cache.ByObject{
+		&corev1.Namespace{}:      {Label: controllerManaged},
+		&corev1.ServiceAccount{}: {Label: controllerManaged},
+		&rbacv1.Role{}:           {Label: controllerManaged},
+		&rbacv1.RoleBinding{}:    {Label: controllerManaged},
+		&corev1.Secret{}: {
+			Field: fields.OneTermNotEqualSelector("type", string(corev1.SecretTypeServiceAccountToken)),
+		},
+	}
 }
 
 // opDelete extends mirror.go's opCreate/opUpdate for use in this file's
@@ -196,12 +228,8 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 			return nil, fmt.Errorf("standby mode requires a remote config for the active hub")
 		}
 		remoteCache, err := cache.New(remoteCfg, cache.Options{
-			Scheme: scheme,
-			ByObject: map[client.Object]cache.ByObject{
-				// Namespace is cluster-scoped and otherwise unfiltered; see
-				// namespaceMirrorSelector's doc comment for why this matters.
-				&corev1.Namespace{}: {Label: namespaceMirrorSelector()},
-			},
+			Scheme:   scheme,
+			ByObject: mirrorCacheByObject(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("building remote cache: %w", err)
@@ -426,6 +454,15 @@ func (s *RemoteSyncer) reconcileKey(ctx context.Context, key syncKey) (mirrorOp,
 	if res.Skip != nil && res.Skip(src) {
 		return "", 0, nil
 	}
+	if res.RequireMirroredNamespace {
+		mirrored, err := s.namespaceIsMirrored(ctx, src.GetNamespace())
+		if err != nil {
+			return "", 0, fmt.Errorf("checking namespace of %s %s/%s: %w", key.GVK.Kind, key.Namespace, key.Name, err)
+		}
+		if !mirrored {
+			return "", 0, nil
+		}
+	}
 
 	op, err := mirrorCreateOrUpdate(ctx, s.localClient, key, res, src)
 	if err != nil {
@@ -438,6 +475,32 @@ func (s *RemoteSyncer) reconcileKey(ctx context.Context, key syncKey) (mirrorOp,
 		return op, time.Since(src.GetCreationTimestamp().Time).Seconds(), nil
 	}
 	return op, time.Since(s.enqueuedTime(key)).Seconds(), nil
+}
+
+// namespaceIsMirrored reports whether ns is one of the namespaces the syncer
+// itself mirrors, by reading the remote cache's Namespace view — which is
+// label-scoped to controller-managed project namespaces (see
+// namespaceMirrorSelector), so any namespace outside that boundary reads as
+// NotFound here no matter what it is named. This is the namespace gate
+// behind MirroredResource.RequireMirroredNamespace.
+//
+// A skip verdict is terminal for this queue item (no retry), so an object
+// racing its own namespace's informer delivery on cold start can be skipped
+// once — the prune loop's reverse diff re-enqueues it within one
+// --ha-sync-interval (see pruneOnce), rather than waiting for the informer's
+// much longer resync period.
+func (s *RemoteSyncer) namespaceIsMirrored(ctx context.Context, ns string) (bool, error) {
+	if ns == "" {
+		return true, nil // cluster-scoped objects have no namespace to gate on
+	}
+	nsKey := syncKey{GVK: schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}, Name: ns}
+	if _, err := s.remoteGet(ctx, nsKey); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // getFromRemoteCache is remoteGetFunc's real implementation: a read from
