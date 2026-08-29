@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kubeslice/kubeslice-monitoring/pkg/events"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 )
 
@@ -86,7 +88,15 @@ type RemoteSyncerOptions struct {
 	// SetupRetryPeriod is how long Start waits between retries when wiring up
 	// the remote informers fails.
 	SetupRetryPeriod time.Duration
-	Log              *zap.SugaredLogger
+	// PruneInterval is how often the prune backstop diffs Standby mirrors
+	// against the Active hub and removes orphans (see prune.go).
+	PruneInterval time.Duration
+	// EventRecorder, if set, gets an HAMirrorSyncFailed event on the first
+	// failure of each mirror-failure episode, attached to the object that
+	// failed to sync. Nil disables event emission (metrics and retries are
+	// unaffected).
+	EventRecorder events.EventRecorder
+	Log           *zap.SugaredLogger
 }
 
 // RemoteSyncer mirrors a fixed set of resources from the Active hub onto the
@@ -107,6 +117,12 @@ type RemoteSyncer struct {
 
 	workers          int
 	setupRetryPeriod time.Duration
+	pruneInterval    time.Duration
+	// remoteList and waitForCacheSync back the prune loop (prune.go); like
+	// remoteGet, they are fields so tests can drive pruning without a real
+	// *rest.Config.
+	remoteList       remoteListFunc
+	waitForCacheSync func(ctx context.Context) bool
 	queue            workqueue.TypedRateLimitingInterface[syncKey]
 	// register performs one attempt at wiring informer event handlers for
 	// every mirrored resource. Kept as a field (rather than calling
@@ -130,7 +146,8 @@ type RemoteSyncer struct {
 	mu         sync.Mutex
 	enqueuedAt map[syncKey]time.Time
 
-	log *zap.SugaredLogger
+	eventRecorder events.EventRecorder
+	log           *zap.SugaredLogger
 }
 
 // NewRemoteSyncer builds a RemoteSyncer. remoteCfg and scheme are only used
@@ -145,6 +162,9 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 	}
 	if opts.SetupRetryPeriod == 0 {
 		opts.SetupRetryPeriod = DefaultInformerSetupRetryPeriod
+	}
+	if opts.PruneInterval == 0 {
+		opts.PruneInterval = DefaultPruneInterval
 	}
 	if opts.Log == nil {
 		opts.Log = util.NewLogger().With("name", "ha-remote-syncer")
@@ -162,9 +182,11 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 		byGVK:             byGVK,
 		workers:           opts.Workers,
 		setupRetryPeriod:  opts.SetupRetryPeriod,
+		pruneInterval:     opts.PruneInterval,
 		queue:             workqueue.NewTypedRateLimitingQueue[syncKey](workqueue.DefaultTypedControllerRateLimiter[syncKey]()),
 		handlerRegistered: make(map[schema.GroupVersionKind]bool, len(opts.Resources)),
 		enqueuedAt:        make(map[syncKey]time.Time),
+		eventRecorder:     opts.EventRecorder,
 		log:               opts.Log,
 	}
 	s.register = s.registerInformersOnce
@@ -186,6 +208,8 @@ func NewRemoteSyncer(localClient client.Client, remoteCfg *rest.Config, scheme *
 		}
 		s.remoteCache = remoteCache
 		s.remoteGet = s.getFromRemoteCache
+		s.remoteList = s.listFromRemoteCache
+		s.waitForCacheSync = remoteCache.WaitForCacheSync
 	}
 
 	return s, nil
@@ -212,9 +236,20 @@ func (s *RemoteSyncer) Start(ctx context.Context) error {
 			s.runWorker(ctx)
 		}()
 	}
+	// The prune loop only watches its context, unlike the workers (which exit
+	// on queue shutdown) — cancel it explicitly so wg.Wait can't hang if the
+	// cache ever stops with an error before ctx itself is cancelled.
+	pruneCtx, cancelPrune := context.WithCancel(ctx)
+	defer cancelPrune()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.runPrune(pruneCtx)
+	}()
 
-	s.log.Infow("remote syncer started", "resources", len(s.resources), "workers", s.workers)
+	s.log.Infow("remote syncer started", "resources", len(s.resources), "workers", s.workers, "pruneInterval", s.pruneInterval)
 	err := s.remoteCache.Start(ctx) // blocks until ctx.Done(); returns nil on graceful shutdown
+	cancelPrune()
 	s.queue.ShutDown()
 	wg.Wait()
 	return err
@@ -285,15 +320,21 @@ func (s *RemoteSyncer) handlersFor(objGVK schema.GroupVersionKind) toolscache.Re
 			s.log.Warnw("remote syncer: unexpected informer object type", "type", fmt.Sprintf("%T", obj))
 			return
 		}
-		key := syncKey{GVK: objGVK, Namespace: u.GetNamespace(), Name: u.GetName()}
-		s.markEnqueued(key)
-		s.queue.Add(key)
+		s.enqueue(syncKey{GVK: objGVK, Namespace: u.GetNamespace(), Name: u.GetName()})
 	}
 	return toolscache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { enqueue(obj) },
 		UpdateFunc: func(_, newObj interface{}) { enqueue(newObj) },
 		DeleteFunc: func(obj interface{}) { enqueue(obj) },
 	}
+}
+
+// enqueue hands one key to the worker pool, stamping its first-enqueue time
+// for the lag metric. Both the informer handlers and the prune loop go
+// through here, so every mirror write shares one queue and one retry policy.
+func (s *RemoteSyncer) enqueue(key syncKey) {
+	s.markEnqueued(key)
+	s.queue.Add(key)
 }
 
 func (s *RemoteSyncer) runWorker(ctx context.Context) {
@@ -324,6 +365,33 @@ func (s *RemoteSyncer) processOnce(ctx context.Context, key syncKey) {
 		s.log.Warnw("mirror sync failed; will retry", "kind", key.GVK.Kind,
 			"namespace", key.Namespace, "name", key.Name,
 			"attempt", s.queue.NumRequeues(key), "error", err)
+		// One HAMirrorSyncFailed event per failure episode (NumRequeues is
+		// still 0 here on the first failure; Forget resets it on success).
+		// The retries that follow are milliseconds apart under early
+		// backoff, and although the recorder aggregates repeats into one
+		// Event's Count, every call is still an API-server write —
+		// per-attempt emission would turn each outage into a write storm
+		// while ha_sync_errors_total already counts every attempt.
+		// The recorder is called directly rather than through
+		// util.RecordEvent: that helper logs via util.CtxLogger, which
+		// panics on any context that didn't pass through a reconciler's
+		// PrepareKubeSliceControllersRequestContext — and Start's context
+		// (main.go's signal-handler context) never does.
+		if s.eventRecorder != nil && s.queue.NumRequeues(key) == 0 {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(key.GVK)
+			obj.SetNamespace(key.Namespace)
+			obj.SetName(key.Name)
+			if recErr := s.eventRecorder.RecordEvent(ctx, &events.Event{
+				Object:            obj,
+				ReportingInstance: util.InstanceController,
+				Name:              ossEvents.EventHAMirrorSyncFailed,
+			}); recErr != nil {
+				s.log.Warnw("failed to record mirror-sync-failed event",
+					"kind", key.GVK.Kind, "namespace", key.Namespace,
+					"name", key.Name, "error", recErr)
+			}
+		}
 		s.queue.AddRateLimited(key)
 		return
 	}

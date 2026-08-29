@@ -734,6 +734,14 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Warning - Certificate Creation job Failed",
 	},
+	"HAMirrorSyncFailed": {
+		Name:                "HAMirrorSyncFailed",
+		Reason:              "HAMirrorSyncFailed",
+		Action:              "HAMirrorSync",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Failed to mirror a resource from the Active hub onto the Standby; the syncer will retry.",
+	},
 }
 
 var (
@@ -826,4 +834,5 @@ var (
 	EventCertificatesRenewNow                 events.EventName = "CertificatesRenewNow"
 	EventIllegalVPNKeyRotationConfigDelete    events.EventName = "IllegalVPNKeyRotationConfigDelete"
 	EventCertificateJobFailed                 events.EventName = "CertificateJobFailed"
+	EventHAMirrorSyncFailed                   events.EventName = "HAMirrorSyncFailed"
 )
