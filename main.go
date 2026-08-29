@@ -48,6 +48,7 @@ import (
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -124,6 +125,7 @@ func initialize(services *service.Services) {
 	var haRenewDeadline time.Duration
 	var haRetryPeriod time.Duration
 	var haPaddingSeconds time.Duration
+	var haSyncWorkers int
 
 	flag.StringVar(&rbacResourcePrefix, "rbac-resource-prefix", service.RbacResourcePrefix, "RBAC resource prefix")
 	flag.StringVar(&projectNameSpacePrefixFromCustomer, "project-namespace-prefix", service.ProjectNamespacePrefix, fmt.Sprintf("Overrides the default %s kubeslice namespace", service.ProjectNamespacePrefix))
@@ -161,6 +163,7 @@ func initialize(services *service.Services) {
 	flag.DurationVar(&haRenewDeadline, "ha-renew-deadline", ha.DefaultRenewDeadline, "Deadline for the Active to renew its Lease before releasing leadership.")
 	flag.DurationVar(&haRetryPeriod, "ha-retry-period", ha.DefaultRetryPeriod, "Interval between Lease renew/watch attempts.")
 	flag.DurationVar(&haPaddingSeconds, "ha-padding-seconds", ha.DefaultPaddingSeconds, "Extra buffer a Standby waits before treating the Active Lease as stale.")
+	flag.IntVar(&haSyncWorkers, "ha-sync-workers", ha.DefaultSyncWorkers, "Number of workers draining the Standby's remote-mirror workqueue.")
 
 	flag.Parse()
 
@@ -313,17 +316,19 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	var remoteHAClient client.Client
+	var remoteHACfg *rest.Config
 	if haRunMode == ha.ModeStandby {
 		if haActiveKubeconfig == "" {
 			setupLog.Error(fmt.Errorf("missing --ha-active-kubeconfig"), "standby mode requires the Active hub kubeconfig")
 			os.Exit(1)
 		}
-		remoteCfg, cfgErr := clientcmd.BuildConfigFromFlags("", haActiveKubeconfig)
+		var cfgErr error
+		remoteHACfg, cfgErr = clientcmd.BuildConfigFromFlags("", haActiveKubeconfig)
 		if cfgErr != nil {
 			setupLog.Error(cfgErr, "unable to load Active hub kubeconfig", "path", haActiveKubeconfig)
 			os.Exit(1)
 		}
-		remoteHAClient, cfgErr = client.New(remoteCfg, client.Options{Scheme: scheme})
+		remoteHAClient, cfgErr = client.New(remoteHACfg, client.Options{Scheme: scheme})
 		if cfgErr != nil {
 			setupLog.Error(cfgErr, "unable to build remote client for Active hub")
 			os.Exit(1)
@@ -340,6 +345,19 @@ func initialize(services *service.Services) {
 		Log:            controllerLog.With("name", "ha"),
 	})
 	setupLog.Info("high availability configured", "mode", haRunMode, "identity", leaderElector.Identity())
+
+	// RemoteSyncer mirrors CRDMirrorSet from the Active hub onto this
+	// cluster; a no-op in any mode other than standby (issue #295). Reuses
+	// the same remote config and local client the elector above already
+	// built rather than loading the kubeconfig twice.
+	remoteSyncer, err := ha.NewRemoteSyncer(localHAClient, remoteHACfg, scheme, haRunMode, ha.RemoteSyncerOptions{
+		Workers: haSyncWorkers,
+		Log:     controllerLog.With("name", "ha-remote-syncer"),
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to build HA remote syncer")
+		os.Exit(1)
+	}
 
 	// initialize controller with Project Kind
 	if err = (&controller.ProjectReconciler{
@@ -508,6 +526,11 @@ func initialize(services *service.Services) {
 				setupLog.Error(err, "HA remote lease watch loop exited")
 			}
 		}()
+		go func() {
+			if err := remoteSyncer.Start(ctx); err != nil {
+				setupLog.Error(err, "HA remote syncer exited")
+			}
+		}()
 	}
 
 	setupLog.Info("starting manager")
@@ -529,6 +552,7 @@ func initialize(services *service.Services) {
 
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create;update;patch;delete;escalate
+//+kubebuilder:rbac:groups="",resources=namespaces/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=create;get;list;watch;escalate;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;escalate;update;patch;create
 //+kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
