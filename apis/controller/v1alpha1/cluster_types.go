@@ -143,6 +143,10 @@ type ClusterStatus struct {
 	// Populated only on an Active/Standby HA deployment; absent otherwise, so a
 	// non-HA worker sees no behaviour change.
 	ActiveController *ActiveControllerInfo `json:"activeController,omitempty"`
+	// Conditions describe this worker's connection to its hub controller, e.g.
+	// ControllerConnected and ControllerEndpointSynced. Written by the worker
+	// operator about itself; absent on a worker that has never reported one.
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // ActiveControllerInfo describes the hub controller currently holding leadership.
