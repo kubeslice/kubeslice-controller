@@ -75,8 +75,9 @@ const (
 	// GatewayConnectionStateNotConnected means the tunnel is down (all gateway
 	// pods report their tunnel not established).
 	GatewayConnectionStateNotConnected = "NotConnected"
-	// GatewayConnectionStatePending means no connectivity has been reported yet.
-	// An empty ConnectionState is treated as Pending by the controller-side aggregation.
+	// GatewayConnectionStatePending means no connectivity has been reported yet
+	// (e.g. the gateway was just created). An empty ConnectionState is treated
+	// as Pending by the controller-side aggregation.
 	GatewayConnectionStatePending = "Pending"
 )
 

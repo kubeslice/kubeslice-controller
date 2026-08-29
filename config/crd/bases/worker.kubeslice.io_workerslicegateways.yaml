@@ -135,14 +135,13 @@ spec:
                 type: string
             type: object
           status:
-            description: WorkerSliceGatewayStatus defines the observed state of WorkerSliceGateway
             properties:
               clusterInsertionIndex:
                 type: integer
               connectionState:
-                description: 'ConnectionState is the connectivity state of this gateway
-                  link as reported by the worker: Connected, NotConnected or Pending.
-                  Empty means Pending.'
+                description: |-
+                  ConnectionState is the connectivity state of this gateway link as reported
+                  by the worker: Connected, NotConnected or Pending. Empty means Pending.
                 type: string
               gatewayNumber:
                 type: integer

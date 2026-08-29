@@ -2324,6 +2324,7 @@ func test_validateTopology(t *testing.T) {
 		name        string
 		clusters    []string
 		topology    *controllerv1alpha1.TopologySpec
+		overlayMode controllerv1alpha1.NetworkType
 		wantErr     bool
 		errContains string
 	}{
@@ -2394,13 +2395,22 @@ func test_validateTopology(t *testing.T) {
 			wantErr:     true,
 			errContains: "mode must be set to HubAndSpoke when hubs is specified",
 		},
+		{
+			name:        "HubAndSpoke on a no-network slice is rejected",
+			clusters:    clusters,
+			topology:    &controllerv1alpha1.TopologySpec{Mode: controllerv1alpha1.TopologyModeHubAndSpoke, Hubs: []string{"cluster-1"}},
+			overlayMode: controllerv1alpha1.NONET,
+			wantErr:     true,
+			errContains: "not supported for a no-network slice",
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			sliceConfig := &controllerv1alpha1.SliceConfig{
 				Spec: controllerv1alpha1.SliceConfigSpec{
-					Clusters: tc.clusters,
-					Topology: tc.topology,
+					Clusters:                     tc.clusters,
+					Topology:                     tc.topology,
+					OverlayNetworkDeploymentMode: tc.overlayMode,
 				},
 			}
 			err := validateTopology(sliceConfig)

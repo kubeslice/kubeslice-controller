@@ -23,12 +23,18 @@ import (
 	"go.uber.org/zap"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // SliceConfigReconciler reconciles a SliceConfig object
@@ -46,9 +52,49 @@ func (r *SliceConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return r.SliceConfigService.ReconcileSliceConfig(kubeSliceCtx, req)
 }
 
+// sliceConfigForGateway maps a WorkerSliceGateway to a reconcile request for the
+// SliceConfig that owns it, so a change in a gateway's connectivity status
+// re-triggers aggregation of the slice's TopologyConverged condition. The
+// gateway carries its slice name in spec.SliceName and lives in the same
+// (project) namespace as the SliceConfig.
+func (r *SliceConfigReconciler) sliceConfigForGateway(ctx context.Context, obj client.Object) []ctrl.Request {
+	gateway, ok := obj.(*workerv1alpha1.WorkerSliceGateway)
+	if !ok || gateway.Spec.SliceName == "" {
+		return nil
+	}
+	return []ctrl.Request{
+		{NamespacedName: types.NamespacedName{Name: gateway.Spec.SliceName, Namespace: gateway.Namespace}},
+	}
+}
+
+// gatewayConnectionStateChanged only lets a WorkerSliceGateway event through when
+// it can actually affect the slice's TopologyConverged condition: any create or
+// delete, or an update that changes the gateway's status.ConnectionState. This
+// filters out the frequent status writes that don't move connectivity (latency,
+// rates, message/reason churn) so large or noisy slices don't trigger a
+// SliceConfig reconcile on every gateway heartbeat.
+var gatewayConnectionStateChanged = predicate.Funcs{
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		oldGw, ok1 := e.ObjectOld.(*workerv1alpha1.WorkerSliceGateway)
+		newGw, ok2 := e.ObjectNew.(*workerv1alpha1.WorkerSliceGateway)
+		if !ok1 || !ok2 {
+			return true
+		}
+		return oldGw.Status.ConnectionState != newGw.Status.ConnectionState
+	},
+}
+
 // SetupWithManager sets up the controller with the Manager.
+//
+// A gateway connection-state change enqueues the owning SliceConfig, which runs
+// the full reconcile (it recomputes the whole desired state, then the
+// TopologyConverged status). The gatewayConnectionStateChanged predicate keeps
+// this to real Connected/NotConnected transitions, so the full-reconcile cost is
+// paid only on genuine convergence changes, not on every status heartbeat.
 func (r *SliceConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&controllerv1alpha1.SliceConfig{}).
+		Watches(&workerv1alpha1.WorkerSliceGateway{}, handler.EnqueueRequestsFromMapFunc(r.sliceConfigForGateway),
+			builder.WithPredicates(gatewayConnectionStateChanged)).
 		Complete(r)
 }

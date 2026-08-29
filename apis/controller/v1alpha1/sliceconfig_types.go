@@ -220,8 +220,28 @@ type KubesliceEvent struct {
 }
 
 // SliceConfigStatus defines the observed state of SliceConfig
+// Slice status condition types and reasons for topology convergence.
+const (
+	// SliceConditionTypeTopologyConverged reports whether every desired gateway
+	// link of the slice is Connected.
+	SliceConditionTypeTopologyConverged = "TopologyConverged"
+	// SliceReasonAllEdgesReady is set when all gateway links are Connected.
+	SliceReasonAllEdgesReady = "AllEdgesReady"
+	// SliceReasonEdgesNotReady is set when one or more gateway links are not Connected.
+	SliceReasonEdgesNotReady = "EdgesNotReady"
+	// SliceReasonNoGatewaysRequired is set when the slice needs no gateway links
+	// (single cluster or no-network mode) and is therefore trivially converged.
+	SliceReasonNoGatewaysRequired = "NoGatewaysRequired"
+)
+
 type SliceConfigStatus struct {
 	KubesliceEvents []KubesliceEvent `json:"kubesliceEvents,omitempty"`
+	// Conditions represent the latest available observations of the slice's
+	// topology state (e.g. TopologyConverged).
+	//+optional
+	//+listType=map
+	//+listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
