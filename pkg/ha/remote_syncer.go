@@ -77,12 +77,13 @@ func namespaceMirrorSelector() labels.Selector {
 //     ReconcileProjectNamespace and on every credential object the
 //     controller creates via util.GetOwnerLabel (which embeds the same
 //     key/value pair).
+//
 //   - Secret: cannot be scoped either way. Not by label — gateway certificate
 //     Secrets are created by the external cert-generator job, unlabeled. No
 //     longer by field either: this cache previously excluded SA-token Secrets
 //     with a "type" field selector, but the Standby now needs their shells in
 //     order to hold a worker credential valid on itself (CredentialMirrorSet,
-//     ADR Decision 6), and no single selector admits both those and the
+//     ADR #293 Decision 6), and no single selector admits both those and the
 //     unlabeled certificate Secrets. So Secrets are cached cluster-wide and
 //     the project-namespace boundary stays client-side, in the row's
 //     RequireMirroredNamespace gate — a Secret in kube-system is cached but

@@ -44,3 +44,40 @@ func TestHAModeIsValid(t *testing.T) {
 		t.Error("unknown mode should be invalid")
 	}
 }
+
+// TestParseHAModeStrict_RejectsTypos covers the case that makes lenient parsing
+// dangerous: standalone is unconditionally the leader, so a hub whose --ha-mode
+// was mistyped does not fail closed into an inert Standby, it fails OPEN into a
+// second unfenced writer against the same worker clusters as the real Active.
+func TestParseHAModeStrict_RejectsTypos(t *testing.T) {
+	for _, bad := range []string{"stanby", "activ", "primary", "true", "STANDBYY"} {
+		mode, err := ParseHAModeStrict(bad)
+		if err == nil {
+			t.Errorf("ParseHAModeStrict(%q) must reject an unknown mode, got %q", bad, mode)
+		}
+	}
+}
+
+// TestParseHAModeStrict_AcceptsKnownModesAndEmpty pins the other half: every
+// deployment that passes no --ha-mode at all must keep getting standalone, and
+// the documented spellings must survive surrounding whitespace and case.
+func TestParseHAModeStrict_AcceptsKnownModesAndEmpty(t *testing.T) {
+	for in, want := range map[string]HAMode{
+		"":            ModeStandalone,
+		"   ":         ModeStandalone,
+		"standalone":  ModeStandalone,
+		"active":      ModeActive,
+		"standby":     ModeStandby,
+		"  Standby  ": ModeStandby,
+		"ACTIVE":      ModeActive,
+	} {
+		got, err := ParseHAModeStrict(in)
+		if err != nil {
+			t.Errorf("ParseHAModeStrict(%q) returned an error: %v", in, err)
+			continue
+		}
+		if got != want {
+			t.Errorf("ParseHAModeStrict(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

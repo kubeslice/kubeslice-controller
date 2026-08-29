@@ -178,33 +178,51 @@ func (p *ActivePublisher) Start(ctx context.Context) error {
 }
 
 // PublishOnce runs a single pass over every Cluster CR on this hub. Promotion
-// calls it synchronously so a failover does not wait for the next tick.
+// calls it synchronously, at the point where it has already taken the Lease and
+// switched to Active but has not yet opened the write fence, so a failover does
+// not wait for the publisher's next tick.
 //
-// It is a no-op unless this hub currently holds leadership: a Standby's copy of
-// the field is owned by the state mirror, and a Standby writing its own identity
-// there would break the very rule workers use to tell the two hubs apart.
+// It deliberately does NOT gate on IsLeader(). That reads like a safety check
+// and is in fact the opposite: promotion holds the write-fence latch across its
+// whole sequence, so IsLeader() reports false for exactly the window in which
+// this is called. Gating here made the promotion-time publication a silent
+// no-op that still logged success, leaving status.activeController naming the
+// dead hub until the periodic loop next ran.
+//
+// The caller is responsible for having established leadership first. The
+// periodic loop must keep using publishOnce, which does gate — an Active that
+// has lost its Lease must stop advertising itself.
 func (p *ActivePublisher) PublishOnce(ctx context.Context) error {
-	_, err := p.publishOnce(ctx)
-	return err
+	return p.publish(ctx)
 }
 
-// publishOnce is PublishOnce, additionally reporting whether this hub held
-// leadership for the pass. Start uses that to decide how long to wait next.
+// publishOnce is the leadership-gated pass the periodic loop runs. It also
+// reports whether this hub held leadership, which Start uses to decide how long
+// to wait next.
+//
+// A Standby must never write this field: its copy is owned by the state mirror
+// and names the Active, which is the whole rule workers use to tell the two
+// hubs apart.
 func (p *ActivePublisher) publishOnce(ctx context.Context) (leader bool, err error) {
 	if !p.elector.IsLeader() {
 		p.log.Debugw("not the leader; skipping activeController publication")
 		return false, nil
 	}
+	return true, p.publish(ctx)
+}
+
+// publish performs one ungated pass over every Cluster CR on this hub.
+func (p *ActivePublisher) publish(ctx context.Context) error {
 	if err := p.validEndpoint(); err != nil {
 		// Deliberately not fatal. A hub that cannot describe itself should keep
 		// reconciling; it just must not advertise an address nobody can reach.
 		p.log.Errorw("refusing to publish activeController", "endpoint", p.endpoint, "error", err)
-		return true, nil
+		return nil
 	}
 
 	clusters := &controllerv1alpha1.ClusterList{}
 	if err := p.localClient.List(ctx, clusters); err != nil {
-		return true, fmt.Errorf("listing clusters to publish activeController: %w", err)
+		return fmt.Errorf("listing clusters to publish activeController: %w", err)
 	}
 
 	desired := controllerv1alpha1.ActiveControllerInfo{
@@ -233,7 +251,7 @@ func (p *ActivePublisher) publishOnce(ctx context.Context) (leader bool, err err
 		p.log.Infow("published activeController",
 			"clusters", updated, "identity", desired.ActiveIdentity, "endpoint", desired.Endpoint)
 	}
-	return true, errors.Join(errs...)
+	return errors.Join(errs...)
 }
 
 // validEndpoint rejects the two values that must never reach a worker: nothing,
@@ -255,7 +273,7 @@ func (p *ActivePublisher) validEndpoint() error {
 // Note what is deliberately absent: nothing ever clears this field. A hub only
 // stops publishing by losing leadership, which in practice means it stopped
 // renewing its Lease — it is unreachable, so a worker cannot read the stale
-// declaration anyway. Auto-demotion of a recovered hub is an explicit ADR
+// declaration anyway. Auto-demotion of a recovered hub is an explicit ADR #293
 // non-goal (Decision 8); LastUpdated is what lets a consumer prefer the fresher
 // of two claims if it ever does see both.
 func activeControllerUpToDate(current *controllerv1alpha1.ActiveControllerInfo, desired controllerv1alpha1.ActiveControllerInfo) bool {
