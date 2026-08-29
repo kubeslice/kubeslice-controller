@@ -98,3 +98,4 @@ data:
       - IllegalVPNKeyRotationConfigDelete
       - CertificateJobFailed
       - HAMirrorSyncFailed
+      - HAPromotedToActive

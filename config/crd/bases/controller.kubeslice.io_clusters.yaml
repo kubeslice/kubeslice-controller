@@ -133,6 +133,31 @@ spec:
                     format: date-time
                     type: string
                 type: object
+              activeController:
+                description: |-
+                  ActiveController identifies the hub controller that currently holds leadership.
+                  Populated only on an Active/Standby HA deployment; absent otherwise, so a
+                  non-HA worker sees no behaviour change.
+                properties:
+                  activeIdentity:
+                    description: ActiveIdentity is the HA identity of the hub that
+                      wrote this field about itself
+                    type: string
+                  caBundle:
+                    description: CABundle is the base64-encoded PEM CA bundle for
+                      Endpoint
+                    type: string
+                  endpoint:
+                    description: Endpoint is the API server endpoint of the hub currently
+                      holding leadership
+                    type: string
+                  lastUpdated:
+                    description: |-
+                      LastUpdated is the timestamp when this declaration was last written. It gives
+                      a consumer a deterministic tie-break if both hubs self-declare simultaneously.
+                    format: date-time
+                    type: string
+                type: object
               clusterHealth:
                 description: ClusterHealth shows the health of the worker cluster
                 properties:

@@ -39,6 +39,21 @@ const (
 	DefaultRenewDeadline  = 10 * time.Second
 	DefaultRetryPeriod    = 2 * time.Second
 	DefaultPaddingSeconds = 5 * time.Second
+
+	// DefaultPromotionDialTimeout bounds the two reads a Standby makes before
+	// promoting: the self-health check against its own API server, and the final
+	// dial to the Active's. Both must be bounded — main.go builds the remote
+	// client with a plain uncached client.New and no timeout, so a dial to a
+	// black-holed API server blocks until the OS TCP timeout, which is minutes
+	// and far outside the failover budget.
+	DefaultPromotionDialTimeout = 5 * time.Second
+
+	// DefaultPromotionGracePeriod bounds step 7 of the promotion sequence:
+	// publishing status.activeController before the write fence opens. On expiry
+	// promotion proceeds anyway and the publisher's own loop keeps retrying —
+	// this is a budget, not a precondition. Distinct from PaddingSeconds, which
+	// is a detection threshold and has nothing to do with sequencing.
+	DefaultPromotionGracePeriod = 10 * time.Second
 )
 
 // Options configures a ClusterLeaderElector. Zero-valued fields fall back to the
@@ -59,7 +74,12 @@ type Options struct {
 	RenewDeadline  time.Duration
 	RetryPeriod    time.Duration
 	PaddingSeconds time.Duration
-	Log            *zap.SugaredLogger
+	// PromotionDialTimeout bounds each of the two pre-promotion reads.
+	PromotionDialTimeout time.Duration
+	// PromotionGracePeriod bounds the activeController publication step of the
+	// promotion sequence.
+	PromotionGracePeriod time.Duration
+	Log                  *zap.SugaredLogger
 }
 
 // ClusterLeaderElector coordinates leadership between two hub clusters. Unlike
@@ -70,15 +90,31 @@ type ClusterLeaderElector struct {
 	localClient  client.Client // own cluster — create and renew the Lease
 	remoteClient client.Client // Standby only — read the Active's Lease (may be nil otherwise)
 
-	mode      HAMode
+	// mode is an atomic.Value holding an HAMode, not a plain field, because
+	// promotion mutates it from its own goroutine while Mode(), StartLeaseRenewal
+	// and WatchRemoteLease read it from theirs — a plain field would be a data
+	// race, and -race would rightly say so.
+	mode      atomic.Value
 	identity  string
 	leaseName string
 	leaseNS   string
+
+	// promoting is held for the whole promotion sequence. IsLeader() reports
+	// false while it is set, regardless of isLeader, so the write fence stays
+	// shut from the first step until the last — see promote().
+	promoting atomic.Bool
+
+	// hooks are promotion's effects outside the elector. Injected so pkg/ha
+	// stays independent of the mirror, the publisher and the manager.
+	hooks PromotionHooks
 
 	leaseDuration time.Duration
 	renewDeadline time.Duration
 	retryPeriod   time.Duration
 	padding       time.Duration
+
+	promotionDialTimeout time.Duration
+	promotionGracePeriod time.Duration
 
 	// isLeader is the single source of truth read by IsLeader(). The background
 	// renewal loop keeps it current, so readers never touch the API server.
@@ -86,6 +122,26 @@ type ClusterLeaderElector struct {
 	// lastRenew is the time of the last successful Lease renewal. Only the
 	// renewal goroutine reads and writes it.
 	lastRenew time.Time
+
+	// lastSeenLease is the newest Lease successfully read from the Active hub,
+	// and nil until the very first successful read. It is the whole of the
+	// promotion trigger (issue #297).
+	//
+	// A failed read deliberately leaves it untouched rather than clearing it or
+	// treating the failure as health. "The Active's controller stopped renewing"
+	// and "the Active's API server stopped answering" are the same event from
+	// here — in both, the newest proof of life this hub holds stops advancing —
+	// so a retained stale Lease ages on its own against a moving clock and one
+	// comparison covers both. Before this, a read failure reported "not stale",
+	// which made the loss of an entire hub undetectable.
+	//
+	// Only WatchRemoteLease's single goroutine touches this and lastGoodRead.
+	lastSeenLease *coordinationv1.Lease
+	// lastGoodRead is the local wall-clock time of that read. Not used by the
+	// verdict, which anchors on the Lease's own renewTime; carried so an
+	// optional local-only staleness floor stays available without a redesign
+	// if clock skew between hubs ever becomes a practical problem.
+	lastGoodRead time.Time
 
 	log *zap.SugaredLogger
 }
@@ -122,6 +178,12 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 	if opts.PaddingSeconds == 0 {
 		opts.PaddingSeconds = DefaultPaddingSeconds
 	}
+	if opts.PromotionDialTimeout == 0 {
+		opts.PromotionDialTimeout = DefaultPromotionDialTimeout
+	}
+	if opts.PromotionGracePeriod == 0 {
+		opts.PromotionGracePeriod = DefaultPromotionGracePeriod
+	}
 	if opts.Identity == "" {
 		if hostname, err := os.Hostname(); err == nil {
 			opts.Identity = hostname
@@ -134,21 +196,25 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 	}
 
 	e := &ClusterLeaderElector{
-		localClient:   local,
-		remoteClient:  remote,
-		mode:          opts.Mode,
-		identity:      opts.Identity,
-		leaseName:     opts.LeaseName,
-		leaseNS:       opts.LeaseNamespace,
-		leaseDuration: opts.LeaseDuration,
-		renewDeadline: opts.RenewDeadline,
-		retryPeriod:   opts.RetryPeriod,
-		padding:       opts.PaddingSeconds,
-		log:           opts.Log,
+		localClient:          local,
+		remoteClient:         remote,
+		identity:             opts.Identity,
+		leaseName:            opts.LeaseName,
+		leaseNS:              opts.LeaseNamespace,
+		leaseDuration:        opts.LeaseDuration,
+		renewDeadline:        opts.RenewDeadline,
+		retryPeriod:          opts.RetryPeriod,
+		padding:              opts.PaddingSeconds,
+		promotionDialTimeout: opts.PromotionDialTimeout,
+		promotionGracePeriod: opts.PromotionGracePeriod,
+		log:                  opts.Log,
 	}
 	// Standalone is always the leader: no Lease, no remote watch — identical to
 	// the controller's behaviour before HA (the no-regression guarantee).
-	if e.mode == ModeStandalone {
+	e.mode.Store(opts.Mode)
+	// Standalone is always the leader: no Lease, no remote watch — identical to
+	// the controller's behaviour before HA (the no-regression guarantee).
+	if opts.Mode == ModeStandalone {
 		e.isLeader.Store(true)
 	}
 	return e
@@ -158,13 +224,38 @@ func NewClusterLeaderElector(local, remote client.Client, opts Options) *Cluster
 // now. It reads an in-memory flag kept current by the background loops, so it is
 // cheap enough to call at the top of every Reconcile. The value reflects live
 // leadership (refreshed every retryPeriod), never a value frozen at startup.
+// It also reports false for the whole of a promotion sequence, regardless of
+// isLeader: steps 0 and 8 of promote() bracket the sequence with the promoting
+// latch, so the write fence stays shut until the new Active has stopped the
+// mirror, taken its Lease and published who it is. That is what gives "the
+// reconcilers are not live until promotion finishes" real teeth without any
+// external status surface.
 func (e *ClusterLeaderElector) IsLeader() bool {
-	return e.isLeader.Load()
+	return e.isLeader.Load() && !e.promoting.Load()
 }
 
-// Mode returns the configured HA mode.
+// Mode returns the current HA mode. It is read live rather than captured at
+// startup, because promotion changes it.
 func (e *ClusterLeaderElector) Mode() HAMode {
-	return e.mode
+	mode, _ := e.mode.Load().(HAMode)
+	return mode
+}
+
+// setMode swaps the running mode. Only promote() calls it.
+func (e *ClusterLeaderElector) setMode(mode HAMode) {
+	e.mode.Store(mode)
+	e.log.Infow("HA mode changed", "mode", mode, "identity", e.identity)
+}
+
+// SetPromotionHooks installs the effects promotion has outside the elector.
+// Called from main.go once the mirror, publisher and manager exist — they are
+// constructed after the elector, so they cannot be constructor arguments.
+//
+// A Standby with no hooks still promotes correctly in the narrow sense (it
+// takes the Lease and opens the fence); the hooks are what make the promotion
+// safe and complete.
+func (e *ClusterLeaderElector) SetPromotionHooks(hooks PromotionHooks) {
+	e.hooks = hooks
 }
 
 // Identity returns this instance's Lease holder identity.
@@ -175,8 +266,8 @@ func (e *ClusterLeaderElector) Identity() string {
 // StartLeaseRenewal runs the Active's renewal loop until ctx is cancelled. It is
 // a no-op in any other mode. It renews immediately, then every retryPeriod.
 func (e *ClusterLeaderElector) StartLeaseRenewal(ctx context.Context) error {
-	if e.mode != ModeActive {
-		e.log.Infow("lease renewal not started; not in active mode", "mode", e.mode)
+	if e.Mode() != ModeActive {
+		e.log.Infow("lease renewal not started; not in active mode", "mode", e.Mode())
 		return nil
 	}
 	e.log.Infow("starting lease renewal",
@@ -222,13 +313,16 @@ func (e *ClusterLeaderElector) renewOnce(ctx context.Context) error {
 	return nil
 }
 
-// WatchRemoteLease runs the Standby's watch loop until ctx is cancelled. It reads
-// the Active's Lease every retryPeriod and logs whether it is fresh or stale. In
-// issue #294 it does not promote — detecting staleness and acquiring leadership
-// is issue #297.
+// WatchRemoteLease runs the Standby's watch loop until ctx is cancelled. It
+// reads the Active's Lease every retryPeriod and, once that Lease has aged past
+// leaseDuration + padding, runs the promotion sequence (issue #297).
+//
+// It returns as soon as promotion succeeds: this hub is an Active now, and
+// there is no longer any Active to watch. Promotion has already started the
+// renewal loop that replaces it.
 func (e *ClusterLeaderElector) WatchRemoteLease(ctx context.Context) error {
-	if e.mode != ModeStandby {
-		e.log.Infow("remote lease watch not started; not in standby mode", "mode", e.mode)
+	if e.Mode() != ModeStandby {
+		e.log.Infow("remote lease watch not started; not in standby mode", "mode", e.Mode())
 		return nil
 	}
 	if e.remoteClient == nil {
@@ -244,27 +338,86 @@ func (e *ClusterLeaderElector) WatchRemoteLease(ctx context.Context) error {
 			e.log.Infow("remote lease watch stopped", "reason", ctx.Err())
 			return nil
 		case <-ticker.C:
-			_, _ = e.checkRemoteLeaseOnce(ctx)
+			candidate, _ := e.checkRemoteLeaseOnce(ctx)
+			if !candidate {
+				continue
+			}
+			promoted, err := e.promote(ctx)
+			if err != nil {
+				// Stay a Standby and try again next tick. Every failure path in
+				// promote() leaves the hub exactly as it was — still fenced,
+				// still armed — so retrying is safe rather than merely tolerable.
+				e.log.Errorw("promotion attempt failed; remaining standby", "error", err)
+				continue
+			}
+			if promoted {
+				e.log.Infow("remote lease watch stopping; this hub is now the active")
+				return nil
+			}
 		}
 	}
 }
 
-// checkRemoteLeaseOnce reads the Active's Lease once and reports whether it is
-// stale. It never changes leadership in issue #294: a Standby stays a Standby.
-func (e *ClusterLeaderElector) checkRemoteLeaseOnce(ctx context.Context) (stale bool, err error) {
-	lease, err := getLease(ctx, e.remoteClient, e.leaseName, e.leaseNS)
+// checkRemoteLeaseOnce reads the Active's Lease once, updates the cached view,
+// and reports whether this hub is now a promotion *candidate*. It never changes
+// leadership itself — the guards and the promotion sequence are separate, so
+// that "we think the Active is gone" and "we took over" stay independently
+// testable.
+//
+// err is the read error, returned for logging and tests; the verdict does not
+// depend on it. A read that fails is not evidence of health, it is the absence
+// of new evidence — see lastSeenLease.
+func (e *ClusterLeaderElector) checkRemoteLeaseOnce(ctx context.Context) (candidate bool, err error) {
+	// ⚠️ Bounded, for the same reason the guards' reads are. The watch loop calls
+	// this synchronously, so a read that blocks blocks the loop — and while it is
+	// blocked no staleness is evaluated at all. main.go builds the remote client
+	// with a plain uncached client.New and no timeout, so an API server that
+	// accepts the connection and then stops answering leaves the read hanging
+	// until the transport gives up: minutes against a black-holed host.
+	//
+	// This is not hypothetical. Live-testing an Active whose API server was shut
+	// down showed a single read blocking for ~12s, with no staleness evaluated in
+	// the whole window, before the connection finally broke. That was a graceful
+	// container shutdown; a powered-off node or a dropped-packet partition has
+	// nothing to break the connection at all, and the failover budget would be
+	// blown by an unbounded wait rather than by the detection rule.
+	readCtx, cancel := context.WithTimeout(ctx, e.promotionDialTimeout)
+	defer cancel()
+
+	lease, err := getLease(readCtx, e.remoteClient, e.leaseName, e.leaseNS)
 	if err != nil {
-		e.log.Warnw("could not read active hub lease", "error", err)
+		e.log.Warnw("could not read active hub lease; retaining last known view",
+			"error", err, "armed", e.lastSeenLease != nil)
+	} else {
+		e.lastSeenLease = lease
+		e.lastGoodRead = time.Now()
+	}
+
+	// ⚠️ This nil check MUST stay a separate statement and must never be folded
+	// into the isLeaseStale call below. isLeaseStale(nil, ...) returns TRUE
+	// (lease.go) — correct for its original caller, where a Lease that does not
+	// exist on your own cluster is stale and should be created. Here it would
+	// mean a Standby that has never once read the Active's Lease concludes the
+	// Active is dead and promotes on its very first tick: a broken kubeconfig,
+	// a missing RBAC grant or a mistyped namespace would each become a
+	// guaranteed split brain. TestNeverArmed_NeverBecomesCandidate pins this.
+	if e.lastSeenLease == nil {
+		e.log.Warnw("the active hub's lease has never been read successfully; refusing to consider promotion",
+			"lease", e.leaseName, "namespace", e.leaseNS,
+			"hint", "check --ha-active-kubeconfig, RBAC for coordination.k8s.io/leases, and the lease namespace")
 		return false, err
 	}
-	if isLeaseStale(lease, e.padding, time.Now()) {
-		e.log.Warnw("active hub lease is STALE; promotion would trigger here (implemented in #297)",
-			"lease", e.leaseName, "holder", leaseHolder(lease), "renewTime", leaseRenewStr(lease))
-		return true, nil
+
+	if !isLeaseStale(e.lastSeenLease, e.padding, time.Now()) {
+		e.log.Debugw("active hub lease is fresh",
+			"lease", e.leaseName, "holder", leaseHolder(e.lastSeenLease), "renewTime", leaseRenewStr(e.lastSeenLease))
+		return false, err
 	}
-	e.log.Debugw("active hub lease is fresh",
-		"lease", e.leaseName, "holder", leaseHolder(lease), "renewTime", leaseRenewStr(lease))
-	return false, nil
+
+	e.log.Warnw("active hub lease is STALE; evaluating promotion",
+		"lease", e.leaseName, "holder", leaseHolder(e.lastSeenLease),
+		"renewTime", leaseRenewStr(e.lastSeenLease), "readable", err == nil)
+	return true, err
 }
 
 // setLeader updates the leadership flag and logs LeadershipAcquired /

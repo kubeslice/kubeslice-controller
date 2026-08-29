@@ -742,6 +742,14 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Failed to mirror a resource from the Active hub onto the Standby; the syncer will retry.",
 	},
+	"HAPromotedToActive": {
+		Name:                "HAPromotedToActive",
+		Reason:              "PromotedToActive",
+		Action:              "HAPromotion",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "This hub was promoted from Standby to Active after the previous Active hub's lease went stale.",
+	},
 }
 
 var (
@@ -835,4 +843,5 @@ var (
 	EventIllegalVPNKeyRotationConfigDelete    events.EventName = "IllegalVPNKeyRotationConfigDelete"
 	EventCertificateJobFailed                 events.EventName = "CertificateJobFailed"
 	EventHAMirrorSyncFailed                   events.EventName = "HAMirrorSyncFailed"
+	EventHAPromotedToActive                   events.EventName = "HAPromotedToActive"
 )
