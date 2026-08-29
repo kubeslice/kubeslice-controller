@@ -215,15 +215,28 @@ func applyDefaults(opts Options) Options {
 	if opts.PromotionGracePeriod == 0 {
 		opts.PromotionGracePeriod = DefaultPromotionGracePeriod
 	}
+	if opts.Log == nil {
+		opts.Log = util.NewLogger().With("name", "ha-leader-elector")
+	}
 	if opts.Identity == "" {
 		if hostname, err := os.Hostname(); err == nil {
 			opts.Identity = hostname
 		} else {
 			opts.Identity = "kubeslice-controller"
 		}
-	}
-	if opts.Log == nil {
-		opts.Log = util.NewLogger().With("name", "ha-leader-elector")
+		// Warned about rather than rejected, because standalone neither writes a
+		// Lease nor publishes an identity and must keep starting with no flags at
+		// all. In active/standby the derived value is the pod name, which the
+		// Deployment replaces on every restart and rollout — and identity is what
+		// the worker's resolver compares to decide whether the hub it is talking
+		// to has changed (sameTarget, worker-operator #467). An unpinned identity
+		// therefore makes a restarted Active look like a different hub: the worker
+		// re-runs its confirmation count and logs a failover that never happened.
+		if opts.Mode != ModeStandalone {
+			opts.Log.Warnw("no --ha-identity given; derived one from the hostname, which changes on every restart",
+				"identity", opts.Identity, "mode", opts.Mode,
+				"advice", "set --ha-identity to a stable per-hub name")
+		}
 	}
 
 	return opts

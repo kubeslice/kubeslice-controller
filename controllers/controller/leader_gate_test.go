@@ -34,8 +34,14 @@ import (
 // controller returns immediately from Reconcile without touching its service
 // (left nil here — a leaking gate would panic), and logs the skip message on
 // every call, proving IsLeader() is evaluated per invocation.
+//
+// The observer is opened at Debug because that is where the skip line lives: a
+// healthy Standby is woken by its own mirror's writes, so at Info it would log
+// once per mirrored object. The behaviour under test is the no-op return, not
+// the level — the level is asserted only so a silent regression to Info, which
+// would reinstate the flood, still fails here.
 func TestReconcile_StandbySkipsAndLogs(t *testing.T) {
-	core, logs := observer.New(zapcore.InfoLevel)
+	core, logs := observer.New(zapcore.DebugLevel)
 	logger := zap.New(core).Sugar()
 
 	standby := ha.NewClusterLeaderElector(nil, nil, ha.Options{
@@ -57,6 +63,12 @@ func TestReconcile_StandbySkipsAndLogs(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, res)
 	}
 
-	assert.Equal(t, calls, logs.FilterMessage("standby mode, skipping reconcile").Len(),
-		"expected one skip log per Reconcile call")
+	skips := logs.FilterMessage("standby mode, skipping reconcile")
+	assert.Equal(t, calls, skips.Len(), "expected one skip log per Reconcile call")
+	for _, entry := range skips.All() {
+		assert.Equal(t, zapcore.DebugLevel, entry.Level,
+			"the skip must stay at debug; at info a Standby floods its own log")
+		assert.Contains(t, entry.ContextMap(), "request",
+			"the skip must name the request it dropped")
+	}
 }

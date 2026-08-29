@@ -122,6 +122,34 @@ func TestRenewOnce_KeepsLeadershipWithinRenewDeadline(t *testing.T) {
 	assert.True(t, e.IsLeader(), "leadership must be kept while still within renewDeadline (transient failure)")
 }
 
+// TestApplyDefaults_WarnsOnDerivedIdentity covers the one case where the
+// hostname fallback is a misconfiguration rather than a convenience: in
+// active/standby the derived value is the pod name, and the worker's resolver
+// reads a changed identity as a changed hub.
+func TestApplyDefaults_WarnsOnDerivedIdentity(t *testing.T) {
+	const warning = "no --ha-identity given; derived one from the hostname, which changes on every restart"
+
+	for _, mode := range []HAMode{ModeActive, ModeStandby} {
+		core, logs := observer.New(zapcore.WarnLevel)
+		opts := applyDefaults(Options{Mode: mode, Log: zap.New(core).Sugar()})
+		assert.NotEmpty(t, opts.Identity, "an identity must still be derived")
+		assert.Equal(t, 1, logs.FilterMessage(warning).Len(),
+			"mode %q must warn that the identity is not stable", mode)
+	}
+
+	// Standalone writes no Lease and publishes no identity, so the derived
+	// value is never read by anything and must stay silent — every existing
+	// single-hub deployment runs with no --ha-identity at all.
+	core, logs := observer.New(zapcore.WarnLevel)
+	applyDefaults(Options{Mode: ModeStandalone, Log: zap.New(core).Sugar()})
+	assert.Zero(t, logs.FilterMessage(warning).Len(), "standalone must not warn")
+
+	// An explicitly pinned identity is the fix, so it must not warn either.
+	core, logs = observer.New(zapcore.WarnLevel)
+	applyDefaults(Options{Mode: ModeActive, Identity: "hub-a", Log: zap.New(core).Sugar()})
+	assert.Zero(t, logs.FilterMessage(warning).Len(), "a pinned identity must not warn")
+}
+
 func TestSetLeader_LogsOnlyOnTransition(t *testing.T) {
 	core, logs := observer.New(zapcore.InfoLevel)
 	log := zap.New(core).Sugar()

@@ -161,7 +161,7 @@ func initialize(services *service.Services) {
 
 	// Cross-cluster HA flags. --ha-mode=standalone (default) preserves today's behaviour.
 	flag.StringVar(&haMode, "ha-mode", "standalone", `Cross-cluster HA mode: "active", "standby", or "standalone" (default).`)
-	flag.StringVar(&haIdentity, "ha-identity", "", "Stable per-cluster identity recorded in the Lease (defaults to the hostname).")
+	flag.StringVar(&haIdentity, "ha-identity", "", "Stable per-hub identity recorded in the Lease and published in status.activeController. Defaults to the hostname, which under a Deployment is the pod name and changes on every restart, so pin it in active/standby mode.")
 	flag.StringVar(&haActiveKubeconfig, "ha-active-kubeconfig", "", "Path to the Active hub kubeconfig; required in standby mode.")
 	flag.StringVar(&haLeaseNamespace, "ha-lease-namespace", os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"), "Namespace for the HA Lease; defaults to the controller's own namespace (KUBESLICE_CONTROLLER_MANAGER_NAMESPACE), where the leader-election Role grants leases. Empty falls back to the pkg/ha default.")
 	flag.DurationVar(&haLeaseDuration, "ha-lease-duration", ha.DefaultLeaseDuration, "HA Lease duration.")
@@ -169,7 +169,7 @@ func initialize(services *service.Services) {
 	flag.DurationVar(&haRetryPeriod, "ha-retry-period", ha.DefaultRetryPeriod, "Interval between Lease renew/watch attempts.")
 	flag.DurationVar(&haPaddingSeconds, "ha-padding-seconds", ha.DefaultPaddingSeconds, "Extra buffer a Standby waits before treating the Active Lease as stale.")
 	flag.IntVar(&haSyncWorkers, "ha-sync-workers", ha.DefaultSyncWorkers, "Number of workers draining the Standby's remote-mirror workqueue.")
-	flag.DurationVar(&haSyncInterval, "ha-sync-interval", ha.DefaultPruneInterval, "How often the Standby prunes mirrored objects that no longer exist on the Active hub.")
+	flag.DurationVar(&haSyncInterval, "ha-sync-interval", ha.DefaultPruneInterval, "How often the Standby reconciles drift against the Active hub: it prunes mirrors whose original is gone, and re-enqueues Active-side objects it holds no mirror of.")
 	flag.DurationVar(&haPromotionDialTimeout, "ha-promotion-dial-timeout", ha.DefaultPromotionDialTimeout, "Bound on every read a Standby makes of a Lease over the network: each periodic poll of the Active's Lease, its own self-health check, and the final dial. Unbounded, an API server that accepts the connection and then stops answering blocks the watch loop and stalls detection entirely.")
 	flag.DurationVar(&haPromotionGracePeriod, "ha-promotion-grace-period", ha.DefaultPromotionGracePeriod, "Bound on each step of the promotion sequence that waits on another component: stopping the mirror, publishing status.activeController, re-enqueuing objects, and emitting the event. A sequencing budget, unrelated to --ha-padding-seconds.")
 	flag.StringVar(&haSelfCABundlePath, "ha-self-ca-bundle-path", ha.DefaultSelfCABundlePath, "Path to this hub's own API server CA, published in status.activeController.caBundle. Unreadable is not fatal; publication continues without it.")

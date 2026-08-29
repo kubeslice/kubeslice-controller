@@ -137,6 +137,63 @@ func TestPruneOnce_ReverseDiffEnqueuesActiveObjectsMissingLocally(t *testing.T) 
 	assert.Equal(t, missing, got)
 }
 
+// TestPruneOnce_ReverseDiffSkipsNamespacesOutsideTheMirror pins the gate that
+// keeps the reverse diff finite. A RequireMirroredNamespace row reads an
+// unscoped remote cache — Secrets can be narrowed neither by label nor by field
+// — so the Active-side listing carries the whole hub. Every out-of-scope key is
+// permanently "missing locally", so without the gate each one is re-enqueued on
+// every pass forever.
+func TestPruneOnce_ReverseDiffSkipsNamespacesOutsideTheMirror(t *testing.T) {
+	ctx := context.Background()
+	inScope := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "wanted"}
+	alsoInScope := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "also-wanted"}
+	outOfScope := syncKey{GVK: testGVK, Namespace: "kube-system", Name: "unrelated"}
+
+	remote := newStubRemote()
+	projNS := syncKey{GVK: nsGVK, Name: "proj-a"}
+	remote.objects[projNS] = newTestUnstructured(nsGVK, "", "proj-a")
+
+	s := buildSyncer(t, remote)
+	s.resources = []MirroredResource{{GVK: testGVK, RequireMirroredNamespace: true}}
+	s.remoteList = stubRemoteList([]syncKey{inScope, alsoInScope, outOfScope}, nil)
+
+	s.pruneOnce(ctx)
+
+	assert.Equal(t, 2, s.queue.Len(), "only the two in-scope keys may be re-enqueued")
+	got := map[syncKey]bool{}
+	for s.queue.Len() > 0 {
+		k, _ := s.queue.Get()
+		got[k] = true
+	}
+	assert.True(t, got[inScope])
+	assert.True(t, got[alsoInScope])
+	assert.False(t, got[outOfScope], "a namespace the mirror does not cover must never be enqueued")
+
+	assert.Equal(t, 1, remote.callCount(projNS),
+		"the namespace verdict must be memoised for the pass, not re-read per key")
+}
+
+// TestPruneOnce_ReverseDiffStillEnqueuesWhenTheRowIsUnscoped guards the other
+// side of the gate: a row without RequireMirroredNamespace has a label-scoped
+// remote cache already, so the reverse diff must not start consulting the
+// Namespace view for it.
+func TestPruneOnce_ReverseDiffStillEnqueuesWhenTheRowIsUnscoped(t *testing.T) {
+	ctx := context.Background()
+	missing := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "sc-missing"}
+
+	remote := newStubRemote() // no Namespace object registered at all
+	s := buildSyncer(t, remote)
+	s.remoteList = stubRemoteList([]syncKey{missing}, nil)
+
+	s.pruneOnce(ctx)
+
+	require.Equal(t, 1, s.queue.Len())
+	got, _ := s.queue.Get()
+	assert.Equal(t, missing, got)
+	assert.Zero(t, remote.callCount(syncKey{GVK: nsGVK, Name: "proj-a"}),
+		"an unscoped row must not pay for a namespace lookup")
+}
+
 func TestPruneOnce_ReverseDiffCannotOverrideConflictGuard(t *testing.T) {
 	ctx := context.Background()
 	key := syncKey{GVK: testGVK, Namespace: "proj-a", Name: "hand-created"}

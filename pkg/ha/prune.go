@@ -82,6 +82,24 @@ func (s *RemoteSyncer) runPrune(ctx context.Context) {
 // information — deleting mirrors is the one operation where acting on an
 // incomplete view is worse than doing nothing until the next tick.
 func (s *RemoteSyncer) pruneOnce(ctx context.Context) {
+	// Memoised for this pass only. The reverse diff below asks the same
+	// question once per out-of-scope key, and on the Active hub of a real
+	// deployment those keys are overwhelmingly Secrets sharing a handful of
+	// namespaces. A pass-scoped map keeps a namespace that gains or loses the
+	// controller label visible by the next tick.
+	nsMirrored := make(map[string]bool)
+	namespaceInScope := func(ns string) (bool, error) {
+		if in, seen := nsMirrored[ns]; seen {
+			return in, nil
+		}
+		in, err := s.namespaceIsMirrored(ctx, ns)
+		if err != nil {
+			return false, err
+		}
+		nsMirrored[ns] = in
+		return in, nil
+	}
+
 	for _, res := range s.resources {
 		activeKeys, err := s.remoteList(ctx, res.GVK)
 		if err != nil {
@@ -122,11 +140,40 @@ func (s *RemoteSyncer) pruneOnce(ctx context.Context) {
 		// Re-enqueueing is always safe: the worker re-reads Active and runs
 		// the full Skip/namespace/conflict-guard chain, so objects that
 		// should not mirror simply no-op again.
+		//
+		// Safe, but not free, and for a RequireMirroredNamespace row not even
+		// finite: that row's remote cache is deliberately unscoped, because
+		// Secrets can be scoped neither by label nor by field (see the cache
+		// comment in remote_syncer.go), so activeKeys holds every Secret on the
+		// Active hub — kube-system, default, the controller's own namespace.
+		// None of them will ever have a local mirror, so "missing locally" is
+		// permanently true for all of them and each one would be re-enqueued
+		// every --ha-sync-interval for the lifetime of the Standby, burning
+		// queue and worker time on a guaranteed no-op and counting itself as a
+		// resurrection on every pass. Applying the same namespace gate the
+		// worker would reach anyway leaves the genuine cases — all of which are
+		// in-scope by construction — and drops the rest before they cost
+		// anything.
 		for key := range activeKeys {
-			if _, mirrored := localKeys[key]; !mirrored {
-				haPruneResurrectedTotal.WithLabelValues(key.GVK.Kind).Inc()
-				s.enqueue(key)
+			if _, mirrored := localKeys[key]; mirrored {
+				continue
 			}
+			if res.RequireMirroredNamespace {
+				inScope, err := namespaceInScope(key.Namespace)
+				if err != nil {
+					// Re-enqueue rather than drop: the worker re-runs this same
+					// gate against a cache that may have recovered by then, and
+					// a wasted no-op is cheaper than a mirror that never appears
+					// because one cache read failed.
+					haSyncErrorsTotal.WithLabelValues(res.GVK.Kind, string(opPrune)).Inc()
+					s.log.Warnw("prune: namespace scope check failed; re-enqueueing anyway",
+						"kind", key.GVK.Kind, "namespace", key.Namespace, "error", err)
+				} else if !inScope {
+					continue
+				}
+			}
+			haPruneResurrectedTotal.WithLabelValues(key.GVK.Kind).Inc()
+			s.enqueue(key)
 		}
 	}
 	// After the loop, not inside it: one pass covers every kind, and a per-kind

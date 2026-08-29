@@ -39,9 +39,9 @@ repo. Logged as a follow-up, not built.
 
 ## Credential mirroring and the Secret-read tradeoff
 
-`pkg/ha.CredentialMirrorSet` (Secrets with the SA-token type filtered out,
-ServiceAccounts, Roles, RoleBindings — for #297's post-promotion use) is
-wired in, and this `ClusterRole` grants the reads it needs. Weigh the
+`pkg/ha.CredentialMirrorSet` (Secrets, ServiceAccounts, Roles,
+RoleBindings — for #297's post-promotion use) is wired in, and this
+`ClusterRole` grants the reads it needs. Weigh the
 Secret rule before applying it: RBAC cannot scope `Secret` access by
 `.type` or by namespace *label*, and a `ClusterRole` +
 `ClusterRoleBinding` is cluster-wide — so the Standby's identity can read
@@ -49,8 +49,9 @@ Secret rule before applying it: RBAC cannot scope `Secret` access by
 Secrets `RemoteSyncer` actually mirrors. The syncer itself only *copies*
 credential objects whose namespace it also mirrors (the label-scoped
 project-namespace boundary — notably excluding the controller's own
-namespace, whose name can match the project-namespace prefix) and
-excludes SA-token Secrets from the watch entirely, but none of that
+namespace, whose name can match the project-namespace prefix), and it
+carries SA-token Secrets as empty shells whose token bytes are stripped
+before the write, but none of that
 narrows what the identity *could* read if the kubeconfig leaked —
 protect it like the credential it is. The narrower alternative — per-namespace `RoleBinding`s in each
 project namespace instead of the cluster-wide binding — works with the
