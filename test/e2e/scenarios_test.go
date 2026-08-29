@@ -160,7 +160,8 @@ func scenarioWebhookRejectsInvalid(t *testing.T) {
 			_, _ = tryRun("kubectl", "", "--context", kubeContext, "delete", "sliceconfig", sliceName+"-bad", "-n", projectNS)
 			t.Fatalf("invalid topology %q was accepted, expected rejection", c.name)
 		}
-		if !strings.Contains(strings.ToLower(out), "invalid") && !strings.Contains(out, "Unsupported") && !strings.Contains(out, "Too many") {
+		lowerOut := strings.ToLower(out)
+		if !strings.Contains(lowerOut, "invalid") && !strings.Contains(lowerOut, "unsupported") && !strings.Contains(lowerOut, "too many") {
 			t.Fatalf("invalid topology %q rejected without a clear error:\n%s", c.name, out)
 		}
 	}
