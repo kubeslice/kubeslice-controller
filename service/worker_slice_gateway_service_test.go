@@ -110,7 +110,6 @@ func testWorkerSliceGatewayReconciliationSuccess(t *testing.T) {
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	result, err := workerSliceGatewayService.ReconcileWorkerSliceGateways(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -151,7 +150,6 @@ func testWorkerSliceGatewayReconciliationIfSliceConfigNotFound(t *testing.T) {
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), sliceConfig).Return(notFoundError).Once()
 	result, err := workerSliceGatewayService.ReconcileWorkerSliceGateways(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -164,7 +162,6 @@ func testWorkerSliceGatewayReconciliationIfGatewayNotFound(t *testing.T) {
 	clientMock.On("Get", ctx, requestObj.NamespacedName, WorkerSliceGateway).Return(notFoundError).Once()
 	result, err := workerSliceGatewayService.ReconcileWorkerSliceGateways(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -187,7 +184,6 @@ func testWorkerSliceGatewayReconciliationDelete(t *testing.T) {
 	clientMock.On("Get", ctx, mock.AnythingOfType("types.NamespacedName"), sliceConfig).Return(notFoundError).Once()
 	result, err := workerSliceGatewayService.ReconcileWorkerSliceGateways(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -242,7 +238,6 @@ func testWorkerSliceGatewayReconciliationDeleteForcefully(t *testing.T) {
 	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
 	result, err := workerSliceGatewayService.ReconcileWorkerSliceGateways(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -324,7 +319,6 @@ func testCreateMinimumWorkerSliceGatewaysAlreadyExists(t *testing.T) {
 
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil, nil)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -513,7 +507,6 @@ func testCreateMinimumWorkerSliceGatewaysNotExists(t *testing.T) {
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := workerSliceGatewayService.CreateMinimumWorkerSliceGateways(ctx, "red", clusterNames, requestObj.Namespace, label, clusterMap, "10.10.10.10/16", "/16", nil, nil)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, result, expectedResult)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -581,7 +574,6 @@ func testDeleteWorkerSliceGatewaysByLabelExists(t *testing.T) {
 	clientMock.On("Update", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	err := workerSliceGatewayService.DeleteWorkerSliceGatewaysByLabel(ctx, label, "namespace")
-	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 	mMock.AssertExpectations(t)
@@ -662,7 +654,6 @@ func testNodeIpReconciliationOfWorkerSliceGatewaysExists(t *testing.T) {
 		Status: controllerv1alpha1.ClusterStatus{},
 	}
 	err := workerSliceGatewayService.NodeIpReconciliationOfWorkerSliceGateways(ctx, &cluster, "namespace")
-	require.NoError(t, nil)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
 }
