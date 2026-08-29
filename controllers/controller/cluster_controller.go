@@ -29,10 +29,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
+	// PromotionKick, when set, delivers one event per existing object after a
+	// promotion. The HA write fence drops reconcile requests rather than
+	// requeuing them, so flipping it reconciles nothing that already existed;
+	// this is what wakes that state up. Nil outside HA, which registers no
+	// extra watch and leaves behaviour unchanged.
+	PromotionKick <-chan event.GenericEvent
 	client.Client
 	Scheme         *runtime.Scheme
 	ClusterService service.IClusterService
@@ -45,9 +54,15 @@ type ClusterReconciler struct {
 
 // SetupWithManager sets up the controller with the Manager.
 func (c *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&controllerv1alpha1.Cluster{}).
-		Complete(c)
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&controllerv1alpha1.Cluster{})
+	// Registered only when set. source.Channel rejects a nil channel when the
+	// manager starts it, so an unconditional watch would break every caller that
+	// does not wire the kick — the envtest suite among them.
+	if c.PromotionKick != nil {
+		b = b.WatchesRawSource(source.Channel(c.PromotionKick, &handler.EnqueueRequestForObject{}))
+	}
+	return b.Complete(c)
 }
 
 // Reconcile is a function to reconcile the cluster , ClusterReconciler implements it

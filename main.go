@@ -373,8 +373,16 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 
+	// One channel per reconciled type, delivered to each controller below and
+	// filled once on promotion. Built unconditionally: outside HA the kick
+	// simply never fires, and wiring it here keeps the reconcilers identical in
+	// both modes.
+	reconcileKicker := ha.NewReconcileKicker(mgr.GetClient(), ha.ReconciledGVKs(),
+		controllerLog.With("name", "ha-reconcile-kicker"))
+
 	// initialize controller with Project Kind
 	if err = (&controller.ProjectReconciler{
+		PromotionKick:  reconcileKicker.Source(ha.GVKProject),
 		LeaderElector:  leaderElector,
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
@@ -387,6 +395,7 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with Cluster Kind
 	if err = (&controller.ClusterReconciler{
+		PromotionKick:  reconcileKicker.Source(ha.GVKCluster),
 		LeaderElector:  leaderElector,
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
@@ -399,6 +408,7 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with SliceConfig Kind
 	if err = (&controller.SliceConfigReconciler{
+		PromotionKick:      reconcileKicker.Source(ha.GVKSliceConfig),
 		LeaderElector:      leaderElector,
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
@@ -411,6 +421,7 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with ServiceExportConfig Kind
 	if err = (&controller.ServiceExportConfigReconciler{
+		PromotionKick:              reconcileKicker.Source(ha.GVKServiceExportConfig),
 		LeaderElector:              leaderElector,
 		Client:                     mgr.GetClient(),
 		Scheme:                     mgr.GetScheme(),
@@ -422,6 +433,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerSliceGatewayReconciler{
+		PromotionKick:             reconcileKicker.Source(ha.GVKWorkerSliceGateway),
 		LeaderElector:             leaderElector,
 		Client:                    mgr.GetClient(),
 		Scheme:                    mgr.GetScheme(),
@@ -433,6 +445,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerSliceConfigReconciler{
+		PromotionKick:      reconcileKicker.Source(ha.GVKWorkerSliceConfig),
 		LeaderElector:      leaderElector,
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
@@ -444,6 +457,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerServiceImportReconciler{
+		PromotionKick:              reconcileKicker.Source(ha.GVKWorkerServiceImport),
 		LeaderElector:              leaderElector,
 		Client:                     mgr.GetClient(),
 		Scheme:                     mgr.GetScheme(),
@@ -455,6 +469,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&controller.SliceQoSConfigReconciler{
+		PromotionKick:         reconcileKicker.Source(ha.GVKSliceQoSConfig),
 		LeaderElector:         leaderElector,
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
@@ -466,6 +481,7 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&controller.VpnKeyRotationReconciler{
+		PromotionKick:         reconcileKicker.Source(ha.GVKVpnKeyRotation),
 		LeaderElector:         leaderElector,
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
@@ -586,6 +602,7 @@ func initialize(services *service.Services) {
 					return fmt.Errorf("timed out waiting for the state mirror to stop: %w", promoteCtx.Err())
 				}
 			},
+			KickReconcilers: reconcileKicker.Kick,
 			PublishActiveController: func(promoteCtx context.Context) error {
 				if activePublisher == nil {
 					return nil

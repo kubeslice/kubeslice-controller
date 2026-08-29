@@ -28,12 +28,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
 )
 
 // SliceQoSConfigReconciler reconciles a SliceQoSConfig object
 type SliceQoSConfigReconciler struct {
+	// PromotionKick, when set, delivers one event per existing object after a
+	// promotion. The HA write fence drops reconcile requests rather than
+	// requeuing them, so flipping it reconciles nothing that already existed;
+	// this is what wakes that state up. Nil outside HA, which registers no
+	// extra watch and leaves behaviour unchanged.
+	PromotionKick <-chan event.GenericEvent
 	client.Client
 	Scheme                *runtime.Scheme
 	SliceQoSConfigService service.ISliceQoSConfigService
@@ -46,9 +55,15 @@ type SliceQoSConfigReconciler struct {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SliceQoSConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&controllerv1alpha1.SliceQoSConfig{}).
-		Complete(r)
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&controllerv1alpha1.SliceQoSConfig{})
+	// Registered only when set. source.Channel rejects a nil channel when the
+	// manager starts it, so an unconditional watch would break every caller that
+	// does not wire the kick — the envtest suite among them.
+	if r.PromotionKick != nil {
+		b = b.WatchesRawSource(source.Channel(r.PromotionKick, &handler.EnqueueRequestForObject{}))
+	}
+	return b.Complete(r)
 }
 
 // Reconcile is a function to reconcile the qos_profile, SliceQoSConfigReconciler implements it
