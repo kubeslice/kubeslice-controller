@@ -539,3 +539,39 @@ events:
     type: Warning
     reportingController: controller
     message: Warning - Certificate Creation job Failed
+  - name: HAMirrorSyncFailed
+    reason: HAMirrorSyncFailed
+    action: HAMirrorSync
+    type: Warning
+    reportingController: controller
+    message: Failed to mirror a resource from the Active hub onto the Standby; the syncer will retry.
+  - name: HAPromotedToActive
+    reason: PromotedToActive
+    action: HAPromotion
+    type: Normal
+    reportingController: controller
+    message: This hub was promoted from Standby to Active after the previous Active hub's lease went stale.
+  - name: HABecameActive
+    reason: BecameActive
+    action: HAStartup
+    type: Normal
+    reportingController: controller
+    message: This hub started in Active mode and will hold the HA lease and reconcile.
+  - name: HABecameStandby
+    reason: BecameStandby
+    action: HAStartup
+    type: Normal
+    reportingController: controller
+    message: This hub started in Standby mode; it mirrors the Active hub's state and does not reconcile.
+  - name: HALeadershipLost
+    reason: LeadershipLost
+    action: HALeaseRenewal
+    type: Warning
+    reportingController: controller
+    message: This hub failed to renew its HA lease within the renew deadline and has released leadership; it will not reconcile until it renews again.
+  - name: HAPromotionAborted
+    reason: PromotionAborted
+    action: HAPromotion
+    type: Warning
+    reportingController: controller
+    message: A promotion was considered and refused; see ha_promotions_aborted_total and the controller logs for which guard fired.

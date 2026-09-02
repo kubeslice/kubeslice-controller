@@ -17,11 +17,14 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
+
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -42,9 +45,13 @@ import (
 	"github.com/kubeslice/kubeslice-controller/controllers/controller"
 	"github.com/kubeslice/kubeslice-controller/controllers/worker"
 	"github.com/kubeslice/kubeslice-controller/metrics"
+	"github.com/kubeslice/kubeslice-controller/pkg/ha"
 	"github.com/kubeslice/kubeslice-controller/service"
 	"github.com/kubeslice/kubeslice-controller/util"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	//+kubebuilder:scaffold:imports
 )
@@ -110,6 +117,20 @@ func initialize(services *service.Services) {
 	var jobServiceAccount string
 	// get prometheus endpoint from environment
 	var prometheusServiceEndpoint string
+	// HA (Active/Standby cross-cluster) configuration — see ADR #293 / issue #294
+	var haMode string
+	var haIdentity string
+	var haActiveKubeconfig string
+	var haLeaseNamespace string
+	var haLeaseDuration time.Duration
+	var haRenewDeadline time.Duration
+	var haRetryPeriod time.Duration
+	var haPaddingSeconds time.Duration
+	var haSyncWorkers int
+	var haSyncInterval time.Duration
+	var haSelfCABundlePath string
+	var haPromotionDialTimeout time.Duration
+	var haPromotionGracePeriod time.Duration
 
 	flag.StringVar(&rbacResourcePrefix, "rbac-resource-prefix", service.RbacResourcePrefix, "RBAC resource prefix")
 	flag.StringVar(&projectNameSpacePrefixFromCustomer, "project-namespace-prefix", service.ProjectNamespacePrefix, fmt.Sprintf("Overrides the default %s kubeslice namespace", service.ProjectNamespacePrefix))
@@ -137,6 +158,21 @@ func initialize(services *service.Services) {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
+	// Cross-cluster HA flags. --ha-mode=standalone (default) preserves today's behaviour.
+	flag.StringVar(&haMode, "ha-mode", "standalone", `Cross-cluster HA mode: "active", "standby", or "standalone" (default).`)
+	flag.StringVar(&haIdentity, "ha-identity", "", "Stable per-hub identity recorded in the Lease and published in status.activeController. Defaults to the hostname, which under a Deployment is the pod name and changes on every restart, so pin it in active/standby mode.")
+	flag.StringVar(&haActiveKubeconfig, "ha-active-kubeconfig", "", "Path to the Active hub kubeconfig; required in standby mode.")
+	flag.StringVar(&haLeaseNamespace, "ha-lease-namespace", os.Getenv("KUBESLICE_CONTROLLER_MANAGER_NAMESPACE"), "Namespace for the HA Lease; defaults to the controller's own namespace (KUBESLICE_CONTROLLER_MANAGER_NAMESPACE), where the leader-election Role grants leases. Empty falls back to the pkg/ha default.")
+	flag.DurationVar(&haLeaseDuration, "ha-lease-duration", ha.DefaultLeaseDuration, "HA Lease duration.")
+	flag.DurationVar(&haRenewDeadline, "ha-renew-deadline", ha.DefaultRenewDeadline, "Deadline for the Active to renew its Lease before releasing leadership.")
+	flag.DurationVar(&haRetryPeriod, "ha-retry-period", ha.DefaultRetryPeriod, "Interval between Lease renew/watch attempts.")
+	flag.DurationVar(&haPaddingSeconds, "ha-padding-seconds", ha.DefaultPaddingSeconds, "Extra buffer a Standby waits before treating the Active Lease as stale.")
+	flag.IntVar(&haSyncWorkers, "ha-sync-workers", ha.DefaultSyncWorkers, "Number of workers draining the Standby's remote-mirror workqueue.")
+	flag.DurationVar(&haSyncInterval, "ha-sync-interval", ha.DefaultPruneInterval, "How often the Standby reconciles drift against the Active hub: it prunes mirrors whose original is gone, and re-enqueues Active-side objects it holds no mirror of.")
+	flag.DurationVar(&haPromotionDialTimeout, "ha-promotion-dial-timeout", ha.DefaultPromotionDialTimeout, "Bound on every read a Standby makes of a Lease over the network: each periodic poll of the Active's Lease, its own self-health check, and the final dial. Unbounded, an API server that accepts the connection and then stops answering blocks the watch loop and stalls detection entirely.")
+	flag.DurationVar(&haPromotionGracePeriod, "ha-promotion-grace-period", ha.DefaultPromotionGracePeriod, "Bound on each step of the promotion sequence that waits on another component: stopping the mirror, publishing status.activeController, re-enqueuing objects, and emitting the event. A sequencing budget, unrelated to --ha-padding-seconds.")
+	flag.StringVar(&haSelfCABundlePath, "ha-self-ca-bundle-path", ha.DefaultSelfCABundlePath, "Path to this hub's own API server CA, published in status.activeController.caBundle. Unreadable is not fatal; publication continues without it.")
 
 	flag.Parse()
 
@@ -278,8 +314,114 @@ func initialize(services *service.Services) {
 	})
 	// setting up metrics collector
 	go metrics.StartMetricsCollector(service.MetricPort, true)
+
+	// Set up cross-cluster HA leader election (ADR #293 / issue #294). In
+	// standalone mode (the default) the elector is always the leader, so the
+	// reconciler write-fence is a no-op and behaviour is unchanged.
+	// Rejected rather than coerced: a mistyped mode that silently became
+	// standalone would start a second unconditionally-unfenced writer against
+	// the same worker clusters as the real Active.
+	haRunMode, err := ha.ParseHAModeStrict(haMode)
+	if err != nil {
+		setupLog.Error(err, "invalid HA configuration")
+		os.Exit(1)
+	}
+	localHAClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to build HA local client")
+		os.Exit(1)
+	}
+	haOpts := ha.Options{
+		Mode:                 haRunMode,
+		Identity:             haIdentity,
+		LeaseNamespace:       haLeaseNamespace,
+		LeaseDuration:        haLeaseDuration,
+		RenewDeadline:        haRenewDeadline,
+		RetryPeriod:          haRetryPeriod,
+		PaddingSeconds:       haPaddingSeconds,
+		PromotionDialTimeout: haPromotionDialTimeout,
+		PromotionGracePeriod: haPromotionGracePeriod,
+		EventRecorder:        eventRecorder,
+		Log:                  controllerLog.With("name", "ha"),
+	}
+
+	// A hub that promoted at runtime still carries --ha-mode=standby, because
+	// promotion does not rewrite its Deployment. Ask the Lease whether this hub
+	// is already the Active before believing the flag; see ha.ResumeAsActive for
+	// why the Lease is the right authority and why it only overrides the flag in
+	// the unambiguous case. Bounded by the same timeout as every other Lease
+	// read over a network — this one is local, but start-up must not hang on an
+	// API server that accepts the connection and then stops answering.
+	if haRunMode == ha.ModeStandby {
+		resumeCtx, cancelResume := context.WithTimeout(context.Background(), haPromotionDialTimeout)
+		resume, reason, resumeErr := ha.ResumeAsActive(resumeCtx, localHAClient, haOpts)
+		cancelResume()
+		switch {
+		case resumeErr != nil:
+			// Not fatal, and deliberately not treated as "so start as standby":
+			// the configured mode still applies, and the operator gets told the
+			// check was inconclusive rather than silently getting either answer.
+			setupLog.Error(resumeErr, "could not determine whether this hub is already the Active; starting in the configured mode",
+				"mode", haRunMode)
+		case resume:
+			setupLog.Info("configured as standby, but this hub is already the Active; resuming as active",
+				"reason", reason, "identity", haIdentity)
+			haRunMode = ha.ModeActive
+			haOpts.Mode = haRunMode
+		default:
+			setupLog.Info("starting as standby", "reason", reason)
+		}
+	}
+
+	var remoteHAClient client.Client
+	var remoteHACfg *rest.Config
+	if haRunMode == ha.ModeStandby {
+		if haActiveKubeconfig == "" {
+			setupLog.Error(fmt.Errorf("missing --ha-active-kubeconfig"), "standby mode requires the Active hub kubeconfig")
+			os.Exit(1)
+		}
+		var cfgErr error
+		remoteHACfg, cfgErr = clientcmd.BuildConfigFromFlags("", haActiveKubeconfig)
+		if cfgErr != nil {
+			setupLog.Error(cfgErr, "unable to load Active hub kubeconfig", "path", haActiveKubeconfig)
+			os.Exit(1)
+		}
+		remoteHAClient, cfgErr = client.New(remoteHACfg, client.Options{Scheme: scheme})
+		if cfgErr != nil {
+			setupLog.Error(cfgErr, "unable to build remote client for Active hub")
+			os.Exit(1)
+		}
+	}
+	leaderElector := ha.NewClusterLeaderElector(localHAClient, remoteHAClient, haOpts)
+	setupLog.Info("high availability configured", "mode", haRunMode, "identity", leaderElector.Identity())
+
+	// RemoteSyncer mirrors CRDMirrorSet from the Active hub onto this
+	// cluster; a no-op in any mode other than standby (issue #295). Reuses
+	// the same remote config and local client the elector above already
+	// built rather than loading the kubeconfig twice.
+	remoteSyncer, err := ha.NewRemoteSyncer(localHAClient, remoteHACfg, scheme, haRunMode, ha.RemoteSyncerOptions{
+		Resources:     ha.FullMirrorSet(),
+		Workers:       haSyncWorkers,
+		PruneInterval: haSyncInterval,
+		EventRecorder: eventRecorder,
+		Log:           controllerLog.With("name", "ha-remote-syncer"),
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to build HA remote syncer")
+		os.Exit(1)
+	}
+
+	// One channel per reconciled type, delivered to each controller below and
+	// filled once on promotion. Built unconditionally: outside HA the kick
+	// simply never fires, and wiring it here keeps the reconcilers identical in
+	// both modes.
+	reconcileKicker := ha.NewReconcileKicker(mgr.GetClient(), ha.ReconciledGVKs(),
+		controllerLog.With("name", "ha-reconcile-kicker"))
+
 	// initialize controller with Project Kind
 	if err = (&controller.ProjectReconciler{
+		PromotionKick:  reconcileKicker.Source(ha.GVKProject),
+		LeaderElector:  leaderElector,
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		Log:            controllerLog.With("name", "Project"),
@@ -291,6 +433,8 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with Cluster Kind
 	if err = (&controller.ClusterReconciler{
+		PromotionKick:  reconcileKicker.Source(ha.GVKCluster),
+		LeaderElector:  leaderElector,
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		Log:            controllerLog.With("name", "Cluster"),
@@ -302,6 +446,8 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with SliceConfig Kind
 	if err = (&controller.SliceConfigReconciler{
+		PromotionKick:      reconcileKicker.Source(ha.GVKSliceConfig),
+		LeaderElector:      leaderElector,
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
 		Log:                controllerLog.With("name", "SliceConfig"),
@@ -313,6 +459,8 @@ func initialize(services *service.Services) {
 	}
 	// initialize controller with ServiceExportConfig Kind
 	if err = (&controller.ServiceExportConfigReconciler{
+		PromotionKick:              reconcileKicker.Source(ha.GVKServiceExportConfig),
+		LeaderElector:              leaderElector,
 		Client:                     mgr.GetClient(),
 		Scheme:                     mgr.GetScheme(),
 		Log:                        controllerLog.With("name", "ServiceExportConfig"),
@@ -323,6 +471,8 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerSliceGatewayReconciler{
+		PromotionKick:             reconcileKicker.Source(ha.GVKWorkerSliceGateway),
+		LeaderElector:             leaderElector,
 		Client:                    mgr.GetClient(),
 		Scheme:                    mgr.GetScheme(),
 		Log:                       controllerLog.With("name", "WorkerSliceGateway"),
@@ -333,6 +483,8 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerSliceConfigReconciler{
+		PromotionKick:      reconcileKicker.Source(ha.GVKWorkerSliceConfig),
+		LeaderElector:      leaderElector,
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
 		Log:                controllerLog.With("name", "WorkerSliceConfig"),
@@ -343,6 +495,8 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&worker.WorkerServiceImportReconciler{
+		PromotionKick:              reconcileKicker.Source(ha.GVKWorkerServiceImport),
+		LeaderElector:              leaderElector,
 		Client:                     mgr.GetClient(),
 		Scheme:                     mgr.GetScheme(),
 		Log:                        controllerLog.With("name", "WorkerServiceImport"),
@@ -353,6 +507,8 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&controller.SliceQoSConfigReconciler{
+		PromotionKick:         reconcileKicker.Source(ha.GVKSliceQoSConfig),
+		LeaderElector:         leaderElector,
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
 		Log:                   controllerLog.With("name", "SliceQoSConfig"),
@@ -363,6 +519,8 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 	if err = (&controller.VpnKeyRotationReconciler{
+		PromotionKick:         reconcileKicker.Source(ha.GVKVpnKeyRotation),
+		LeaderElector:         leaderElector,
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
 		Log:                   controllerLog.With("name", "VpnKeyRotationConfig"),
@@ -419,8 +577,95 @@ func initialize(services *service.Services) {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
+	// Publish status.activeController for as long as this hub holds leadership
+	// (ADR #293 Decision 7), so workers can identify the Active by watching both
+	// hubs. Deliberately not started in standalone mode: a non-HA deployment must
+	// leave the field absent, which is what keeps an existing worker's behaviour
+	// unchanged. A Standby starts it too — the publisher no-ops while it is not
+	// the leader, so promotion needs no extra wiring here.
+	var activePublisher *ha.ActivePublisher
+	if haRunMode != ha.ModeStandalone {
+		activePublisher = ha.NewActivePublisher(localHAClient, leaderElector, ha.ActivePublisherOptions{
+			Endpoint:     controllerEndpoint,
+			CABundlePath: haSelfCABundlePath,
+			Log:          controllerLog.With("name", "ha-active-publisher"),
+		})
+		go func() {
+			if err := activePublisher.Start(ctx); err != nil {
+				setupLog.Error(err, "HA activeController publisher exited")
+			}
+		}()
+	}
+
+	// BecameActive / BecameStandby (issue #298). Emitted here rather than beside
+	// the elector's construction for two reasons: ctx does not exist until
+	// SetupSignalHandler above, and recording an Event is an API-server write that
+	// building an elector should not perform — every unit test constructs one. A
+	// no-op in standalone mode and whenever no recorder is configured.
+	leaderElector.EmitStartupModeEvent(ctx)
+
+	// Start the HA background loop for the configured mode. Standalone starts
+	// nothing (it is always the leader).
+	switch haRunMode {
+	case ha.ModeActive:
+		go func() {
+			if err := leaderElector.StartLeaseRenewal(ctx); err != nil {
+				setupLog.Error(err, "HA lease renewal loop exited")
+			}
+		}()
+	case ha.ModeStandby:
+		// The syncer gets its own cancellable context so promotion can stop the
+		// mirror without tearing down everything else that hangs off ctx.
+		syncerCtx, stopSyncer := context.WithCancel(ctx)
+		syncerDone := make(chan struct{})
+		go func() {
+			defer close(syncerDone)
+			if err := remoteSyncer.Start(syncerCtx); err != nil {
+				setupLog.Error(err, "HA remote syncer exited")
+			}
+		}()
+
+		// Promotion's effects outside the elector (issue #297). Wired here rather
+		// than at construction because the syncer, the publisher and the manager
+		// are all built after the elector.
+		leaderElector.SetPromotionHooks(ha.PromotionHooks{
+			// Cancel the mirror and WAIT for it to confirm it has stopped. The
+			// wait is the point: RemoteSyncer.Start already drains its workqueue
+			// and prune goroutine before returning, so returning from it is a
+			// sufficient and already-correct barrier. Without the wait, a hub can
+			// open its write fence while the mirror is still writing — and in the
+			// most common failover trigger (the Active's pod dies, its API server
+			// does not) the mirror is very much still alive at that moment.
+			StopMirror: func(promoteCtx context.Context) error {
+				stopSyncer()
+				select {
+				case <-syncerDone:
+					return nil
+				case <-promoteCtx.Done():
+					return fmt.Errorf("timed out waiting for the state mirror to stop: %w", promoteCtx.Err())
+				}
+			},
+			KickReconcilers: reconcileKicker.Kick,
+			PublishActiveController: func(promoteCtx context.Context) error {
+				if activePublisher == nil {
+					return nil
+				}
+				return activePublisher.PublishOnce(promoteCtx)
+			},
+			EmitPromotedEvent: ha.PromotedToActiveEmitter(eventRecorder),
+		})
+
+		go func() {
+			if err := leaderElector.WatchRemoteLease(ctx); err != nil {
+				setupLog.Error(err, "HA remote lease watch loop exited")
+			}
+		}()
+	}
+
 	setupLog.Info("starting manager")
-	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
@@ -438,8 +683,13 @@ func initialize(services *service.Services) {
 
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create;update;patch;delete;escalate
+//+kubebuilder:rbac:groups="",resources=namespaces/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=create;get;list;watch;escalate;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;escalate;update;patch;create
 //+kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings;roles;clusterroles,verbs=get;list;watch;create;update;patch;delete
+
+// NOTE: the HA leader-election Lease lives in the controller's own namespace and
+// reuses the existing leader-election Role's coordination.k8s.io/leases grant
+// (config/rbac/leader_election_role.yaml); no dedicated RBAC marker is needed.

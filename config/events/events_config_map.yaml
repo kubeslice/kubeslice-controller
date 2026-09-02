@@ -97,3 +97,9 @@ data:
       - CertificatesRenewNow
       - IllegalVPNKeyRotationConfigDelete
       - CertificateJobFailed
+      - HAMirrorSyncFailed
+      - HAPromotedToActive
+      - HABecameActive
+      - HABecameStandby
+      - HALeadershipLost
+      - HAPromotionAborted

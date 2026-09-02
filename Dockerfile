@@ -23,6 +23,7 @@ COPY util/ util/
 COPY events/ events/
 COPY metrics/ metrics/
 COPY cleanup/ cleanup/
+COPY pkg/ pkg/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -o manager main.go

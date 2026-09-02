@@ -427,11 +427,45 @@ func (a *AccessControlService) createOrUpdateServiceAccountsAndRoleBindings(ctx 
 					"object_kind": metricKindServiceAccount,
 				},
 			)
+		}
+
+		// The token Secret's existence is checked independently of the
+		// ServiceAccount's, and must stay that way. Creating it only inside the
+		// branch above assumes the two are always absent together, which is true
+		// when this routine created both — and false as soon as a ServiceAccount
+		// arrives by any other means. A cross-cluster HA Standby is the case that
+		// exposes it: the state mirror copies ServiceAccounts, and copies their
+		// token Secrets only as empty shells — a token signed by one cluster is
+		// invalid on another, so the value never crosses and each cluster's own
+		// token controller fills its own copy in. A promoted hub that finds the
+		// account present would skip the branch, never mint a token, and then
+		// fail every reconcile of every registered cluster on the missing Secret.
+		// The requeue guard in ClusterService.ReconcileCluster does not catch it
+		// either, because the ServiceAccount is built with its Secrets reference
+		// already populated and therefore claims a Secret that does not exist.
+		//
+		// This is behaviour-neutral on a hub that has only ever created its own
+		// accounts, where the Secret is always present whenever the account is,
+		// and on a promoted Standby that mirrored the shell — the check below
+		// simply finds it. It remains the recovery path for the cases the mirror
+		// cannot cover: a hub promoted before shell mirroring existed, and any
+		// cluster whose token Secret was deleted by hand.
+		secretNamespacedName := client.ObjectKey{
+			Namespace: namespace,
+			Name:      serviceAccountNamespacedName.Name,
+		}
+		foundSecret, err := util.GetResourceIfExist(ctx, secretNamespacedName, &corev1.Secret{})
+		if err != nil {
+			logger.With(zap.Error(err)).Errorw("could not fetch the service account's token Secret",
+				"namespace", secretNamespacedName.Namespace, "name", secretNamespacedName.Name)
+			return ctrl.Result{}, err
+		}
+		if !foundSecret {
 			// create secret for the service account
 			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        expectedServiceAccount.Name,
-					Annotations: map[string]string{"kubernetes.io/service-account.name": expectedServiceAccount.Name},
+					Name:        serviceAccountNamespacedName.Name,
+					Annotations: map[string]string{"kubernetes.io/service-account.name": serviceAccountNamespacedName.Name},
 					Namespace:   namespace,
 				},
 				Type: "kubernetes.io/service-account-token",

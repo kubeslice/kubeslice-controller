@@ -734,6 +734,54 @@ var EventsMap = map[events.EventName]*events.EventSchema{
 		ReportingController: "controller",
 		Message:             "Warning - Certificate Creation job Failed",
 	},
+	"HAMirrorSyncFailed": {
+		Name:                "HAMirrorSyncFailed",
+		Reason:              "HAMirrorSyncFailed",
+		Action:              "HAMirrorSync",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "Failed to mirror a resource from the Active hub onto the Standby; the syncer will retry.",
+	},
+	"HAPromotedToActive": {
+		Name:                "HAPromotedToActive",
+		Reason:              "PromotedToActive",
+		Action:              "HAPromotion",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "This hub was promoted from Standby to Active after the previous Active hub's lease went stale.",
+	},
+	"HABecameActive": {
+		Name:                "HABecameActive",
+		Reason:              "BecameActive",
+		Action:              "HAStartup",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "This hub started in Active mode and will hold the HA lease and reconcile.",
+	},
+	"HABecameStandby": {
+		Name:                "HABecameStandby",
+		Reason:              "BecameStandby",
+		Action:              "HAStartup",
+		Type:                events.EventTypeNormal,
+		ReportingController: "controller",
+		Message:             "This hub started in Standby mode; it mirrors the Active hub's state and does not reconcile.",
+	},
+	"HALeadershipLost": {
+		Name:                "HALeadershipLost",
+		Reason:              "LeadershipLost",
+		Action:              "HALeaseRenewal",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "This hub failed to renew its HA lease within the renew deadline and has released leadership; it will not reconcile until it renews again.",
+	},
+	"HAPromotionAborted": {
+		Name:                "HAPromotionAborted",
+		Reason:              "PromotionAborted",
+		Action:              "HAPromotion",
+		Type:                events.EventTypeWarning,
+		ReportingController: "controller",
+		Message:             "A promotion was considered and refused; see ha_promotions_aborted_total and the controller logs for which guard fired.",
+	},
 }
 
 var (
@@ -826,4 +874,10 @@ var (
 	EventCertificatesRenewNow                 events.EventName = "CertificatesRenewNow"
 	EventIllegalVPNKeyRotationConfigDelete    events.EventName = "IllegalVPNKeyRotationConfigDelete"
 	EventCertificateJobFailed                 events.EventName = "CertificateJobFailed"
+	EventHAMirrorSyncFailed                   events.EventName = "HAMirrorSyncFailed"
+	EventHAPromotedToActive                   events.EventName = "HAPromotedToActive"
+	EventHABecameActive                       events.EventName = "HABecameActive"
+	EventHABecameStandby                      events.EventName = "HABecameStandby"
+	EventHALeadershipLost                     events.EventName = "HALeadershipLost"
+	EventHAPromotionAborted                   events.EventName = "HAPromotionAborted"
 )
