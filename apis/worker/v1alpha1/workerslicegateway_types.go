@@ -41,6 +41,12 @@ type WorkerSliceGatewaySpec struct {
 	LocalGatewayConfig  SliceGatewayConfig `json:"localGatewayConfig,omitempty"`
 	RemoteGatewayConfig SliceGatewayConfig `json:"remoteGatewayConfig,omitempty"`
 	GatewayNumber       int                `json:"gatewayNumber,omitempty"`
+	// RouteEntireSliceSubnet, when true, tells the worker to route the whole
+	// slice subnet (not just the peer gateway's subnet) via this gateway. The
+	// controller sets it on a spoke's gateway to the hub in HubAndSpoke topology,
+	// so a spoke forwards all slice-internal traffic (including traffic destined
+	// for other spokes) to the hub, which relays it.
+	RouteEntireSliceSubnet bool `json:"routeEntireSliceSubnet,omitempty"`
 }
 
 type SliceGatewayConfig struct {
@@ -61,9 +67,32 @@ type GatewayCredentials struct {
 }
 
 // WorkerSliceGatewayStatus defines the observed state of WorkerSliceGateway
+// Gateway connection states reported by the worker on WorkerSliceGatewayStatus.
+const (
+	// GatewayConnectionStateConnected means the gateway tunnel is up (at least
+	// one HA gateway pod reports its tunnel established).
+	GatewayConnectionStateConnected = "Connected"
+	// GatewayConnectionStateNotConnected means the tunnel is down (all gateway
+	// pods report their tunnel not established).
+	GatewayConnectionStateNotConnected = "NotConnected"
+	// GatewayConnectionStatePending means no connectivity has been reported yet
+	// (e.g. the gateway was just created). An empty ConnectionState is treated
+	// as Pending by the controller-side aggregation.
+	GatewayConnectionStatePending = "Pending"
+)
+
 type WorkerSliceGatewayStatus struct {
 	GatewayNumber         int `json:"gatewayNumber,omitempty"`
 	ClusterInsertionIndex int `json:"clusterInsertionIndex,omitempty"`
+	// ConnectionState is the connectivity state of this gateway link as reported
+	// by the worker: Connected, NotConnected or Pending. Empty means Pending.
+	ConnectionState string `json:"connectionState,omitempty"`
+	// LastTransitionTime is the time ConnectionState last changed.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a short, machine-readable reason for the current ConnectionState.
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable description of the current ConnectionState.
+	Message string `json:"message,omitempty"`
 }
 
 //+kubebuilder:object:root=true

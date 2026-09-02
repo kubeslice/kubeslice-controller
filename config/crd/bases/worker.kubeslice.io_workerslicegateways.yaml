@@ -123,16 +123,40 @@ spec:
                   vpnIp:
                     type: string
                 type: object
+              routeEntireSliceSubnet:
+                description: |-
+                  RouteEntireSliceSubnet, when true, tells the worker to route the whole
+                  slice subnet (not just the peer gateway's subnet) via this gateway. The
+                  controller sets it on a spoke's gateway to the hub in HubAndSpoke topology,
+                  so a spoke forwards all slice-internal traffic (including traffic destined
+                  for other spokes) to the hub, which relays it.
+                type: boolean
               sliceName:
                 type: string
             type: object
           status:
-            description: WorkerSliceGatewayStatus defines the observed state of WorkerSliceGateway
             properties:
               clusterInsertionIndex:
                 type: integer
+              connectionState:
+                description: |-
+                  ConnectionState is the connectivity state of this gateway link as reported
+                  by the worker: Connected, NotConnected or Pending. Empty means Pending.
+                type: string
               gatewayNumber:
                 type: integer
+              lastTransitionTime:
+                description: LastTransitionTime is the time ConnectionState last changed.
+                format: date-time
+                type: string
+              message:
+                description: Message is a human-readable description of the current
+                  ConnectionState.
+                type: string
+              reason:
+                description: Reason is a short, machine-readable reason for the current
+                  ConnectionState.
+                type: string
             type: object
         type: object
     served: true

@@ -83,6 +83,10 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-local: envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/controller/... -coverprofile cover.out
 
+.PHONY: test-e2e-hns
+test-e2e-hns: ## Run the Hub-and-Spoke (partial mesh) control-plane e2e suite against a real, disposable Kind cluster.
+	go test -tags e2e -v -timeout 20m ./test/e2e/...
+
 .PHONY: int-test
 int-test: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/controller/... -coverprofile cover.out

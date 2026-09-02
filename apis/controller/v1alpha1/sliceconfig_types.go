@@ -74,6 +74,31 @@ type SliceConfigSpec struct {
 	// RenewBefore is used for renew now!
 	RenewBefore *metav1.Time      `json:"renewBefore,omitempty"`
 	VPNConfig   *VPNConfiguration `json:"vpnConfig,omitempty"`
+	// Topology configures the inter-cluster connection topology for the slice.
+	// When absent, the slice uses full-mesh connectivity (existing behavior).
+	//+optional
+	Topology *TopologySpec `json:"topology,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=FullMesh;HubAndSpoke
+type TopologyMode string
+
+const (
+	TopologyModeFullMesh    TopologyMode = "FullMesh"
+	TopologyModeHubAndSpoke TopologyMode = "HubAndSpoke"
+)
+
+// TopologySpec defines the inter-cluster connection topology of the slice
+type TopologySpec struct {
+	// Mode selects the connection topology. Absent defaults to FullMesh.
+	//+optional
+	Mode TopologyMode `json:"mode,omitempty"`
+	// Hubs lists the clusters acting as hubs when Mode is HubAndSpoke.
+	// Each entry must be a member of spec.clusters. All non-hub members
+	// become spokes. Exactly one hub is supported in this release.
+	//+optional
+	//+kubebuilder:validation:MaxItems=1
+	Hubs []string `json:"hubs,omitempty"`
 }
 
 // ExternalGatewayConfig is the configuration for external gateways like 'istio', etc/
@@ -195,8 +220,28 @@ type KubesliceEvent struct {
 }
 
 // SliceConfigStatus defines the observed state of SliceConfig
+// Slice status condition types and reasons for topology convergence.
+const (
+	// SliceConditionTypeTopologyConverged reports whether every desired gateway
+	// link of the slice is Connected.
+	SliceConditionTypeTopologyConverged = "TopologyConverged"
+	// SliceReasonAllEdgesReady is set when all gateway links are Connected.
+	SliceReasonAllEdgesReady = "AllEdgesReady"
+	// SliceReasonEdgesNotReady is set when one or more gateway links are not Connected.
+	SliceReasonEdgesNotReady = "EdgesNotReady"
+	// SliceReasonNoGatewaysRequired is set when the slice needs no gateway links
+	// (single cluster or no-network mode) and is therefore trivially converged.
+	SliceReasonNoGatewaysRequired = "NoGatewaysRequired"
+)
+
 type SliceConfigStatus struct {
 	KubesliceEvents []KubesliceEvent `json:"kubesliceEvents,omitempty"`
+	// Conditions represent the latest available observations of the slice's
+	// topology state (e.g. TopologyConverged).
+	//+optional
+	//+listType=map
+	//+listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -28,7 +28,9 @@ import (
 	"github.com/kubeslice/kubeslice-controller/events"
 	"github.com/kubeslice/kubeslice-controller/util"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -186,8 +188,16 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	ownershipLabel := util.GetOwnerLabel(completeResourceName)
 
 	if sliceConfig.Spec.OverlayNetworkDeploymentMode == v1alpha1.NONET {
-		err = s.ms.CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name)
-		return ctrl.Result{}, err
+		if err = s.ms.CreateMinimalWorkerSliceConfigForNoNetworkSlice(ctx, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, sliceConfig.Name); err != nil {
+			return ctrl.Result{}, err
+		}
+		// A no-network slice has no gateway links, so its topology is trivially
+		// converged (TopologyConverged=True, reason NoGatewaysRequired). Reconcile
+		// it here since this path returns before Step 9.
+		if err := s.reconcileTopologyStatus(ctx, sliceConfig, req.Namespace, ownershipLabel); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// Step 4: Creation of worker slice Objects and Cluster Labels
@@ -204,7 +214,7 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	}
 
 	// Step 5: Create gateways with minimum specification
-	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap)
+	_, err = s.sgs.CreateMinimumWorkerSliceGateways(ctx, sliceConfig.Name, sliceConfig.Spec.Clusters, req.Namespace, ownershipLabel, clusterMap, sliceConfig.Spec.SliceSubnet, clusterCidr, sliceGwSvcTypeMap, sliceConfig.Spec.Topology)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -238,7 +248,48 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 		}
 	}
 
+	// Step 9: Aggregate per-gateway connectivity into the slice's TopologyConverged condition.
+	if err := s.reconcileTopologyStatus(ctx, sliceConfig, req.Namespace, ownershipLabel); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// reconcileTopologyStatus lists the slice's WorkerSliceGateway objects, aggregates
+// their connectivity into the TopologyConverged condition on SliceConfig.status,
+// and persists it only when the condition changed (so LastTransitionTime and the
+// status subresource are not churned on every reconcile).
+func (s *SliceConfigService) reconcileTopologyStatus(ctx context.Context, sliceConfig *v1alpha1.SliceConfig, namespace string, ownershipLabel map[string]string) error {
+	// The gateway list is read once outside the retry loop below. On a write
+	// conflict the retry reuses this snapshot, which is benign: any gateway
+	// connectivity change also enqueues a fresh SliceConfig reconcile (via the
+	// WorkerSliceGateway watch), so a slightly stale list self-corrects on the
+	// next pass rather than needing a re-list here.
+	gateways, err := s.sgs.ListWorkerSliceGateways(ctx, ownershipLabel, namespace)
+	if err != nil {
+		return err
+	}
+	condition := buildTopologyConvergedCondition(gateways, sliceConfig.Generation)
+	// The SliceConfig has already been mutated earlier in this reconcile (finalizer,
+	// labels), and the WorkerSliceGateway watch can drive concurrent reconciles, so
+	// the in-memory copy may be stale. Re-fetch the latest object and retry on a
+	// write conflict rather than failing the whole reconcile.
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest := &v1alpha1.SliceConfig{}
+		found, err := util.GetResourceIfExist(ctx, client.ObjectKey{Name: sliceConfig.Name, Namespace: namespace}, latest)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return nil
+		}
+		condition.ObservedGeneration = latest.Generation
+		if !apimeta.SetStatusCondition(&latest.Status.Conditions, condition) {
+			return nil
+		}
+		return util.UpdateStatus(ctx, latest)
+	})
 }
 
 // checkForProjectNamespace is a function to check the namespace is in proper format

@@ -30,6 +30,7 @@ import (
 
 	"github.com/dailymotion/allure-go"
 	controllerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/controller/v1alpha1"
+	workerv1alpha1 "github.com/kubeslice/kubeslice-controller/apis/worker/v1alpha1"
 	ossEvents "github.com/kubeslice/kubeslice-controller/events"
 
 	"github.com/kubeslice/kubeslice-controller/service/mocks"
@@ -80,6 +81,26 @@ var SliceConfigTestBed = map[string]func(*testing.T){
 	"SliceConfig_ErrorOnCreateOrUpdateServiceImport":             SliceConfigErrorOnCreateOrUpdateServiceImport,
 }
 
+// fakeStatusWriter is a minimal client.SubResourceWriter for tests that exercise
+// status subresource updates. It records the last object passed to Update so
+// callers may assert on the written status.
+type fakeStatusWriter struct {
+	updated client.Object
+}
+
+func (f *fakeStatusWriter) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+	return nil
+}
+
+func (f *fakeStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	f.updated = obj
+	return nil
+}
+
+func (f *fakeStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	return nil
+}
+
 func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 	workerSliceGatewayMock, workerSliceConfigMock, _, workerServiceImportMock, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
@@ -102,7 +123,7 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 	}
 
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
-	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{
 		"original-slice-name": sliceConfig.Name,
 	}
@@ -119,9 +140,12 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 		}
 	}).Once()
 	workerServiceImportMock.On("CreateMinimalWorkerServiceImport", ctx, sliceConfig.Spec.Clusters, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	// Step 9 (topology status aggregation): no gateways -> TopologyConverged is set
+	// for the first time, so the condition changes and the status is written.
+	workerSliceGatewayMock.On("ListWorkerSliceGateways", ctx, mock.Anything, requestObj.Namespace).Return([]workerv1alpha1.WorkerSliceGateway{}, nil).Once()
+	clientMock.On("Status").Return(&fakeStatusWriter{})
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -133,7 +157,7 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 }
 
 func SliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
-	_, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
+	workerSliceGatewayMock, workerSliceConfigMock, _, _, _, clientMock, sliceConfig, ctx, sliceConfigService, requestObj, mMock := setupSliceConfigTest("slice_config", "namespace")
 	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(2).(*controllerv1alpha1.SliceConfig)
@@ -153,15 +177,19 @@ func SliceConfigReconciliationNoNetCompleteHappyCase(t *testing.T) {
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil)
 
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfigForNoNetworkSlice", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything).Return(nil).Once()
+	// A no-network slice reconciles its TopologyConverged status (zero gateways ->
+	// True/NoGatewaysRequired), which lists gateways and writes the slice status.
+	workerSliceGatewayMock.On("ListWorkerSliceGateways", ctx, mock.Anything, requestObj.Namespace).Return([]workerv1alpha1.WorkerSliceGateway{}, nil).Once()
+	clientMock.On("Status").Return(&fakeStatusWriter{})
 
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
 	clientMock.AssertExpectations(t)
 	workerSliceConfigMock.AssertExpectations(t)
+	workerSliceGatewayMock.AssertExpectations(t)
 	mMock.AssertExpectations(t)
 }
 
@@ -184,7 +212,6 @@ func SliceConfigGetObjectErrorNotFound(t *testing.T) {
 	clientMock.On("Get", ctx, requestObj.NamespacedName, sliceConfig).Return(notFoundError).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err2)
 	require.False(t, result.Requeue)
@@ -212,7 +239,6 @@ func SliceConfigDeleteTheObjectHappyCase(t *testing.T) {
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -241,7 +267,6 @@ func SliceConfigObjectNamespaceNotFound(t *testing.T) {
 	}).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -266,7 +291,6 @@ func SliceConfigObjectNotInProjectNamespace(t *testing.T) {
 	}).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -286,7 +310,6 @@ func SliceConfigObjectWithDuplicateClustersInSpec(t *testing.T) {
 	}).Once()
 	result, err := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	require.False(t, result.Requeue)
@@ -350,7 +373,7 @@ func SliceConfigErrorOnCreateWorkerSliceGateway(t *testing.T) {
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
 	err1 := errors.New("internal_error")
-	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, err1).Once()
+	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, err1).Once()
 	result, err2 := sliceConfigService.ReconcileSliceConfig(ctx, requestObj)
 	expectedResult := ctrl.Result{}
 	require.Error(t, err2)
@@ -541,7 +564,6 @@ func SliceConfigDeleteHappyCase(t *testing.T) {
 	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := sliceConfigService.DeleteSliceConfigs(ctx, requestObj.Namespace)
 	expectedResult := ctrl.Result{}
-	require.NoError(t, nil)
 	require.Equal(t, expectedResult, result)
 	require.Nil(t, err)
 	clientMock.AssertExpectations(t)
@@ -626,7 +648,7 @@ func SliceConfigErrorOnListingServiceExport(t *testing.T) {
 	}
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
-	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{
 		"original-slice-name": sliceConfig.Name,
 	}
@@ -667,7 +689,7 @@ func SliceConfigErrorOnCreateOrUpdateServiceImport(t *testing.T) {
 
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 	workerSliceConfigMock.On("CreateMinimalWorkerSliceConfig", ctx, mock.Anything, requestObj.Namespace, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(clusterMap, nil).Once()
-	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
+	workerSliceGatewayMock.On("CreateMinimumWorkerSliceGateways", ctx, mock.Anything, mock.Anything, requestObj.Namespace, mock.Anything, clusterMap, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ctrl.Result{}, nil).Once()
 	label := map[string]string{
 		"original-slice-name": sliceConfig.Name,
 	}
