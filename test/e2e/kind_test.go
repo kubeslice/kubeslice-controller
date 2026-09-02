@@ -124,18 +124,23 @@ func kindLoadImage(t *testing.T, name, image string) {
 	runKind(t, "kind", "load", "image-archive", archive, "--name", full)
 }
 
-// waitFor polls cond until it returns true or the timeout elapses, matching
+// waitFor polls cond until it reports success or the timeout elapses, matching
 // the proven suite's own wait_for helper (lib.sh).
+//
+// Success requires both a true result and a nil error. Several conditions here
+// are written as `return x == want, err`, which yields (true, err) whenever the
+// comparison happens to hold on a read that also failed — accepting that would
+// let a test converge on a value it never actually managed to read.
 func waitFor(t *testing.T, desc string, timeout time.Duration, cond func() (bool, error)) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	for time.Now().Before(deadline) {
 		ok, err := cond()
-		if ok {
+		lastErr = err
+		if ok && err == nil {
 			return
 		}
-		lastErr = err
 		time.Sleep(2 * time.Second)
 	}
 	if lastErr != nil {
