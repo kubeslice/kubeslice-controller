@@ -12,7 +12,7 @@ fully tested end-to-end. WireGuard is **deferred** — see
 cannot come up yet (a pre-existing controller key-generation gap, outside this
 feature).
 
-The feature spans three repositories:
+The feature spans four repositories:
 
 | Repo | Role |
 |---|---|
