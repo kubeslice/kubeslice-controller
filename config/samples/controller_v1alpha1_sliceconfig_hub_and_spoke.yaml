@@ -3,11 +3,9 @@
 # worker-1 acts as the hub; worker-2 and worker-3 become spokes (all
 # non-hub members are spokes).
 #
-# Note: this sample exercises the API and validation only. As of this
-# release the controller does not yet consume spec.topology to change
-# gateway/peer link creation (that is follow-up implementation work);
-# the intended result once it does is hub<->spoke links only
-# (worker-1<->worker-2, worker-1<->worker-3) and no spoke<->spoke link.
+# The controller consumes spec.topology for this sample and creates
+# hub<->spoke links only: worker-1<->worker-2 and worker-1<->worker-3.
+# No spoke<->spoke link is created.
 #
 # Omitting spec.topology entirely (or setting mode: FullMesh with no
 # hubs) keeps the existing full-mesh behavior.
