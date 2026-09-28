@@ -124,7 +124,18 @@ func scenarioHubChangeNoStaleFlag(t *testing.T) {
 	run(t, "", "kubectl", "--context", kubeContext, "patch", "sliceconfig", sliceName,
 		"-n", projectNS, "--type=merge",
 		"-p", `{"spec":{"topology":{"mode":"HubAndSpoke","hubs":["worker-2"]}}}`)
-	time.Sleep(6 * time.Second)
+	// Wait for the hub=worker-2 topology to settle before switching back, rather
+	// than sleeping a fixed interval: worker-1 is now a spoke, so its client side
+	// must carry the flag and worker-2's side must be a plain Server.
+	waitFor(t, "topology settles to hub=worker-2 before switching back", 60*time.Second, func() bool {
+		if gatewayCount(t) != 4 {
+			return false
+		}
+		host12, route12 := gatewayRow(t, gw("1", "2"))
+		host21, route21 := gatewayRow(t, gw("2", "1"))
+		return host12 == "Client" && route12 == "true" &&
+			host21 == "Server" && route21 == "<none>"
+	})
 	run(t, "", "kubectl", "--context", kubeContext, "patch", "sliceconfig", sliceName,
 		"-n", projectNS, "--type=merge",
 		"-p", `{"spec":{"topology":{"mode":"HubAndSpoke","hubs":["worker-1"]}}}`)
