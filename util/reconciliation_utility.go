@@ -19,7 +19,9 @@ package util
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -29,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -219,12 +222,60 @@ func ContainsString(strings []string, t string) bool {
 	return false
 }
 
-// GetOwnerLabel is a function returns the label of object
+const (
+	// ownerLabelDigestLength is the number of hex characters (128 bits of SHA-256) kept in a
+	// hashed owner label value.
+	ownerLabelDigestLength = 32
+	// ownerLabelPrefixLength is the readable part of a hashed owner label value:
+	// prefix + "_" + digest is at most 63 characters.
+	ownerLabelPrefixLength = validation.LabelValueMaxLength - 1 - ownerLabelDigestLength
+)
+
+// GetOwnerLabel is a function returns the label of object.
+//
+// A name of up to 63 characters is the label value. A longer name is split into 63-character
+// pieces (LabelManagedBy, LabelManagedBy-1, ...). A piece that is not a valid label value, for
+// example one that starts or ends with "-", makes the API server reject the object. Only in
+// that case a single hashed value replaces the pieces (see hashedOwnerLabelValue). No object
+// could be stored with the rejected pieces, so names that worked before keep their labels.
 func GetOwnerLabel(completeResourceName string) map[string]string {
-	label := map[string]string{}
+	label := splitOwnerLabel(completeResourceName)
+	for _, value := range label {
+		if len(validation.IsValidLabelValue(value)) != 0 {
+			label = map[string]string{LabelManagedBy: hashedOwnerLabelValue(completeResourceName)}
+			break
+		}
+	}
 	for key, value := range LabelsKubeSliceController {
 		label[key] = value
 	}
+	return label
+}
+
+// hashedOwnerLabelValue returns "<readable prefix>_<digest>", where the digest is the first
+// 128 bits of the SHA-256 of the complete name. Kubernetes object names and kinds cannot
+// contain "_", so the value cannot equal a piece produced by splitOwnerLabel.
+func hashedOwnerLabelValue(completeResourceName string) string {
+	sum := sha256.Sum256([]byte(completeResourceName))
+	digest := hex.EncodeToString(sum[:])[:ownerLabelDigestLength]
+	prefix := make([]byte, 0, ownerLabelPrefixLength)
+	for i := 0; i < len(completeResourceName) && len(prefix) < ownerLabelPrefixLength; i++ {
+		c := completeResourceName[i]
+		isAlphaNumeric := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+		// the value must start with an alphanumeric character
+		if isAlphaNumeric || (len(prefix) > 0 && (c == '-' || c == '.')) {
+			prefix = append(prefix, c)
+		}
+	}
+	if len(prefix) == 0 {
+		return digest
+	}
+	return string(prefix) + "_" + digest
+}
+
+// splitOwnerLabel splits the name into 63-character label values
+func splitOwnerLabel(completeResourceName string) map[string]string {
+	label := map[string]string{}
 	lenCompleteResourceName := len(completeResourceName)
 	i := 0
 	j := 0
