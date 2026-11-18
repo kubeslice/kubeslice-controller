@@ -231,6 +231,11 @@ func (s *SliceConfigService) ReconcileSliceConfig(ctx context.Context, req ctrl.
 	if len(serviceExports.Items) > 0 {
 		// iterate service export configs
 		for _, serviceExport := range serviceExports.Items {
+			// An export that is being deleted removes its own imports; creating them here
+			// again would leave imports without an export.
+			if !serviceExport.DeletionTimestamp.IsZero() {
+				continue
+			}
 			err = s.si.CreateMinimalWorkerServiceImport(ctx, sliceConfig.Spec.Clusters, req.Namespace, s.getOwnerLabelsForServiceExport(&serviceExport), serviceExport.Spec.ServiceName, serviceExport.Spec.ServiceNamespace, serviceExport.Spec.SliceName, serviceExport.Spec.Aliases)
 			if err != nil {
 				return ctrl.Result{}, err

@@ -51,6 +51,11 @@ type WorkerServiceImportService struct {
 	mf metrics.IMetricRecorder
 }
 
+// orphanWorkerServiceImportGracePeriod is how long a WorkerServiceImport may exist without a
+// ServiceExportConfig before it is removed. It covers the moment between the creation of an
+// import and the export showing up in a lookup.
+const orphanWorkerServiceImportGracePeriod = time.Minute
+
 // ReconcileWorkerServiceImport is a function to reconcile the service import for worker object
 func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Step 0: Get WorkerServiceImport resource
@@ -157,7 +162,28 @@ func (s *WorkerServiceImportService) ReconcileWorkerServiceImport(ctx context.Co
 	}
 	found = len(serviceExportList.Items) > 0
 	if !found {
-		logger.Infof("serviceExport %v not found, returning from  reconciler loop.", req.NamespacedName)
+		// No export backs this import. This happens when a SliceConfig reconcile re-creates the
+		// imports of an export that is being deleted at the same moment. Nothing else would
+		// remove such an import, and workers would keep a ServiceImport without endpoints.
+		age := time.Since(workerServiceImport.CreationTimestamp.Time)
+		if age < orphanWorkerServiceImportGracePeriod {
+			logger.Infof("serviceExport for %v not found, checking again before removing the import.", req.NamespacedName)
+			return ctrl.Result{RequeueAfter: orphanWorkerServiceImportGracePeriod - age}, nil
+		}
+		logger.Infof("serviceExport for %v not found, deleting the orphaned WorkerServiceImport.", req.NamespacedName)
+		if err = util.DeleteResource(ctx, workerServiceImport); err != nil {
+			util.RecordEvent(ctx, eventRecorder, workerServiceImport, nil, events.EventWorkerServiceImportDeletionFailed)
+			return ctrl.Result{}, err
+		}
+		util.RecordEvent(ctx, eventRecorder, workerServiceImport, nil, events.EventWorkerServiceImportDeleted)
+		s.mf.RecordCounterMetric(metrics.KubeSliceEventsCounter,
+			map[string]string{
+				"action":      "deleted",
+				"event":       string(events.EventWorkerServiceImportDeleted),
+				"object_name": workerServiceImport.Name,
+				"object_kind": metricKindWorkerServiceImport,
+			},
+		)
 		return ctrl.Result{}, nil
 	}
 	//add more fields

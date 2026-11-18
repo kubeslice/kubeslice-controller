@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 	"fmt"
 	"github.com/kubeslice/kubeslice-controller/metrics"
 	metricMock "github.com/kubeslice/kubeslice-controller/metrics/mocks"
@@ -57,6 +58,8 @@ var WorkerServiceImportServiceTestbed = map[string]func(*testing.T){
 	"TestReconcileWorkerServiceDeleteTheobjectHappyCase":                                   testReconcileWorkerServiceDeleteTheobjectHappyCase,
 	"TestReconcileWorkerServiceImportGetServiceExportListFail":                             testReconcileWorkerServiceImportGetServiceExportListFail,
 	"TestReconcileWorkerServiceImportGetServiceExportListEmpty":                            testReconcileWorkerServiceImportGetServiceExportListEmpty,
+	"TestReconcileWorkerServiceImportOrphanWithinGracePeriodIsKept":                        testReconcileWorkerServiceImportOrphanWithinGracePeriodIsKept,
+	"TestReconcileWorkerServiceImportOrphanDeleteFail":                                     testReconcileWorkerServiceImportOrphanDeleteFail,
 	"TestReconcileWorkerServiceImportHappyPath":                                            testReconcileWorkerServiceImportHappyPath,
 	"TestListWorkerServiceImportFail":                                                      testListWorkerServiceImportFail,
 	"TestDeleteWorkerServiceImportByLabelPass":                                             testDeleteWorkerServiceImportByLabelPass,
@@ -211,9 +214,69 @@ func testReconcileWorkerServiceImportGetServiceExportListEmpty(t *testing.T) {
 	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	clientMock.On("List", ctx, serviceExportList, client.InNamespace(requestObj.Namespace), client.MatchingLabels(labels)).Return(nil).Once()
+	// serviceExportList.Items = empty and the import is older than the grace period: it is an
+	// orphan and is deleted.
+	clientMock.On("Delete", ctx, mock.AnythingOfType("*v1alpha1.WorkerServiceImport")).Return(nil).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	mMock.On("RecordCounterMetric", mock.Anything, mock.Anything).Return().Once()
 	result, err := WorkerServiceImportServiceStruct.ReconcileWorkerServiceImport(ctx, requestObj)
-	require.False(t, result.Requeue) //serviceExportList.Items = empty
+	require.Equal(t, ctrl.Result{}, result)
 	require.Nil(t, err)
+	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
+}
+
+// A just created import without an export is not deleted yet: the lookup is repeated after the
+// grace period.
+func testReconcileWorkerServiceImportOrphanWithinGracePeriodIsKept(t *testing.T) {
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
+	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
+	requestObj := ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: "cisco", Name: "mysql-1"},
+	}
+	clientMock := &utilmock.Client{}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	clientMock.On("Get", ctx, requestObj.NamespacedName, workerServiceImport).Return(nil).Run(func(args mock.Arguments) {
+		arg := args.Get(2).(*workerv1alpha1.WorkerServiceImport)
+		arg.CreationTimestamp = kubemachine.Now()
+	}).Once()
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	clientMock.On("List", ctx, mock.AnythingOfType("*v1alpha1.ServiceExportConfigList"), mock.Anything, mock.Anything).Return(nil).Once()
+	result, err := WorkerServiceImportServiceStruct.ReconcileWorkerServiceImport(ctx, requestObj)
+	require.Nil(t, err)
+	require.Greater(t, result.RequeueAfter, time.Duration(0))
+	require.LessOrEqual(t, result.RequeueAfter, orphanWorkerServiceImportGracePeriod)
+	clientMock.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
+	clientMock.AssertExpectations(t)
+	mMock.AssertExpectations(t)
+}
+
+func testReconcileWorkerServiceImportOrphanDeleteFail(t *testing.T) {
+	mMock := &metricMock.IMetricRecorder{}
+	WorkerServiceImportServiceStruct := WorkerServiceImportService{
+		mf: mMock,
+	}
+	workerServiceImport := &workerv1alpha1.WorkerServiceImport{}
+	requestObj := ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: "cisco", Name: "mysql-1"},
+	}
+	clientMock := &utilmock.Client{}
+	mMock.On("WithProject", mock.AnythingOfType("string")).Return(&metrics.MetricRecorder{}).Once()
+	ctx := prepareTestContext(context.Background(), clientMock, nil)
+	clientMock.On("Get", ctx, requestObj.NamespacedName, workerServiceImport).Return(nil).Once()
+	clientMock.On("Update", ctx, mock.Anything).Return(nil).Once()
+	clientMock.On("Get", ctx, mock.Anything, mock.Anything).Return(nil).Once()
+	clientMock.On("List", ctx, mock.AnythingOfType("*v1alpha1.ServiceExportConfigList"), mock.Anything, mock.Anything).Return(nil).Once()
+	deleteErr := errors.New("delete failed")
+	clientMock.On("Delete", ctx, mock.AnythingOfType("*v1alpha1.WorkerServiceImport")).Return(deleteErr).Once()
+	clientMock.On("Create", ctx, mock.AnythingOfType("*v1.Event")).Return(nil).Once()
+	_, err := WorkerServiceImportServiceStruct.ReconcileWorkerServiceImport(ctx, requestObj)
+	require.Equal(t, deleteErr, err)
 	clientMock.AssertExpectations(t)
 	mMock.AssertExpectations(t)
 }

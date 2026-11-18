@@ -109,11 +109,21 @@ func SliceConfigReconciliationCompleteHappyCase(t *testing.T) {
 	serviceExportList := &controllerv1alpha1.ServiceExportConfigList{}
 	clientMock.On("List", ctx, serviceExportList, client.InNamespace(requestObj.Namespace), client.MatchingLabels(label)).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(1).(*controllerv1alpha1.ServiceExportConfigList)
+		deletedAt := metav1.Now()
 		arg.Items = []controllerv1alpha1.ServiceExportConfig{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "service-export-config-1",
 					Namespace: requestObj.Namespace,
+				},
+			},
+			// an export that is being deleted gets no imports: CreateMinimalWorkerServiceImport
+			// is expected once, for the export above
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "service-export-config-deleting",
+					Namespace:         requestObj.Namespace,
+					DeletionTimestamp: &deletedAt,
 				},
 			},
 		}
